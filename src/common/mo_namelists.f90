@@ -17,10 +17,6 @@ module mo_namelists
 
   implicit none
 
-  type, private :: nml_base
-    logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
-  end type nml_base
-
   !######## mo_common_read_config
 
   ! namelist /project_description/ &
@@ -34,8 +30,9 @@ module mo_namelists
   !
   !> \class   nml_project_description_t
   !> \brief   'project_description' namelist content
-  type, extends(nml_base), public :: nml_project_description_t
+  type, public :: nml_project_description_t
     character(19) :: name = "project_description" !< namelist name
+    logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
     character(1024) :: project_details !< project including funding instituion., PI, etc.
     character(1024) :: setup_description !< any specific description of simulation
     character(1024) :: simulation_type !< e.g. seasonal forecast, climate projection, ...
@@ -62,8 +59,9 @@ module mo_namelists
   !
   !> \class   nml_directories_general_t
   !> \brief   'directories_general' namelist content
-  type, extends(nml_base), public :: nml_directories_general_t
+  type, public :: nml_directories_general_t
     character(19) :: name = "directories_general" !< namelist name
+    logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
     character(256) :: dirConfigOut !< directory for config file output
     character(256) :: dirCommonFiles !< directory where common input files should be located
     character(256), dimension(maxNoDomains) :: mhm_file_RestartOut !< Directory where mhm output of restart is written
@@ -89,8 +87,9 @@ module mo_namelists
   !
   !> \class   nml_mainconfig_t
   !> \brief   'mainconfig' namelist content
-  type, extends(nml_base), public :: nml_mainconfig_t
+  type, public :: nml_mainconfig_t
     character(10) :: name = "mainconfig" !< namelist name
+    logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
     integer(i4) :: iFlag_cordinate_sys !< options model for the run cordinate system
     real(dp), dimension(maxNoDomains) :: resolution_Hydrology !< [m or degree] resolution of hydrology - Level 1
     integer(i4) :: nDomains !< number of domains
@@ -109,8 +108,9 @@ module mo_namelists
   !
   !> \class   nml_processselection_t
   !> \brief   'processSelection' namelist content
-  type, extends(nml_base), public :: nml_processselection_t
+  type, public :: nml_processselection_t
     character(16) :: name = "processSelection" !< namelist name
+    logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
     integer(i4), dimension(nProcesses) :: processCase !< ! Choosen process description number
   contains
     !> \copydoc mo_namelists::read_processselection
@@ -127,8 +127,9 @@ module mo_namelists
   !
   !> \class   nml_lcover_t
   !> \brief   'LCover' namelist content
-  type, extends(nml_base), public :: nml_lcover_t
+  type, public :: nml_lcover_t
     character(6) :: name = "LCover" !< namelist name
+    logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
     integer(i4) :: nLCoverScene !< Number of land cover scene (lcs)
     integer(i4), dimension(maxNLCovers) :: LCoverYearStart !< starting year LCover
     integer(i4), dimension(maxNLCovers) :: LCoverYearEnd !< ending year LCover
@@ -157,8 +158,9 @@ module mo_namelists
   !
   !> \class   nml_mainconfig_mhm_mrm_t
   !> \brief   'mainconfig_mhm_mrm' namelist content
-  type, extends(nml_base), public :: nml_mainconfig_mhm_mrm_t
+  type, public :: nml_mainconfig_mhm_mrm_t
     character(18) :: name = "mainconfig_mhm_mrm" !< namelist name
+    logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
     integer(i4) :: timeStep !< [h] simulation time step (= TS) in [h] either 1, 2, 3, 4, 6, 12 or 24
     real(dp), dimension(maxNoDomains) :: resolution_Routing !< resolution of Level-11 discharge routing [m or degree] per domain
     logical :: optimize !< Optimization (.true.) or Evaluation run (.false.)
@@ -190,8 +192,9 @@ module mo_namelists
   !
   !> \class   nml_optimization_t
   !> \brief   'Optimization' namelist content
-  type, extends(nml_base), public :: nml_Optimization_t
+  type, public :: nml_Optimization_t
     character(12) :: name = "Optimization" !< namelist name
+    logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
     integer(i4) :: nIterations !< number of iterations for optimization
     integer(i8) :: seed !< seed used for optimization, default: -9 --> system time
     real(dp) :: dds_r !< DDS: perturbation rate, default: 0.2
@@ -214,8 +217,9 @@ module mo_namelists
   !
   !> \class   nml_time_periods_t
   !> \brief   'time_periods' namelist content
-  type, extends(nml_base), public :: nml_time_periods_t
+  type, public :: nml_time_periods_t
     character(12) :: name = "time_periods" !< namelist name
+    logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
     integer(i4), dimension(maxNoDomains) :: warming_Days !< number of days for warm up period
     type(period), dimension(maxNoDomains) :: eval_Per !< time period for model evaluation
   contains
@@ -241,8 +245,9 @@ module mo_namelists
   !
   !> \class   nml_directories_mhm_t
   !> \brief   'directories_mHM' namelist content
-  type, extends(nml_base), public :: nml_directories_mHM_t
+  type, public :: nml_directories_mHM_t
     character(15) :: name = "directories_mHM" !< namelist name
+    logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
     character(256), public :: inputFormat_meteo_forcings !< format of meteo input data (nc)
     character(256), dimension(maxNoDomains) :: dir_Precipitation !< Directory where precipitation files are located
     character(256), dimension(maxNoDomains) :: dir_Temperature !< Directory where temperature files are located
@@ -274,8 +279,9 @@ module mo_namelists
   !
   !> \class   nml_optional_data_t
   !> \brief   'optional_data' namelist content
-  type, extends(nml_base), public :: nml_optional_data_t
+  type, public :: nml_optional_data_t
     character(13) :: name = "optional_data" !< namelist name
+    logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
     integer(i4) :: nSoilHorizons_sm_input !< No. of mhm soil horizons equivalent to sm input
     character(256), dimension(maxNoDomains) :: dir_soil_moisture !< soil moisture input
     character(256), dimension(maxNoDomains) :: dir_neutrons !< ground albedo neutron input
@@ -297,8 +303,9 @@ module mo_namelists
   !
   !> \class   nml_panevapo_t
   !> \brief   'panEvapo' namelist content
-  type, extends(nml_base), public :: nml_panEvapo_t
+  type, public :: nml_panEvapo_t
     character(8) :: name = "panEvapo" !< namelist name
+    logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
     real(dp), dimension(int(YearMonths, i4)) :: evap_coeff !< [-] Evap. coef. for free-water surfaces
   contains
     !> \copydoc mo_namelists::read_panEvapo
@@ -317,8 +324,9 @@ module mo_namelists
   !
   !> \class   nml_nightdayratio_t
   !> \brief   'nightDayRatio' namelist content
-  type, extends(nml_base), public :: nml_nightDayRatio_t
+  type, public :: nml_nightDayRatio_t
     character(18) :: name = "nightDayRatio" !< namelist name
+    logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
     logical :: read_meteo_weights !< read weights for meteo data
     real(dp), dimension(int(YearMonths, i4)) :: fnight_prec !< [-] Night ratio precipitation < 1
     real(dp), dimension(int(YearMonths, i4)) :: fnight_pet !< [-] Night ratio PET  < 1
@@ -340,8 +348,9 @@ module mo_namelists
   !
   !> \class   nml_nloutputresults_t
   !> \brief   'NLoutputResults' namelist content
-  type, extends(nml_base), public :: nml_NLoutputResults_t
+  type, public :: nml_NLoutputResults_t
     character(15) :: name = "NLoutputResults" !< namelist name
+    logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
     integer(i4) :: output_deflate_level !< deflate level in nc files
     logical :: output_double_precision !< output precision in nc files
     integer(i4) :: timeStep_model_outputs !< timestep for writing model outputs
@@ -359,8 +368,9 @@ module mo_namelists
   !
   !> \class   nml_bfi_inputs_t
   !> \brief   'BFI_inputs' namelist content
-  type, extends(nml_base), public :: nml_BFI_inputs_t
+  type, public :: nml_BFI_inputs_t
     character(18) :: name = "BFI_inputs" !< namelist name
+    logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
     logical :: BFI_calc !< calculate observed BFI from gauges with Eckhardt filter
     real(dp), dimension(maxNoDomains) :: BFI_obs !< given base-flow index per domain
 contains
@@ -376,8 +386,9 @@ contains
   !
   ! !> \class   nml_mainconfig_mhm_mrm_t
   ! !> \brief   'mainconfig_mhm_mrm' namelist content
-  ! type, extends(nml_base), public :: nml_mainconfig_mhm_mrm_t
+  ! type, public :: nml_mainconfig_mhm_mrm_t
   !   character(18) :: name = "mainconfig_mhm_mrm" !< namelist name
+  !   logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
   ! contains
   !   !> \copydoc mo_namelists::read_mainconfig_mhm_mrm
   !   procedure, public :: read => read_mainconfig_mhm_mrm !< \see mo_namelists::read_mainconfig_mhm_mrm
@@ -393,8 +404,9 @@ contains
   !
   ! !> \class   nml_mainconfig_mhm_mrm_t
   ! !> \brief   'mainconfig_mhm_mrm' namelist content
-  ! type, extends(nml_base), public :: nml_mainconfig_mhm_mrm_t
+  ! type, public :: nml_mainconfig_mhm_mrm_t
   !   character(18) :: name = "mainconfig_mhm_mrm" !< namelist name
+  !   logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
   ! contains
   !   !> \copydoc mo_namelists::read_mainconfig_mhm_mrm
   !   procedure, public :: read => read_mainconfig_mhm_mrm !< \see mo_namelists::read_mainconfig_mhm_mrm
@@ -408,8 +420,9 @@ contains
   !
   ! !> \class   nml_mainconfig_mhm_mrm_t
   ! !> \brief   'mainconfig_mhm_mrm' namelist content
-  ! type, extends(nml_base), public :: nml_mainconfig_mhm_mrm_t
+  ! type, public :: nml_mainconfig_mhm_mrm_t
   !   character(18) :: name = "mainconfig_mhm_mrm" !< namelist name
+  !   logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
   ! contains
   !   !> \copydoc mo_namelists::read_mainconfig_mhm_mrm
   !   procedure, public :: read => read_mainconfig_mhm_mrm !< \see mo_namelists::read_mainconfig_mhm_mrm
@@ -422,8 +435,9 @@ contains
   !
   ! !> \class   nml_mainconfig_mhm_mrm_t
   ! !> \brief   'mainconfig_mhm_mrm' namelist content
-  ! type, extends(nml_base), public :: nml_mainconfig_mhm_mrm_t
+  ! type, public :: nml_mainconfig_mhm_mrm_t
   !   character(18) :: name = "mainconfig_mhm_mrm" !< namelist name
+  !   logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
   ! contains
   !   !> \copydoc mo_namelists::read_mainconfig_mhm_mrm
   !   procedure, public :: read => read_mainconfig_mhm_mrm !< \see mo_namelists::read_mainconfig_mhm_mrm
@@ -436,8 +450,9 @@ contains
   !
   ! !> \class   nml_mainconfig_mhm_mrm_t
   ! !> \brief   'mainconfig_mhm_mrm' namelist content
-  ! type, extends(nml_base), public :: nml_mainconfig_mhm_mrm_t
+  ! type, public :: nml_mainconfig_mhm_mrm_t
   !   character(18) :: name = "mainconfig_mhm_mrm" !< namelist name
+  !   logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
   ! contains
   !   !> \copydoc mo_namelists::read_mainconfig_mhm_mrm
   !   procedure, public :: read => read_mainconfig_mhm_mrm !< \see mo_namelists::read_mainconfig_mhm_mrm
@@ -457,8 +472,9 @@ contains
   !
   ! !> \class   nml_mainconfig_mhm_mrm_t
   ! !> \brief   'mainconfig_mhm_mrm' namelist content
-  ! type, extends(nml_base), public :: nml_mainconfig_mhm_mrm_t
+  ! type, public :: nml_mainconfig_mhm_mrm_t
   !   character(18) :: name = "mainconfig_mhm_mrm" !< namelist name
+  !   logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
   ! contains
   !   !> \copydoc mo_namelists::read_mainconfig_mhm_mrm
   !   procedure, public :: read => read_mainconfig_mhm_mrm !< \see mo_namelists::read_mainconfig_mhm_mrm
@@ -487,8 +503,9 @@ contains
   !
   ! !> \class   nml_mainconfig_mhm_mrm_t
   ! !> \brief   'mainconfig_mhm_mrm' namelist content
-  ! type, extends(nml_base), public :: nml_mainconfig_mhm_mrm_t
+  ! type, public :: nml_mainconfig_mhm_mrm_t
   !   character(18) :: name = "mainconfig_mhm_mrm" !< namelist name
+  !   logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
   ! contains
   !   !> \copydoc mo_namelists::read_mainconfig_mhm_mrm
   !   procedure, public :: read => read_mainconfig_mhm_mrm !< \see mo_namelists::read_mainconfig_mhm_mrm
@@ -518,8 +535,9 @@ contains
   !
   ! !> \class   nml_mainconfig_mhm_mrm_t
   ! !> \brief   'mainconfig_mhm_mrm' namelist content
-  ! type, extends(nml_base), public :: nml_mainconfig_mhm_mrm_t
+  ! type, public :: nml_mainconfig_mhm_mrm_t
   !   character(18) :: name = "mainconfig_mhm_mrm" !< namelist name
+  !   logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
   ! contains
   !   !> \copydoc mo_namelists::read_mainconfig_mhm_mrm
   !   procedure, public :: read => read_mainconfig_mhm_mrm !< \see mo_namelists::read_mainconfig_mhm_mrm
@@ -552,8 +570,9 @@ contains
   !
   ! !> \class   nml_mainconfig_mhm_mrm_t
   ! !> \brief   'mainconfig_mhm_mrm' namelist content
-  ! type, extends(nml_base), public :: nml_mainconfig_mhm_mrm_t
+  ! type, public :: nml_mainconfig_mhm_mrm_t
   !   character(18) :: name = "mainconfig_mhm_mrm" !< namelist name
+  !   logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
   ! contains
   !   !> \copydoc mo_namelists::read_mainconfig_mhm_mrm
   !   procedure, public :: read => read_mainconfig_mhm_mrm !< \see mo_namelists::read_mainconfig_mhm_mrm
@@ -585,8 +604,9 @@ contains
   !
   ! !> \class   nml_mainconfig_mhm_mrm_t
   ! !> \brief   'mainconfig_mhm_mrm' namelist content
-  ! type, extends(nml_base), public :: nml_mainconfig_mhm_mrm_t
+  ! type, public :: nml_mainconfig_mhm_mrm_t
   !   character(18) :: name = "mainconfig_mhm_mrm" !< namelist name
+  !   logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
   ! contains
   !   !> \copydoc mo_namelists::read_mainconfig_mhm_mrm
   !   procedure, public :: read => read_mainconfig_mhm_mrm !< \see mo_namelists::read_mainconfig_mhm_mrm
@@ -599,8 +619,9 @@ contains
   !
   ! !> \class   nml_mainconfig_mhm_mrm_t
   ! !> \brief   'mainconfig_mhm_mrm' namelist content
-  ! type, extends(nml_base), public :: nml_mainconfig_mhm_mrm_t
+  ! type, public :: nml_mainconfig_mhm_mrm_t
   !   character(18) :: name = "mainconfig_mhm_mrm" !< namelist name
+  !   logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
   ! contains
   !   !> \copydoc mo_namelists::read_mainconfig_mhm_mrm
   !   procedure, public :: read => read_mainconfig_mhm_mrm !< \see mo_namelists::read_mainconfig_mhm_mrm
@@ -617,8 +638,9 @@ contains
   !
   ! !> \class   nml_mainconfig_mhm_mrm_t
   ! !> \brief   'mainconfig_mhm_mrm' namelist content
-  ! type, extends(nml_base), public :: nml_mainconfig_mhm_mrm_t
+  ! type, public :: nml_mainconfig_mhm_mrm_t
   !   character(18) :: name = "mainconfig_mhm_mrm" !< namelist name
+  !   logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
   ! contains
   !   !> \copydoc mo_namelists::read_mainconfig_mhm_mrm
   !   procedure, public :: read => read_mainconfig_mhm_mrm !< \see mo_namelists::read_mainconfig_mhm_mrm
@@ -633,8 +655,9 @@ contains
   !
   ! !> \class   nml_mainconfig_mhm_mrm_t
   ! !> \brief   'mainconfig_mhm_mrm' namelist content
-  ! type, extends(nml_base), public :: nml_mainconfig_mhm_mrm_t
+  ! type, public :: nml_mainconfig_mhm_mrm_t
   !   character(18) :: name = "mainconfig_mhm_mrm" !< namelist name
+  !   logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
   ! contains
   !   !> \copydoc mo_namelists::read_mainconfig_mhm_mrm
   !   procedure, public :: read => read_mainconfig_mhm_mrm !< \see mo_namelists::read_mainconfig_mhm_mrm
@@ -650,8 +673,9 @@ contains
   !
   ! !> \class   nml_mainconfig_mhm_mrm_t
   ! !> \brief   'mainconfig_mhm_mrm' namelist content
-  ! type, extends(nml_base), public :: nml_mainconfig_mhm_mrm_t
+  ! type, public :: nml_mainconfig_mhm_mrm_t
   !   character(18) :: name = "mainconfig_mhm_mrm" !< namelist name
+  !   logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
   ! contains
   !   !> \copydoc mo_namelists::read_mainconfig_mhm_mrm
   !   procedure, public :: read => read_mainconfig_mhm_mrm !< \see mo_namelists::read_mainconfig_mhm_mrm
@@ -665,8 +689,9 @@ contains
   !
   ! !> \class   nml_mainconfig_mhm_mrm_t
   ! !> \brief   'mainconfig_mhm_mrm' namelist content
-  ! type, extends(nml_base), public :: nml_mainconfig_mhm_mrm_t
+  ! type, public :: nml_mainconfig_mhm_mrm_t
   !   character(18) :: name = "mainconfig_mhm_mrm" !< namelist name
+  !   logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
   ! contains
   !   !> \copydoc mo_namelists::read_mainconfig_mhm_mrm
   !   procedure, public :: read => read_mainconfig_mhm_mrm !< \see mo_namelists::read_mainconfig_mhm_mrm
@@ -685,8 +710,9 @@ contains
   !
   ! !> \class   nml_mainconfig_mhm_mrm_t
   ! !> \brief   'mainconfig_mhm_mrm' namelist content
-  ! type, extends(nml_base), public :: nml_mainconfig_mhm_mrm_t
+  ! type, public :: nml_mainconfig_mhm_mrm_t
   !   character(18) :: name = "mainconfig_mhm_mrm" !< namelist name
+  !   logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
   ! contains
   !   !> \copydoc mo_namelists::read_mainconfig_mhm_mrm
   !   procedure, public :: read => read_mainconfig_mhm_mrm !< \see mo_namelists::read_mainconfig_mhm_mrm
@@ -703,8 +729,9 @@ contains
   !
   ! !> \class   nml_mainconfig_mhm_mrm_t
   ! !> \brief   'mainconfig_mhm_mrm' namelist content
-  ! type, extends(nml_base), public :: nml_mainconfig_mhm_mrm_t
+  ! type, public :: nml_mainconfig_mhm_mrm_t
   !   character(18) :: name = "mainconfig_mhm_mrm" !< namelist name
+  !   logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
   ! contains
   !   !> \copydoc mo_namelists::read_mainconfig_mhm_mrm
   !   procedure, public :: read => read_mainconfig_mhm_mrm !< \see mo_namelists::read_mainconfig_mhm_mrm
@@ -719,8 +746,9 @@ contains
   !
   ! !> \class   nml_mainconfig_mhm_mrm_t
   ! !> \brief   'mainconfig_mhm_mrm' namelist content
-  ! type, extends(nml_base), public :: nml_mainconfig_mhm_mrm_t
+  ! type, public :: nml_mainconfig_mhm_mrm_t
   !   character(18) :: name = "mainconfig_mhm_mrm" !< namelist name
+  !   logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
   ! contains
   !   !> \copydoc mo_namelists::read_mainconfig_mhm_mrm
   !   procedure, public :: read => read_mainconfig_mhm_mrm !< \see mo_namelists::read_mainconfig_mhm_mrm
@@ -735,8 +763,9 @@ contains
   !
   ! !> \class   nml_mainconfig_mhm_mrm_t
   ! !> \brief   'mainconfig_mhm_mrm' namelist content
-  ! type, extends(nml_base), public :: nml_mainconfig_mhm_mrm_t
+  ! type, public :: nml_mainconfig_mhm_mrm_t
   !   character(18) :: name = "mainconfig_mhm_mrm" !< namelist name
+  !   logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
   ! contains
   !   !> \copydoc mo_namelists::read_mainconfig_mhm_mrm
   !   procedure, public :: read => read_mainconfig_mhm_mrm !< \see mo_namelists::read_mainconfig_mhm_mrm
@@ -757,8 +786,9 @@ contains
   !
   ! !> \class   nml_mainconfig_mhm_mrm_t
   ! !> \brief   'mainconfig_mhm_mrm' namelist content
-  ! type, extends(nml_base), public :: nml_mainconfig_mhm_mrm_t
+  ! type, public :: nml_mainconfig_mhm_mrm_t
   !   character(18) :: name = "mainconfig_mhm_mrm" !< namelist name
+  !   logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
   ! contains
   !   !> \copydoc mo_namelists::read_mainconfig_mhm_mrm
   !   procedure, public :: read => read_mainconfig_mhm_mrm !< \see mo_namelists::read_mainconfig_mhm_mrm
@@ -771,8 +801,9 @@ contains
   !
   ! !> \class   nml_mainconfig_mhm_mrm_t
   ! !> \brief   'mainconfig_mhm_mrm' namelist content
-  ! type, extends(nml_base), public :: nml_mainconfig_mhm_mrm_t
+  ! type, public :: nml_mainconfig_mhm_mrm_t
   !   character(18) :: name = "mainconfig_mhm_mrm" !< namelist name
+  !   logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
   ! contains
   !   !> \copydoc mo_namelists::read_mainconfig_mhm_mrm
   !   procedure, public :: read => read_mainconfig_mhm_mrm !< \see mo_namelists::read_mainconfig_mhm_mrm
@@ -789,8 +820,9 @@ contains
   !
   ! !> \class   nml_mainconfig_mhm_mrm_t
   ! !> \brief   'mainconfig_mhm_mrm' namelist content
-  ! type, extends(nml_base), public :: nml_mainconfig_mhm_mrm_t
+  ! type, public :: nml_mainconfig_mhm_mrm_t
   !   character(18) :: name = "mainconfig_mhm_mrm" !< namelist name
+  !   logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
   ! contains
   !   !> \copydoc mo_namelists::read_mainconfig_mhm_mrm
   !   procedure, public :: read => read_mainconfig_mhm_mrm !< \see mo_namelists::read_mainconfig_mhm_mrm
@@ -805,8 +837,9 @@ contains
   !
   ! !> \class   nml_mainconfig_mhm_mrm_t
   ! !> \brief   'mainconfig_mhm_mrm' namelist content
-  ! type, extends(nml_base), public :: nml_mainconfig_mhm_mrm_t
+  ! type, public :: nml_mainconfig_mhm_mrm_t
   !   character(18) :: name = "mainconfig_mhm_mrm" !< namelist name
+  !   logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
   ! contains
   !   !> \copydoc mo_namelists::read_mainconfig_mhm_mrm
   !   procedure, public :: read => read_mainconfig_mhm_mrm !< \see mo_namelists::read_mainconfig_mhm_mrm
@@ -822,8 +855,9 @@ contains
   !
   ! !> \class   nml_mainconfig_mhm_mrm_t
   ! !> \brief   'mainconfig_mhm_mrm' namelist content
-  ! type, extends(nml_base), public :: nml_mainconfig_mhm_mrm_t
+  ! type, public :: nml_mainconfig_mhm_mrm_t
   !   character(18) :: name = "mainconfig_mhm_mrm" !< namelist name
+  !   logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
   ! contains
   !   !> \copydoc mo_namelists::read_mainconfig_mhm_mrm
   !   procedure, public :: read => read_mainconfig_mhm_mrm !< \see mo_namelists::read_mainconfig_mhm_mrm
@@ -840,8 +874,9 @@ contains
   !
   ! !> \class   nml_mainconfig_mhm_mrm_t
   ! !> \brief   'mainconfig_mhm_mrm' namelist content
-  ! type, extends(nml_base), public :: nml_mainconfig_mhm_mrm_t
+  ! type, public :: nml_mainconfig_mhm_mrm_t
   !   character(18) :: name = "mainconfig_mhm_mrm" !< namelist name
+  !   logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
   ! contains
   !   !> \copydoc mo_namelists::read_mainconfig_mhm_mrm
   !   procedure, public :: read => read_mainconfig_mhm_mrm !< \see mo_namelists::read_mainconfig_mhm_mrm
@@ -857,8 +892,9 @@ contains
   !
   ! !> \class   nml_mainconfig_mhm_mrm_t
   ! !> \brief   'mainconfig_mhm_mrm' namelist content
-  ! type, extends(nml_base), public :: nml_mainconfig_mhm_mrm_t
+  ! type, public :: nml_mainconfig_mhm_mrm_t
   !   character(18) :: name = "mainconfig_mhm_mrm" !< namelist name
+  !   logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
   ! contains
   !   !> \copydoc mo_namelists::read_mainconfig_mhm_mrm
   !   procedure, public :: read => read_mainconfig_mhm_mrm !< \see mo_namelists::read_mainconfig_mhm_mrm
@@ -875,8 +911,9 @@ contains
   !
   ! !> \class   nml_mainconfig_mhm_mrm_t
   ! !> \brief   'mainconfig_mhm_mrm' namelist content
-  ! type, extends(nml_base), public :: nml_mainconfig_mhm_mrm_t
+  ! type, public :: nml_mainconfig_mhm_mrm_t
   !   character(18) :: name = "mainconfig_mhm_mrm" !< namelist name
+  !   logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
   ! contains
   !   !> \copydoc mo_namelists::read_mainconfig_mhm_mrm
   !   procedure, public :: read => read_mainconfig_mhm_mrm !< \see mo_namelists::read_mainconfig_mhm_mrm
@@ -889,8 +926,9 @@ contains
   !
   ! !> \class   nml_mainconfig_mhm_mrm_t
   ! !> \brief   'mainconfig_mhm_mrm' namelist content
-  ! type, extends(nml_base), public :: nml_mainconfig_mhm_mrm_t
+  ! type, public :: nml_mainconfig_mhm_mrm_t
   !   character(18) :: name = "mainconfig_mhm_mrm" !< namelist name
+  !   logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
   ! contains
   !   !> \copydoc mo_namelists::read_mainconfig_mhm_mrm
   !   procedure, public :: read => read_mainconfig_mhm_mrm !< \see mo_namelists::read_mainconfig_mhm_mrm
@@ -903,8 +941,9 @@ contains
   !
   ! !> \class   nml_mainconfig_mhm_mrm_t
   ! !> \brief   'mainconfig_mhm_mrm' namelist content
-  ! type, extends(nml_base), public :: nml_mainconfig_mhm_mrm_t
+  ! type, public :: nml_mainconfig_mhm_mrm_t
   !   character(18) :: name = "mainconfig_mhm_mrm" !< namelist name
+  !   logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
   ! contains
   !   !> \copydoc mo_namelists::read_mainconfig_mhm_mrm
   !   procedure, public :: read => read_mainconfig_mhm_mrm !< \see mo_namelists::read_mainconfig_mhm_mrm
@@ -927,8 +966,9 @@ contains
   !
   ! !> \class   nml_mainconfig_mhm_mrm_t
   ! !> \brief   'mainconfig_mhm_mrm' namelist content
-  ! type, extends(nml_base), public :: nml_mainconfig_mhm_mrm_t
+  ! type, public :: nml_mainconfig_mhm_mrm_t
   !   character(18) :: name = "mainconfig_mhm_mrm" !< namelist name
+  !   logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
   ! contains
   !   !> \copydoc mo_namelists::read_mainconfig_mhm_mrm
   !   procedure, public :: read => read_mainconfig_mhm_mrm !< \see mo_namelists::read_mainconfig_mhm_mrm
