@@ -230,6 +230,7 @@ module mo_namelists
   type(nml_time_periods_t), public :: nml_time_periods
 
   !######## mo_mhm_read_config
+
   ! namelist /directories_mHM/ &
   !   inputFormat_meteo_forcings, &
   !   dir_Precipitation, &
@@ -325,7 +326,7 @@ module mo_namelists
   !> \class   nml_nightdayratio_t
   !> \brief   'nightDayRatio' namelist content
   type, public :: nml_nightDayRatio_t
-    character(18) :: name = "nightDayRatio" !< namelist name
+    character(13) :: name = "nightDayRatio" !< namelist name
     logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
     logical :: read_meteo_weights !< read weights for meteo data
     real(dp), dimension(int(YearMonths, i4)) :: fnight_prec !< [-] Night ratio precipitation < 1
@@ -369,7 +370,7 @@ module mo_namelists
   !> \class   nml_bfi_inputs_t
   !> \brief   'BFI_inputs' namelist content
   type, public :: nml_BFI_inputs_t
-    character(18) :: name = "BFI_inputs" !< namelist name
+    character(10) :: name = "BFI_inputs" !< namelist name
     logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
     logical :: BFI_calc !< calculate observed BFI from gauges with Eckhardt filter
     real(dp), dimension(maxNoDomains) :: BFI_obs !< given base-flow index per domain
