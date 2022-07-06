@@ -88,6 +88,13 @@ CONTAINS
 
   subroutine mhm_read_config(file_namelist, unamelist)
 
+    use mo_namelists, only : &
+      nml_directories_mHM, &
+      nml_optional_data, &
+      nml_panEvapo, &
+      nml_nightDayRatio, &
+      nml_NLoutputResults, &
+      nml_BFI_inputs
     use mo_common_constants, only : maxNoDomains, nodata_i4
     use mo_common_mHM_mRM_read_config, only : common_check_resolution
     use mo_common_mhm_mrm_variables, only : opti_function, optimize
@@ -108,7 +115,6 @@ CONTAINS
     use mo_message, only : message
     use mo_mpr_constants, only : maxNoSoilHorizons
     use mo_mpr_global_variables, only : nSoilHorizons_mHM
-    use mo_nml, only : close_nml, open_nml, position_nml
     use mo_string_utils, only : num2str
 
     implicit none
@@ -158,51 +164,6 @@ CONTAINS
     integer(i4) :: timeStep_neutrons_input    ! time step of optional data: neutrons
 
 
-    ! define namelists
-    ! namelist directories
-    namelist /directories_mHM/ &
-            inputFormat_meteo_forcings, &
-            dir_Precipitation, &
-            dir_Temperature, &
-            dir_ReferenceET, &
-            dir_MinTemperature, &
-            dir_MaxTemperature, &
-            dir_absVapPressure, &
-            dir_windspeed, &
-            dir_NetRadiation, &
-            dir_Radiation, &
-            time_step_model_inputs
-    ! optional data used for optimization
-    namelist /optional_data/ &
-            dir_soil_moisture, &
-            nSoilHorizons_sm_input, &
-            dir_neutrons, &
-            dir_evapotranspiration, &
-            dir_TWS, &
-            timeStep_sm_input, &
-            timeStep_neutrons_input, &
-            timeStep_et_input, &
-            timeStep_tws_input
-    ! namelist for pan evaporation
-    namelist /panEvapo/evap_coeff
-
-    ! namelist for night-day ratio of precipitation, referenceET and temperature
-    namelist /nightDayRatio/ read_meteo_weights, &
-      fnight_prec, fnight_pet, fnight_temp, fnight_ssrd, fnight_strd
-    ! name list regarding output
-    namelist /NLoutputResults/ &
-            output_deflate_level, &
-            output_double_precision, &
-            timeStep_model_outputs, &
-            outputFlxState
-    ! namelist for baseflow index optimzation
-    namelist /BFI_inputs/ BFI_calc, BFI_obs
-
-    !===============================================================
-    !  Read namelist main directories
-    !===============================================================
-    call open_nml(file_namelist, unamelist, quiet = .true.)
-
     allocate(dirPrecipitation(domainMeta%nDomains))
     allocate(dirTemperature(domainMeta%nDomains))
     allocate(dirwindspeed(domainMeta%nDomains))
@@ -220,14 +181,22 @@ CONTAINS
     allocate(timestep_model_inputs(domainMeta%nDomains))
     ! observed baseflow indizes
     allocate(BFI_obs(domainMeta%nDomains))
-    BFI_obs = -1.0_dp  ! negative value to flag missing values
-    BFI_calc = .false.
 
     !===============================================================
     !  Read namelist for mainpaths
     !===============================================================
-    call position_nml('directories_mHM', unamelist)
-    read(unamelist, nml = directories_mHM)
+    call nml_directories_mHM%read(file_namelist, unamelist)
+    inputFormat_meteo_forcings = nml_directories_mHM%inputFormat_meteo_forcings
+    dir_Precipitation = nml_directories_mHM%dir_Precipitation
+    dir_Temperature = nml_directories_mHM%dir_Temperature
+    dir_ReferenceET = nml_directories_mHM%dir_ReferenceET
+    dir_MinTemperature = nml_directories_mHM%dir_MinTemperature
+    dir_MaxTemperature = nml_directories_mHM%dir_MaxTemperature
+    dir_absVapPressure = nml_directories_mHM%dir_absVapPressure
+    dir_windspeed = nml_directories_mHM%dir_windspeed
+    dir_NetRadiation = nml_directories_mHM%dir_NetRadiation
+    dir_Radiation = nml_directories_mHM%dir_Radiation
+    time_step_model_inputs = nml_directories_mHM%time_step_model_inputs
 
     do iDomain = 1, domainMeta%nDomains
       domainID = domainMeta%indices(iDomain)
@@ -264,11 +233,28 @@ CONTAINS
     !===============================================================
     ! read optional optional data if necessary
     if (optimize) then
+      ! read nml
+      select case (opti_function)
+        case(10 : 13, 15, 17, 27 : 30, 33)
+          call nml_optional_data%read(file_namelist, unamelist)
+          nSoilHorizons_sm_input = nml_optional_data%nSoilHorizons_sm_input
+          dir_soil_moisture = nml_optional_data%dir_soil_moisture
+          dir_neutrons = nml_optional_data%dir_neutrons
+          dir_evapotranspiration = nml_optional_data%dir_evapotranspiration
+          dir_TWS = nml_optional_data%dir_TWS
+          timeStep_sm_input = nml_optional_data%timeStep_sm_input
+          timeStep_neutrons_input = nml_optional_data%timeStep_neutrons_input
+          timeStep_et_input = nml_optional_data%timeStep_et_input
+          timeStep_tws_input = nml_optional_data%timeStep_tws_input
+        case(34)
+          call nml_BFI_inputs%read(file_namelist, unamelist)
+          BFI_calc = nml_BFI_inputs%BFI_calc
+          BFI_obs = nml_BFI_inputs%BFI_obs
+      end select
+
       select case (opti_function)
         case(10 : 13, 28)
           ! soil moisture
-          call position_nml('optional_data', unamelist)
-          read(unamelist, nml = optional_data)
           do iDomain = 1, domainMeta%nDomains
             domainID = domainMeta%indices(iDomain)
             L1_smObs(iDomain)%dir = dir_Soil_moisture(domainID)
@@ -283,8 +269,6 @@ CONTAINS
           end if
         case(17)
           ! neutrons
-          call position_nml('optional_data', unamelist)
-          read(unamelist, nml = optional_data)
           do iDomain = 1, domainMeta%nDomains
             domainID = domainMeta%indices(iDomain)
             L1_neutronsObs(iDomain)%dir = dir_neutrons(domainID)
@@ -294,8 +278,6 @@ CONTAINS
           end do
         case(27, 29, 30)
           ! evapotranspiration
-          call position_nml('optional_data', unamelist)
-          read(unamelist, nml = optional_data)
           do iDomain = 1, domainMeta%nDomains
             domainID = domainMeta%indices(iDomain)
             L1_etObs(iDomain)%dir = dir_evapotranspiration(domainID)
@@ -304,8 +286,6 @@ CONTAINS
           end do
         case(15)
           ! domain average TWS data
-          call position_nml('optional_data', unamelist)
-          read(unamelist, nml = optional_data)
           do iDomain = 1, domainMeta%nDomains
             domainID = domainMeta%indices(iDomain)
             L1_twsaObs(iDomain)%dir = dir_TWS(domainID)
@@ -314,18 +294,13 @@ CONTAINS
           end do
         case(33)
           ! evapotranspiration
-          call position_nml('optional_data', unamelist)
-          read(unamelist, nml = optional_data)
           do iDomain = 1, domainMeta%nDomains
             domainID = domainMeta%indices(iDomain)
             L1_etObs(iDomain)%dir = dir_evapotranspiration(domainID)
             L1_etObs(iDomain)%timeStepInput = timeStep_et_input
             L1_etObs(iDomain)%varname = 'et'
           end do
-
           ! domain average TWS data
-          call position_nml('optional_data', unamelist)
-          read(unamelist, nml = optional_data)
           do iDomain = 1, domainMeta%nDomains
             domainID = domainMeta%indices(iDomain)
             L1_twsaObs(iDomain)%dir = dir_TWS(domainID)
@@ -333,26 +308,23 @@ CONTAINS
             L1_twsaObs(iDomain)%varname = 'twsa'
           end do
 
-        case(34)
-          !baseflow index optimization
-          call position_nml('BFI_inputs', unamelist)
-          read(unamelist, nml = BFI_inputs)
-
       end select
     end if
 
     !===============================================================
     ! Read night-day ratios and pan evaporation
     !===============================================================
-    ! default values for long/shortwave rad.
-    fnight_ssrd = 0.0_dp
-    fnight_strd = 0.45_dp
     ! Evap. coef. for free-water surfaces
-    call position_nml('panEvapo', unamelist)
-    read(unamelist, nml = panEvapo)
+    call nml_panEvapo%read(file_namelist, unamelist)
+    evap_coeff = nml_panEvapo%evap_coeff
     ! namelist for night-day ratio of precipitation, referenceET and temperature
-    call position_nml('nightDayRatio', unamelist)
-    read(unamelist, nml = nightDayRatio)
+    call nml_nightDayRatio%read(file_namelist, unamelist)
+    read_meteo_weights = nml_nightDayRatio%read_meteo_weights
+    fnight_prec = nml_nightDayRatio%fnight_prec
+    fnight_pet = nml_nightDayRatio%fnight_pet
+    fnight_temp = nml_nightDayRatio%fnight_temp
+    fnight_ssrd = nml_nightDayRatio%fnight_ssrd
+    fnight_strd = nml_nightDayRatio%fnight_strd
     !
     fday_prec = 1.0_dp - fnight_prec
     fday_pet = 1.0_dp - fnight_pet
@@ -365,18 +337,14 @@ CONTAINS
 
     call common_check_resolution(.true., .false.)
 
-    call close_nml(unamelist)
-
     !===============================================================
     ! Read output specifications for mHM
     !===============================================================
-    call open_nml(file_defOutput, udefOutput, quiet = .true.)
-    output_deflate_level = 6
-    output_double_precision = .true.
-    outputFlxState = .FALSE.
-    call position_nml('NLoutputResults', udefOutput)
-    read(udefOutput, nml = NLoutputResults)
-    call close_nml(udefOutput)
+    call nml_NLoutputResults%read(file_defOutput, udefOutput)
+    output_deflate_level = nml_NLoutputResults%output_deflate_level
+    output_double_precision = nml_NLoutputResults%output_double_precision
+    timeStep_model_outputs = nml_NLoutputResults%timeStep_model_outputs
+    outputFlxState = nml_NLoutputResults%outputFlxState
 
     call message('')
     call message('Following output will be written:')
