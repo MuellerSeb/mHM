@@ -49,6 +49,12 @@ CONTAINS
 
   subroutine common_read_config(file_namelist, unamelist)
 
+    use mo_namelists, only : &
+      nml_project_description, &
+      nml_directories_general, &
+      nml_mainconfig, &
+      nml_processselection, &
+      nml_lcover
     use mo_common_constants, only : maxNLcovers, maxNoDomains
     use mo_common_variables, only : Conventions, LC_year_end, LC_year_start, LCfilename, contact, &
                                     dirCommonFiles, dirConfigOut, dirLCover, dirMorpho, dirOut, &
@@ -57,7 +63,6 @@ CONTAINS
                                     nProcesses, nuniqueL0Domains, processMatrix, project_details, resolutionHydrology, &
                                     setup_description, simulation_type, write_restart
     use mo_message, only : message
-    use mo_nml, only : close_nml, open_nml, position_nml
     use mo_string_utils, only : num2str
 
     implicit none
@@ -103,40 +108,28 @@ CONTAINS
     ! flag to advance nuniqueL0Domain counter
     logical :: addCounter
 
-
-    ! define namelists
-    ! namelist directories
-    namelist /project_description/ project_details, setup_description, simulation_type, &
-            Conventions, contact, mHM_details, history
-    namelist /directories_general/ dirConfigOut, dirCommonFiles, &
-            dir_Morpho, dir_LCover, &
-            dir_Out, mhm_file_RestartOut, mrm_file_RestartOut, &
-            file_LatLon
-    ! namelist spatial & temporal resolution, optimization information
-    namelist /mainconfig/ iFlag_cordinate_sys, resolution_Hydrology, nDomains, L0Domain, write_restart, &
-            read_opt_domain_data
-    ! namelist process selection
-    namelist /processSelection/ processCase
-
-    ! namelist for land cover scenes
-    namelist/LCover/nLcoverScene, LCoverYearStart, LCoverYearEnd, LCoverfName
-
-    !===============================================================
-    !  Read namelist main directories
-    !===============================================================
-    call open_nml(file_namelist, unamelist, quiet = .true.)
-
     !===============================================================
     !  Read namelist specifying the project description
     !===============================================================
-    call position_nml('project_description', unamelist)
-    read(unamelist, nml = project_description)
+    call nml_project_description%read(file_namelist, unamelist)
+    project_details = nml_project_description%project_details
+    setup_description = nml_project_description%setup_description
+    simulation_type = nml_project_description%simulation_type
+    Conventions = nml_project_description%Conventions
+    contact = nml_project_description%contact
+    mHM_details = nml_project_description%mHM_details
+    history = nml_project_description%history
 
     !===============================================================
     !  Read namelist specifying the model configuration
     !===============================================================
-    call position_nml('mainconfig', unamelist)
-    read(unamelist, nml = mainconfig)
+    call nml_mainconfig%read(file_namelist, unamelist)
+    iFlag_cordinate_sys = nml_mainconfig%iFlag_cordinate_sys
+    resolution_Hydrology = nml_mainconfig%resolution_Hydrology
+    nDomains = nml_mainconfig%nDomains
+    L0Domain = nml_mainconfig%L0Domain
+    write_restart = nml_mainconfig%write_restart
+    read_opt_domain_data = nml_mainconfig%read_opt_domain_data
 
     call init_domain_variable(nDomains, read_opt_domain_data(1:nDomains), domainMeta)
 
@@ -187,8 +180,11 @@ CONTAINS
     !===============================================================
     ! Read land cover
     !===============================================================
-    call position_nml('LCover', unamelist)
-    read(unamelist, nml = LCover)
+    call nml_lcover%read(file_namelist, unamelist)
+    nLcoverScene = nml_lcover%nLcoverScene
+    LCoverYearStart = nml_lcover%LCoverYearStart
+    LCoverYearEnd = nml_lcover%LCoverYearEnd
+    LCoverfName = nml_lcover%LCoverfName
 
     ! put land cover scenes to corresponding file name and LuT
     ! this is done already here for MPR, which does not check for the time periods
@@ -202,8 +198,15 @@ CONTAINS
     !===============================================================
     ! Read namelist for mainpaths
     !===============================================================
-    call position_nml('directories_general', unamelist)
-    read(unamelist, nml = directories_general)
+    call nml_directories_general%read(file_namelist, unamelist)
+    dirConfigOut = nml_directories_general%dirConfigOut
+    dirCommonFiles = nml_directories_general%dirCommonFiles
+    dir_Morpho = nml_directories_general%dir_Morpho
+    dir_LCover = nml_directories_general%dir_LCover
+    dir_Out = nml_directories_general%dir_Out
+    mhm_file_RestartOut = nml_directories_general%mhm_file_RestartOut
+    mrm_file_RestartOut = nml_directories_general%mrm_file_RestartOut
+    file_LatLon = nml_directories_general%file_LatLon
 
     do iDomain = 1, domainMeta%nDomains
       domainID = domainMeta%indices(iDomain)
@@ -223,11 +226,8 @@ CONTAINS
     !===============================================================
     ! Read process selection list
     !===============================================================
-    ! init the processCase matrix to 0 to be backward compatible
-    ! if cases were added later (then there would be no values if not init here)
-    processCase = 0_i4
-    call position_nml('processselection', unamelist)
-    read(unamelist, nml = processSelection)
+    call nml_processselection%read(file_namelist, unamelist)
+    processCase = nml_processselection%processCase
 
     processMatrix = 0_i4
     processMatrix(:, 1) = processCase
@@ -236,8 +236,6 @@ CONTAINS
     else
       domainMeta%doRouting(:) = .TRUE.
     end if
-
-    call close_nml(unamelist)
 
   end subroutine common_read_config
 
