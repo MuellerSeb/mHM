@@ -249,7 +249,7 @@ CONTAINS
         case(34)
           call nml_BFI_inputs%read(file_namelist, unamelist)
           BFI_calc = nml_BFI_inputs%BFI_calc
-          BFI_obs = nml_BFI_inputs%BFI_obs
+          BFI_obs = nml_BFI_inputs%BFI_obs(1:size(BFI_obs))
       end select
 
       select case (opti_function)
