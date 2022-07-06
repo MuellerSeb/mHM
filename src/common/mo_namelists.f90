@@ -7,10 +7,12 @@
 !> \date    Jul 2022
 module mo_namelists
 
-  use mo_kind, only : i4, dp
+  use mo_kind, only : i4, i8, dp
   use mo_nml, only : open_nml, close_nml, position_nml
   use mo_common_constants, only : maxNLcovers, maxNoDomains
-  use mo_common_variables, only : nProcesses
+  use mo_common_variables, only : nProcesses, period
+  use mo_common_mHM_mRM_variables, only : nerror_model
+
   implicit none
 
   type, private :: nml_base
@@ -137,6 +139,7 @@ module mo_namelists
   type(nml_lcover_t), public :: nml_lcover
 
   !######## mo_mHM_mRM_read_config
+
   ! namelist /mainconfig_mhm_mrm/ &
   !   timestep, &
   !   resolution_Routing, &
@@ -149,6 +152,29 @@ module mo_namelists
   !   read_old_style_restart_bounds, &
   !   mhm_file_RestartIn, &
   !   mrm_file_RestartIn
+  !
+  !> \class   nml_mainconfig_mhm_mrm_t
+  !> \brief   'mainconfig_mhm_mrm' namelist content
+  type, extends(nml_base), public :: nml_mainconfig_mhm_mrm_t
+    character(18) :: name = "mainconfig_mhm_mrm" !< namelist name
+    integer(i4) :: timeStep !< [h] simulation time step (= TS) in [h] either 1, 2, 3, 4, 6, 12 or 24
+    real(dp), dimension(maxNoDomains) :: resolution_Routing !< resolution of Level-11 discharge routing [m or degree] per domain
+    logical :: optimize !< Optimization (.true.) or Evaluation run (.false.)
+    logical :: optimize_restart !< Optimization will be restarted from mo_<opti_method>.restart file (.true.)
+    integer(i4) :: opti_method !< Optimization algorithm: 1 - DDS; 2 - Simulated Annealing; 3 - SCE
+    integer(i4) :: opti_function !< Objective function
+    logical :: read_restart !< flag for reading restart output
+    logical :: mrm_read_river_network !< flag to read the river network for mRM (read_restart = .True. forces .True.)
+    logical :: read_old_style_restart_bounds !< flag to use an old-style restart file created by mhm<=v5.11
+    character(256), dimension(maxNoDomains) :: mhm_file_RestartIn !< mhm restart file paths
+    character(256), dimension(maxNoDomains) :: mrm_file_RestartIn !< mrm restart file paths
+  contains
+    !> \copydoc mo_namelists::read_mainconfig_mhm_mrm
+    procedure, public :: read => read_mainconfig_mhm_mrm !< \see mo_namelists::read_mainconfig_mhm_mrm
+  end type nml_mainconfig_mhm_mrm_t
+  !> 'mainconfig_mhm_mrm' namelist content
+  type(nml_mainconfig_mhm_mrm_t), public :: nml_mainconfig_mhm_mrm
+
   ! namelist /Optimization/ &
   !   nIterations, &
   !   seed, &
@@ -159,9 +185,43 @@ module mo_namelists
   !   sce_nps, &
   !   mcmc_opti, &
   !   mcmc_error_params
+  !
+  !> \class   nml_optimization_t
+  !> \brief   'Optimization' namelist content
+  type, extends(nml_base), public :: nml_Optimization_t
+    character(12) :: name = "Optimization" !< namelist name
+    integer(i4) :: nIterations !< number of iterations for optimization
+    integer(i8) :: seed !< seed used for optimization, default: -9 --> system time
+    real(dp) :: dds_r !< DDS: perturbation rate, default: 0.2
+    real(dp) :: sa_temp !< SA:  initial temperature, default: -9.0 --> estimated
+    integer(i4) :: sce_ngs !< SCE: # of complexes, default: 2
+    integer(i4) :: sce_npg !< SCE: # of points per complex,default: -9 --> 2n+1
+    integer(i4) :: sce_nps !< SCE: # of points per subcomplex,default: -9 --> n+1
+    logical :: mcmc_opti !< MCMC: Optimization (.true.) or only parameter uncertainty (.false.)
+    real(dp), dimension(nerror_model) :: mcmc_error_params !< error model para (mcmc_opti=.false.) e.g. for opti_function=8: .01, .3
+  contains
+    !> \copydoc mo_namelists::read_Optimization
+    procedure, public :: read => read_Optimization !< \see mo_namelists::read_Optimization
+  end type nml_Optimization_t
+  !> 'Optimization' namelist content
+  type(nml_Optimization_t), public :: nml_Optimization
+
   ! namelist /time_periods/ &
   !   warming_Days, &
   !   eval_Per
+  !
+  !> \class   nml_time_periods_t
+  !> \brief   'time_periods' namelist content
+  type, extends(nml_base), public :: nml_time_periods_t
+    character(12) :: name = "time_periods" !< namelist name
+    integer(i4), dimension(maxNoDomains) :: warming_Days !< number of days for warm up period
+    type(period), dimension(maxNoDomains) :: eval_Per !< time period for model evaluation
+  contains
+    !> \copydoc mo_namelists::read_time_periods
+    procedure, public :: read => read_time_periods !< \see mo_namelists::read_time_periods
+  end type nml_time_periods_t
+  !> 'time_periods' namelist content
+  type(nml_time_periods_t), public :: nml_time_periods
 
   !######## mo_mhm_read_config
   ! namelist /directories_mHM/ &
@@ -176,6 +236,18 @@ module mo_namelists
   !   dir_NetRadiation, &
   !   dir_Radiation, &
   !   time_step_model_inputs
+  !
+  ! !> \class   nml_mainconfig_mhm_mrm_t
+  ! !> \brief   'mainconfig_mhm_mrm' namelist content
+  ! type, extends(nml_base), public :: nml_mainconfig_mhm_mrm_t
+  !   character(18) :: name = "mainconfig_mhm_mrm" !< namelist name
+  ! contains
+  !   !> \copydoc mo_namelists::read_mainconfig_mhm_mrm
+  !   procedure, public :: read => read_mainconfig_mhm_mrm !< \see mo_namelists::read_mainconfig_mhm_mrm
+  ! end type nml_mainconfig_mhm_mrm_t
+  ! !> 'mainconfig_mhm_mrm' namelist content
+  ! type(nml_mainconfig_mhm_mrm_t), public :: nml_mainconfig_mhm_mrm
+
   ! namelist /optional_data/ &
   !   dir_soil_moisture, &
   !   nSoilHorizons_sm_input, &
@@ -186,8 +258,32 @@ module mo_namelists
   !   timeStep_neutrons_input, &
   !   timeStep_et_input, &
   !   timeStep_tws_input
+  !
+  ! !> \class   nml_mainconfig_mhm_mrm_t
+  ! !> \brief   'mainconfig_mhm_mrm' namelist content
+  ! type, extends(nml_base), public :: nml_mainconfig_mhm_mrm_t
+  !   character(18) :: name = "mainconfig_mhm_mrm" !< namelist name
+  ! contains
+  !   !> \copydoc mo_namelists::read_mainconfig_mhm_mrm
+  !   procedure, public :: read => read_mainconfig_mhm_mrm !< \see mo_namelists::read_mainconfig_mhm_mrm
+  ! end type nml_mainconfig_mhm_mrm_t
+  ! !> 'mainconfig_mhm_mrm' namelist content
+  ! type(nml_mainconfig_mhm_mrm_t), public :: nml_mainconfig_mhm_mrm
+
   ! namelist /panEvapo/ &
   !   evap_coeff
+  !
+  ! !> \class   nml_mainconfig_mhm_mrm_t
+  ! !> \brief   'mainconfig_mhm_mrm' namelist content
+  ! type, extends(nml_base), public :: nml_mainconfig_mhm_mrm_t
+  !   character(18) :: name = "mainconfig_mhm_mrm" !< namelist name
+  ! contains
+  !   !> \copydoc mo_namelists::read_mainconfig_mhm_mrm
+  !   procedure, public :: read => read_mainconfig_mhm_mrm !< \see mo_namelists::read_mainconfig_mhm_mrm
+  ! end type nml_mainconfig_mhm_mrm_t
+  ! !> 'mainconfig_mhm_mrm' namelist content
+  ! type(nml_mainconfig_mhm_mrm_t), public :: nml_mainconfig_mhm_mrm
+
   ! namelist /nightDayRatio/ &
   !   read_meteo_weights, &
   !   fnight_prec, &
@@ -195,30 +291,125 @@ module mo_namelists
   !   fnight_temp, &
   !   fnight_ssrd, &
   !   fnight_strd
+  !
+  ! !> \class   nml_mainconfig_mhm_mrm_t
+  ! !> \brief   'mainconfig_mhm_mrm' namelist content
+  ! type, extends(nml_base), public :: nml_mainconfig_mhm_mrm_t
+  !   character(18) :: name = "mainconfig_mhm_mrm" !< namelist name
+  ! contains
+  !   !> \copydoc mo_namelists::read_mainconfig_mhm_mrm
+  !   procedure, public :: read => read_mainconfig_mhm_mrm !< \see mo_namelists::read_mainconfig_mhm_mrm
+  ! end type nml_mainconfig_mhm_mrm_t
+  ! !> 'mainconfig_mhm_mrm' namelist content
+  ! type(nml_mainconfig_mhm_mrm_t), public :: nml_mainconfig_mhm_mrm
+
   ! namelist /NLoutputResults/ &
   !   output_deflate_level, &
   !   output_double_precision, &
   !   timeStep_model_outputs, &
   !   outputFlxState
+  !
+  ! !> \class   nml_mainconfig_mhm_mrm_t
+  ! !> \brief   'mainconfig_mhm_mrm' namelist content
+  ! type, extends(nml_base), public :: nml_mainconfig_mhm_mrm_t
+  !   character(18) :: name = "mainconfig_mhm_mrm" !< namelist name
+  ! contains
+  !   !> \copydoc mo_namelists::read_mainconfig_mhm_mrm
+  !   procedure, public :: read => read_mainconfig_mhm_mrm !< \see mo_namelists::read_mainconfig_mhm_mrm
+  ! end type nml_mainconfig_mhm_mrm_t
+  ! !> 'mainconfig_mhm_mrm' namelist content
+  ! type(nml_mainconfig_mhm_mrm_t), public :: nml_mainconfig_mhm_mrm
+
   ! namelist /BFI_inputs/ &
   !   BFI_calc, &
   !   BFI_obs
+  !
+  ! !> \class   nml_mainconfig_mhm_mrm_t
+  ! !> \brief   'mainconfig_mhm_mrm' namelist content
+  ! type, extends(nml_base), public :: nml_mainconfig_mhm_mrm_t
+  !   character(18) :: name = "mainconfig_mhm_mrm" !< namelist name
+  ! contains
+  !   !> \copydoc mo_namelists::read_mainconfig_mhm_mrm
+  !   procedure, public :: read => read_mainconfig_mhm_mrm !< \see mo_namelists::read_mainconfig_mhm_mrm
+  ! end type nml_mainconfig_mhm_mrm_t
+  ! !> 'mainconfig_mhm_mrm' namelist content
+  ! type(nml_mainconfig_mhm_mrm_t), public :: nml_mainconfig_mhm_mrm
 
   !######## mo_mpr_read_config
   ! namelist /directories_MPR/ &
   !   dir_gridded_LAI
+  !
+  ! !> \class   nml_mainconfig_mhm_mrm_t
+  ! !> \brief   'mainconfig_mhm_mrm' namelist content
+  ! type, extends(nml_base), public :: nml_mainconfig_mhm_mrm_t
+  !   character(18) :: name = "mainconfig_mhm_mrm" !< namelist name
+  ! contains
+  !   !> \copydoc mo_namelists::read_mainconfig_mhm_mrm
+  !   procedure, public :: read => read_mainconfig_mhm_mrm !< \see mo_namelists::read_mainconfig_mhm_mrm
+  ! end type nml_mainconfig_mhm_mrm_t
+  ! !> 'mainconfig_mhm_mrm' namelist content
+  ! type(nml_mainconfig_mhm_mrm_t), public :: nml_mainconfig_mhm_mrm
+
   ! namelist /soildata/ &
   !   iFlag_soilDB, &
   !   tillageDepth, &
   !   nSoilHorizons_mHM, &
   !   soil_Depth
+  !
+  ! !> \class   nml_mainconfig_mhm_mrm_t
+  ! !> \brief   'mainconfig_mhm_mrm' namelist content
+  ! type, extends(nml_base), public :: nml_mainconfig_mhm_mrm_t
+  !   character(18) :: name = "mainconfig_mhm_mrm" !< namelist name
+  ! contains
+  !   !> \copydoc mo_namelists::read_mainconfig_mhm_mrm
+  !   procedure, public :: read => read_mainconfig_mhm_mrm !< \see mo_namelists::read_mainconfig_mhm_mrm
+  ! end type nml_mainconfig_mhm_mrm_t
+  ! !> 'mainconfig_mhm_mrm' namelist content
+  ! type(nml_mainconfig_mhm_mrm_t), public :: nml_mainconfig_mhm_mrm
+
   ! namelist /LAI_data_information/ &
   !   inputFormat_gridded_LAI, &
   !   timeStep_LAI_input
+  !
+  ! !> \class   nml_mainconfig_mhm_mrm_t
+  ! !> \brief   'mainconfig_mhm_mrm' namelist content
+  ! type, extends(nml_base), public :: nml_mainconfig_mhm_mrm_t
+  !   character(18) :: name = "mainconfig_mhm_mrm" !< namelist name
+  ! contains
+  !   !> \copydoc mo_namelists::read_mainconfig_mhm_mrm
+  !   procedure, public :: read => read_mainconfig_mhm_mrm !< \see mo_namelists::read_mainconfig_mhm_mrm
+  ! end type nml_mainconfig_mhm_mrm_t
+  ! !> 'mainconfig_mhm_mrm' namelist content
+  ! type(nml_mainconfig_mhm_mrm_t), public :: nml_mainconfig_mhm_mrm
+
   ! namelist /LCover_MPR/ &
   !   fracSealed_cityArea
+  !
+  ! !> \class   nml_mainconfig_mhm_mrm_t
+  ! !> \brief   'mainconfig_mhm_mrm' namelist content
+  ! type, extends(nml_base), public :: nml_mainconfig_mhm_mrm_t
+  !   character(18) :: name = "mainconfig_mhm_mrm" !< namelist name
+  ! contains
+  !   !> \copydoc mo_namelists::read_mainconfig_mhm_mrm
+  !   procedure, public :: read => read_mainconfig_mhm_mrm !< \see mo_namelists::read_mainconfig_mhm_mrm
+  ! end type nml_mainconfig_mhm_mrm_t
+  ! !> 'mainconfig_mhm_mrm' namelist content
+  ! type(nml_mainconfig_mhm_mrm_t), public :: nml_mainconfig_mhm_mrm
+
   ! namelist /interception1/ &
   !   canopyInterceptionFactor
+  !
+  ! !> \class   nml_mainconfig_mhm_mrm_t
+  ! !> \brief   'mainconfig_mhm_mrm' namelist content
+  ! type, extends(nml_base), public :: nml_mainconfig_mhm_mrm_t
+  !   character(18) :: name = "mainconfig_mhm_mrm" !< namelist name
+  ! contains
+  !   !> \copydoc mo_namelists::read_mainconfig_mhm_mrm
+  !   procedure, public :: read => read_mainconfig_mhm_mrm !< \see mo_namelists::read_mainconfig_mhm_mrm
+  ! end type nml_mainconfig_mhm_mrm_t
+  ! !> 'mainconfig_mhm_mrm' namelist content
+  ! type(nml_mainconfig_mhm_mrm_t), public :: nml_mainconfig_mhm_mrm
+
   ! namelist /snow1/ &
   !   snowTreshholdTemperature, &
   !   degreeDayFactor_forest, &
@@ -228,6 +419,18 @@ module mo_namelists
   !   maxDegreeDayFactor_forest, &
   !   maxDegreeDayFactor_impervious, &
   !   maxDegreeDayFactor_pervious
+  !
+  ! !> \class   nml_mainconfig_mhm_mrm_t
+  ! !> \brief   'mainconfig_mhm_mrm' namelist content
+  ! type, extends(nml_base), public :: nml_mainconfig_mhm_mrm_t
+  !   character(18) :: name = "mainconfig_mhm_mrm" !< namelist name
+  ! contains
+  !   !> \copydoc mo_namelists::read_mainconfig_mhm_mrm
+  !   procedure, public :: read => read_mainconfig_mhm_mrm !< \see mo_namelists::read_mainconfig_mhm_mrm
+  ! end type nml_mainconfig_mhm_mrm_t
+  ! !> 'mainconfig_mhm_mrm' namelist content
+  ! type(nml_mainconfig_mhm_mrm_t), public :: nml_mainconfig_mhm_mrm
+
   ! namelist /soilmoisture1/ &
   !   orgMatterContent_forest, &
   !   orgMatterContent_impervious, &
@@ -246,6 +449,18 @@ module mo_namelists
   !   rootFractionCoefficient_impervious, &
   !   rootFractionCoefficient_pervious, &
   !   infiltrationShapeFactor
+  !
+  ! !> \class   nml_mainconfig_mhm_mrm_t
+  ! !> \brief   'mainconfig_mhm_mrm' namelist content
+  ! type, extends(nml_base), public :: nml_mainconfig_mhm_mrm_t
+  !   character(18) :: name = "mainconfig_mhm_mrm" !< namelist name
+  ! contains
+  !   !> \copydoc mo_namelists::read_mainconfig_mhm_mrm
+  !   procedure, public :: read => read_mainconfig_mhm_mrm !< \see mo_namelists::read_mainconfig_mhm_mrm
+  ! end type nml_mainconfig_mhm_mrm_t
+  ! !> 'mainconfig_mhm_mrm' namelist content
+  ! type(nml_mainconfig_mhm_mrm_t), public :: nml_mainconfig_mhm_mrm
+
   ! namelist /soilmoisture2/ &
   !   orgMatterContent_forest, &
   !   orgMatterContent_impervious, &
@@ -265,6 +480,18 @@ module mo_namelists
   !   rootFractionCoefficient_pervious, &
   !   infiltrationShapeFactor, &
   !   jarvis_sm_threshold_c1
+  !
+  ! !> \class   nml_mainconfig_mhm_mrm_t
+  ! !> \brief   'mainconfig_mhm_mrm' namelist content
+  ! type, extends(nml_base), public :: nml_mainconfig_mhm_mrm_t
+  !   character(18) :: name = "mainconfig_mhm_mrm" !< namelist name
+  ! contains
+  !   !> \copydoc mo_namelists::read_mainconfig_mhm_mrm
+  !   procedure, public :: read => read_mainconfig_mhm_mrm !< \see mo_namelists::read_mainconfig_mhm_mrm
+  ! end type nml_mainconfig_mhm_mrm_t
+  ! !> 'mainconfig_mhm_mrm' namelist content
+  ! type(nml_mainconfig_mhm_mrm_t), public :: nml_mainconfig_mhm_mrm
+
   ! namelist /soilmoisture3/ &
   !   orgMatterContent_forest, &
   !   orgMatterContent_impervious, &
@@ -287,6 +514,18 @@ module mo_namelists
   !   FCmin_glob, &
   !   FCdelta_glob, &
   !   jarvis_sm_threshold_c1
+  !
+  ! !> \class   nml_mainconfig_mhm_mrm_t
+  ! !> \brief   'mainconfig_mhm_mrm' namelist content
+  ! type, extends(nml_base), public :: nml_mainconfig_mhm_mrm_t
+  !   character(18) :: name = "mainconfig_mhm_mrm" !< namelist name
+  ! contains
+  !   !> \copydoc mo_namelists::read_mainconfig_mhm_mrm
+  !   procedure, public :: read => read_mainconfig_mhm_mrm !< \see mo_namelists::read_mainconfig_mhm_mrm
+  ! end type nml_mainconfig_mhm_mrm_t
+  ! !> 'mainconfig_mhm_mrm' namelist content
+  ! type(nml_mainconfig_mhm_mrm_t), public :: nml_mainconfig_mhm_mrm
+
   ! namelist /soilmoisture4/ &
   !   orgMatterContent_forest, &
   !   orgMatterContent_impervious, &
@@ -308,26 +547,98 @@ module mo_namelists
   !   rootFractionCoefficient_clay, &
   !   FCmin_glob, &
   !   FCdelta_glob
+  !
+  ! !> \class   nml_mainconfig_mhm_mrm_t
+  ! !> \brief   'mainconfig_mhm_mrm' namelist content
+  ! type, extends(nml_base), public :: nml_mainconfig_mhm_mrm_t
+  !   character(18) :: name = "mainconfig_mhm_mrm" !< namelist name
+  ! contains
+  !   !> \copydoc mo_namelists::read_mainconfig_mhm_mrm
+  !   procedure, public :: read => read_mainconfig_mhm_mrm !< \see mo_namelists::read_mainconfig_mhm_mrm
+  ! end type nml_mainconfig_mhm_mrm_t
+  ! !> 'mainconfig_mhm_mrm' namelist content
+  ! type(nml_mainconfig_mhm_mrm_t), public :: nml_mainconfig_mhm_mrm
+
   ! namelist /directRunoff1/ &
   !   imperviousStorageCapacity
+  !
+  ! !> \class   nml_mainconfig_mhm_mrm_t
+  ! !> \brief   'mainconfig_mhm_mrm' namelist content
+  ! type, extends(nml_base), public :: nml_mainconfig_mhm_mrm_t
+  !   character(18) :: name = "mainconfig_mhm_mrm" !< namelist name
+  ! contains
+  !   !> \copydoc mo_namelists::read_mainconfig_mhm_mrm
+  !   procedure, public :: read => read_mainconfig_mhm_mrm !< \see mo_namelists::read_mainconfig_mhm_mrm
+  ! end type nml_mainconfig_mhm_mrm_t
+  ! !> 'mainconfig_mhm_mrm' namelist content
+  ! type(nml_mainconfig_mhm_mrm_t), public :: nml_mainconfig_mhm_mrm
+
   ! namelist /PETminus1/  &
   !   PET_a_forest, &
   !   PET_a_impervious, &
   !   PET_a_pervious, &
   !   PET_b, &
   !   PET_c
+  !
+  ! !> \class   nml_mainconfig_mhm_mrm_t
+  ! !> \brief   'mainconfig_mhm_mrm' namelist content
+  ! type, extends(nml_base), public :: nml_mainconfig_mhm_mrm_t
+  !   character(18) :: name = "mainconfig_mhm_mrm" !< namelist name
+  ! contains
+  !   !> \copydoc mo_namelists::read_mainconfig_mhm_mrm
+  !   procedure, public :: read => read_mainconfig_mhm_mrm !< \see mo_namelists::read_mainconfig_mhm_mrm
+  ! end type nml_mainconfig_mhm_mrm_t
+  ! !> 'mainconfig_mhm_mrm' namelist content
+  ! type(nml_mainconfig_mhm_mrm_t), public :: nml_mainconfig_mhm_mrm
+
   ! namelist /PET0/ &
   !   minCorrectionFactorPET, &
   !   maxCorrectionFactorPET, &
   !   aspectTresholdPET
+  !
+  ! !> \class   nml_mainconfig_mhm_mrm_t
+  ! !> \brief   'mainconfig_mhm_mrm' namelist content
+  ! type, extends(nml_base), public :: nml_mainconfig_mhm_mrm_t
+  !   character(18) :: name = "mainconfig_mhm_mrm" !< namelist name
+  ! contains
+  !   !> \copydoc mo_namelists::read_mainconfig_mhm_mrm
+  !   procedure, public :: read => read_mainconfig_mhm_mrm !< \see mo_namelists::read_mainconfig_mhm_mrm
+  ! end type nml_mainconfig_mhm_mrm_t
+  ! !> 'mainconfig_mhm_mrm' namelist content
+  ! type(nml_mainconfig_mhm_mrm_t), public :: nml_mainconfig_mhm_mrm
+
   ! namelist /PET1/ &
   !   minCorrectionFactorPET, &
   !   maxCorrectionFactorPET, &
   !   aspectTresholdPET, &
   !   HargreavesSamaniCoeff
+  !
+  ! !> \class   nml_mainconfig_mhm_mrm_t
+  ! !> \brief   'mainconfig_mhm_mrm' namelist content
+  ! type, extends(nml_base), public :: nml_mainconfig_mhm_mrm_t
+  !   character(18) :: name = "mainconfig_mhm_mrm" !< namelist name
+  ! contains
+  !   !> \copydoc mo_namelists::read_mainconfig_mhm_mrm
+  !   procedure, public :: read => read_mainconfig_mhm_mrm !< \see mo_namelists::read_mainconfig_mhm_mrm
+  ! end type nml_mainconfig_mhm_mrm_t
+  ! !> 'mainconfig_mhm_mrm' namelist content
+  ! type(nml_mainconfig_mhm_mrm_t), public :: nml_mainconfig_mhm_mrm
+
   ! namelist /PET2/ &
   !   PriestleyTaylorCoeff, &
   !   PriestleyTaylorLAIcorr
+  !
+  ! !> \class   nml_mainconfig_mhm_mrm_t
+  ! !> \brief   'mainconfig_mhm_mrm' namelist content
+  ! type, extends(nml_base), public :: nml_mainconfig_mhm_mrm_t
+  !   character(18) :: name = "mainconfig_mhm_mrm" !< namelist name
+  ! contains
+  !   !> \copydoc mo_namelists::read_mainconfig_mhm_mrm
+  !   procedure, public :: read => read_mainconfig_mhm_mrm !< \see mo_namelists::read_mainconfig_mhm_mrm
+  ! end type nml_mainconfig_mhm_mrm_t
+  ! !> 'mainconfig_mhm_mrm' namelist content
+  ! type(nml_mainconfig_mhm_mrm_t), public :: nml_mainconfig_mhm_mrm
+
   ! namelist /PET3/ &
   !   canopyheigth_forest, &
   !   canopyheigth_impervious, &
@@ -336,20 +647,68 @@ module mo_namelists
   !   roughnesslength_momentum_coeff, &
   !   roughnesslength_heat_coeff, &
   !   stomatal_resistance
+  !
+  ! !> \class   nml_mainconfig_mhm_mrm_t
+  ! !> \brief   'mainconfig_mhm_mrm' namelist content
+  ! type, extends(nml_base), public :: nml_mainconfig_mhm_mrm_t
+  !   character(18) :: name = "mainconfig_mhm_mrm" !< namelist name
+  ! contains
+  !   !> \copydoc mo_namelists::read_mainconfig_mhm_mrm
+  !   procedure, public :: read => read_mainconfig_mhm_mrm !< \see mo_namelists::read_mainconfig_mhm_mrm
+  ! end type nml_mainconfig_mhm_mrm_t
+  ! !> 'mainconfig_mhm_mrm' namelist content
+  ! type(nml_mainconfig_mhm_mrm_t), public :: nml_mainconfig_mhm_mrm
+
   ! namelist /interflow1/ &
   !   interflowStorageCapacityFactor, &
   !   interflowRecession_slope, &
   !   fastInterflowRecession_forest, &
   !   slowInterflowRecession_Ks, &
   !   exponentSlowInterflow
+  !
+  ! !> \class   nml_mainconfig_mhm_mrm_t
+  ! !> \brief   'mainconfig_mhm_mrm' namelist content
+  ! type, extends(nml_base), public :: nml_mainconfig_mhm_mrm_t
+  !   character(18) :: name = "mainconfig_mhm_mrm" !< namelist name
+  ! contains
+  !   !> \copydoc mo_namelists::read_mainconfig_mhm_mrm
+  !   procedure, public :: read => read_mainconfig_mhm_mrm !< \see mo_namelists::read_mainconfig_mhm_mrm
+  ! end type nml_mainconfig_mhm_mrm_t
+  ! !> 'mainconfig_mhm_mrm' namelist content
+  ! type(nml_mainconfig_mhm_mrm_t), public :: nml_mainconfig_mhm_mrm
+
   ! namelist /percolation1/ &
   !   rechargeCoefficient, &
   !   rechargeFactor_karstic, &
   !   gain_loss_GWreservoir_karstic
+  !
+  ! !> \class   nml_mainconfig_mhm_mrm_t
+  ! !> \brief   'mainconfig_mhm_mrm' namelist content
+  ! type, extends(nml_base), public :: nml_mainconfig_mhm_mrm_t
+  !   character(18) :: name = "mainconfig_mhm_mrm" !< namelist name
+  ! contains
+  !   !> \copydoc mo_namelists::read_mainconfig_mhm_mrm
+  !   procedure, public :: read => read_mainconfig_mhm_mrm !< \see mo_namelists::read_mainconfig_mhm_mrm
+  ! end type nml_mainconfig_mhm_mrm_t
+  ! !> 'mainconfig_mhm_mrm' namelist content
+  ! type(nml_mainconfig_mhm_mrm_t), public :: nml_mainconfig_mhm_mrm
+
   ! namelist /neutrons1/ &
   !   Desilets_N0, &
   !   Desilets_LW0, &
   !   Desilets_LW1
+  !
+  ! !> \class   nml_mainconfig_mhm_mrm_t
+  ! !> \brief   'mainconfig_mhm_mrm' namelist content
+  ! type, extends(nml_base), public :: nml_mainconfig_mhm_mrm_t
+  !   character(18) :: name = "mainconfig_mhm_mrm" !< namelist name
+  ! contains
+  !   !> \copydoc mo_namelists::read_mainconfig_mhm_mrm
+  !   procedure, public :: read => read_mainconfig_mhm_mrm !< \see mo_namelists::read_mainconfig_mhm_mrm
+  ! end type nml_mainconfig_mhm_mrm_t
+  ! !> 'mainconfig_mhm_mrm' namelist content
+  ! type(nml_mainconfig_mhm_mrm_t), public :: nml_mainconfig_mhm_mrm
+
   ! namelist /neutrons2/ &
   !   COSMIC_N0, &
   !   COSMIC_N1, &
@@ -360,8 +719,31 @@ module mo_namelists
   !   COSMIC_L31, &
   !   COSMIC_LW0, &
   !   COSMIC_LW1
+  !
+  ! !> \class   nml_mainconfig_mhm_mrm_t
+  ! !> \brief   'mainconfig_mhm_mrm' namelist content
+  ! type, extends(nml_base), public :: nml_mainconfig_mhm_mrm_t
+  !   character(18) :: name = "mainconfig_mhm_mrm" !< namelist name
+  ! contains
+  !   !> \copydoc mo_namelists::read_mainconfig_mhm_mrm
+  !   procedure, public :: read => read_mainconfig_mhm_mrm !< \see mo_namelists::read_mainconfig_mhm_mrm
+  ! end type nml_mainconfig_mhm_mrm_t
+  ! !> 'mainconfig_mhm_mrm' namelist content
+  ! type(nml_mainconfig_mhm_mrm_t), public :: nml_mainconfig_mhm_mrm
+
   ! namelist /geoparameter/ &
   !   GeoParam
+  !
+  ! !> \class   nml_mainconfig_mhm_mrm_t
+  ! !> \brief   'mainconfig_mhm_mrm' namelist content
+  ! type, extends(nml_base), public :: nml_mainconfig_mhm_mrm_t
+  !   character(18) :: name = "mainconfig_mhm_mrm" !< namelist name
+  ! contains
+  !   !> \copydoc mo_namelists::read_mainconfig_mhm_mrm
+  !   procedure, public :: read => read_mainconfig_mhm_mrm !< \see mo_namelists::read_mainconfig_mhm_mrm
+  ! end type nml_mainconfig_mhm_mrm_t
+  ! !> 'mainconfig_mhm_mrm' namelist content
+  ! type(nml_mainconfig_mhm_mrm_t), public :: nml_mainconfig_mhm_mrm
 
   !######## mo_mrm_read_config
   ! namelist /mainconfig_mrm/ &
@@ -369,36 +751,131 @@ module mo_namelists
   !   filenameTotalRunoff, &
   !   varnameTotalRunoff, &
   !   gw_coupling
+  !
+  ! !> \class   nml_mainconfig_mhm_mrm_t
+  ! !> \brief   'mainconfig_mhm_mrm' namelist content
+  ! type, extends(nml_base), public :: nml_mainconfig_mhm_mrm_t
+  !   character(18) :: name = "mainconfig_mhm_mrm" !< namelist name
+  ! contains
+  !   !> \copydoc mo_namelists::read_mainconfig_mhm_mrm
+  !   procedure, public :: read => read_mainconfig_mhm_mrm !< \see mo_namelists::read_mainconfig_mhm_mrm
+  ! end type nml_mainconfig_mhm_mrm_t
+  ! !> 'mainconfig_mhm_mrm' namelist content
+  ! type(nml_mainconfig_mhm_mrm_t), public :: nml_mainconfig_mhm_mrm
+
   ! namelist /directories_mRM/ &
   !   dir_Gauges, &
   !   dir_Total_Runoff, &
   !   dir_Bankfull_Runoff
+  !
+  ! !> \class   nml_mainconfig_mhm_mrm_t
+  ! !> \brief   'mainconfig_mhm_mrm' namelist content
+  ! type, extends(nml_base), public :: nml_mainconfig_mhm_mrm_t
+  !   character(18) :: name = "mainconfig_mhm_mrm" !< namelist name
+  ! contains
+  !   !> \copydoc mo_namelists::read_mainconfig_mhm_mrm
+  !   procedure, public :: read => read_mainconfig_mhm_mrm !< \see mo_namelists::read_mainconfig_mhm_mrm
+  ! end type nml_mainconfig_mhm_mrm_t
+  ! !> 'mainconfig_mhm_mrm' namelist content
+  ! type(nml_mainconfig_mhm_mrm_t), public :: nml_mainconfig_mhm_mrm
+
   ! namelist /evaluation_gauges/ &
   !   nGaugesTotal, &
   !   NoGauges_domain, &
   !   Gauge_id, &
   !   gauge_filename
+  !
+  ! !> \class   nml_mainconfig_mhm_mrm_t
+  ! !> \brief   'mainconfig_mhm_mrm' namelist content
+  ! type, extends(nml_base), public :: nml_mainconfig_mhm_mrm_t
+  !   character(18) :: name = "mainconfig_mhm_mrm" !< namelist name
+  ! contains
+  !   !> \copydoc mo_namelists::read_mainconfig_mhm_mrm
+  !   procedure, public :: read => read_mainconfig_mhm_mrm !< \see mo_namelists::read_mainconfig_mhm_mrm
+  ! end type nml_mainconfig_mhm_mrm_t
+  ! !> 'mainconfig_mhm_mrm' namelist content
+  ! type(nml_mainconfig_mhm_mrm_t), public :: nml_mainconfig_mhm_mrm
+
   ! namelist /inflow_gauges/ &
   !   nInflowGaugesTotal, &
   !   NoInflowGauges_domain, &
   !   InflowGauge_id, &
   !   InflowGauge_filename, &
   !   InflowGauge_Headwater
+  !
+  ! !> \class   nml_mainconfig_mhm_mrm_t
+  ! !> \brief   'mainconfig_mhm_mrm' namelist content
+  ! type, extends(nml_base), public :: nml_mainconfig_mhm_mrm_t
+  !   character(18) :: name = "mainconfig_mhm_mrm" !< namelist name
+  ! contains
+  !   !> \copydoc mo_namelists::read_mainconfig_mhm_mrm
+  !   procedure, public :: read => read_mainconfig_mhm_mrm !< \see mo_namelists::read_mainconfig_mhm_mrm
+  ! end type nml_mainconfig_mhm_mrm_t
+  ! !> 'mainconfig_mhm_mrm' namelist content
+  ! type(nml_mainconfig_mhm_mrm_t), public :: nml_mainconfig_mhm_mrm
+
   ! namelist /NLoutputResults/ &
   !   output_deflate_level_mrm, &
   !   output_double_precision_mrm, &
   !   timeStep_model_outputs_mrm, &
   !   outputFlxState_mrm
+  !
+  ! !> \class   nml_mainconfig_mhm_mrm_t
+  ! !> \brief   'mainconfig_mhm_mrm' namelist content
+  ! type, extends(nml_base), public :: nml_mainconfig_mhm_mrm_t
+  !   character(18) :: name = "mainconfig_mhm_mrm" !< namelist name
+  ! contains
+  !   !> \copydoc mo_namelists::read_mainconfig_mhm_mrm
+  !   procedure, public :: read => read_mainconfig_mhm_mrm !< \see mo_namelists::read_mainconfig_mhm_mrm
+  ! end type nml_mainconfig_mhm_mrm_t
+  ! !> 'mainconfig_mhm_mrm' namelist content
+  ! type(nml_mainconfig_mhm_mrm_t), public :: nml_mainconfig_mhm_mrm
+
   ! namelist /routing1/ &
   !   muskingumTravelTime_constant, &
   !   muskingumTravelTime_riverLength, &
   !   muskingumTravelTime_riverSlope, &
   !   muskingumTravelTime_impervious, &
   !   muskingumAttenuation_riverSlope
+  !
+  ! !> \class   nml_mainconfig_mhm_mrm_t
+  ! !> \brief   'mainconfig_mhm_mrm' namelist content
+  ! type, extends(nml_base), public :: nml_mainconfig_mhm_mrm_t
+  !   character(18) :: name = "mainconfig_mhm_mrm" !< namelist name
+  ! contains
+  !   !> \copydoc mo_namelists::read_mainconfig_mhm_mrm
+  !   procedure, public :: read => read_mainconfig_mhm_mrm !< \see mo_namelists::read_mainconfig_mhm_mrm
+  ! end type nml_mainconfig_mhm_mrm_t
+  ! !> 'mainconfig_mhm_mrm' namelist content
+  ! type(nml_mainconfig_mhm_mrm_t), public :: nml_mainconfig_mhm_mrm
+
   ! namelist /routing2/ &
   !   streamflow_celerity
+  !
+  ! !> \class   nml_mainconfig_mhm_mrm_t
+  ! !> \brief   'mainconfig_mhm_mrm' namelist content
+  ! type, extends(nml_base), public :: nml_mainconfig_mhm_mrm_t
+  !   character(18) :: name = "mainconfig_mhm_mrm" !< namelist name
+  ! contains
+  !   !> \copydoc mo_namelists::read_mainconfig_mhm_mrm
+  !   procedure, public :: read => read_mainconfig_mhm_mrm !< \see mo_namelists::read_mainconfig_mhm_mrm
+  ! end type nml_mainconfig_mhm_mrm_t
+  ! !> 'mainconfig_mhm_mrm' namelist content
+  ! type(nml_mainconfig_mhm_mrm_t), public :: nml_mainconfig_mhm_mrm
+
   ! namelist /routing3/ &
   !   slope_factor
+  !
+  ! !> \class   nml_mainconfig_mhm_mrm_t
+  ! !> \brief   'mainconfig_mhm_mrm' namelist content
+  ! type, extends(nml_base), public :: nml_mainconfig_mhm_mrm_t
+  !   character(18) :: name = "mainconfig_mhm_mrm" !< namelist name
+  ! contains
+  !   !> \copydoc mo_namelists::read_mainconfig_mhm_mrm
+  !   procedure, public :: read => read_mainconfig_mhm_mrm !< \see mo_namelists::read_mainconfig_mhm_mrm
+  ! end type nml_mainconfig_mhm_mrm_t
+  ! !> 'mainconfig_mhm_mrm' namelist content
+  ! type(nml_mainconfig_mhm_mrm_t), public :: nml_mainconfig_mhm_mrm
 
   !######## mo_mrm_riv_temp_class
   ! namelist /config_riv_temp/ &
@@ -412,7 +889,17 @@ module mo_namelists
   !   riv_widths_file, &
   !   riv_widths_name, &
   !   dir_riv_widths
-
+  !
+  ! !> \class   nml_mainconfig_mhm_mrm_t
+  ! !> \brief   'mainconfig_mhm_mrm' namelist content
+  ! type, extends(nml_base), public :: nml_mainconfig_mhm_mrm_t
+  !   character(18) :: name = "mainconfig_mhm_mrm" !< namelist name
+  ! contains
+  !   !> \copydoc mo_namelists::read_mainconfig_mhm_mrm
+  !   procedure, public :: read => read_mainconfig_mhm_mrm !< \see mo_namelists::read_mainconfig_mhm_mrm
+  ! end type nml_mainconfig_mhm_mrm_t
+  ! !> 'mainconfig_mhm_mrm' namelist content
+  ! type(nml_mainconfig_mhm_mrm_t), public :: nml_mainconfig_mhm_mrm
 
 contains
 
@@ -591,6 +1078,132 @@ contains
       self%read_from_file = .false.
     end if
   end subroutine read_LCover
+
+  !> \brief Read 'mainconfig_mhm_mrm' namelist content.
+  subroutine read_mainconfig_mhm_mrm(self, file, unit)
+    implicit none
+    class(nml_mainconfig_mhm_mrm_t), intent(inout) :: self
+    character(*), intent(in) :: file !< file containing the namelist
+    integer, intent(in) :: unit !< file unit to open the given file
+
+    integer(i4) :: timeStep !< [h] simulation time step (= TS) in [h] either 1, 2, 3, 4, 6, 12 or 24
+    real(dp), dimension(maxNoDomains) :: resolution_Routing !< resolution of Level-11 discharge routing [m or degree] per domain
+    logical :: optimize !< Optimization (.true.) or Evaluation run (.false.)
+    logical :: optimize_restart !< Optimization will be restarted from mo_<opti_method>.restart file (.true.)
+    integer(i4) :: opti_method !< Optimization algorithm: 1 - DDS; 2 - Simulated Annealing; 3 - SCE
+    integer(i4) :: opti_function !< Objective function
+    logical :: read_restart !< flag for reading restart output
+    logical :: mrm_read_river_network !< flag to read the river network for mRM (read_restart = .True. forces .True.)
+    logical :: read_old_style_restart_bounds !< flag to use an old-style restart file created by mhm<=v5.11
+    character(256), dimension(maxNoDomains) :: mhm_file_RestartIn !< mhm restart file paths
+    character(256), dimension(maxNoDomains) :: mrm_file_RestartIn !< mrm restart file paths
+
+    namelist /mainconfig_mhm_mrm/ &
+      timestep, &
+      resolution_Routing, &
+      optimize, &
+      optimize_restart, &
+      opti_method, &
+      opti_function, &
+      read_restart, &
+      mrm_read_river_network, &
+      read_old_style_restart_bounds, &
+      mhm_file_RestartIn, &
+      mrm_file_RestartIn
+
+    if ( self%read_from_file ) then
+      ! set default values for optional arguments
+      mrm_read_river_network = .false.
+      read_old_style_restart_bounds = .false.
+      call open_nml(file, unit, quiet =.true.)
+      call position_nml(self%name, unit)
+      read(unit, nml=mainconfig_mhm_mrm)
+      call close_nml(unit)
+      self%timestep = timestep
+      self%resolution_Routing = resolution_Routing
+      self%optimize = optimize
+      self%optimize_restart = optimize_restart
+      self%opti_method = opti_method
+      self%opti_function = opti_function
+      self%read_restart = read_restart
+      self%mrm_read_river_network = mrm_read_river_network
+      self%read_old_style_restart_bounds = read_old_style_restart_bounds
+      self%mhm_file_RestartIn = mhm_file_RestartIn
+      self%mrm_file_RestartIn = mrm_file_RestartIn
+      self%read_from_file = .false.
+    end if
+  end subroutine read_mainconfig_mhm_mrm
+
+  !> \brief Read 'Optimization' namelist content.
+  subroutine read_Optimization(self, file, unit)
+    implicit none
+    class(nml_Optimization_t), intent(inout) :: self
+    character(*), intent(in) :: file !< file containing the namelist
+    integer, intent(in) :: unit !< file unit to open the given file
+
+    integer(i4) :: nIterations !< number of iterations for optimization
+    integer(i8) :: seed !< seed used for optimization, default: -9 --> system time
+    real(dp) :: dds_r !< DDS: perturbation rate, default: 0.2
+    real(dp) :: sa_temp !< SA:  initial temperature, default: -9.0 --> estimated
+    integer(i4) :: sce_ngs !< SCE: # of complexes, default: 2
+    integer(i4) :: sce_npg !< SCE: # of points per complex,default: -9 --> 2n+1
+    integer(i4) :: sce_nps !< SCE: # of points per subcomplex,default: -9 --> n+1
+    logical :: mcmc_opti !< MCMC: Optimization (.true.) or only parameter uncertainty (.false.)
+    real(dp), dimension(nerror_model) :: mcmc_error_params !< error model para (mcmc_opti=.false.) e.g. for opti_function=8: .01, .3
+
+    namelist /Optimization/ &
+      nIterations, &
+      seed, &
+      dds_r, &
+      sa_temp, &
+      sce_ngs, &
+      sce_npg, &
+      sce_nps, &
+      mcmc_opti, &
+      mcmc_error_params
+
+    if ( self%read_from_file ) then
+      call open_nml(file, unit, quiet =.true.)
+      call position_nml(self%name, unit)
+      read(unit, nml=Optimization)
+      call close_nml(unit)
+      self%nIterations = nIterations
+      self%seed = seed
+      self%dds_r = dds_r
+      self%sa_temp = sa_temp
+      self%sce_ngs = sce_ngs
+      self%sce_npg = sce_npg
+      self%sce_nps = sce_nps
+      self%mcmc_opti = mcmc_opti
+      self%mcmc_error_params = mcmc_error_params
+      self%read_from_file = .false.
+    end if
+  end subroutine read_Optimization
+
+  !> \brief Read 'time_periods' namelist content.
+  subroutine read_time_periods(self, file, unit)
+    implicit none
+    class(nml_time_periods_t), intent(inout) :: self
+    character(*), intent(in) :: file !< file containing the namelist
+    integer, intent(in) :: unit !< file unit to open the given file
+
+    integer(i4), dimension(maxNoDomains) :: warming_Days !< number of days for warm up period
+    type(period), dimension(maxNoDomains) :: eval_Per !< time period for model evaluation
+
+    namelist /time_periods/ &
+      warming_Days, &
+      eval_Per
+
+      if ( self%read_from_file ) then
+      call open_nml(file, unit, quiet =.true.)
+      call position_nml(self%name, unit)
+      read(unit, nml=time_periods)
+      call close_nml(unit)
+      self%warming_Days = warming_Days
+      self%eval_Per = eval_Per
+      self%read_from_file = .false.
+    end if
+  end subroutine read_time_periods
 
   ! !> \brief Read 'directories_general' namelist content.
   ! subroutine read_directories_general(self, file, unit)

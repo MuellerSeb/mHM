@@ -49,6 +49,10 @@ CONTAINS
 
   subroutine common_mHM_mRM_read_config(file_namelist, unamelist)
 
+    use mo_namelists, only : &
+      nml_mainconfig_mhm_mrm, &
+      nml_Optimization, &
+      nml_time_periods
     use mo_common_constants, only : maxNoDomains, nodata_i4
     use mo_common_mHM_mRM_variables, only : LCyearId, dds_r, mhmFileRestartIn, mrmFileRestartIn, evalPer,&
                                             mcmc_error_params, mcmc_opti, nIterations, &
@@ -60,7 +64,6 @@ CONTAINS
     use mo_common_variables, only : LCfilename, domainMeta, period, processMatrix
     use mo_julian, only : caldat, julday
     use mo_message, only : message
-    use mo_nml, only : close_nml, open_nml, position_nml
     use mo_string_utils, only : num2str
 
     implicit none
@@ -82,32 +85,21 @@ CONTAINS
     character(256), dimension(maxNoDomains) :: mhm_file_RestartIn
     character(256), dimension(maxNoDomains) :: mrm_file_RestartIn
 
-
-    ! namelist spatial & temporal resolution, otmization information
-    namelist /mainconfig_mhm_mrm/ timestep, resolution_Routing, optimize, &
-            optimize_restart, opti_method, opti_function, &
-            read_restart, mrm_read_river_network, read_old_style_restart_bounds, &
-            mhm_file_RestartIn, mrm_file_RestartIn
-    ! namelist for optimization settings
-    namelist /Optimization/ nIterations, seed, dds_r, sa_temp, sce_ngs, &
-            sce_npg, sce_nps, mcmc_opti, mcmc_error_params
-    ! namelist for time settings
-    namelist /time_periods/ warming_Days, eval_Per
-
-    ! set default values for optional arguments
-    mrm_read_river_network = .false.
-    read_old_style_restart_bounds = .false.
-
-    !===============================================================
-    !  Read namelist main directories
-    !===============================================================
-    call open_nml(file_namelist, unamelist, quiet = .true.)
-
     !===============================================================
     !  Read namelist specifying the model configuration
     !===============================================================
-    call position_nml('mainconfig_mhm_mrm', unamelist)
-    read(unamelist, nml = mainconfig_mhm_mrm)
+    call nml_mainconfig_mhm_mrm%read(file_namelist, unamelist)
+    timestep = nml_mainconfig_mhm_mrm%timestep
+    resolution_Routing = nml_mainconfig_mhm_mrm%resolution_Routing
+    optimize = nml_mainconfig_mhm_mrm%optimize
+    optimize_restart = nml_mainconfig_mhm_mrm%optimize_restart
+    opti_method = nml_mainconfig_mhm_mrm%opti_method
+    opti_function = nml_mainconfig_mhm_mrm%opti_function
+    read_restart = nml_mainconfig_mhm_mrm%read_restart
+    mrm_read_river_network = nml_mainconfig_mhm_mrm%mrm_read_river_network
+    read_old_style_restart_bounds = nml_mainconfig_mhm_mrm%read_old_style_restart_bounds
+    mhm_file_RestartIn = nml_mainconfig_mhm_mrm%mhm_file_RestartIn
+    mrm_file_RestartIn = nml_mainconfig_mhm_mrm%mrm_file_RestartIn
     ! consistency between read_restart and mrm_read_river_network
     if (read_restart) then
        if (.not. mrm_read_river_network) then
@@ -162,8 +154,10 @@ CONTAINS
     !===============================================================
     !  read simulation time periods incl. warming days
     !===============================================================
-    call position_nml('time_periods', unamelist)
-    read(unamelist, nml = time_periods)
+    call nml_time_periods%read(file_namelist, unamelist)
+    warming_Days = nml_time_periods%warming_Days
+    eval_Per = nml_time_periods%eval_Per
+
     do iDomain = 1, domainMeta%nDomains
       domainID = domainMeta%indices(iDomain)
       warmingDays(iDomain) = warming_Days(domainID)
@@ -210,12 +204,18 @@ CONTAINS
     !===============================================================
     ! Settings for Optimization
     !===============================================================
-    ! namelist for Optimization settings
-    call position_nml('Optimization', unamelist)
-    read(unamelist, nml = Optimization)
+    call nml_Optimization%read(file_namelist, unamelist)
+    nIterations = nml_Optimization%nIterations
+    seed = nml_Optimization%seed
+    dds_r = nml_Optimization%dds_r
+    sa_temp = nml_Optimization%sa_temp
+    sce_ngs = nml_Optimization%sce_ngs
+    sce_npg = nml_Optimization%sce_npg
+    sce_nps = nml_Optimization%sce_nps
+    mcmc_opti = nml_Optimization%mcmc_opti
+    mcmc_error_params = nml_Optimization%mcmc_error_params
     ! checking of settings and default value initialization moved to new subroutine
     ! because global_parameters need to be set, which is not the case right now
-    call close_nml(unamelist)
 
   end subroutine common_mHM_mRM_read_config
 
