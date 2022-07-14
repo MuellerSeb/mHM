@@ -87,7 +87,6 @@ contains
     use mo_mpr_global_variables, only : HorizonDepth_mHM, dirgridded_LAI, fracSealed_cityArea, iFlag_soilDB, &
                                         inputFormat_gridded_LAI, nGeoUnits, nSoilHorizons_mHM, tillageDepth, &
                                         timeStep_LAI_input
-    use mo_nml, only : close_nml, open_nml, position_nml
     use mo_string_utils, only : num2str
     use mo_utils, only : EQ
 
@@ -204,60 +203,6 @@ contains
     real(dp), dimension(nColPars) :: COSMIC_LW1
 
     integer(i4) :: iDomain, domainID
-
-
-    ! namelist parameters
-    namelist /interception1/ canopyInterceptionFactor
-    namelist /snow1/snowTreshholdTemperature, degreeDayFactor_forest, degreeDayFactor_impervious, &
-            degreeDayFactor_pervious, increaseDegreeDayFactorByPrecip, maxDegreeDayFactor_forest, &
-            maxDegreeDayFactor_impervious, maxDegreeDayFactor_pervious
-    namelist /soilmoisture1/ orgMatterContent_forest, orgMatterContent_impervious, orgMatterContent_pervious, &
-            PTF_lower66_5_constant, PTF_lower66_5_clay, PTF_lower66_5_Db, PTF_higher66_5_constant, &
-            PTF_higher66_5_clay, PTF_higher66_5_Db, PTF_Ks_constant, &
-            PTF_Ks_sand, PTF_Ks_clay, PTF_Ks_curveSlope, &
-            rootFractionCoefficient_forest, rootFractionCoefficient_impervious, &
-            rootFractionCoefficient_pervious, infiltrationShapeFactor
-    namelist /soilmoisture2/ orgMatterContent_forest, orgMatterContent_impervious, orgMatterContent_pervious, &
-            PTF_lower66_5_constant, PTF_lower66_5_clay, PTF_lower66_5_Db, PTF_higher66_5_constant, &
-            PTF_higher66_5_clay, PTF_higher66_5_Db, PTF_Ks_constant, &
-            PTF_Ks_sand, PTF_Ks_clay, PTF_Ks_curveSlope, &
-            rootFractionCoefficient_forest, rootFractionCoefficient_impervious, &
-            rootFractionCoefficient_pervious, infiltrationShapeFactor, jarvis_sm_threshold_c1
-    namelist /soilmoisture3/ orgMatterContent_forest, orgMatterContent_impervious, orgMatterContent_pervious, &
-            PTF_lower66_5_constant, PTF_lower66_5_clay, PTF_lower66_5_Db, PTF_higher66_5_constant, &
-            PTF_higher66_5_clay, PTF_higher66_5_Db, PTF_Ks_constant, &
-            PTF_Ks_sand, PTF_Ks_clay, PTF_Ks_curveSlope, &
-            rootFractionCoefficient_forest, rootFractionCoefficient_impervious, &
-            rootFractionCoefficient_pervious, infiltrationShapeFactor,rootFractionCoefficient_sand, &
-            rootFractionCoefficient_clay, FCmin_glob, FCdelta_glob, jarvis_sm_threshold_c1
-    namelist /soilmoisture4/ orgMatterContent_forest, orgMatterContent_impervious, orgMatterContent_pervious, &
-            PTF_lower66_5_constant, PTF_lower66_5_clay, PTF_lower66_5_Db, PTF_higher66_5_constant, &
-            PTF_higher66_5_clay, PTF_higher66_5_Db, PTF_Ks_constant, &
-            PTF_Ks_sand, PTF_Ks_clay, PTF_Ks_curveSlope, &
-            rootFractionCoefficient_forest, rootFractionCoefficient_impervious, &
-            rootFractionCoefficient_pervious, infiltrationShapeFactor,rootFractionCoefficient_sand, &
-            rootFractionCoefficient_clay, FCmin_glob, FCdelta_glob
-    namelist /directRunoff1/ imperviousStorageCapacity
-    ! PET is input, LAI driven correction
-    namelist /PETminus1/  PET_a_forest, PET_a_impervious, PET_a_pervious, PET_b, PET_c
-    ! PET is input, aspect driven correction
-    namelist /PET0/  minCorrectionFactorPET, maxCorrectionFactorPET, aspectTresholdPET
-    ! Hargreaves-Samani
-    namelist /PET1/  minCorrectionFactorPET, maxCorrectionFactorPET, aspectTresholdPET, HargreavesSamaniCoeff
-    ! Priestely-Taylor
-    namelist /PET2/  PriestleyTaylorCoeff, PriestleyTaylorLAIcorr
-    ! Penman-Monteith
-    namelist /PET3/  canopyheigth_forest, canopyheigth_impervious, canopyheigth_pervious, displacementheight_coeff, &
-            roughnesslength_momentum_coeff, roughnesslength_heat_coeff, stomatal_resistance
-    namelist /interflow1/ interflowStorageCapacityFactor, interflowRecession_slope, fastInterflowRecession_forest, &
-            slowInterflowRecession_Ks, exponentSlowInterflow
-    namelist /percolation1/ rechargeCoefficient, rechargeFactor_karstic, gain_loss_GWreservoir_karstic
-    namelist /neutrons1/ Desilets_N0, Desilets_LW0, Desilets_LW1
-    namelist /neutrons2/ COSMIC_N0, COSMIC_N1, COSMIC_N2, COSMIC_alpha0, COSMIC_alpha1, COSMIC_L30, COSMIC_L31, &
-         COSMIC_LW0, COSMIC_LW1
-
-    !
-    namelist /geoparameter/ GeoParam
 
     !===============================================================
     ! INITIALIZATION
