@@ -11,10 +11,12 @@ module mo_namelists
   use mo_nml, only : open_nml, close_nml, position_nml
   use mo_constants, only : YearMonths
   use mo_mhm_constants, only : nOutFlxState
-  use mo_common_constants, only : maxNLcovers, maxNoDomains, nColPars, nodata_dp
+  use mo_common_constants, only : maxNLcovers, maxNoDomains, nColPars, nodata_dp, nodata_i4
   use mo_common_variables, only : nProcesses, period
   use mo_common_mHM_mRM_variables, only : nerror_model
   use mo_mpr_constants, only : maxGeoUnit, maxNoSoilHorizons
+  use mo_mrm_constants, only : maxNoGauges, mrm_nOutFlxState => nOutFlxState
+  use mo_string_utils, only : num2str
 
   implicit none
 
@@ -110,7 +112,7 @@ module mo_namelists
   !> \class   nml_processselection_t
   !> \brief   'processSelection' namelist content
   type, public :: nml_processselection_t
-    character(16) :: name = "processSelection" !< namelist name
+    character(16) :: name = "processselection" !< namelist name
     logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
     integer(i4), dimension(nProcesses) :: processCase !< ! Choosen process description number
   contains
@@ -129,7 +131,7 @@ module mo_namelists
   !> \class   nml_lcover_t
   !> \brief   'LCover' namelist content
   type, public :: nml_lcover_t
-    character(6) :: name = "LCover" !< namelist name
+    character(6) :: name = "lcover" !< namelist name
     logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
     integer(i4) :: nLCoverScene !< Number of land cover scene (lcs)
     integer(i4), dimension(maxNLCovers) :: LCoverYearStart !< starting year LCover
@@ -192,9 +194,9 @@ module mo_namelists
   !   mcmc_error_params
   !
   !> \class   nml_optimization_t
-  !> \brief   'Optimization' namelist content
-  type, public :: nml_Optimization_t
-    character(12) :: name = "Optimization" !< namelist name
+  !> \brief   'optimization' namelist content
+  type, public :: nml_optimization_t
+    character(12) :: name = "optimization" !< namelist name
     logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
     integer(i4) :: nIterations !< number of iterations for optimization
     integer(i8) :: seed !< seed used for optimization, default: -9 --> system time
@@ -203,14 +205,14 @@ module mo_namelists
     integer(i4) :: sce_ngs !< SCE: # of complexes, default: 2
     integer(i4) :: sce_npg !< SCE: # of points per complex,default: -9 --> 2n+1
     integer(i4) :: sce_nps !< SCE: # of points per subcomplex,default: -9 --> n+1
-    logical :: mcmc_opti !< MCMC: Optimization (.true.) or only parameter uncertainty (.false.)
+    logical :: mcmc_opti !< MCMC: optimization (.true.) or only parameter uncertainty (.false.)
     real(dp), dimension(nerror_model) :: mcmc_error_params !< error model para (mcmc_opti=.false.) e.g. for opti_function=8: .01, .3
   contains
-    !> \copydoc mo_namelists::read_Optimization
-    procedure, public :: read => read_Optimization !< \see mo_namelists::read_Optimization
-  end type nml_Optimization_t
-  !> 'Optimization' namelist content
-  type(nml_Optimization_t), public :: nml_Optimization
+    !> \copydoc mo_namelists::read_optimization
+    procedure, public :: read => read_optimization !< \see mo_namelists::read_optimization
+  end type nml_optimization_t
+  !> 'optimization' namelist content
+  type(nml_optimization_t), public :: nml_optimization
 
   ! namelist /time_periods/ &
   !   warming_Days, &
@@ -232,7 +234,7 @@ module mo_namelists
 
   !######## mo_mhm_read_config
 
-  ! namelist /directories_mHM/ &
+  ! namelist /directories_mhm/ &
   !   inputFormat_meteo_forcings, &
   !   dir_Precipitation, &
   !   dir_Temperature, &
@@ -246,9 +248,9 @@ module mo_namelists
   !   time_step_model_inputs
   !
   !> \class   nml_directories_mhm_t
-  !> \brief   'directories_mHM' namelist content
-  type, public :: nml_directories_mHM_t
-    character(15) :: name = "directories_mHM" !< namelist name
+  !> \brief   'directories_mhm' namelist content
+  type, public :: nml_directories_mhm_t
+    character(15) :: name = "directories_mhm" !< namelist name
     logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
     character(256), public :: inputFormat_meteo_forcings !< format of meteo input data (nc)
     character(256), dimension(maxNoDomains) :: dir_Precipitation !< Directory where precipitation files are located
@@ -262,11 +264,11 @@ module mo_namelists
     character(256), dimension(maxNoDomains) :: dir_Radiation !< riv-temp related: directory of (long/short-wave)radiation
     integer(i4), dimension(maxNoDomains) :: time_step_model_inputs !< frequency for reading meteo input
   contains
-    !> \copydoc mo_namelists::read_directories_mHM
-    procedure, public :: read => read_directories_mHM !< \see mo_namelists::read_directories_mHM
-  end type nml_directories_mHM_t
-  !> 'directories_mHM' namelist content
-  type(nml_directories_mHM_t), public :: nml_directories_mHM
+    !> \copydoc mo_namelists::read_directories_mhm
+    procedure, public :: read => read_directories_mhm !< \see mo_namelists::read_directories_mhm
+  end type nml_directories_mhm_t
+  !> 'directories_mhm' namelist content
+  type(nml_directories_mhm_t), public :: nml_directories_mhm
 
   ! namelist /optional_data/ &
   !   nSoilHorizons_sm_input, &
@@ -300,23 +302,23 @@ module mo_namelists
   !> 'optional_data' namelist content
   type(nml_optional_data_t), public :: nml_optional_data
 
-  ! namelist /panEvapo/ &
+  ! namelist /panevapo/ &
   !   evap_coeff
   !
   !> \class   nml_panevapo_t
-  !> \brief   'panEvapo' namelist content
-  type, public :: nml_panEvapo_t
-    character(8) :: name = "panEvapo" !< namelist name
+  !> \brief   'panevapo' namelist content
+  type, public :: nml_panevapo_t
+    character(8) :: name = "panevapo" !< namelist name
     logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
     real(dp), dimension(int(YearMonths, i4)) :: evap_coeff !< [-] Evap. coef. for free-water surfaces
   contains
-    !> \copydoc mo_namelists::read_panEvapo
-    procedure, public :: read => read_panEvapo !< \see mo_namelists::read_panEvapo
-  end type nml_panEvapo_t
-  !> 'panEvapo' namelist content
-  type(nml_panEvapo_t), public :: nml_panEvapo
+    !> \copydoc mo_namelists::read_panevapo
+    procedure, public :: read => read_panevapo !< \see mo_namelists::read_panevapo
+  end type nml_panevapo_t
+  !> 'panevapo' namelist content
+  type(nml_panevapo_t), public :: nml_panevapo
 
-  ! namelist /nightDayRatio/ &
+  ! namelist /nightdayratio/ &
   !   read_meteo_weights, &
   !   fnight_prec, &
   !   fnight_pet, &
@@ -325,9 +327,9 @@ module mo_namelists
   !   fnight_strd
   !
   !> \class   nml_nightdayratio_t
-  !> \brief   'nightDayRatio' namelist content
-  type, public :: nml_nightDayRatio_t
-    character(13) :: name = "nightDayRatio" !< namelist name
+  !> \brief   'nightdayratio' namelist content
+  type, public :: nml_nightdayratio_t
+    character(13) :: name = "nightdayratio" !< namelist name
     logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
     logical :: read_meteo_weights !< read weights for meteo data
     real(dp), dimension(int(YearMonths, i4)) :: fnight_prec !< [-] Night ratio precipitation < 1
@@ -336,51 +338,51 @@ module mo_namelists
     real(dp), dimension(int(YearMonths, i4)) :: fnight_ssrd !< [-] Night factor short-wave rad.
     real(dp), dimension(int(YearMonths, i4)) :: fnight_strd !< [-] Night factor long-wave rad.
   contains
-    !> \copydoc mo_namelists::read_nightDayRatio
-    procedure, public :: read => read_nightDayRatio !< \see mo_namelists::read_nightDayRatio
-  end type nml_nightDayRatio_t
-  !> 'nightDayRatio' namelist content
-  type(nml_nightDayRatio_t), public :: nml_nightDayRatio
+    !> \copydoc mo_namelists::read_nightdayratio
+    procedure, public :: read => read_nightdayratio !< \see mo_namelists::read_nightdayratio
+  end type nml_nightdayratio_t
+  !> 'nightdayratio' namelist content
+  type(nml_nightdayratio_t), public :: nml_nightdayratio
 
-  ! namelist /NLoutputResults/ &
+  ! namelist /nloutputresults/ &
   !   output_deflate_level, &
   !   output_double_precision, &
   !   timeStep_model_outputs, &
   !   outputFlxState
   !
   !> \class   nml_nloutputresults_t
-  !> \brief   'NLoutputResults' namelist content
-  type, public :: nml_NLoutputResults_t
-    character(15) :: name = "NLoutputResults" !< namelist name
+  !> \brief   'nloutputresults' namelist content
+  type, public :: nml_nloutputresults_t
+    character(15) :: name = "nloutputresults" !< namelist name
     logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
     integer(i4) :: output_deflate_level !< deflate level in nc files
     logical :: output_double_precision !< output precision in nc files
     integer(i4) :: timeStep_model_outputs !< timestep for writing model outputs
     logical, dimension(nOutFlxState) :: outputFlxState !< Define model outputs see "mhm_outputs.nml"
   contains
-    !> \copydoc mo_namelists::read_NLoutputResults
-    procedure, public :: read => read_NLoutputResults !< \see mo_namelists::read_NLoutputResults
-  end type nml_NLoutputResults_t
-  !> 'NLoutputResults' namelist content
-  type(nml_NLoutputResults_t), public :: nml_NLoutputResults
+    !> \copydoc mo_namelists::read_nloutputresults
+    procedure, public :: read => read_nloutputresults !< \see mo_namelists::read_nloutputresults
+  end type nml_nloutputresults_t
+  !> 'nloutputresults' namelist content
+  type(nml_nloutputresults_t), public :: nml_nloutputresults
 
-  ! namelist /BFI_inputs/ &
+  ! namelist /bfi_inputs/ &
   !   BFI_calc, &
   !   BFI_obs
   !
   !> \class   nml_bfi_inputs_t
-  !> \brief   'BFI_inputs' namelist content
-  type, public :: nml_BFI_inputs_t
-    character(10) :: name = "BFI_inputs" !< namelist name
+  !> \brief   'bfi_inputs' namelist content
+  type, public :: nml_bfi_inputs_t
+    character(10) :: name = "bfi_inputs" !< namelist name
     logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
     logical :: BFI_calc !< calculate observed BFI from gauges with Eckhardt filter
     real(dp), dimension(maxNoDomains) :: BFI_obs !< given base-flow index per domain
 contains
-    !> \copydoc mo_namelists::read_BFI_inputs
-    procedure, public :: read => read_BFI_inputs !< \see mo_namelists::read_BFI_inputs
-  end type nml_BFI_inputs_t
-  !> 'BFI_inputs' namelist content
-  type(nml_BFI_inputs_t), public :: nml_BFI_inputs
+    !> \copydoc mo_namelists::read_bfi_inputs
+    procedure, public :: read => read_bfi_inputs !< \see mo_namelists::read_bfi_inputs
+  end type nml_bfi_inputs_t
+  !> 'bfi_inputs' namelist content
+  type(nml_bfi_inputs_t), public :: nml_bfi_inputs
 
   !######## mo_mpr_read_config
   ! namelist /directories_MPR/ &
@@ -997,34 +999,41 @@ contains
   !   varnameTotalRunoff, &
   !   gw_coupling
   !
-  ! !> \class   nml_mainconfig_mhm_mrm_t
-  ! !> \brief   'mainconfig_mhm_mrm' namelist content
-  ! type, public :: nml_mainconfig_mhm_mrm_t
-  !   character(18) :: name = "mainconfig_mhm_mrm" !< namelist name
-  !   logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
-  ! contains
-  !   !> \copydoc mo_namelists::read_mainconfig_mhm_mrm
-  !   procedure, public :: read => read_mainconfig_mhm_mrm !< \see mo_namelists::read_mainconfig_mhm_mrm
-  ! end type nml_mainconfig_mhm_mrm_t
-  ! !> 'mainconfig_mhm_mrm' namelist content
-  ! type(nml_mainconfig_mhm_mrm_t), public :: nml_mainconfig_mhm_mrm
+  !> \class   nml_mainconfig_mrm_t
+  !> \brief   'mainconfig_mrm' namelist content
+  type, public :: nml_mainconfig_mrm_t
+    character(14) :: name = "mainconfig_mrm" !< namelist name
+    logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
+    logical :: ALMA_convention !< flag for ALMA convention (see http://www.lmd.jussieu.fr/~polcher/ALMA/convention_3.html)
+    character(256) :: filenameTotalRunoff !< Filename of simulated total runoff file
+    character(256) :: varnameTotalRunoff !< variable name of total runoff
+    logical :: gw_coupling !< switch to enable ground water coupling
+  contains
+    !> \copydoc mo_namelists::read_mainconfig_mrm
+    procedure, public :: read => read_mainconfig_mrm !< \see mo_namelists::read_mainconfig_mrm
+  end type nml_mainconfig_mrm_t
+  !> 'mainconfig_mrm' namelist content
+  type(nml_mainconfig_mrm_t), public :: nml_mainconfig_mrm
 
   ! namelist /directories_mRM/ &
   !   dir_Gauges, &
   !   dir_Total_Runoff, &
   !   dir_Bankfull_Runoff
   !
-  ! !> \class   nml_mainconfig_mhm_mrm_t
-  ! !> \brief   'mainconfig_mhm_mrm' namelist content
-  ! type, public :: nml_mainconfig_mhm_mrm_t
-  !   character(18) :: name = "mainconfig_mhm_mrm" !< namelist name
-  !   logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
-  ! contains
-  !   !> \copydoc mo_namelists::read_mainconfig_mhm_mrm
-  !   procedure, public :: read => read_mainconfig_mhm_mrm !< \see mo_namelists::read_mainconfig_mhm_mrm
-  ! end type nml_mainconfig_mhm_mrm_t
-  ! !> 'mainconfig_mhm_mrm' namelist content
-  ! type(nml_mainconfig_mhm_mrm_t), public :: nml_mainconfig_mhm_mrm
+  !> \class   nml_directories_mrm_t
+  !> \brief   'directories_mrm' namelist content
+  type, public :: nml_directories_mrm_t
+    character(15) :: name = "directories_mrm" !< namelist name
+    logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
+    character(256), dimension(maxNoDomains) :: dir_Gauges !< directory containing gauge time series
+    character(256), dimension(maxNoDomains) :: dir_Total_Runoff !< directory where simulated runoff can be found
+    character(256), dimension(maxNoDomains) :: dir_Bankfull_Runoff !< directory where runoff at bankfull conditions can be found
+  contains
+    !> \copydoc mo_namelists::read_directories_mrm
+    procedure, public :: read => read_directories_mrm !< \see mo_namelists::read_directories_mrm
+  end type nml_directories_mrm_t
+  !> 'directories_mrm' namelist content
+  type(nml_directories_mrm_t), public :: nml_directories_mrm
 
   ! namelist /evaluation_gauges/ &
   !   nGaugesTotal, &
@@ -1032,17 +1041,21 @@ contains
   !   Gauge_id, &
   !   gauge_filename
   !
-  ! !> \class   nml_mainconfig_mhm_mrm_t
-  ! !> \brief   'mainconfig_mhm_mrm' namelist content
-  ! type, public :: nml_mainconfig_mhm_mrm_t
-  !   character(18) :: name = "mainconfig_mhm_mrm" !< namelist name
-  !   logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
-  ! contains
-  !   !> \copydoc mo_namelists::read_mainconfig_mhm_mrm
-  !   procedure, public :: read => read_mainconfig_mhm_mrm !< \see mo_namelists::read_mainconfig_mhm_mrm
-  ! end type nml_mainconfig_mhm_mrm_t
-  ! !> 'mainconfig_mhm_mrm' namelist content
-  ! type(nml_mainconfig_mhm_mrm_t), public :: nml_mainconfig_mhm_mrm
+  !> \class   nml_evaluation_gauges_t
+  !> \brief   'evaluation_gauges' namelist content
+  type, public :: nml_evaluation_gauges_t
+    character(17) :: name = "evaluation_gauges" !< namelist name
+    logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
+    integer(i4) :: nGaugesTotal !< Number of evaluation gauges for all domains
+    integer(i4), dimension(maxNoDomains) :: NoGauges_domain !< number of gauges per domain
+    integer(i4), dimension(maxNoDomains, maxNoGauges) :: Gauge_id !< gauge ID for each gauge
+    character(256), dimension(maxNoDomains, maxNoGauges) :: Gauge_filename !< filename for each gauge time series
+  contains
+    !> \copydoc mo_namelists::read_evaluation_gauges
+    procedure, public :: read => read_evaluation_gauges !< \see mo_namelists::read_evaluation_gauges
+  end type nml_evaluation_gauges_t
+  !> 'evaluation_gauges' namelist content
+  type(nml_evaluation_gauges_t), public :: nml_evaluation_gauges
 
   ! namelist /inflow_gauges/ &
   !   nInflowGaugesTotal, &
@@ -1051,35 +1064,46 @@ contains
   !   InflowGauge_filename, &
   !   InflowGauge_Headwater
   !
-  ! !> \class   nml_mainconfig_mhm_mrm_t
-  ! !> \brief   'mainconfig_mhm_mrm' namelist content
-  ! type, public :: nml_mainconfig_mhm_mrm_t
-  !   character(18) :: name = "mainconfig_mhm_mrm" !< namelist name
-  !   logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
-  ! contains
-  !   !> \copydoc mo_namelists::read_mainconfig_mhm_mrm
-  !   procedure, public :: read => read_mainconfig_mhm_mrm !< \see mo_namelists::read_mainconfig_mhm_mrm
-  ! end type nml_mainconfig_mhm_mrm_t
-  ! !> 'mainconfig_mhm_mrm' namelist content
-  ! type(nml_mainconfig_mhm_mrm_t), public :: nml_mainconfig_mhm_mrm
+  !> \class   nml_inflow_gauges_t
+  !> \brief   'inflow_gauges' namelist content
+  type, public :: nml_inflow_gauges_t
+    character(13) :: name = "inflow_gauges" !< namelist name
+    logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
+    integer(i4) :: nInflowGaugesTotal !< Number of evaluation gauges for all domains
+    integer(i4), dimension(maxNoDomains) :: NoInflowGauges_domain !< number of gauges for subdomain (1)
+    integer(i4), dimension(maxNoDomains, maxNoGauges) :: InflowGauge_id !< id of inflow gauge(1) for subdomain(1) --> (1,1)
+    !> name of file with timeseries of inflow gauge(1) for subdomain(1) --> (1,1)
+    character(256), dimension(maxNoDomains, maxNoGauges) :: InflowGauge_filename
+    !> consider flows from upstream/headwater cells of inflow gauge(1) for subdomain(1) --> (1,1)
+    logical, dimension(maxNoDomains, maxNoGauges) :: InflowGauge_Headwater
+  contains
+    !> \copydoc mo_namelists::read_inflow_gauges
+    procedure, public :: read => read_inflow_gauges !< \see mo_namelists::read_inflow_gauges
+  end type nml_inflow_gauges_t
+  !> 'inflow_gauges' namelist content
+  type(nml_inflow_gauges_t), public :: nml_inflow_gauges
 
-  ! namelist /NLoutputResults/ &
+  ! namelist /nloutputresults/ &
   !   output_deflate_level_mrm, &
   !   output_double_precision_mrm, &
   !   timeStep_model_outputs_mrm, &
   !   outputFlxState_mrm
   !
-  ! !> \class   nml_mainconfig_mhm_mrm_t
-  ! !> \brief   'mainconfig_mhm_mrm' namelist content
-  ! type, public :: nml_mainconfig_mhm_mrm_t
-  !   character(18) :: name = "mainconfig_mhm_mrm" !< namelist name
-  !   logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
-  ! contains
-  !   !> \copydoc mo_namelists::read_mainconfig_mhm_mrm
-  !   procedure, public :: read => read_mainconfig_mhm_mrm !< \see mo_namelists::read_mainconfig_mhm_mrm
-  ! end type nml_mainconfig_mhm_mrm_t
-  ! !> 'mainconfig_mhm_mrm' namelist content
-  ! type(nml_mainconfig_mhm_mrm_t), public :: nml_mainconfig_mhm_mrm
+  !> \class   nml_mrm_outputs_t
+  !> \brief   'mrm_outputs' namelist content
+  type, public :: nml_mrm_outputs_t
+    character(15) :: name = "nloutputresults" !< namelist name
+    logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
+    integer(i4) :: output_deflate_level_mrm !< netcdf deflate level
+    logical :: output_double_precision_mrm !< switch to enable double precision in netcdf
+    integer(i4) :: timeStep_model_outputs_mrm !< timestep for writing model outputs
+    logical, dimension(mrm_nOutFlxState) :: outputFlxState_mrm !< Define model outputs see "mhm_outputs.nml"
+  contains
+    !> \copydoc mo_namelists::read_mrm_outputs
+    procedure, public :: read => read_mrm_outputs !< \see mo_namelists::read_mrm_outputs
+  end type nml_mrm_outputs_t
+  !> 'mrm_outputs' namelist content
+  type(nml_mrm_outputs_t), public :: nml_mrm_outputs
 
   ! namelist /routing1/ &
   !   muskingumTravelTime_constant, &
@@ -1088,47 +1112,54 @@ contains
   !   muskingumTravelTime_impervious, &
   !   muskingumAttenuation_riverSlope
   !
-  ! !> \class   nml_mainconfig_mhm_mrm_t
-  ! !> \brief   'mainconfig_mhm_mrm' namelist content
-  ! type, public :: nml_mainconfig_mhm_mrm_t
-  !   character(18) :: name = "mainconfig_mhm_mrm" !< namelist name
-  !   logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
-  ! contains
-  !   !> \copydoc mo_namelists::read_mainconfig_mhm_mrm
-  !   procedure, public :: read => read_mainconfig_mhm_mrm !< \see mo_namelists::read_mainconfig_mhm_mrm
-  ! end type nml_mainconfig_mhm_mrm_t
-  ! !> 'mainconfig_mhm_mrm' namelist content
-  ! type(nml_mainconfig_mhm_mrm_t), public :: nml_mainconfig_mhm_mrm
+  !> \class   nml_routing1_t
+  !> \brief   'routing1' namelist content
+  type, public :: nml_routing1_t
+    character(8) :: name = "routing1" !< namelist name
+    logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
+    real(dp), dimension(nColPars) :: muskingumTravelTime_constant !< muskingum parameter constant
+    real(dp), dimension(nColPars) :: muskingumTravelTime_riverLength !< muskingum parameter river length
+    real(dp), dimension(nColPars) :: muskingumTravelTime_riverSlope !< muskingum parameter river slope
+    real(dp), dimension(nColPars) :: muskingumTravelTime_impervious !< muskingum parameter impervious
+    real(dp), dimension(nColPars) :: muskingumAttenuation_riverSlope !< muskingum parameter attenuation river slope
+  contains
+    !> \copydoc mo_namelists::read_routing1
+    procedure, public :: read => read_routing1 !< \see mo_namelists::read_routing1
+  end type nml_routing1_t
+  !> 'routing1' namelist content
+  type(nml_routing1_t), public :: nml_routing1
 
   ! namelist /routing2/ &
   !   streamflow_celerity
   !
-  ! !> \class   nml_mainconfig_mhm_mrm_t
-  ! !> \brief   'mainconfig_mhm_mrm' namelist content
-  ! type, public :: nml_mainconfig_mhm_mrm_t
-  !   character(18) :: name = "mainconfig_mhm_mrm" !< namelist name
-  !   logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
-  ! contains
-  !   !> \copydoc mo_namelists::read_mainconfig_mhm_mrm
-  !   procedure, public :: read => read_mainconfig_mhm_mrm !< \see mo_namelists::read_mainconfig_mhm_mrm
-  ! end type nml_mainconfig_mhm_mrm_t
-  ! !> 'mainconfig_mhm_mrm' namelist content
-  ! type(nml_mainconfig_mhm_mrm_t), public :: nml_mainconfig_mhm_mrm
+  !> \class   nml_routing2_t
+  !> \brief   'routing2' namelist content
+  type, public :: nml_routing2_t
+    character(8) :: name = "routing2" !< namelist name
+    logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
+    real(dp), dimension(nColPars) :: streamflow_celerity !< streamflow celerity
+  contains
+    !> \copydoc mo_namelists::read_routing2
+    procedure, public :: read => read_routing2 !< \see mo_namelists::read_routing2
+  end type nml_routing2_t
+  !> 'routing2' namelist content
+  type(nml_routing2_t), public :: nml_routing2
 
   ! namelist /routing3/ &
   !   slope_factor
   !
-  ! !> \class   nml_mainconfig_mhm_mrm_t
-  ! !> \brief   'mainconfig_mhm_mrm' namelist content
-  ! type, public :: nml_mainconfig_mhm_mrm_t
-  !   character(18) :: name = "mainconfig_mhm_mrm" !< namelist name
-  !   logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
-  ! contains
-  !   !> \copydoc mo_namelists::read_mainconfig_mhm_mrm
-  !   procedure, public :: read => read_mainconfig_mhm_mrm !< \see mo_namelists::read_mainconfig_mhm_mrm
-  ! end type nml_mainconfig_mhm_mrm_t
-  ! !> 'mainconfig_mhm_mrm' namelist content
-  ! type(nml_mainconfig_mhm_mrm_t), public :: nml_mainconfig_mhm_mrm
+  !> \class   nml_routing3_t
+  !> \brief   'routing3' namelist content
+  type, public :: nml_routing3_t
+    character(8) :: name = "routing3" !< namelist name
+    logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
+    real(dp), dimension(nColPars) :: slope_factor !< slope factor
+  contains
+    !> \copydoc mo_namelists::read_routing3
+    procedure, public :: read => read_routing3 !< \see mo_namelists::read_routing3
+  end type nml_routing3_t
+  !> 'routing3' namelist content
+  type(nml_routing3_t), public :: nml_routing3
 
   !######## mo_mrm_riv_temp_class
   ! namelist /config_riv_temp/ &
@@ -1143,17 +1174,27 @@ contains
   !   riv_widths_name, &
   !   dir_riv_widths
   !
-  ! !> \class   nml_mainconfig_mhm_mrm_t
-  ! !> \brief   'mainconfig_mhm_mrm' namelist content
-  ! type, public :: nml_mainconfig_mhm_mrm_t
-  !   character(18) :: name = "mainconfig_mhm_mrm" !< namelist name
-  !   logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
-  ! contains
-  !   !> \copydoc mo_namelists::read_mainconfig_mhm_mrm
-  !   procedure, public :: read => read_mainconfig_mhm_mrm !< \see mo_namelists::read_mainconfig_mhm_mrm
-  ! end type nml_mainconfig_mhm_mrm_t
-  ! !> 'mainconfig_mhm_mrm' namelist content
-  ! type(nml_mainconfig_mhm_mrm_t), public :: nml_mainconfig_mhm_mrm
+  !> \class   nml_config_riv_temp_t
+  !> \brief   'config_riv_temp' namelist content
+  type, public :: nml_config_riv_temp_t
+    character(15) :: name = "config_riv_temp" !< namelist name
+    logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
+    real(dp) :: albedo_water !< albedo of open water
+    real(dp) :: pt_a_water !< priestley taylor alpha parameter for PET on open water
+    real(dp) :: emissivity_water !< emissivity of water
+    real(dp) :: turb_heat_ex_coeff !< lateral heat exchange coefficient water <-> air
+    integer(i4) :: max_iter !< maximum number of iterations
+    real(dp) :: delta_iter !< convergence delta
+    real(dp) :: step_iter !< step size for iterative solver
+    character(256) :: riv_widths_file !< file name for river widths
+    character(256) :: riv_widths_name !< variable name for river widths
+    character(256), dimension(maxNoDomains) :: dir_riv_widths !< files for river widths
+  contains
+    !> \copydoc mo_namelists::read_config_riv_temp
+    procedure, public :: read => read_config_riv_temp !< \see mo_namelists::read_config_riv_temp
+  end type nml_config_riv_temp_t
+  !> 'config_riv_temp' namelist content
+  type(nml_config_riv_temp_t), public :: nml_config_riv_temp
 
 contains
 
@@ -1388,10 +1429,10 @@ contains
     end if
   end subroutine read_mainconfig_mhm_mrm
 
-  !> \brief Read 'Optimization' namelist content.
-  subroutine read_Optimization(self, file, unit)
+  !> \brief Read 'optimization' namelist content.
+  subroutine read_optimization(self, file, unit)
     implicit none
-    class(nml_Optimization_t), intent(inout) :: self
+    class(nml_optimization_t), intent(inout) :: self
     character(*), intent(in) :: file !< file containing the namelist
     integer, intent(in) :: unit !< file unit to open the given file
 
@@ -1402,10 +1443,10 @@ contains
     integer(i4) :: sce_ngs !< SCE: # of complexes, default: 2
     integer(i4) :: sce_npg !< SCE: # of points per complex,default: -9 --> 2n+1
     integer(i4) :: sce_nps !< SCE: # of points per subcomplex,default: -9 --> n+1
-    logical :: mcmc_opti !< MCMC: Optimization (.true.) or only parameter uncertainty (.false.)
+    logical :: mcmc_opti !< MCMC: optimization (.true.) or only parameter uncertainty (.false.)
     real(dp), dimension(nerror_model) :: mcmc_error_params !< error model para (mcmc_opti=.false.) e.g. for opti_function=8: .01, .3
 
-    namelist /Optimization/ &
+    namelist /optimization/ &
       nIterations, &
       seed, &
       dds_r, &
@@ -1419,7 +1460,7 @@ contains
     if ( self%read_from_file ) then
       call open_nml(file, unit, quiet=.true.)
       call position_nml(self%name, unit)
-      read(unit, nml=Optimization)
+      read(unit, nml=optimization)
       call close_nml(unit)
       self%nIterations = nIterations
       self%seed = seed
@@ -1432,7 +1473,7 @@ contains
       self%mcmc_error_params = mcmc_error_params
       self%read_from_file = .false.
     end if
-  end subroutine read_Optimization
+  end subroutine read_optimization
 
   !> \brief Read 'time_periods' namelist content.
   subroutine read_time_periods(self, file, unit)
@@ -1459,10 +1500,10 @@ contains
     end if
   end subroutine read_time_periods
 
-  !> \brief Read 'directories_mHM' namelist content.
-  subroutine read_directories_mHM(self, file, unit)
+  !> \brief Read 'directories_mhm' namelist content.
+  subroutine read_directories_mhm(self, file, unit)
     implicit none
-    class(nml_directories_mHM_t), intent(inout) :: self
+    class(nml_directories_mhm_t), intent(inout) :: self
     character(*), intent(in) :: file !< file containing the namelist
     integer, intent(in) :: unit !< file unit to open the given file
 
@@ -1478,7 +1519,7 @@ contains
     character(256), dimension(maxNoDomains) :: dir_Radiation !< riv-temp related: directory of (long/short-wave)radiation
     integer(i4), dimension(maxNoDomains) :: time_step_model_inputs !< frequency for reading meteo input
 
-    namelist /directories_mHM/ &
+    namelist /directories_mhm/ &
       inputFormat_meteo_forcings, &
       dir_Precipitation, &
       dir_Temperature, &
@@ -1494,7 +1535,7 @@ contains
     if ( self%read_from_file ) then
       call open_nml(file, unit, quiet=.true.)
       call position_nml(self%name, unit)
-      read(unit, nml=directories_mHM)
+      read(unit, nml=directories_mhm)
       call close_nml(unit)
       self%inputFormat_meteo_forcings = inputFormat_meteo_forcings
       self%dir_Precipitation = dir_Precipitation
@@ -1509,7 +1550,7 @@ contains
       self%time_step_model_inputs = time_step_model_inputs
       self%read_from_file = .false.
     end if
-  end subroutine read_directories_mHM
+  end subroutine read_directories_mhm
 
   !> \brief Read 'optional_data' namelist content.
   subroutine read_optional_data(self, file, unit)
@@ -1557,32 +1598,32 @@ contains
     end if
   end subroutine read_optional_data
 
-  !> \brief Read 'panEvapo' namelist content.
-  subroutine read_panEvapo(self, file, unit)
+  !> \brief Read 'panevapo' namelist content.
+  subroutine read_panevapo(self, file, unit)
     implicit none
-    class(nml_panEvapo_t), intent(inout) :: self
+    class(nml_panevapo_t), intent(inout) :: self
     character(*), intent(in) :: file !< file containing the namelist
     integer, intent(in) :: unit !< file unit to open the given file
 
     real(dp), dimension(int(YearMonths, i4)) :: evap_coeff !< [-] Evap. coef. for free-water surfaces
 
-    namelist /panEvapo/ &
+    namelist /panevapo/ &
       evap_coeff
 
     if ( self%read_from_file ) then
       call open_nml(file, unit, quiet=.true.)
       call position_nml(self%name, unit)
-      read(unit, nml=panEvapo)
+      read(unit, nml=panevapo)
       call close_nml(unit)
       self%evap_coeff = evap_coeff
       self%read_from_file = .false.
     end if
-  end subroutine read_panEvapo
+  end subroutine read_panevapo
 
-  !> \brief Read 'nightDayRatio' namelist content.
-  subroutine read_nightDayRatio(self, file, unit)
+  !> \brief Read 'nightdayratio' namelist content.
+  subroutine read_nightdayratio(self, file, unit)
     implicit none
-    class(nml_nightDayRatio_t), intent(inout) :: self
+    class(nml_nightdayratio_t), intent(inout) :: self
     character(*), intent(in) :: file !< file containing the namelist
     integer, intent(in) :: unit !< file unit to open the given file
 
@@ -1593,7 +1634,7 @@ contains
     real(dp), dimension(int(YearMonths, i4)) :: fnight_ssrd !< [-] Night factor short-wave rad.
     real(dp), dimension(int(YearMonths, i4)) :: fnight_strd !< [-] Night factor long-wave rad.
 
-    namelist /nightDayRatio/ &
+    namelist /nightdayratio/ &
       read_meteo_weights, &
       fnight_prec, &
       fnight_pet, &
@@ -1607,7 +1648,7 @@ contains
       fnight_strd = 0.45_dp
       call open_nml(file, unit, quiet=.true.)
       call position_nml(self%name, unit)
-      read(unit, nml=nightDayRatio)
+      read(unit, nml=nightdayratio)
       call close_nml(unit)
       self%read_meteo_weights = read_meteo_weights
       self%fnight_prec = fnight_prec
@@ -1617,12 +1658,12 @@ contains
       self%fnight_strd = fnight_strd
       self%read_from_file = .false.
     end if
-  end subroutine read_nightDayRatio
+  end subroutine read_nightdayratio
 
-  !> \brief Read 'NLoutputResults' namelist content.
-  subroutine read_NLoutputResults(self, file, unit)
+  !> \brief Read 'nloutputresults' namelist content.
+  subroutine read_nloutputresults(self, file, unit)
     implicit none
-    class(nml_NLoutputResults_t), intent(inout) :: self
+    class(nml_nloutputresults_t), intent(inout) :: self
     character(*), intent(in) :: file !< file containing the namelist
     integer, intent(in) :: unit !< file unit to open the given file
 
@@ -1631,7 +1672,7 @@ contains
     integer(i4) :: timeStep_model_outputs !< timestep for writing model outputs
     logical, dimension(nOutFlxState) :: outputFlxState !< Define model outputs see "mhm_outputs.nml"
 
-    namelist /NLoutputResults/ &
+    namelist /nloutputresults/ &
       output_deflate_level, &
       output_double_precision, &
       timeStep_model_outputs, &
@@ -1644,7 +1685,7 @@ contains
       outputFlxState = .FALSE.
       call open_nml(file, unit, quiet=.true.)
       call position_nml(self%name, unit)
-      read(unit, nml=NLoutputResults)
+      read(unit, nml=nloutputresults)
       call close_nml(unit)
       self%output_deflate_level = output_deflate_level
       self%output_double_precision = output_double_precision
@@ -1652,19 +1693,19 @@ contains
       self%outputFlxState = outputFlxState
       self%read_from_file = .false.
     end if
-  end subroutine read_NLoutputResults
+  end subroutine read_nloutputresults
 
-  !> \brief Read 'BFI_inputs' namelist content.
-  subroutine read_BFI_inputs(self, file, unit)
+  !> \brief Read 'bfi_inputs' namelist content.
+  subroutine read_bfi_inputs(self, file, unit)
     implicit none
-    class(nml_BFI_inputs_t), intent(inout) :: self
+    class(nml_bfi_inputs_t), intent(inout) :: self
     character(*), intent(in) :: file !< file containing the namelist
     integer, intent(in) :: unit !< file unit to open the given file
 
     logical :: BFI_calc !< calculate observed BFI from gauges with Eckhardt filter
     real(dp), dimension(maxNoDomains) :: BFI_obs !< given base-flow index per domain
 
-    namelist /BFI_inputs/ &
+    namelist /bfi_inputs/ &
       BFI_calc, &
       BFI_obs
 
@@ -1673,13 +1714,13 @@ contains
       BFI_obs = -1.0_dp  ! negative value to flag missing values
       call open_nml(file, unit, quiet=.true.)
       call position_nml(self%name, unit)
-      read(unit, nml=BFI_inputs)
+      read(unit, nml=bfi_inputs)
       call close_nml(unit)
       self%BFI_calc = BFI_calc
       self%BFI_obs = BFI_obs
       self%read_from_file = .false.
     end if
-  end subroutine read_BFI_inputs
+  end subroutine read_bfi_inputs
 
   !> \brief Read 'directories_mpr' namelist content.
   subroutine read_directories_mpr(self, file, unit)
@@ -2528,22 +2569,311 @@ contains
     end if
   end subroutine read_geoparameter
 
-  ! !> \brief Read 'directories_general' namelist content.
-  ! subroutine read_directories_general(self, file, unit)
-  !   implicit none
-  !   class(nml_directories_general_t), intent(inout) :: self
-  !   character(*), intent(in) :: file !< file containing the namelist
-  !   integer, intent(in) :: unit !< file unit to open the given file
+  !> \brief Read 'mainconfig_mrm' namelist content.
+  subroutine read_mainconfig_mrm(self, file, unit)
+    implicit none
+    class(nml_mainconfig_mrm_t), intent(inout) :: self
+    character(*), intent(in) :: file !< file containing the namelist
+    integer, intent(in) :: unit !< file unit to open the given file
 
-  !   namelist /directories_general/ &
+    logical :: ALMA_convention !< flag for ALMA convention (see http://www.lmd.jussieu.fr/~polcher/ALMA/convention_3.html)
+    character(256) :: filenameTotalRunoff !< Filename of simulated total runoff file
+    character(256) :: varnameTotalRunoff !< variable name of total runoff
+    logical :: gw_coupling !< switch to enable ground water coupling
 
-  !   if ( self%read_from_file ) then
-  !     call open_nml(file, unit, quiet=.true.)
-  !     call position_nml(self%name, unit)
-  !     read(unit, nml=directories_general)
-  !     call close_nml(unit)
-  !     self%read_from_file = .false.
-  !   end if
-  ! end subroutine read_directories_general
+    namelist /mainconfig_mrm/ &
+      ALMA_convention, &
+      filenameTotalRunoff, &
+      varnameTotalRunoff, &
+      gw_coupling
+
+    if ( self%read_from_file ) then
+      ALMA_convention = .false.
+      filenameTotalRunoff = 'total_runoff'
+      varnameTotalRunoff = 'total_runoff'
+      gw_coupling = .false.
+      call open_nml(file, unit, quiet=.true.)
+      call position_nml(self%name, unit)
+      read(unit, nml=mainconfig_mrm)
+      call close_nml(unit)
+      self%ALMA_convention = ALMA_convention
+      self%filenameTotalRunoff = filenameTotalRunoff
+      self%varnameTotalRunoff = varnameTotalRunoff
+      self%gw_coupling = gw_coupling
+      self%read_from_file = .false.
+    end if
+  end subroutine read_mainconfig_mrm
+
+  !> \brief Read 'directories_mrm' namelist content.
+  subroutine read_directories_mrm(self, file, unit)
+    implicit none
+    class(nml_directories_mrm_t), intent(inout) :: self
+    character(*), intent(in) :: file !< file containing the namelist
+    integer, intent(in) :: unit !< file unit to open the given file
+
+    character(256), dimension(maxNoDomains) :: dir_Gauges !< directory containing gauge time series
+    character(256), dimension(maxNoDomains) :: dir_Total_Runoff !< directory where simulated runoff can be found
+    character(256), dimension(maxNoDomains) :: dir_Bankfull_Runoff !< directory where runoff at bankfull conditions can be found
+
+    namelist /directories_mrm/ &
+      dir_Gauges, &
+      dir_Total_Runoff, &
+      dir_Bankfull_Runoff
+
+    if ( self%read_from_file ) then
+      call open_nml(file, unit, quiet=.true.)
+      call position_nml(self%name, unit)
+      read(unit, nml=directories_mrm)
+      call close_nml(unit)
+      self%dir_Gauges = dir_Gauges
+      self%dir_Total_Runoff = dir_Total_Runoff
+      self%dir_Bankfull_Runoff = dir_Bankfull_Runoff
+      self%read_from_file = .false.
+    end if
+  end subroutine read_directories_mrm
+
+  !> \brief Read 'evaluation_gauges' namelist content.
+  subroutine read_evaluation_gauges(self, file, unit)
+    implicit none
+    class(nml_evaluation_gauges_t), intent(inout) :: self
+    character(*), intent(in) :: file !< file containing the namelist
+    integer, intent(in) :: unit !< file unit to open the given file
+
+    integer(i4) :: nGaugesTotal !< Number of evaluation gauges for all domains
+    integer(i4), dimension(maxNoDomains) :: NoGauges_domain !< number of gauges per domain
+    integer(i4), dimension(maxNoDomains, maxNoGauges) :: Gauge_id !< gauge ID for each gauge
+    character(256), dimension(maxNoDomains, maxNoGauges) :: Gauge_filename !< filename for each gauge time series
+
+    namelist /evaluation_gauges/ &
+      nGaugesTotal, &
+      NoGauges_domain, &
+      Gauge_id, &
+      gauge_filename
+
+    if ( self%read_from_file ) then
+      nGaugesTotal = nodata_i4
+      NoGauges_domain = nodata_i4
+      Gauge_id = nodata_i4
+      gauge_filename = num2str(nodata_i4)
+      call open_nml(file, unit, quiet=.true.)
+      call position_nml(self%name, unit)
+      read(unit, nml=evaluation_gauges)
+      call close_nml(unit)
+      self%nGaugesTotal = nGaugesTotal
+      self%NoGauges_domain = NoGauges_domain
+      self%Gauge_id = Gauge_id
+      self%gauge_filename = gauge_filename
+      self%read_from_file = .false.
+    end if
+  end subroutine read_evaluation_gauges
+
+  !> \brief Read 'inflow_gauges' namelist content.
+  subroutine read_inflow_gauges(self, file, unit)
+    implicit none
+    class(nml_inflow_gauges_t), intent(inout) :: self
+    character(*), intent(in) :: file !< file containing the namelist
+    integer, intent(in) :: unit !< file unit to open the given file
+
+    integer(i4) :: nInflowGaugesTotal !< Number of evaluation gauges for all domains
+    integer(i4), dimension(maxNoDomains) :: NoInflowGauges_domain !< number of gauges for subdomain (1)
+    integer(i4), dimension(maxNoDomains, maxNoGauges) :: InflowGauge_id !< id of inflow gauge(1) for subdomain(1) --> (1,1)
+    !> name of file with timeseries of inflow gauge(1) for subdomain(1) --> (1,1)
+    character(256), dimension(maxNoDomains, maxNoGauges) :: InflowGauge_filename
+    !> consider flows from upstream/headwater cells of inflow gauge(1) for subdomain(1) --> (1,1)
+    logical, dimension(maxNoDomains, maxNoGauges) :: InflowGauge_Headwater
+
+    namelist /inflow_gauges/ &
+      nInflowGaugesTotal, &
+      NoInflowGauges_domain, &
+      InflowGauge_id, &
+      InflowGauge_filename, &
+      InflowGauge_Headwater
+
+    if ( self%read_from_file ) then
+      nInflowGaugesTotal = 0
+      NoInflowGauges_domain = 0
+      InflowGauge_id = nodata_i4
+      InflowGauge_filename = num2str(nodata_i4)
+      call open_nml(file, unit, quiet=.true.)
+      call position_nml(self%name, unit)
+      read(unit, nml=inflow_gauges)
+      call close_nml(unit)
+      self%nInflowGaugesTotal = nInflowGaugesTotal
+      self%NoInflowGauges_domain = NoInflowGauges_domain
+      self%InflowGauge_id = InflowGauge_id
+      self%InflowGauge_filename = InflowGauge_filename
+      self%InflowGauge_Headwater = InflowGauge_Headwater
+      self%read_from_file = .false.
+    end if
+  end subroutine read_inflow_gauges
+
+  !> \brief Read 'mrm_outputs' namelist content.
+  subroutine read_mrm_outputs(self, file, unit)
+    use mo_message, only : message
+    implicit none
+    class(nml_mrm_outputs_t), intent(inout) :: self
+    character(*), intent(in) :: file !< file containing the namelist
+    integer, intent(in) :: unit !< file unit to open the given file
+
+    integer(i4) :: output_deflate_level_mrm !< netcdf deflate level
+    logical :: output_double_precision_mrm !< switch to enable double precision in netcdf
+    integer(i4) :: timeStep_model_outputs_mrm !< timestep for writing model outputs
+    logical, dimension(mrm_nOutFlxState) :: outputFlxState_mrm !< Define model outputs see "mhm_outputs.nml"
+
+    logical :: file_exists
+
+    namelist /nloutputresults/ &
+      output_deflate_level_mrm, &
+      output_double_precision_mrm, &
+      timeStep_model_outputs_mrm, &
+      outputFlxState_mrm
+
+    if ( self%read_from_file ) then
+      output_deflate_level_mrm = 6
+      output_double_precision_mrm = .true.
+      outputFlxState_mrm = .FALSE.
+      timeStep_model_outputs_mrm = -2
+      inquire(file = file, exist = file_exists)
+      if (file_exists) then
+        call open_nml(file, unit, quiet=.true.)
+        call position_nml(self%name, unit)
+        read(unit, nml=nloutputresults)
+        call close_nml(unit)
+      else
+        call message('***Warning: No file specifying mRM output fluxes exists')
+      end if
+      self%output_deflate_level_mrm = output_deflate_level_mrm
+      self%output_double_precision_mrm = output_double_precision_mrm
+      self%timeStep_model_outputs_mrm = timeStep_model_outputs_mrm
+      self%outputFlxState_mrm = outputFlxState_mrm
+      self%read_from_file = .false.
+    end if
+  end subroutine read_mrm_outputs
+
+  !> \brief Read 'routing1' namelist content.
+  subroutine read_routing1(self, file, unit)
+    implicit none
+    class(nml_routing1_t), intent(inout) :: self
+    character(*), intent(in) :: file !< file containing the namelist
+    integer, intent(in) :: unit !< file unit to open the given file
+
+    real(dp), dimension(nColPars) :: muskingumTravelTime_constant !< muskingum parameter constant
+    real(dp), dimension(nColPars) :: muskingumTravelTime_riverLength !< muskingum parameter river length
+    real(dp), dimension(nColPars) :: muskingumTravelTime_riverSlope !< muskingum parameter river slope
+    real(dp), dimension(nColPars) :: muskingumTravelTime_impervious !< muskingum parameter impervious
+    real(dp), dimension(nColPars) :: muskingumAttenuation_riverSlope !< muskingum parameter attenuation river slope
+
+    namelist /routing1/ &
+      muskingumTravelTime_constant, &
+      muskingumTravelTime_riverLength, &
+      muskingumTravelTime_riverSlope, &
+      muskingumTravelTime_impervious, &
+      muskingumAttenuation_riverSlope
+
+    if ( self%read_from_file ) then
+      call open_nml(file, unit, quiet=.true.)
+      call position_nml(self%name, unit)
+      read(unit, nml=routing1)
+      call close_nml(unit)
+      self%muskingumTravelTime_constant = muskingumTravelTime_constant
+      self%muskingumTravelTime_riverLength = muskingumTravelTime_riverLength
+      self%muskingumTravelTime_riverSlope = muskingumTravelTime_riverSlope
+      self%muskingumTravelTime_impervious = muskingumTravelTime_impervious
+      self%muskingumAttenuation_riverSlope = muskingumAttenuation_riverSlope
+      self%read_from_file = .false.
+    end if
+  end subroutine read_routing1
+
+  !> \brief Read 'routing2' namelist content.
+  subroutine read_routing2(self, file, unit)
+    implicit none
+    class(nml_routing2_t), intent(inout) :: self
+    character(*), intent(in) :: file !< file containing the namelist
+    integer, intent(in) :: unit !< file unit to open the given file
+
+    real(dp), dimension(nColPars) :: streamflow_celerity !< streamflow celerity
+
+    namelist /routing2/ &
+      streamflow_celerity
+    if ( self%read_from_file ) then
+      call open_nml(file, unit, quiet=.true.)
+      call position_nml(self%name, unit)
+      read(unit, nml=routing2)
+      call close_nml(unit)
+      self%streamflow_celerity = streamflow_celerity
+      self%read_from_file = .false.
+    end if
+  end subroutine read_routing2
+
+  !> \brief Read 'routing3' namelist content.
+  subroutine read_routing3(self, file, unit)
+    implicit none
+    class(nml_routing3_t), intent(inout) :: self
+    character(*), intent(in) :: file !< file containing the namelist
+    integer, intent(in) :: unit !< file unit to open the given file
+
+    real(dp), dimension(nColPars) :: slope_factor !< slope factor
+
+    namelist /routing3/ &
+      slope_factor
+
+    if ( self%read_from_file ) then
+      call open_nml(file, unit, quiet=.true.)
+      call position_nml(self%name, unit)
+      read(unit, nml=routing3)
+      call close_nml(unit)
+      self%slope_factor = slope_factor
+      self%read_from_file = .false.
+    end if
+  end subroutine read_routing3
+
+  !> \brief Read 'config_riv_temp' namelist content.
+  subroutine read_config_riv_temp(self, file, unit)
+    implicit none
+    class(nml_config_riv_temp_t), intent(inout) :: self
+    character(*), intent(in) :: file !< file containing the namelist
+    integer, intent(in) :: unit !< file unit to open the given file
+
+    real(dp) :: albedo_water !< albedo of open water
+    real(dp) :: pt_a_water !< priestley taylor alpha parameter for PET on open water
+    real(dp) :: emissivity_water !< emissivity of water
+    real(dp) :: turb_heat_ex_coeff !< lateral heat exchange coefficient water <-> air
+    integer(i4) :: max_iter !< maximum number of iterations
+    real(dp) :: delta_iter !< convergence delta
+    real(dp) :: step_iter !< step size for iterative solver
+    character(256) :: riv_widths_file !< file name for river widths
+    character(256) :: riv_widths_name !< variable name for river widths
+    character(256), dimension(maxNoDomains) :: dir_riv_widths !< files for river widths
+
+    namelist /config_riv_temp/ &
+      albedo_water, &
+      pt_a_water, &
+      emissivity_water, &
+      turb_heat_ex_coeff, &
+      max_iter, &
+      delta_iter, &
+      step_iter, &
+      riv_widths_file, &
+      riv_widths_name, &
+      dir_riv_widths
+
+    if ( self%read_from_file ) then
+      call open_nml(file, unit, quiet=.true.)
+      call position_nml(self%name, unit)
+      read(unit, nml=config_riv_temp)
+      call close_nml(unit)
+      self%albedo_water = albedo_water
+      self%pt_a_water = pt_a_water
+      self%emissivity_water = emissivity_water
+      self%turb_heat_ex_coeff = turb_heat_ex_coeff
+      self%max_iter = max_iter
+      self%delta_iter = delta_iter
+      self%step_iter = step_iter
+      self%riv_widths_file = riv_widths_file
+      self%riv_widths_name = riv_widths_name
+      self%dir_riv_widths = dir_riv_widths
+      self%read_from_file = .false.
+    end if
+  end subroutine read_config_riv_temp
 
 end module mo_namelists
