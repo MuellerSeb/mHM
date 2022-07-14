@@ -55,11 +55,33 @@ contains
 
   subroutine mpr_read_config(file_namelist, unamelist, file_namelist_param, unamelist_param)
 
+    use mo_namelists, only : &
+      nml_directories_mpr, &
+      nml_soildata, &
+      nml_lai_data_information, &
+      nml_lcover_mpr, &
+      nml_interception1, &
+      nml_snow1, &
+      nml_soilmoisture1, &
+      nml_soilmoisture2, &
+      nml_soilmoisture3, &
+      nml_soilmoisture4, &
+      nml_directrunoff1, &
+      nml_petminus1, &
+      nml_pet0, &
+      nml_pet1, &
+      nml_pet2, &
+      nml_pet3, &
+      nml_interflow1, &
+      nml_percolation1, &
+      nml_neutrons1, &
+      nml_neutrons2, &
+      nml_geoparameter
     use mo_append, only : append
     use mo_common_constants, only : eps_dp, maxNoDomains, nColPars, nodata_dp
     use mo_common_functions, only : in_bound
     use mo_common_variables, only : global_parameters, global_parameters_name, domainMeta, processMatrix
-    use mo_message, only : message
+    use mo_message, only : message, error_message
     use mo_mpr_constants, only : maxGeoUnit, &
                                  maxNoSoilHorizons
     use mo_mpr_global_variables, only : HorizonDepth_mHM, dirgridded_LAI, fracSealed_cityArea, iFlag_soilDB, &
@@ -99,156 +121,90 @@ contains
     real(dp), dimension(nColPars) :: canopyInterceptionFactor
 
     real(dp), dimension(nColPars) :: snowTreshholdTemperature
-
     real(dp), dimension(nColPars) :: degreeDayFactor_forest
-
     real(dp), dimension(nColPars) :: degreeDayFactor_impervious
-
     real(dp), dimension(nColPars) :: degreeDayFactor_pervious
-
     real(dp), dimension(nColPars) :: increaseDegreeDayFactorByPrecip
-
     real(dp), dimension(nColPars) :: maxDegreeDayFactor_forest
-
     real(dp), dimension(nColPars) :: maxDegreeDayFactor_impervious
-
     real(dp), dimension(nColPars) :: maxDegreeDayFactor_pervious
 
     real(dp), dimension(nColPars) :: orgMatterContent_forest
-
     real(dp), dimension(nColPars) :: orgMatterContent_impervious
-
     real(dp), dimension(nColPars) :: orgMatterContent_pervious
-
     real(dp), dimension(nColPars) :: PTF_lower66_5_constant
-
     real(dp), dimension(nColPars) :: PTF_lower66_5_clay
-
     real(dp), dimension(nColPars) :: PTF_lower66_5_Db
-
     real(dp), dimension(nColPars) :: PTF_higher66_5_constant
-
     real(dp), dimension(nColPars) :: PTF_higher66_5_clay
-
     real(dp), dimension(nColPars) :: PTF_higher66_5_Db
-
-    real(dp), dimension(nColPars) :: infiltrationShapeFactor
-
     real(dp), dimension(nColPars) :: PTF_Ks_constant
-
     real(dp), dimension(nColPars) :: PTF_Ks_sand
-
     real(dp), dimension(nColPars) :: PTF_Ks_clay
-
     real(dp), dimension(nColPars) :: PTF_Ks_curveSlope
-
     real(dp), dimension(nColPars) :: rootFractionCoefficient_forest
-
     real(dp), dimension(nColPars) :: rootFractionCoefficient_impervious
-
     real(dp), dimension(nColPars) :: rootFractionCoefficient_pervious
-
+    real(dp), dimension(nColPars) :: infiltrationShapeFactor
     real(dp), dimension(nColPars) :: jarvis_sm_threshold_c1
 
     real(dp), dimension(nColPars) :: FCmin_glob
-
     real(dp), dimension(nColPars) :: FCdelta_glob
-
     real(dp), dimension(nColPars) :: rootFractionCoefficient_sand
-
     real(dp), dimension(nColPars) :: rootFractionCoefficient_clay
 
     real(dp), dimension(nColPars) :: imperviousStorageCapacity
 
     real(dp), dimension(nColPars) :: PET_a_forest
-
     real(dp), dimension(nColPars) :: PET_a_impervious
-
     real(dp), dimension(nColPars) :: PET_a_pervious
-
     real(dp), dimension(nColPars) :: PET_b
-
     real(dp), dimension(nColPars) :: PET_c
 
     real(dp), dimension(nColPars) :: minCorrectionFactorPET
-
     real(dp), dimension(nColPars) :: maxCorrectionFactorPET
-
     real(dp), dimension(nColPars) :: aspectTresholdPET
-
     real(dp), dimension(nColPars) :: HargreavesSamaniCoeff
 
     real(dp), dimension(nColPars) :: PriestleyTaylorCoeff
-
     real(dp), dimension(nColPars) :: PriestleyTaylorLAIcorr
 
     real(dp), dimension(nColPars) :: canopyheigth_forest
-
     real(dp), dimension(nColPars) :: canopyheigth_impervious
-
     real(dp), dimension(nColPars) :: canopyheigth_pervious
-
     real(dp), dimension(nColPars) :: displacementheight_coeff
-
     real(dp), dimension(nColPars) :: roughnesslength_momentum_coeff
-
     real(dp), dimension(nColPars) :: roughnesslength_heat_coeff
-
     real(dp), dimension(nColPars) :: stomatal_resistance
 
     real(dp), dimension(nColPars) :: interflowStorageCapacityFactor
-
     real(dp), dimension(nColPars) :: interflowRecession_slope
-
     real(dp), dimension(nColPars) :: fastInterflowRecession_forest
-
     real(dp), dimension(nColPars) :: slowInterflowRecession_Ks
-
     real(dp), dimension(nColPars) :: exponentSlowInterflow
 
     real(dp), dimension(nColPars) :: rechargeCoefficient
-
     real(dp), dimension(nColPars) :: rechargeFactor_karstic
-
     real(dp), dimension(nColPars) :: gain_loss_GWreservoir_karstic
 
     real(dp), dimension(maxGeoUnit, nColPars) :: GeoParam
 
     real(dp), dimension(nColPars) :: Desilets_N0
-
     real(dp), dimension(nColPars) :: Desilets_LW0
-    
     real(dp), dimension(nColPars) :: Desilets_LW1
-    
+
     real(dp), dimension(nColPars) :: COSMIC_N0
-
     real(dp), dimension(nColPars) :: COSMIC_N1
-
     real(dp), dimension(nColPars) :: COSMIC_N2
-
     real(dp), dimension(nColPars) :: COSMIC_alpha0
-
     real(dp), dimension(nColPars) :: COSMIC_alpha1
-
     real(dp), dimension(nColPars) :: COSMIC_L30
-
     real(dp), dimension(nColPars) :: COSMIC_L31
-    
     real(dp), dimension(nColPars) :: COSMIC_LW0
-    
     real(dp), dimension(nColPars) :: COSMIC_LW1
 
     integer(i4) :: iDomain, domainID
 
-
-    ! namelist directories
-    namelist /directories_MPR/ dir_gridded_LAI
-    ! namelist soil database
-    namelist /soildata/ iFlag_soilDB, tillageDepth, nSoilHorizons_mHM, soil_Depth
-    ! namelist for LAI related data
-    namelist /LAI_data_information/ inputFormat_gridded_LAI, timeStep_LAI_input
-    ! namelist for land cover scenes
-    namelist /LCover_MPR/ fracSealed_cityArea
 
     ! namelist parameters
     namelist /interception1/ canopyInterceptionFactor
@@ -299,30 +255,30 @@ contains
     namelist /neutrons1/ Desilets_N0, Desilets_LW0, Desilets_LW1
     namelist /neutrons2/ COSMIC_N0, COSMIC_N1, COSMIC_N2, COSMIC_alpha0, COSMIC_alpha1, COSMIC_L30, COSMIC_L31, &
          COSMIC_LW0, COSMIC_LW1
-         
+
     !
     namelist /geoparameter/ GeoParam
 
     !===============================================================
     ! INITIALIZATION
     !===============================================================
-    soil_Depth = 0.0_dp
     dummy_2d_dp = nodata_dp
     dummy_2d_dp_2 = nodata_dp
-
-    call open_nml(file_namelist, unamelist, quiet = .true.)
 
     !===============================================================
     !  Read namelist for LCover
     !===============================================================
-    call position_nml('LCover_MPR', unamelist)
-    read(unamelist, nml = LCover_MPR)
+    call nml_lcover_mpr%read(file_namelist, unamelist)
+    fracSealed_cityArea = nml_lcover_mpr%fracSealed_cityArea
 
     !===============================================================
     ! Read soil layering information
     !===============================================================
-    call position_nml('soildata', unamelist)
-    read(unamelist, nml = soildata)
+    call nml_soildata%read(file_namelist, unamelist)
+    iFlag_soilDB = nml_soildata%iFlag_soilDB
+    tillageDepth = nml_soildata%tillageDepth
+    nSoilHorizons_mHM = nml_soildata%nSoilHorizons_mHM
+    soil_Depth = nml_soildata%soil_Depth
 
     allocate(HorizonDepth_mHM(nSoilHorizons_mHM))
     HorizonDepth_mHM(:) = 0.0_dp
@@ -330,11 +286,8 @@ contains
     HorizonDepth_mHM(1 : nSoilHorizons_mHM) = soil_Depth(1 : nSoilHorizons_mHM)
 
     ! counter checks -- soil horizons
-    if (nSoilHorizons_mHM .GT. maxNoSoilHorizons) then
-      call message()
-      call message('***ERROR: Number of soil horizons is resticted to ', trim(num2str(maxNoSoilHorizons)), '!')
-      stop
-    end if
+    if (nSoilHorizons_mHM .GT. maxNoSoilHorizons) &
+      call error_message('***ERROR: Number of soil horizons is resticted to ', trim(num2str(maxNoSoilHorizons)), '!')
 
     ! the default is the HorizonDepths are all set up to last
     ! as is the default for option-1 where horizon specific information are taken into consideration
@@ -342,32 +295,28 @@ contains
       ! classical mhm soil database
       HorizonDepth_mHM(nSoilHorizons_mHM) = 0.0_dp
     else if(iFlag_soilDB .ne. 1) then
-      call message()
-      call message('***ERROR: iFlag_soilDB option given does not exist. Only 0 and 1 is taken at the moment.')
-      stop
+      call error_message('***ERROR: iFlag_soilDB option given does not exist. Only 0 and 1 is taken at the moment.')
     end if
 
     ! some consistency checks for the specification of the tillage depth
     if(iFlag_soilDB .eq. 1) then
-      if(count(abs(HorizonDepth_mHM(:) - tillageDepth) .lt. eps_dp)  .eq. 0) then
-        call message()
-        call message('***ERROR: Soil tillage depth must conform with one of the specified horizon (lower) depth.')
-        stop
-      end if
+      if(count(abs(HorizonDepth_mHM(:) - tillageDepth) .lt. eps_dp)  .eq. 0) &
+        call error_message('***ERROR: Soil tillage depth must conform with one of the specified horizon (lower) depth.')
     end if
 
     !===============================================================
     ! Read LAI related information
     !===============================================================
-    call position_nml('LAI_data_information', unamelist)
-    read(unamelist, nml = LAI_data_information)
+    call nml_lai_data_information%read(file_namelist, unamelist)
+    inputFormat_gridded_LAI = nml_lai_data_information%inputFormat_gridded_LAI
+    timeStep_LAI_input = nml_lai_data_information%timeStep_LAI_input
 
     if (timeStep_LAI_input .ne. 0) then
       !===============================================================
       !  Read namelist for main directories
       !===============================================================
-      call position_nml('directories_MPR', unamelist)
-      read(unamelist, nml = directories_MPR)
+      call nml_directories_mpr%read(file_namelist, unamelist)
+      dir_gridded_LAI = nml_directories_mpr%dir_gridded_LAI
 
       allocate(dirgridded_LAI(domainMeta%nDomains))
       do iDomain = 1, domainMeta%nDomains
@@ -375,14 +324,9 @@ contains
         dirgridded_LAI(iDomain) = dir_gridded_LAI(domainID)
       end do
 
-      if (timeStep_LAI_input .GT. 1) then
-        call message()
-        call message('***ERROR: option for selected timeStep_LAI_input not coded yet')
-        stop
-      end if
+      if (timeStep_LAI_input .GT. 1) &
+        call error_message('***ERROR: option for selected timeStep_LAI_input not coded yet')
     end if
-
-    call close_nml(unamelist)
 
     !===============================================================
     ! Read namelist global parameters
@@ -980,7 +924,7 @@ contains
       call message('***ERROR: Process description for process "geoparameter" does not exist!')
       stop
    end select
-   
+
     !===============================================================
     ! NEUTRON COUNT
     !===============================================================
@@ -993,7 +937,7 @@ contains
       ! 0 - deactivated
       call message()
       call message('***SELECTION: Neutron count routine is deativated! ')
-      
+
     case(1)
       ! 1 - inverse N0 based on Desilets et al. 2010
       call position_nml('neutrons1', unamelist_param)
@@ -1009,7 +953,7 @@ contains
            'Desilets_N0   ', &
            'Desilets_LW0  ', &
            'Desilets_LW1  '/))
- 
+
       ! check if parameter are in range
       if (.not. in_bound(global_parameters)) then
         call message('***ERROR: parameter in namelist "neutrons1" out of bound in ', &
@@ -1050,14 +994,14 @@ contains
                 trim(adjustl(file_namelist_param)))
         stop
       end if
-      
+
      case DEFAULT
       call message()
       call message('***ERROR: Process description for process "NEUTRON count" does not exist!')
       stop
    end select
 
-    
+
     call close_nml(unamelist_param)
 
   end subroutine mpr_read_config
