@@ -2858,6 +2858,13 @@ contains
       dir_riv_widths
 
     if ( self%read_from_file ) then
+      albedo_water = 0.15_dp
+      pt_a_water = 1.26_dp
+      emissivity_water = 0.96_dp
+      turb_heat_ex_coeff = 20.0_dp
+      max_iter = 20_i4
+      delta_iter = 1.0e-02_dp
+      step_iter = 5.0_dp
       call open_nml(file, unit, quiet=.true.)
       call position_nml(self%name, unit)
       read(unit, nml=config_riv_temp)
