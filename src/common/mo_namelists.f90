@@ -11,9 +11,10 @@ module mo_namelists
   use mo_nml, only : open_nml, close_nml, position_nml
   use mo_constants, only : YearMonths
   use mo_mhm_constants, only : nOutFlxState
-  use mo_common_constants, only : maxNLcovers, maxNoDomains
+  use mo_common_constants, only : maxNLcovers, maxNoDomains, nColPars
   use mo_common_variables, only : nProcesses, period
   use mo_common_mHM_mRM_variables, only : nerror_model
+  use mo_mpr_constants, only : maxGeoUnit, maxNoSoilHorizons
 
   implicit none
 
@@ -385,17 +386,18 @@ contains
   ! namelist /directories_MPR/ &
   !   dir_gridded_LAI
   !
-  ! !> \class   nml_mainconfig_mhm_mrm_t
-  ! !> \brief   'mainconfig_mhm_mrm' namelist content
-  ! type, public :: nml_mainconfig_mhm_mrm_t
-  !   character(18) :: name = "mainconfig_mhm_mrm" !< namelist name
-  !   logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
-  ! contains
-  !   !> \copydoc mo_namelists::read_mainconfig_mhm_mrm
-  !   procedure, public :: read => read_mainconfig_mhm_mrm !< \see mo_namelists::read_mainconfig_mhm_mrm
-  ! end type nml_mainconfig_mhm_mrm_t
-  ! !> 'mainconfig_mhm_mrm' namelist content
-  ! type(nml_mainconfig_mhm_mrm_t), public :: nml_mainconfig_mhm_mrm
+  !> \class   nml_directories_mpr_t
+  !> \brief   'directories_mpr' namelist content
+  type, public :: nml_directories_mpr_t
+    character(15) :: name = "directories_mpr" !< namelist name
+    logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
+    character(256), dimension(maxNoDomains) :: dir_gridded_LAI !< directory of gridded LAI data, used when timeStep_LAI_input<0
+  contains
+    !> \copydoc mo_namelists::read_directories_mpr
+    procedure, public :: read => read_directories_mpr !< \see mo_namelists::read_directories_mpr
+  end type nml_directories_mpr_t
+  !> 'directories_mpr' namelist content
+  type(nml_directories_mpr_t), public :: nml_directories_mpr
 
   ! namelist /soildata/ &
   !   iFlag_soilDB, &
@@ -403,63 +405,71 @@ contains
   !   nSoilHorizons_mHM, &
   !   soil_Depth
   !
-  ! !> \class   nml_mainconfig_mhm_mrm_t
-  ! !> \brief   'mainconfig_mhm_mrm' namelist content
-  ! type, public :: nml_mainconfig_mhm_mrm_t
-  !   character(18) :: name = "mainconfig_mhm_mrm" !< namelist name
-  !   logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
-  ! contains
-  !   !> \copydoc mo_namelists::read_mainconfig_mhm_mrm
-  !   procedure, public :: read => read_mainconfig_mhm_mrm !< \see mo_namelists::read_mainconfig_mhm_mrm
-  ! end type nml_mainconfig_mhm_mrm_t
-  ! !> 'mainconfig_mhm_mrm' namelist content
-  ! type(nml_mainconfig_mhm_mrm_t), public :: nml_mainconfig_mhm_mrm
+  !> \class   nml_soildata_t
+  !> \brief   'soildata' namelist content
+  type, public :: nml_soildata_t
+    character(8) :: name = "soildata" !< namelist name
+    logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
+    integer(i4) :: iFlag_soilDB !< options to handle different soil databases
+    real(dp) :: tillageDepth !< [mm] Soil depth down to which organic
+    integer(i4) :: nSoilHorizons_mHM !< Number of horizons to model
+    real(dp), dimension(maxNoSoilHorizons) :: soil_Depth !< depth of the single horizons
+  contains
+    !> \copydoc mo_namelists::read_soildata
+    procedure, public :: read => read_soildata !< \see mo_namelists::read_soildata
+  end type nml_soildata_t
+  !> 'soildata' namelist content
+  type(nml_soildata_t), public :: nml_soildata
 
   ! namelist /LAI_data_information/ &
   !   inputFormat_gridded_LAI, &
   !   timeStep_LAI_input
   !
-  ! !> \class   nml_mainconfig_mhm_mrm_t
-  ! !> \brief   'mainconfig_mhm_mrm' namelist content
-  ! type, public :: nml_mainconfig_mhm_mrm_t
-  !   character(18) :: name = "mainconfig_mhm_mrm" !< namelist name
-  !   logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
-  ! contains
-  !   !> \copydoc mo_namelists::read_mainconfig_mhm_mrm
-  !   procedure, public :: read => read_mainconfig_mhm_mrm !< \see mo_namelists::read_mainconfig_mhm_mrm
-  ! end type nml_mainconfig_mhm_mrm_t
-  ! !> 'mainconfig_mhm_mrm' namelist content
-  ! type(nml_mainconfig_mhm_mrm_t), public :: nml_mainconfig_mhm_mrm
+  !> \class   nml_lai_data_information_t
+  !> \brief   'lai_data_information' namelist content
+  type, public :: nml_lai_data_information_t
+    character(20) :: name = "lai_data_information" !< namelist name
+    logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
+    character(256) :: inputFormat_gridded_LAI !< format of gridded LAI data (nc only)
+    integer(i4) :: timeStep_LAI_input !< time step of gridded LAI input
+  contains
+    !> \copydoc mo_namelists::read_lai_data_information
+    procedure, public :: read => read_lai_data_information !< \see mo_namelists::read_lai_data_information
+  end type nml_lai_data_information_t
+  !> 'lai_data_information' namelist content
+  type(nml_lai_data_information_t), public :: nml_lai_data_information
 
   ! namelist /LCover_MPR/ &
   !   fracSealed_cityArea
   !
-  ! !> \class   nml_mainconfig_mhm_mrm_t
-  ! !> \brief   'mainconfig_mhm_mrm' namelist content
-  ! type, public :: nml_mainconfig_mhm_mrm_t
-  !   character(18) :: name = "mainconfig_mhm_mrm" !< namelist name
-  !   logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
-  ! contains
-  !   !> \copydoc mo_namelists::read_mainconfig_mhm_mrm
-  !   procedure, public :: read => read_mainconfig_mhm_mrm !< \see mo_namelists::read_mainconfig_mhm_mrm
-  ! end type nml_mainconfig_mhm_mrm_t
-  ! !> 'mainconfig_mhm_mrm' namelist content
-  ! type(nml_mainconfig_mhm_mrm_t), public :: nml_mainconfig_mhm_mrm
+  !> \class   nml_lcover_mpr_t
+  !> \brief   'lcover_mpr' namelist content
+  type, public :: nml_lcover_mpr_t
+    character(10) :: name = "lcover_mpr" !< namelist name
+    logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
+    real(dp) :: fracSealed_cityArea !< fraction of area within city assumed to be perfectly sealed [0-1]
+  contains
+    !> \copydoc mo_namelists::read_lcover_mpr
+    procedure, public :: read => read_lcover_mpr !< \see mo_namelists::read_lcover_mpr
+  end type nml_lcover_mpr_t
+  !> 'lcover_mpr' namelist content
+  type(nml_lcover_mpr_t), public :: nml_lcover_mpr
 
   ! namelist /interception1/ &
   !   canopyInterceptionFactor
   !
-  ! !> \class   nml_mainconfig_mhm_mrm_t
-  ! !> \brief   'mainconfig_mhm_mrm' namelist content
-  ! type, public :: nml_mainconfig_mhm_mrm_t
-  !   character(18) :: name = "mainconfig_mhm_mrm" !< namelist name
-  !   logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
-  ! contains
-  !   !> \copydoc mo_namelists::read_mainconfig_mhm_mrm
-  !   procedure, public :: read => read_mainconfig_mhm_mrm !< \see mo_namelists::read_mainconfig_mhm_mrm
-  ! end type nml_mainconfig_mhm_mrm_t
-  ! !> 'mainconfig_mhm_mrm' namelist content
-  ! type(nml_mainconfig_mhm_mrm_t), public :: nml_mainconfig_mhm_mrm
+  !> \class   nml_interception1_t
+  !> \brief   'interception1' namelist content
+  type, public :: nml_interception1_t
+    character(13) :: name = "interception1" !< namelist name
+    logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
+    real(dp), dimension(nColPars) :: canopyInterceptionFactor !< multiplier to relate LAI to interception storage [-]
+  contains
+    !> \copydoc mo_namelists::read_interception1
+    procedure, public :: read => read_interception1 !< \see mo_namelists::read_interception1
+  end type nml_interception1_t
+  !> 'interception1' namelist content
+  type(nml_interception1_t), public :: nml_interception1
 
   ! namelist /snow1/ &
   !   snowTreshholdTemperature, &
@@ -471,17 +481,25 @@ contains
   !   maxDegreeDayFactor_impervious, &
   !   maxDegreeDayFactor_pervious
   !
-  ! !> \class   nml_mainconfig_mhm_mrm_t
-  ! !> \brief   'mainconfig_mhm_mrm' namelist content
-  ! type, public :: nml_mainconfig_mhm_mrm_t
-  !   character(18) :: name = "mainconfig_mhm_mrm" !< namelist name
-  !   logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
-  ! contains
-  !   !> \copydoc mo_namelists::read_mainconfig_mhm_mrm
-  !   procedure, public :: read => read_mainconfig_mhm_mrm !< \see mo_namelists::read_mainconfig_mhm_mrm
-  ! end type nml_mainconfig_mhm_mrm_t
-  ! !> 'mainconfig_mhm_mrm' namelist content
-  ! type(nml_mainconfig_mhm_mrm_t), public :: nml_mainconfig_mhm_mrm
+  !> \class   nml_snow1_t
+  !> \brief   'snow1' namelist content
+  type, public :: nml_snow1_t
+    character(5) :: name = "snow1" !< namelist name
+    logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
+    real(dp), dimension(nColPars) :: snowTreshholdTemperature !< Threshold for rain/snow partitioning [degC]
+    real(dp), dimension(nColPars) :: degreeDayFactor_forest !< forest: deg day factors to determine melting flux [m degC-1]
+    real(dp), dimension(nColPars) :: degreeDayFactor_impervious !< impervious: deg day factors to determine melting flux [m degC-1]
+    real(dp), dimension(nColPars) :: degreeDayFactor_pervious !< pervious: deg day factors to determine melting flux [m degC-1]
+    real(dp), dimension(nColPars) :: increaseDegreeDayFactorByPrecip !< increase of deg day factor in case of precipitation [degC-1]
+    real(dp), dimension(nColPars) :: maxDegreeDayFactor_forest !< forest: maximum values for degree day factor [m degC-1]
+    real(dp), dimension(nColPars) :: maxDegreeDayFactor_impervious !< impervious: maximum values for degree day factor [m degC-1]
+    real(dp), dimension(nColPars) :: maxDegreeDayFactor_pervious !< pervious: maximum values for degree day factor [m degC-1]
+  contains
+    !> \copydoc mo_namelists::read_snow1
+    procedure, public :: read => read_snow1 !< \see mo_namelists::read_snow1
+  end type nml_snow1_t
+  !> 'snow1' namelist content
+  type(nml_snow1_t), public :: nml_snow1
 
   ! namelist /soilmoisture1/ &
   !   orgMatterContent_forest, &
@@ -502,17 +520,41 @@ contains
   !   rootFractionCoefficient_pervious, &
   !   infiltrationShapeFactor
   !
-  ! !> \class   nml_mainconfig_mhm_mrm_t
-  ! !> \brief   'mainconfig_mhm_mrm' namelist content
-  ! type, public :: nml_mainconfig_mhm_mrm_t
-  !   character(18) :: name = "mainconfig_mhm_mrm" !< namelist name
-  !   logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
-  ! contains
-  !   !> \copydoc mo_namelists::read_mainconfig_mhm_mrm
-  !   procedure, public :: read => read_mainconfig_mhm_mrm !< \see mo_namelists::read_mainconfig_mhm_mrm
-  ! end type nml_mainconfig_mhm_mrm_t
-  ! !> 'mainconfig_mhm_mrm' namelist content
-  ! type(nml_mainconfig_mhm_mrm_t), public :: nml_mainconfig_mhm_mrm
+  !> \class   nml_soilmoisture1_t
+  !> \brief   'soilmoisture1' namelist content
+  type, public :: nml_soilmoisture1_t
+    character(13) :: name = "soilmoisture1" !< namelist name
+    logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
+    real(dp), dimension(nColPars) :: orgMatterContent_forest !< organic matter content [%] for forest
+    real(dp), dimension(nColPars) :: orgMatterContent_impervious !< organic matter content [%] for impervious
+    real(dp), dimension(nColPars) :: orgMatterContent_pervious !< organic matter content [%] for pervious
+    !> Zacharias PTF parameters below 66.5 % sand content (Zacharias et al., 2007, doi:10.2136/sssaj2006.0098)
+    real(dp), dimension(nColPars) :: PTF_lower66_5_constant
+    real(dp), dimension(nColPars) :: PTF_lower66_5_clay !< multiplier for clay constant (see PTF_lower66_5_constant)
+    real(dp), dimension(nColPars) :: PTF_lower66_5_Db !< multiplier for mineral bulk density (see PTF_lower66_5_constant)
+    !> Zacharias PTF parameters above 66.5 % sand content (Zacharias et al., 2007, doi:10.2136/sssaj2006.0098)
+    real(dp), dimension(nColPars) :: PTF_higher66_5_constant
+    real(dp), dimension(nColPars) :: PTF_higher66_5_clay !< multiplier for clay constant (see PTF_higher66_5_constant)
+    real(dp), dimension(nColPars) :: PTF_higher66_5_Db !< multiplier for mineral bulk density (see PTF_higher66_5_constant)
+    !> PTF parameters for saturated hydraulic conductivity after Cosby et al. (1984)
+    real(dp), dimension(nColPars) :: PTF_Ks_constant
+    real(dp), dimension(nColPars) :: PTF_Ks_sand !< multiplier for sand (see PTF_Ks_constant)
+    real(dp), dimension(nColPars) :: PTF_Ks_clay !< multiplier for clay (see PTF_Ks_constant)
+    real(dp), dimension(nColPars) :: PTF_Ks_curveSlope !< unit conversion factor from inch/h to cm/d
+    !> shape factor for root distribution with depth, which follows an exponential function [-] for forest
+    real(dp), dimension(nColPars) :: rootFractionCoefficient_forest
+    !> shape factor for root distribution with depth, which follows an exponential function [-] for impervious
+    real(dp), dimension(nColPars) :: rootFractionCoefficient_impervious
+    !> shape factor for root distribution with depth, which follows an exponential function [-] for pervious
+    real(dp), dimension(nColPars) :: rootFractionCoefficient_pervious
+    !> shape factor for partitioning effective precipitation into runoff and infiltration based on soil wetness [-]
+    real(dp), dimension(nColPars) :: infiltrationShapeFactor
+  contains
+    !> \copydoc mo_namelists::read_soilmoisture1
+    procedure, public :: read => read_soilmoisture1 !< \see mo_namelists::read_soilmoisture1
+  end type nml_soilmoisture1_t
+  !> 'soilmoisture1' namelist content
+  type(nml_soilmoisture1_t), public :: nml_soilmoisture1
 
   ! namelist /soilmoisture2/ &
   !   orgMatterContent_forest, &
@@ -534,17 +576,42 @@ contains
   !   infiltrationShapeFactor, &
   !   jarvis_sm_threshold_c1
   !
-  ! !> \class   nml_mainconfig_mhm_mrm_t
-  ! !> \brief   'mainconfig_mhm_mrm' namelist content
-  ! type, public :: nml_mainconfig_mhm_mrm_t
-  !   character(18) :: name = "mainconfig_mhm_mrm" !< namelist name
-  !   logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
-  ! contains
-  !   !> \copydoc mo_namelists::read_mainconfig_mhm_mrm
-  !   procedure, public :: read => read_mainconfig_mhm_mrm !< \see mo_namelists::read_mainconfig_mhm_mrm
-  ! end type nml_mainconfig_mhm_mrm_t
-  ! !> 'mainconfig_mhm_mrm' namelist content
-  ! type(nml_mainconfig_mhm_mrm_t), public :: nml_mainconfig_mhm_mrm
+  !> \class   nml_soilmoisture2_t
+  !> \brief   'soilmoisture2' namelist content
+  type, public :: nml_soilmoisture2_t
+    character(13) :: name = "soilmoisture2" !< namelist name
+    logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
+    real(dp), dimension(nColPars) :: orgMatterContent_forest !< organic matter content [%] for forest
+    real(dp), dimension(nColPars) :: orgMatterContent_impervious !< organic matter content [%] for impervious
+    real(dp), dimension(nColPars) :: orgMatterContent_pervious !< organic matter content [%] for pervious
+    !> Zacharias PTF parameters below 66.5 % sand content (Zacharias et al., 2007, doi:10.2136/sssaj2006.0098)
+    real(dp), dimension(nColPars) :: PTF_lower66_5_constant
+    real(dp), dimension(nColPars) :: PTF_lower66_5_clay !< multiplier for clay constant (see PTF_lower66_5_constant)
+    real(dp), dimension(nColPars) :: PTF_lower66_5_Db !< multiplier for mineral bulk density (see PTF_lower66_5_constant)
+    !> Zacharias PTF parameters above 66.5 % sand content (Zacharias et al., 2007, doi:10.2136/sssaj2006.0098)
+    real(dp), dimension(nColPars) :: PTF_higher66_5_constant
+    real(dp), dimension(nColPars) :: PTF_higher66_5_clay !< multiplier for clay constant (see PTF_higher66_5_constant)
+    real(dp), dimension(nColPars) :: PTF_higher66_5_Db !< multiplier for mineral bulk density (see PTF_higher66_5_constant)
+    !> PTF parameters for saturated hydraulic conductivity after Cosby et al. (1984)
+    real(dp), dimension(nColPars) :: PTF_Ks_constant
+    real(dp), dimension(nColPars) :: PTF_Ks_sand !< multiplier for sand (see PTF_Ks_constant)
+    real(dp), dimension(nColPars) :: PTF_Ks_clay !< multiplier for clay (see PTF_Ks_constant)
+    real(dp), dimension(nColPars) :: PTF_Ks_curveSlope !< unit conversion factor from inch/h to cm/d
+    !> shape factor for root distribution with depth, which follows an exponential function [-] for forest
+    real(dp), dimension(nColPars) :: rootFractionCoefficient_forest
+    !> shape factor for root distribution with depth, which follows an exponential function [-] for impervious
+    real(dp), dimension(nColPars) :: rootFractionCoefficient_impervious
+    !> shape factor for root distribution with depth, which follows an exponential function [-] for pervious
+    real(dp), dimension(nColPars) :: rootFractionCoefficient_pervious
+    !> shape factor for partitioning effective precipitation into runoff and infiltration based on soil wetness [-]
+    real(dp), dimension(nColPars) :: infiltrationShapeFactor
+    real(dp), dimension(nColPars) :: jarvis_sm_threshold_c1 !< soil moisture threshod for jarvis model
+  contains
+    !> \copydoc mo_namelists::read_soilmoisture2
+    procedure, public :: read => read_soilmoisture2 !< \see mo_namelists::read_soilmoisture2
+  end type nml_soilmoisture2_t
+  !> 'soilmoisture2' namelist content
+  type(nml_soilmoisture2_t), public :: nml_soilmoisture2
 
   ! namelist /soilmoisture3/ &
   !   orgMatterContent_forest, &
@@ -563,23 +630,53 @@ contains
   !   rootFractionCoefficient_forest, &
   !   rootFractionCoefficient_impervious, &
   !   rootFractionCoefficient_pervious, &
-  !   infiltrationShapeFactor,rootFractionCoefficient_sand, &
+  !   infiltrationShapeFactor, &
+  !   rootFractionCoefficient_sand, &
   !   rootFractionCoefficient_clay, &
   !   FCmin_glob, &
   !   FCdelta_glob, &
   !   jarvis_sm_threshold_c1
   !
-  ! !> \class   nml_mainconfig_mhm_mrm_t
-  ! !> \brief   'mainconfig_mhm_mrm' namelist content
-  ! type, public :: nml_mainconfig_mhm_mrm_t
-  !   character(18) :: name = "mainconfig_mhm_mrm" !< namelist name
-  !   logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
-  ! contains
-  !   !> \copydoc mo_namelists::read_mainconfig_mhm_mrm
-  !   procedure, public :: read => read_mainconfig_mhm_mrm !< \see mo_namelists::read_mainconfig_mhm_mrm
-  ! end type nml_mainconfig_mhm_mrm_t
-  ! !> 'mainconfig_mhm_mrm' namelist content
-  ! type(nml_mainconfig_mhm_mrm_t), public :: nml_mainconfig_mhm_mrm
+  !> \class   nml_soilmoisture3_t
+  !> \brief   'soilmoisture3' namelist content
+  type, public :: nml_soilmoisture3_t
+    character(13) :: name = "soilmoisture3" !< namelist name
+    logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
+    real(dp), dimension(nColPars) :: orgMatterContent_forest !< organic matter content [%] for forest
+    real(dp), dimension(nColPars) :: orgMatterContent_impervious !< organic matter content [%] for impervious
+    real(dp), dimension(nColPars) :: orgMatterContent_pervious !< organic matter content [%] for pervious
+    !> Zacharias PTF parameters below 66.5 % sand content (Zacharias et al., 2007, doi:10.2136/sssaj2006.0098)
+    real(dp), dimension(nColPars) :: PTF_lower66_5_constant
+    real(dp), dimension(nColPars) :: PTF_lower66_5_clay !< multiplier for clay constant (see PTF_lower66_5_constant)
+    real(dp), dimension(nColPars) :: PTF_lower66_5_Db !< multiplier for mineral bulk density (see PTF_lower66_5_constant)
+    !> Zacharias PTF parameters above 66.5 % sand content (Zacharias et al., 2007, doi:10.2136/sssaj2006.0098)
+    real(dp), dimension(nColPars) :: PTF_higher66_5_constant
+    real(dp), dimension(nColPars) :: PTF_higher66_5_clay !< multiplier for clay constant (see PTF_higher66_5_constant)
+    real(dp), dimension(nColPars) :: PTF_higher66_5_Db !< multiplier for mineral bulk density (see PTF_higher66_5_constant)
+    !> PTF parameters for saturated hydraulic conductivity after Cosby et al. (1984)
+    real(dp), dimension(nColPars) :: PTF_Ks_constant
+    real(dp), dimension(nColPars) :: PTF_Ks_sand !< multiplier for sand (see PTF_Ks_constant)
+    real(dp), dimension(nColPars) :: PTF_Ks_clay !< multiplier for clay (see PTF_Ks_constant)
+    real(dp), dimension(nColPars) :: PTF_Ks_curveSlope !< unit conversion factor from inch/h to cm/d
+    !> shape factor for root distribution with depth, which follows an exponential function [-] for forest
+    real(dp), dimension(nColPars) :: rootFractionCoefficient_forest
+    !> shape factor for root distribution with depth, which follows an exponential function [-] for impervious
+    real(dp), dimension(nColPars) :: rootFractionCoefficient_impervious
+    !> shape factor for root distribution with depth, which follows an exponential function [-] for pervious
+    real(dp), dimension(nColPars) :: rootFractionCoefficient_pervious
+    !> shape factor for partitioning effective precipitation into runoff and infiltration based on soil wetness [-]
+    real(dp), dimension(nColPars) :: infiltrationShapeFactor
+    real(dp), dimension(nColPars) :: FCmin_glob !< global field capacity minimum
+    real(dp), dimension(nColPars) :: FCdelta_glob !< difference between global field capacity minimum and maximum
+    real(dp), dimension(nColPars) :: rootFractionCoefficient_sand !< threshold for actual ET reduction for sand
+    real(dp), dimension(nColPars) :: rootFractionCoefficient_clay !< threshold for actual ET reduction for clay
+    real(dp), dimension(nColPars) :: jarvis_sm_threshold_c1 !< soil moisture threshod for jarvis model
+  contains
+    !> \copydoc mo_namelists::read_soilmoisture3
+    procedure, public :: read => read_soilmoisture3 !< \see mo_namelists::read_soilmoisture3
+  end type nml_soilmoisture3_t
+  !> 'soilmoisture3' namelist content
+  type(nml_soilmoisture3_t), public :: nml_soilmoisture3
 
   ! namelist /soilmoisture4/ &
   !   orgMatterContent_forest, &
@@ -598,37 +695,67 @@ contains
   !   rootFractionCoefficient_forest, &
   !   rootFractionCoefficient_impervious, &
   !   rootFractionCoefficient_pervious, &
-  !   infiltrationShapeFactor,rootFractionCoefficient_sand, &
+  !   infiltrationShapeFactor, &
+  !   rootFractionCoefficient_sand, &
   !   rootFractionCoefficient_clay, &
   !   FCmin_glob, &
-  !   FCdelta_glob
+  !   FCdelta_glob, &
   !
-  ! !> \class   nml_mainconfig_mhm_mrm_t
-  ! !> \brief   'mainconfig_mhm_mrm' namelist content
-  ! type, public :: nml_mainconfig_mhm_mrm_t
-  !   character(18) :: name = "mainconfig_mhm_mrm" !< namelist name
-  !   logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
-  ! contains
-  !   !> \copydoc mo_namelists::read_mainconfig_mhm_mrm
-  !   procedure, public :: read => read_mainconfig_mhm_mrm !< \see mo_namelists::read_mainconfig_mhm_mrm
-  ! end type nml_mainconfig_mhm_mrm_t
-  ! !> 'mainconfig_mhm_mrm' namelist content
-  ! type(nml_mainconfig_mhm_mrm_t), public :: nml_mainconfig_mhm_mrm
+  !> \class   nml_soilmoisture4_t
+  !> \brief   'soilmoisture4' namelist content
+  type, public :: nml_soilmoisture4_t
+    character(13) :: name = "soilmoisture4" !< namelist name
+    logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
+    real(dp), dimension(nColPars) :: orgMatterContent_forest !< organic matter content [%] for forest
+    real(dp), dimension(nColPars) :: orgMatterContent_impervious !< organic matter content [%] for impervious
+    real(dp), dimension(nColPars) :: orgMatterContent_pervious !< organic matter content [%] for pervious
+    !> Zacharias PTF parameters below 66.5 % sand content (Zacharias et al., 2007, doi:10.2136/sssaj2006.0098)
+    real(dp), dimension(nColPars) :: PTF_lower66_5_constant
+    real(dp), dimension(nColPars) :: PTF_lower66_5_clay !< multiplier for clay constant (see PTF_lower66_5_constant)
+    real(dp), dimension(nColPars) :: PTF_lower66_5_Db !< multiplier for mineral bulk density (see PTF_lower66_5_constant)
+    !> Zacharias PTF parameters above 66.5 % sand content (Zacharias et al., 2007, doi:10.2136/sssaj2006.0098)
+    real(dp), dimension(nColPars) :: PTF_higher66_5_constant
+    real(dp), dimension(nColPars) :: PTF_higher66_5_clay !< multiplier for clay constant (see PTF_higher66_5_constant)
+    real(dp), dimension(nColPars) :: PTF_higher66_5_Db !< multiplier for mineral bulk density (see PTF_higher66_5_constant)
+    !> PTF parameters for saturated hydraulic conductivity after Cosby et al. (1984)
+    real(dp), dimension(nColPars) :: PTF_Ks_constant
+    real(dp), dimension(nColPars) :: PTF_Ks_sand !< multiplier for sand (see PTF_Ks_constant)
+    real(dp), dimension(nColPars) :: PTF_Ks_clay !< multiplier for clay (see PTF_Ks_constant)
+    real(dp), dimension(nColPars) :: PTF_Ks_curveSlope !< unit conversion factor from inch/h to cm/d
+    !> shape factor for root distribution with depth, which follows an exponential function [-] for forest
+    real(dp), dimension(nColPars) :: rootFractionCoefficient_forest
+    !> shape factor for root distribution with depth, which follows an exponential function [-] for impervious
+    real(dp), dimension(nColPars) :: rootFractionCoefficient_impervious
+    !> shape factor for root distribution with depth, which follows an exponential function [-] for pervious
+    real(dp), dimension(nColPars) :: rootFractionCoefficient_pervious
+    !> shape factor for partitioning effective precipitation into runoff and infiltration based on soil wetness [-]
+    real(dp), dimension(nColPars) :: infiltrationShapeFactor
+    real(dp), dimension(nColPars) :: FCmin_glob !< global field capacity minimum
+    real(dp), dimension(nColPars) :: FCdelta_glob !< difference between global field capacity minimum and maximum
+    real(dp), dimension(nColPars) :: rootFractionCoefficient_sand !< threshold for actual ET reduction for sand
+    real(dp), dimension(nColPars) :: rootFractionCoefficient_clay !< threshold for actual ET reduction for clay
+  contains
+    !> \copydoc mo_namelists::read_soilmoisture4
+    procedure, public :: read => read_soilmoisture4 !< \see mo_namelists::read_soilmoisture4
+  end type nml_soilmoisture4_t
+  !> 'soilmoisture4' namelist content
+  type(nml_soilmoisture4_t), public :: nml_soilmoisture4
 
   ! namelist /directRunoff1/ &
   !   imperviousStorageCapacity
   !
-  ! !> \class   nml_mainconfig_mhm_mrm_t
-  ! !> \brief   'mainconfig_mhm_mrm' namelist content
-  ! type, public :: nml_mainconfig_mhm_mrm_t
-  !   character(18) :: name = "mainconfig_mhm_mrm" !< namelist name
-  !   logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
-  ! contains
-  !   !> \copydoc mo_namelists::read_mainconfig_mhm_mrm
-  !   procedure, public :: read => read_mainconfig_mhm_mrm !< \see mo_namelists::read_mainconfig_mhm_mrm
-  ! end type nml_mainconfig_mhm_mrm_t
-  ! !> 'mainconfig_mhm_mrm' namelist content
-  ! type(nml_mainconfig_mhm_mrm_t), public :: nml_mainconfig_mhm_mrm
+  !> \class   nml_directrunoff1_t
+  !> \brief   'directrunoff1' namelist content
+  type, public :: nml_directrunoff1_t
+    character(13) :: name = "directrunoff1" !< namelist name
+    logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
+    real(dp), dimension(nColPars) :: imperviousStorageCapacity !< direct Runoff: Sealed Area storage capacity
+  contains
+    !> \copydoc mo_namelists::read_directrunoff1
+    procedure, public :: read => read_directrunoff1 !< \see mo_namelists::read_directrunoff1
+  end type nml_directrunoff1_t
+  !> 'directrunoff1' namelist content
+  type(nml_directrunoff1_t), public :: nml_directrunoff1
 
   ! namelist /PETminus1/  &
   !   PET_a_forest, &
@@ -637,34 +764,44 @@ contains
   !   PET_b, &
   !   PET_c
   !
-  ! !> \class   nml_mainconfig_mhm_mrm_t
-  ! !> \brief   'mainconfig_mhm_mrm' namelist content
-  ! type, public :: nml_mainconfig_mhm_mrm_t
-  !   character(18) :: name = "mainconfig_mhm_mrm" !< namelist name
-  !   logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
-  ! contains
-  !   !> \copydoc mo_namelists::read_mainconfig_mhm_mrm
-  !   procedure, public :: read => read_mainconfig_mhm_mrm !< \see mo_namelists::read_mainconfig_mhm_mrm
-  ! end type nml_mainconfig_mhm_mrm_t
-  ! !> 'mainconfig_mhm_mrm' namelist content
-  ! type(nml_mainconfig_mhm_mrm_t), public :: nml_mainconfig_mhm_mrm
+  !> \class   nml_petminus1_t
+  !> \brief   'petminus1' namelist content
+  !> \details PET is input, LAI driven correction
+  type, public :: nml_petminus1_t
+    character(9) :: name = "petminus1" !< namelist name
+    logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
+    real(dp), dimension(nColPars) :: PET_a_forest !< DSF=PET_a+PET_b*(1-exp(PET_c*LAI)) to correct PET as PET=DSF*PET
+    real(dp), dimension(nColPars) :: PET_a_impervious !< DSF=PET_a+PET_b*(1-exp(PET_c*LAI)) to correct PET as PET=DSF*PET
+    real(dp), dimension(nColPars) :: PET_a_pervious !< DSF=PET_a+PET_b*(1-exp(PET_c*LAI)) to correct PET as PET=DSF*PET
+    real(dp), dimension(nColPars) :: PET_b !< DSF=PET_a+PET_b*(1-exp(PET_c*LAI)) to correct PET as PET=DSF*PET
+    real(dp), dimension(nColPars) :: PET_c !< DSF=PET_a+PET_b*(1-exp(PET_c*LAI)) to correct PET as PET=DSF*PET
+  contains
+    !> \copydoc mo_namelists::read_petminus1
+    procedure, public :: read => read_petminus1 !< \see mo_namelists::read_petminus1
+  end type nml_petminus1_t
+  !> 'petminus1' namelist content
+  type(nml_petminus1_t), public :: nml_petminus1
 
   ! namelist /PET0/ &
   !   minCorrectionFactorPET, &
   !   maxCorrectionFactorPET, &
   !   aspectTresholdPET
   !
-  ! !> \class   nml_mainconfig_mhm_mrm_t
-  ! !> \brief   'mainconfig_mhm_mrm' namelist content
-  ! type, public :: nml_mainconfig_mhm_mrm_t
-  !   character(18) :: name = "mainconfig_mhm_mrm" !< namelist name
-  !   logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
-  ! contains
-  !   !> \copydoc mo_namelists::read_mainconfig_mhm_mrm
-  !   procedure, public :: read => read_mainconfig_mhm_mrm !< \see mo_namelists::read_mainconfig_mhm_mrm
-  ! end type nml_mainconfig_mhm_mrm_t
-  ! !> 'mainconfig_mhm_mrm' namelist content
-  ! type(nml_mainconfig_mhm_mrm_t), public :: nml_mainconfig_mhm_mrm
+  !> \class   nml_pet0_t
+  !> \brief   'pet0' namelist content
+  !> \details PET is input, aspect driven correction
+  type, public :: nml_pet0_t
+    character(4) :: name = "pet0" !< namelist name
+    logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
+    real(dp), dimension(nColPars) :: minCorrectionFactorPET !< minimum factor for PET correction with aspect
+    real(dp), dimension(nColPars) :: maxCorrectionFactorPET !< maximum factor for PET correction with aspect
+    real(dp), dimension(nColPars) :: aspectTresholdPET !< aspect threshold for PET correction with aspect
+  contains
+    !> \copydoc mo_namelists::read_pet0
+    procedure, public :: read => read_pet0 !< \see mo_namelists::read_pet0
+  end type nml_pet0_t
+  !> 'pet0' namelist content
+  type(nml_pet0_t), public :: nml_pet0
 
   ! namelist /PET1/ &
   !   minCorrectionFactorPET, &
@@ -672,33 +809,41 @@ contains
   !   aspectTresholdPET, &
   !   HargreavesSamaniCoeff
   !
-  ! !> \class   nml_mainconfig_mhm_mrm_t
-  ! !> \brief   'mainconfig_mhm_mrm' namelist content
-  ! type, public :: nml_mainconfig_mhm_mrm_t
-  !   character(18) :: name = "mainconfig_mhm_mrm" !< namelist name
-  !   logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
-  ! contains
-  !   !> \copydoc mo_namelists::read_mainconfig_mhm_mrm
-  !   procedure, public :: read => read_mainconfig_mhm_mrm !< \see mo_namelists::read_mainconfig_mhm_mrm
-  ! end type nml_mainconfig_mhm_mrm_t
-  ! !> 'mainconfig_mhm_mrm' namelist content
-  ! type(nml_mainconfig_mhm_mrm_t), public :: nml_mainconfig_mhm_mrm
+  !> \class   nml_pet1_t
+  !> \brief   'pet1' namelist content
+  !> \details PET - Hargreaves Samani
+  type, public :: nml_pet1_t
+    character(4) :: name = "pet1" !< namelist name
+    logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
+    real(dp), dimension(nColPars) :: minCorrectionFactorPET !< minimum factor for PET correction with aspect
+    real(dp), dimension(nColPars) :: maxCorrectionFactorPET !< maximum factor for PET correction with aspect
+    real(dp), dimension(nColPars) :: aspectTresholdPET !< aspect threshold for PET correction with aspect
+    real(dp), dimension(nColPars) :: HargreavesSamaniCoeff !< coefficient for Hargreaves Samani
+  contains
+    !> \copydoc mo_namelists::read_pet1
+    procedure, public :: read => read_pet1 !< \see mo_namelists::read_pet1
+  end type nml_pet1_t
+  !> 'pet1' namelist content
+  type(nml_pet1_t), public :: nml_pet1
 
   ! namelist /PET2/ &
   !   PriestleyTaylorCoeff, &
   !   PriestleyTaylorLAIcorr
   !
-  ! !> \class   nml_mainconfig_mhm_mrm_t
-  ! !> \brief   'mainconfig_mhm_mrm' namelist content
-  ! type, public :: nml_mainconfig_mhm_mrm_t
-  !   character(18) :: name = "mainconfig_mhm_mrm" !< namelist name
-  !   logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
-  ! contains
-  !   !> \copydoc mo_namelists::read_mainconfig_mhm_mrm
-  !   procedure, public :: read => read_mainconfig_mhm_mrm !< \see mo_namelists::read_mainconfig_mhm_mrm
-  ! end type nml_mainconfig_mhm_mrm_t
-  ! !> 'mainconfig_mhm_mrm' namelist content
-  ! type(nml_mainconfig_mhm_mrm_t), public :: nml_mainconfig_mhm_mrm
+  !> \class   nml_pet2_t
+  !> \brief   'pet2' namelist content
+  !> \details PET - Priestley Taylor
+  type, public :: nml_pet2_t
+    character(4) :: name = "pet2" !< namelist name
+    logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
+    real(dp), dimension(nColPars) :: PriestleyTaylorCoeff !< Priestley-Taylor coefficient
+    real(dp), dimension(nColPars) :: PriestleyTaylorLAIcorr !< Priestley-Taylor LAI correction factor
+  contains
+    !> \copydoc mo_namelists::read_pet2
+    procedure, public :: read => read_pet2 !< \see mo_namelists::read_pet2
+  end type nml_pet2_t
+  !> 'pet2' namelist content
+  type(nml_pet2_t), public :: nml_pet2
 
   ! namelist /PET3/ &
   !   canopyheigth_forest, &
@@ -709,17 +854,25 @@ contains
   !   roughnesslength_heat_coeff, &
   !   stomatal_resistance
   !
-  ! !> \class   nml_mainconfig_mhm_mrm_t
-  ! !> \brief   'mainconfig_mhm_mrm' namelist content
-  ! type, public :: nml_mainconfig_mhm_mrm_t
-  !   character(18) :: name = "mainconfig_mhm_mrm" !< namelist name
-  !   logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
-  ! contains
-  !   !> \copydoc mo_namelists::read_mainconfig_mhm_mrm
-  !   procedure, public :: read => read_mainconfig_mhm_mrm !< \see mo_namelists::read_mainconfig_mhm_mrm
-  ! end type nml_mainconfig_mhm_mrm_t
-  ! !> 'mainconfig_mhm_mrm' namelist content
-  ! type(nml_mainconfig_mhm_mrm_t), public :: nml_mainconfig_mhm_mrm
+  !> \class   nml_pet3_t
+  !> \brief   'pet3' namelist content
+  !> \details PET - Penman Monteith
+  type, public :: nml_pet3_t
+    character(4) :: name = "pet3" !< namelist name
+    logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
+    real(dp), dimension(nColPars) :: canopyheigth_forest !< canopy height for foreset
+    real(dp), dimension(nColPars) :: canopyheigth_impervious !< canopy height for impervious
+    real(dp), dimension(nColPars) :: canopyheigth_pervious !< canopy height for pervious
+    real(dp), dimension(nColPars) :: displacementheight_coeff !< displacement height coefficient
+    real(dp), dimension(nColPars) :: roughnesslength_momentum_coeff !< roughness length momentum coefficient
+    real(dp), dimension(nColPars) :: roughnesslength_heat_coeff !< roughness length heat coefficient
+    real(dp), dimension(nColPars) :: stomatal_resistance !< stomatal resistance
+  contains
+    !> \copydoc mo_namelists::read_pet3
+    procedure, public :: read => read_pet3 !< \see mo_namelists::read_pet3
+  end type nml_pet3_t
+  !> 'pet3' namelist content
+  type(nml_pet3_t), public :: nml_pet3
 
   ! namelist /interflow1/ &
   !   interflowStorageCapacityFactor, &
@@ -728,51 +881,65 @@ contains
   !   slowInterflowRecession_Ks, &
   !   exponentSlowInterflow
   !
-  ! !> \class   nml_mainconfig_mhm_mrm_t
-  ! !> \brief   'mainconfig_mhm_mrm' namelist content
-  ! type, public :: nml_mainconfig_mhm_mrm_t
-  !   character(18) :: name = "mainconfig_mhm_mrm" !< namelist name
-  !   logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
-  ! contains
-  !   !> \copydoc mo_namelists::read_mainconfig_mhm_mrm
-  !   procedure, public :: read => read_mainconfig_mhm_mrm !< \see mo_namelists::read_mainconfig_mhm_mrm
-  ! end type nml_mainconfig_mhm_mrm_t
-  ! !> 'mainconfig_mhm_mrm' namelist content
-  ! type(nml_mainconfig_mhm_mrm_t), public :: nml_mainconfig_mhm_mrm
+  !> \class   nml_interflow1_t
+  !> \brief   'interflow1' namelist content
+  type, public :: nml_interflow1_t
+    character(10) :: name = "interflow1" !< namelist name
+    logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
+    real(dp), dimension(nColPars) :: interflowStorageCapacityFactor !< interflow storage capacity factor
+    real(dp), dimension(nColPars) :: interflowRecession_slope !< multiplier for slope to derive interflow recession constant
+    !> multiplier to derive fast interflow recession constant for forest
+    real(dp), dimension(nColPars) :: fastInterflowRecession_forest
+    !> multiplier for variability of saturated hydraulic conductivity to derive slow interflow recession constant
+    real(dp), dimension(nColPars) :: slowInterflowRecession_Ks
+    !> multiplier for variability of saturated hydraulic conductivity to derive slow interflow exponent
+    real(dp), dimension(nColPars) :: exponentSlowInterflow
+  contains
+    !> \copydoc mo_namelists::read_interflow1
+    procedure, public :: read => read_interflow1 !< \see mo_namelists::read_interflow1
+  end type nml_interflow1_t
+  !> 'interflow1' namelist content
+  type(nml_interflow1_t), public :: nml_interflow1
 
   ! namelist /percolation1/ &
   !   rechargeCoefficient, &
   !   rechargeFactor_karstic, &
   !   gain_loss_GWreservoir_karstic
   !
-  ! !> \class   nml_mainconfig_mhm_mrm_t
-  ! !> \brief   'mainconfig_mhm_mrm' namelist content
-  ! type, public :: nml_mainconfig_mhm_mrm_t
-  !   character(18) :: name = "mainconfig_mhm_mrm" !< namelist name
-  !   logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
-  ! contains
-  !   !> \copydoc mo_namelists::read_mainconfig_mhm_mrm
-  !   procedure, public :: read => read_mainconfig_mhm_mrm !< \see mo_namelists::read_mainconfig_mhm_mrm
-  ! end type nml_mainconfig_mhm_mrm_t
-  ! !> 'mainconfig_mhm_mrm' namelist content
-  ! type(nml_mainconfig_mhm_mrm_t), public :: nml_mainconfig_mhm_mrm
+  !> \class   nml_percolation1_t
+  !> \brief   'percolation1' namelist content
+  type, public :: nml_percolation1_t
+    character(12) :: name = "percolation1" !< namelist name
+    logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
+    real(dp), dimension(nColPars) :: rechargeCoefficient !< recharge coefficient
+    real(dp), dimension(nColPars) :: rechargeFactor_karstic !< recharge factor for karstic percolation
+    real(dp), dimension(nColPars) :: gain_loss_GWreservoir_karstic !< gain loss in ground water reservoir for karstic
+  contains
+    !> \copydoc mo_namelists::read_percolation1
+    procedure, public :: read => read_percolation1 !< \see mo_namelists::read_percolation1
+  end type nml_percolation1_t
+  !> 'percolation1' namelist content
+  type(nml_percolation1_t), public :: nml_percolation1
 
   ! namelist /neutrons1/ &
   !   Desilets_N0, &
   !   Desilets_LW0, &
   !   Desilets_LW1
   !
-  ! !> \class   nml_mainconfig_mhm_mrm_t
-  ! !> \brief   'mainconfig_mhm_mrm' namelist content
-  ! type, public :: nml_mainconfig_mhm_mrm_t
-  !   character(18) :: name = "mainconfig_mhm_mrm" !< namelist name
-  !   logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
-  ! contains
-  !   !> \copydoc mo_namelists::read_mainconfig_mhm_mrm
-  !   procedure, public :: read => read_mainconfig_mhm_mrm !< \see mo_namelists::read_mainconfig_mhm_mrm
-  ! end type nml_mainconfig_mhm_mrm_t
-  ! !> 'mainconfig_mhm_mrm' namelist content
-  ! type(nml_mainconfig_mhm_mrm_t), public :: nml_mainconfig_mhm_mrm
+  !> \class   nml_neutrons1_t
+  !> \brief   'neutrons1' namelist content
+  type, public :: nml_neutrons1_t
+    character(9) :: name = "neutrons1" !< namelist name
+    logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
+    real(dp), dimension(nColPars) :: Desilets_N0 !< Desilets N0 parameter
+    real(dp), dimension(nColPars) :: Desilets_LW0 !< Desilets LW0 parameter
+    real(dp), dimension(nColPars) :: Desilets_LW1 !< Desilets LW1 parameter
+  contains
+    !> \copydoc mo_namelists::read_neutrons1
+    procedure, public :: read => read_neutrons1 !< \see mo_namelists::read_neutrons1
+  end type nml_neutrons1_t
+  !> 'neutrons1' namelist content
+  type(nml_neutrons1_t), public :: nml_neutrons1
 
   ! namelist /neutrons2/ &
   !   COSMIC_N0, &
@@ -785,32 +952,43 @@ contains
   !   COSMIC_LW0, &
   !   COSMIC_LW1
   !
-  ! !> \class   nml_mainconfig_mhm_mrm_t
-  ! !> \brief   'mainconfig_mhm_mrm' namelist content
-  ! type, public :: nml_mainconfig_mhm_mrm_t
-  !   character(18) :: name = "mainconfig_mhm_mrm" !< namelist name
-  !   logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
-  ! contains
-  !   !> \copydoc mo_namelists::read_mainconfig_mhm_mrm
-  !   procedure, public :: read => read_mainconfig_mhm_mrm !< \see mo_namelists::read_mainconfig_mhm_mrm
-  ! end type nml_mainconfig_mhm_mrm_t
-  ! !> 'mainconfig_mhm_mrm' namelist content
-  ! type(nml_mainconfig_mhm_mrm_t), public :: nml_mainconfig_mhm_mrm
+  !> \class   nml_neutrons2_t
+  !> \brief   'neutrons2' namelist content
+  type, public :: nml_neutrons2_t
+    character(9) :: name = "neutrons2" !< namelist name
+    logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
+    real(dp), dimension(nColPars) :: COSMIC_N0 !< cosmic N0 parameter
+    real(dp), dimension(nColPars) :: COSMIC_N1 !< cosmic N1 parameter
+    real(dp), dimension(nColPars) :: COSMIC_N2 !< cosmic N2 parameter
+    real(dp), dimension(nColPars) :: COSMIC_alpha0 !< cosmic alpha0 parameter
+    real(dp), dimension(nColPars) :: COSMIC_alpha1 !< cosmic alpha1 parameter
+    real(dp), dimension(nColPars) :: COSMIC_L30 !< cosmic L30 parameter
+    real(dp), dimension(nColPars) :: COSMIC_L31 !< cosmic L31 parameter
+    real(dp), dimension(nColPars) :: COSMIC_LW0 !< cosmic LW0 parameter
+    real(dp), dimension(nColPars) :: COSMIC_LW1 !< cosmic LW1 parameter
+  contains
+    !> \copydoc mo_namelists::read_neutrons2
+    procedure, public :: read => read_neutrons2 !< \see mo_namelists::read_neutrons2
+  end type nml_neutrons2_t
+  !> 'neutrons2' namelist content
+  type(nml_neutrons2_t), public :: nml_neutrons2
 
   ! namelist /geoparameter/ &
   !   GeoParam
   !
-  ! !> \class   nml_mainconfig_mhm_mrm_t
-  ! !> \brief   'mainconfig_mhm_mrm' namelist content
-  ! type, public :: nml_mainconfig_mhm_mrm_t
-  !   character(18) :: name = "mainconfig_mhm_mrm" !< namelist name
-  !   logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
-  ! contains
-  !   !> \copydoc mo_namelists::read_mainconfig_mhm_mrm
-  !   procedure, public :: read => read_mainconfig_mhm_mrm !< \see mo_namelists::read_mainconfig_mhm_mrm
-  ! end type nml_mainconfig_mhm_mrm_t
-  ! !> 'mainconfig_mhm_mrm' namelist content
-  ! type(nml_mainconfig_mhm_mrm_t), public :: nml_mainconfig_mhm_mrm
+  !> \class   nml_geoparameter_t
+  !> \brief   'geoparameter' namelist content
+  type, public :: nml_geoparameter_t
+    character(12) :: name = "geoparameter" !< namelist name
+    logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
+    !> geological parameters (ordering according to file 'geology_classdefinition.txt')
+    real(dp), dimension(maxGeoUnit, nColPars) :: GeoParam
+  contains
+    !> \copydoc mo_namelists::read_geoparameter
+    procedure, public :: read => read_geoparameter !< \see mo_namelists::read_geoparameter
+  end type nml_geoparameter_t
+  !> 'geoparameter' namelist content
+  type(nml_geoparameter_t), public :: nml_geoparameter
 
   !######## mo_mrm_read_config
   ! namelist /mainconfig_mrm/ &
@@ -1502,6 +1680,852 @@ contains
       self%read_from_file = .false.
     end if
   end subroutine read_BFI_inputs
+
+  !> \brief Read 'directories_mpr' namelist content.
+  subroutine read_directories_mpr(self, file, unit)
+    implicit none
+    class(nml_directories_mpr_t), intent(inout) :: self
+    character(*), intent(in) :: file !< file containing the namelist
+    integer, intent(in) :: unit !< file unit to open the given file
+
+    character(256), dimension(maxNoDomains) :: dir_gridded_LAI !< directory of gridded LAI data, used when timeStep_LAI_input<0
+
+    namelist /directories_mpr/ &
+      dir_gridded_LAI
+
+    if ( self%read_from_file ) then
+      call open_nml(file, unit, quiet=.true.)
+      call position_nml(self%name, unit)
+      read(unit, nml=directories_mpr)
+      call close_nml(unit)
+      self%dir_gridded_LAI = dir_gridded_LAI
+      self%read_from_file = .false.
+    end if
+  end subroutine read_directories_mpr
+
+  !> \brief Read 'soildata' namelist content.
+  subroutine read_soildata(self, file, unit)
+    implicit none
+    class(nml_soildata_t), intent(inout) :: self
+    character(*), intent(in) :: file !< file containing the namelist
+    integer, intent(in) :: unit !< file unit to open the given file
+
+    integer(i4) :: iFlag_soilDB !< options to handle different soil databases
+    real(dp) :: tillageDepth !< [mm] Soil depth down to which organic
+    integer(i4) :: nSoilHorizons_mHM !< Number of horizons to model
+    real(dp), dimension(maxNoSoilHorizons) :: soil_Depth !< depth of the single horizons
+
+    namelist /soildata/ &
+      iFlag_soilDB, &
+      tillageDepth, &
+      nSoilHorizons_mHM, &
+      soil_Depth
+
+    if ( self%read_from_file ) then
+      soil_Depth = 0.0_dp ! default soil depth
+      call open_nml(file, unit, quiet=.true.)
+      call position_nml(self%name, unit)
+      read(unit, nml=soildata)
+      call close_nml(unit)
+      self%iFlag_soilDB = iFlag_soilDB
+      self%tillageDepth = tillageDepth
+      self%nSoilHorizons_mHM = nSoilHorizons_mHM
+      self%soil_Depth = soil_Depth
+      self%read_from_file = .false.
+    end if
+  end subroutine read_soildata
+
+  !> \brief Read 'lai_data_information' namelist content.
+  subroutine read_lai_data_information(self, file, unit)
+    implicit none
+    class(nml_lai_data_information_t), intent(inout) :: self
+    character(*), intent(in) :: file !< file containing the namelist
+    integer, intent(in) :: unit !< file unit to open the given file
+
+    character(256) :: inputFormat_gridded_LAI !< format of gridded LAI data (nc only)
+    integer(i4) :: timeStep_LAI_input !< time step of gridded LAI input
+
+    namelist /lai_data_information/ &
+      inputFormat_gridded_LAI, &
+      timeStep_LAI_input
+
+    if ( self%read_from_file ) then
+      call open_nml(file, unit, quiet=.true.)
+      call position_nml(self%name, unit)
+      read(unit, nml=lai_data_information)
+      call close_nml(unit)
+      self%inputFormat_gridded_LAI = inputFormat_gridded_LAI
+      self%timeStep_LAI_input = timeStep_LAI_input
+      self%read_from_file = .false.
+    end if
+  end subroutine read_lai_data_information
+
+  !> \brief Read 'lcover_mpr' namelist content.
+  subroutine read_lcover_mpr(self, file, unit)
+    implicit none
+    class(nml_lcover_mpr_t), intent(inout) :: self
+    character(*), intent(in) :: file !< file containing the namelist
+    integer, intent(in) :: unit !< file unit to open the given file
+
+    real(dp) :: fracSealed_cityArea !< fraction of area within city assumed to be perfectly sealed [0-1]
+
+    namelist /lcover_mpr/ &
+      fracSealed_cityArea
+
+    if ( self%read_from_file ) then
+      call open_nml(file, unit, quiet=.true.)
+      call position_nml(self%name, unit)
+      read(unit, nml=lcover_mpr)
+      call close_nml(unit)
+      self%fracSealed_cityArea = fracSealed_cityArea
+      self%read_from_file = .false.
+    end if
+  end subroutine read_lcover_mpr
+
+  !> \brief Read 'interception1' namelist content.
+  subroutine read_interception1(self, file, unit)
+    implicit none
+    class(nml_interception1_t), intent(inout) :: self
+    character(*), intent(in) :: file !< file containing the namelist
+    integer, intent(in) :: unit !< file unit to open the given file
+
+    real(dp), dimension(nColPars) :: canopyInterceptionFactor !< multiplier to relate LAI to interception storage [-]
+
+    namelist /interception1/ &
+      canopyInterceptionFactor
+
+    if ( self%read_from_file ) then
+      call open_nml(file, unit, quiet=.true.)
+      call position_nml(self%name, unit)
+      read(unit, nml=interception1)
+      call close_nml(unit)
+      self%canopyInterceptionFactor = canopyInterceptionFactor
+      self%read_from_file = .false.
+    end if
+  end subroutine read_interception1
+
+  !> \brief Read 'snow1' namelist content.
+  subroutine read_snow1(self, file, unit)
+    implicit none
+    class(nml_snow1_t), intent(inout) :: self
+    character(*), intent(in) :: file !< file containing the namelist
+    integer, intent(in) :: unit !< file unit to open the given file
+
+    real(dp), dimension(nColPars) :: snowTreshholdTemperature !< Threshold for rain/snow partitioning [degC]
+    real(dp), dimension(nColPars) :: degreeDayFactor_forest !< forest: deg day factors to determine melting flux [m degC-1]
+    real(dp), dimension(nColPars) :: degreeDayFactor_impervious !< impervious: deg day factors to determine melting flux [m degC-1]
+    real(dp), dimension(nColPars) :: degreeDayFactor_pervious !< pervious: deg day factors to determine melting flux [m degC-1]
+    real(dp), dimension(nColPars) :: increaseDegreeDayFactorByPrecip !< increase of deg day factor in case of precipitation [degC-1]
+    real(dp), dimension(nColPars) :: maxDegreeDayFactor_forest !< forest: maximum values for degree day factor [m degC-1]
+    real(dp), dimension(nColPars) :: maxDegreeDayFactor_impervious !< impervious: maximum values for degree day factor [m degC-1]
+    real(dp), dimension(nColPars) :: maxDegreeDayFactor_pervious !< pervious: maximum values for degree day factor [m degC-1]
+
+    namelist /snow1/ &
+      snowTreshholdTemperature, &
+      degreeDayFactor_forest, &
+      degreeDayFactor_impervious, &
+      degreeDayFactor_pervious, &
+      increaseDegreeDayFactorByPrecip, &
+      maxDegreeDayFactor_forest, &
+      maxDegreeDayFactor_impervious, &
+      maxDegreeDayFactor_pervious
+
+    if ( self%read_from_file ) then
+      call open_nml(file, unit, quiet=.true.)
+      call position_nml(self%name, unit)
+      read(unit, nml=snow1)
+      call close_nml(unit)
+      self%snowTreshholdTemperature = snowTreshholdTemperature
+      self%degreeDayFactor_forest = degreeDayFactor_forest
+      self%degreeDayFactor_impervious = degreeDayFactor_impervious
+      self%degreeDayFactor_pervious = degreeDayFactor_pervious
+      self%increaseDegreeDayFactorByPrecip = increaseDegreeDayFactorByPrecip
+      self%maxDegreeDayFactor_forest = maxDegreeDayFactor_forest
+      self%maxDegreeDayFactor_impervious = maxDegreeDayFactor_impervious
+      self%maxDegreeDayFactor_pervious = maxDegreeDayFactor_pervious
+      self%read_from_file = .false.
+    end if
+  end subroutine read_snow1
+
+  !> \brief Read 'soilmoisture1' namelist content.
+  subroutine read_soilmoisture1(self, file, unit)
+    implicit none
+    class(nml_soilmoisture1_t), intent(inout) :: self
+    character(*), intent(in) :: file !< file containing the namelist
+    integer, intent(in) :: unit !< file unit to open the given file
+
+    real(dp), dimension(nColPars) :: orgMatterContent_forest !< organic matter content [%] for forest
+    real(dp), dimension(nColPars) :: orgMatterContent_impervious !< organic matter content [%] for impervious
+    real(dp), dimension(nColPars) :: orgMatterContent_pervious !< organic matter content [%] for pervious
+    !> Zacharias PTF parameters below 66.5 % sand content (Zacharias et al., 2007, doi:10.2136/sssaj2006.0098)
+    real(dp), dimension(nColPars) :: PTF_lower66_5_constant
+    real(dp), dimension(nColPars) :: PTF_lower66_5_clay !< multiplier for clay constant (see PTF_lower66_5_constant)
+    real(dp), dimension(nColPars) :: PTF_lower66_5_Db !< multiplier for mineral bulk density (see PTF_lower66_5_constant)
+    !> Zacharias PTF parameters above 66.5 % sand content (Zacharias et al., 2007, doi:10.2136/sssaj2006.0098)
+    real(dp), dimension(nColPars) :: PTF_higher66_5_constant
+    real(dp), dimension(nColPars) :: PTF_higher66_5_clay !< multiplier for clay constant (see PTF_higher66_5_constant)
+    real(dp), dimension(nColPars) :: PTF_higher66_5_Db !< multiplier for mineral bulk density (see PTF_higher66_5_constant)
+    !> PTF parameters for saturated hydraulic conductivity after Cosby et al. (1984)
+    real(dp), dimension(nColPars) :: PTF_Ks_constant
+    real(dp), dimension(nColPars) :: PTF_Ks_sand !< multiplier for sand (see PTF_Ks_constant)
+    real(dp), dimension(nColPars) :: PTF_Ks_clay !< multiplier for clay (see PTF_Ks_constant)
+    real(dp), dimension(nColPars) :: PTF_Ks_curveSlope !< unit conversion factor from inch/h to cm/d
+    !> shape factor for root distribution with depth, which follows an exponential function [-] for forest
+    real(dp), dimension(nColPars) :: rootFractionCoefficient_forest
+    !> shape factor for root distribution with depth, which follows an exponential function [-] for impervious
+    real(dp), dimension(nColPars) :: rootFractionCoefficient_impervious
+    !> shape factor for root distribution with depth, which follows an exponential function [-] for pervious
+    real(dp), dimension(nColPars) :: rootFractionCoefficient_pervious
+    !> shape factor for partitioning effective precipitation into runoff and infiltration based on soil wetness [-]
+    real(dp), dimension(nColPars) :: infiltrationShapeFactor
+
+    namelist /soilmoisture1/ &
+      orgMatterContent_forest, &
+      orgMatterContent_impervious, &
+      orgMatterContent_pervious, &
+      PTF_lower66_5_constant, &
+      PTF_lower66_5_clay, &
+      PTF_lower66_5_Db, &
+      PTF_higher66_5_constant, &
+      PTF_higher66_5_clay, &
+      PTF_higher66_5_Db, &
+      PTF_Ks_constant, &
+      PTF_Ks_sand, &
+      PTF_Ks_clay, &
+      PTF_Ks_curveSlope, &
+      rootFractionCoefficient_forest, &
+      rootFractionCoefficient_impervious, &
+      rootFractionCoefficient_pervious, &
+      infiltrationShapeFactor
+
+    if ( self%read_from_file ) then
+      call open_nml(file, unit, quiet=.true.)
+      call position_nml(self%name, unit)
+      read(unit, nml=soilmoisture1)
+      call close_nml(unit)
+      self%orgMatterContent_forest = orgMatterContent_forest
+      self%orgMatterContent_impervious = orgMatterContent_impervious
+      self%orgMatterContent_pervious = orgMatterContent_pervious
+      self%PTF_lower66_5_constant = PTF_lower66_5_constant
+      self%PTF_lower66_5_clay = PTF_lower66_5_clay
+      self%PTF_lower66_5_Db = PTF_lower66_5_Db
+      self%PTF_higher66_5_constant = PTF_higher66_5_constant
+      self%PTF_higher66_5_clay = PTF_higher66_5_clay
+      self%PTF_higher66_5_Db = PTF_higher66_5_Db
+      self%PTF_Ks_constant = PTF_Ks_constant
+      self%PTF_Ks_sand = PTF_Ks_sand
+      self%PTF_Ks_clay = PTF_Ks_clay
+      self%PTF_Ks_curveSlope = PTF_Ks_curveSlope
+      self%rootFractionCoefficient_forest = rootFractionCoefficient_forest
+      self%rootFractionCoefficient_impervious = rootFractionCoefficient_impervious
+      self%rootFractionCoefficient_pervious = rootFractionCoefficient_pervious
+      self%infiltrationShapeFactor = infiltrationShapeFactor
+      self%read_from_file = .false.
+    end if
+  end subroutine read_soilmoisture1
+
+  !> \brief Read 'soilmoisture2' namelist content.
+  subroutine read_soilmoisture2(self, file, unit)
+    implicit none
+    class(nml_soilmoisture2_t), intent(inout) :: self
+    character(*), intent(in) :: file !< file containing the namelist
+    integer, intent(in) :: unit !< file unit to open the given file
+
+    real(dp), dimension(nColPars) :: orgMatterContent_forest !< organic matter content [%] for forest
+    real(dp), dimension(nColPars) :: orgMatterContent_impervious !< organic matter content [%] for impervious
+    real(dp), dimension(nColPars) :: orgMatterContent_pervious !< organic matter content [%] for pervious
+    !> Zacharias PTF parameters below 66.5 % sand content (Zacharias et al., 2007, doi:10.2136/sssaj2006.0098)
+    real(dp), dimension(nColPars) :: PTF_lower66_5_constant
+    real(dp), dimension(nColPars) :: PTF_lower66_5_clay !< multiplier for clay constant (see PTF_lower66_5_constant)
+    real(dp), dimension(nColPars) :: PTF_lower66_5_Db !< multiplier for mineral bulk density (see PTF_lower66_5_constant)
+    !> Zacharias PTF parameters above 66.5 % sand content (Zacharias et al., 2007, doi:10.2136/sssaj2006.0098)
+    real(dp), dimension(nColPars) :: PTF_higher66_5_constant
+    real(dp), dimension(nColPars) :: PTF_higher66_5_clay !< multiplier for clay constant (see PTF_higher66_5_constant)
+    real(dp), dimension(nColPars) :: PTF_higher66_5_Db !< multiplier for mineral bulk density (see PTF_higher66_5_constant)
+    !> PTF parameters for saturated hydraulic conductivity after Cosby et al. (1984)
+    real(dp), dimension(nColPars) :: PTF_Ks_constant
+    real(dp), dimension(nColPars) :: PTF_Ks_sand !< multiplier for sand (see PTF_Ks_constant)
+    real(dp), dimension(nColPars) :: PTF_Ks_clay !< multiplier for clay (see PTF_Ks_constant)
+    real(dp), dimension(nColPars) :: PTF_Ks_curveSlope !< unit conversion factor from inch/h to cm/d
+    !> shape factor for root distribution with depth, which follows an exponential function [-] for forest
+    real(dp), dimension(nColPars) :: rootFractionCoefficient_forest
+    !> shape factor for root distribution with depth, which follows an exponential function [-] for impervious
+    real(dp), dimension(nColPars) :: rootFractionCoefficient_impervious
+    !> shape factor for root distribution with depth, which follows an exponential function [-] for pervious
+    real(dp), dimension(nColPars) :: rootFractionCoefficient_pervious
+    !> shape factor for partitioning effective precipitation into runoff and infiltration based on soil wetness [-]
+    real(dp), dimension(nColPars) :: infiltrationShapeFactor
+    real(dp), dimension(nColPars) :: jarvis_sm_threshold_c1 !< soil moisture threshod for jarvis model
+
+    namelist /soilmoisture2/ &
+      orgMatterContent_forest, &
+      orgMatterContent_impervious, &
+      orgMatterContent_pervious, &
+      PTF_lower66_5_constant, &
+      PTF_lower66_5_clay, &
+      PTF_lower66_5_Db, &
+      PTF_higher66_5_constant, &
+      PTF_higher66_5_clay, &
+      PTF_higher66_5_Db, &
+      PTF_Ks_constant, &
+      PTF_Ks_sand, &
+      PTF_Ks_clay, &
+      PTF_Ks_curveSlope, &
+      rootFractionCoefficient_forest, &
+      rootFractionCoefficient_impervious, &
+      rootFractionCoefficient_pervious, &
+      infiltrationShapeFactor, &
+      jarvis_sm_threshold_c1
+
+    if ( self%read_from_file ) then
+      call open_nml(file, unit, quiet=.true.)
+      call position_nml(self%name, unit)
+      read(unit, nml=soilmoisture2)
+      call close_nml(unit)
+      self%orgMatterContent_forest = orgMatterContent_forest
+      self%orgMatterContent_impervious = orgMatterContent_impervious
+      self%orgMatterContent_pervious = orgMatterContent_pervious
+      self%PTF_lower66_5_constant = PTF_lower66_5_constant
+      self%PTF_lower66_5_clay = PTF_lower66_5_clay
+      self%PTF_lower66_5_Db = PTF_lower66_5_Db
+      self%PTF_higher66_5_constant = PTF_higher66_5_constant
+      self%PTF_higher66_5_clay = PTF_higher66_5_clay
+      self%PTF_higher66_5_Db = PTF_higher66_5_Db
+      self%PTF_Ks_constant = PTF_Ks_constant
+      self%PTF_Ks_sand = PTF_Ks_sand
+      self%PTF_Ks_clay = PTF_Ks_clay
+      self%PTF_Ks_curveSlope = PTF_Ks_curveSlope
+      self%rootFractionCoefficient_forest = rootFractionCoefficient_forest
+      self%rootFractionCoefficient_impervious = rootFractionCoefficient_impervious
+      self%rootFractionCoefficient_pervious = rootFractionCoefficient_pervious
+      self%infiltrationShapeFactor = infiltrationShapeFactor
+      self%jarvis_sm_threshold_c1 = jarvis_sm_threshold_c1
+      self%read_from_file = .false.
+    end if
+  end subroutine read_soilmoisture2
+
+  !> \brief Read 'soilmoisture3' namelist content.
+  subroutine read_soilmoisture3(self, file, unit)
+    implicit none
+    class(nml_soilmoisture3_t), intent(inout) :: self
+    character(*), intent(in) :: file !< file containing the namelist
+    integer, intent(in) :: unit !< file unit to open the given file
+
+    real(dp), dimension(nColPars) :: orgMatterContent_forest !< organic matter content [%] for forest
+    real(dp), dimension(nColPars) :: orgMatterContent_impervious !< organic matter content [%] for impervious
+    real(dp), dimension(nColPars) :: orgMatterContent_pervious !< organic matter content [%] for pervious
+    !> Zacharias PTF parameters below 66.5 % sand content (Zacharias et al., 2007, doi:10.2136/sssaj2006.0098)
+    real(dp), dimension(nColPars) :: PTF_lower66_5_constant
+    real(dp), dimension(nColPars) :: PTF_lower66_5_clay !< multiplier for clay constant (see PTF_lower66_5_constant)
+    real(dp), dimension(nColPars) :: PTF_lower66_5_Db !< multiplier for mineral bulk density (see PTF_lower66_5_constant)
+    !> Zacharias PTF parameters above 66.5 % sand content (Zacharias et al., 2007, doi:10.2136/sssaj2006.0098)
+    real(dp), dimension(nColPars) :: PTF_higher66_5_constant
+    real(dp), dimension(nColPars) :: PTF_higher66_5_clay !< multiplier for clay constant (see PTF_higher66_5_constant)
+    real(dp), dimension(nColPars) :: PTF_higher66_5_Db !< multiplier for mineral bulk density (see PTF_higher66_5_constant)
+    !> PTF parameters for saturated hydraulic conductivity after Cosby et al. (1984)
+    real(dp), dimension(nColPars) :: PTF_Ks_constant
+    real(dp), dimension(nColPars) :: PTF_Ks_sand !< multiplier for sand (see PTF_Ks_constant)
+    real(dp), dimension(nColPars) :: PTF_Ks_clay !< multiplier for clay (see PTF_Ks_constant)
+    real(dp), dimension(nColPars) :: PTF_Ks_curveSlope !< unit conversion factor from inch/h to cm/d
+    !> shape factor for root distribution with depth, which follows an exponential function [-] for forest
+    real(dp), dimension(nColPars) :: rootFractionCoefficient_forest
+    !> shape factor for root distribution with depth, which follows an exponential function [-] for impervious
+    real(dp), dimension(nColPars) :: rootFractionCoefficient_impervious
+    !> shape factor for root distribution with depth, which follows an exponential function [-] for pervious
+    real(dp), dimension(nColPars) :: rootFractionCoefficient_pervious
+    !> shape factor for partitioning effective precipitation into runoff and infiltration based on soil wetness [-]
+    real(dp), dimension(nColPars) :: infiltrationShapeFactor
+    real(dp), dimension(nColPars) :: FCmin_glob !< global field capacity minimum
+    real(dp), dimension(nColPars) :: FCdelta_glob !< difference between global field capacity minimum and maximum
+    real(dp), dimension(nColPars) :: rootFractionCoefficient_sand !< threshold for actual ET reduction for sand
+    real(dp), dimension(nColPars) :: rootFractionCoefficient_clay !< threshold for actual ET reduction for clay
+    real(dp), dimension(nColPars) :: jarvis_sm_threshold_c1 !< soil moisture threshod for jarvis model
+
+    namelist /soilmoisture3/ &
+      orgMatterContent_forest, &
+      orgMatterContent_impervious, &
+      orgMatterContent_pervious, &
+      PTF_lower66_5_constant, &
+      PTF_lower66_5_clay, &
+      PTF_lower66_5_Db, &
+      PTF_higher66_5_constant, &
+      PTF_higher66_5_clay, &
+      PTF_higher66_5_Db, &
+      PTF_Ks_constant, &
+      PTF_Ks_sand, &
+      PTF_Ks_clay, &
+      PTF_Ks_curveSlope, &
+      rootFractionCoefficient_forest, &
+      rootFractionCoefficient_impervious, &
+      rootFractionCoefficient_pervious, &
+      infiltrationShapeFactor, &
+      rootFractionCoefficient_sand, &
+      rootFractionCoefficient_clay, &
+      FCmin_glob, &
+      FCdelta_glob, &
+      jarvis_sm_threshold_c1
+
+    if ( self%read_from_file ) then
+      call open_nml(file, unit, quiet=.true.)
+      call position_nml(self%name, unit)
+      read(unit, nml=soilmoisture3)
+      call close_nml(unit)
+      self%orgMatterContent_forest = orgMatterContent_forest
+      self%orgMatterContent_impervious = orgMatterContent_impervious
+      self%orgMatterContent_pervious = orgMatterContent_pervious
+      self%PTF_lower66_5_constant = PTF_lower66_5_constant
+      self%PTF_lower66_5_clay = PTF_lower66_5_clay
+      self%PTF_lower66_5_Db = PTF_lower66_5_Db
+      self%PTF_higher66_5_constant = PTF_higher66_5_constant
+      self%PTF_higher66_5_clay = PTF_higher66_5_clay
+      self%PTF_higher66_5_Db = PTF_higher66_5_Db
+      self%PTF_Ks_constant = PTF_Ks_constant
+      self%PTF_Ks_sand = PTF_Ks_sand
+      self%PTF_Ks_clay = PTF_Ks_clay
+      self%PTF_Ks_curveSlope = PTF_Ks_curveSlope
+      self%rootFractionCoefficient_forest = rootFractionCoefficient_forest
+      self%rootFractionCoefficient_impervious = rootFractionCoefficient_impervious
+      self%rootFractionCoefficient_pervious = rootFractionCoefficient_pervious
+      self%infiltrationShapeFactor = infiltrationShapeFactor
+      self%rootFractionCoefficient_sand = rootFractionCoefficient_sand
+      self%rootFractionCoefficient_clay = rootFractionCoefficient_clay
+      self%FCmin_glob = FCmin_glob
+      self%FCdelta_glob = FCdelta_glob
+      self%jarvis_sm_threshold_c1 = jarvis_sm_threshold_c1
+      self%read_from_file = .false.
+    end if
+  end subroutine read_soilmoisture3
+
+  !> \brief Read 'soilmoisture4' namelist content.
+  subroutine read_soilmoisture4(self, file, unit)
+    implicit none
+    class(nml_soilmoisture4_t), intent(inout) :: self
+    character(*), intent(in) :: file !< file containing the namelist
+    integer, intent(in) :: unit !< file unit to open the given file
+
+    real(dp), dimension(nColPars) :: orgMatterContent_forest !< organic matter content [%] for forest
+    real(dp), dimension(nColPars) :: orgMatterContent_impervious !< organic matter content [%] for impervious
+    real(dp), dimension(nColPars) :: orgMatterContent_pervious !< organic matter content [%] for pervious
+    !> Zacharias PTF parameters below 66.5 % sand content (Zacharias et al., 2007, doi:10.2136/sssaj2006.0098)
+    real(dp), dimension(nColPars) :: PTF_lower66_5_constant
+    real(dp), dimension(nColPars) :: PTF_lower66_5_clay !< multiplier for clay constant (see PTF_lower66_5_constant)
+    real(dp), dimension(nColPars) :: PTF_lower66_5_Db !< multiplier for mineral bulk density (see PTF_lower66_5_constant)
+    !> Zacharias PTF parameters above 66.5 % sand content (Zacharias et al., 2007, doi:10.2136/sssaj2006.0098)
+    real(dp), dimension(nColPars) :: PTF_higher66_5_constant
+    real(dp), dimension(nColPars) :: PTF_higher66_5_clay !< multiplier for clay constant (see PTF_higher66_5_constant)
+    real(dp), dimension(nColPars) :: PTF_higher66_5_Db !< multiplier for mineral bulk density (see PTF_higher66_5_constant)
+    !> PTF parameters for saturated hydraulic conductivity after Cosby et al. (1984)
+    real(dp), dimension(nColPars) :: PTF_Ks_constant
+    real(dp), dimension(nColPars) :: PTF_Ks_sand !< multiplier for sand (see PTF_Ks_constant)
+    real(dp), dimension(nColPars) :: PTF_Ks_clay !< multiplier for clay (see PTF_Ks_constant)
+    real(dp), dimension(nColPars) :: PTF_Ks_curveSlope !< unit conversion factor from inch/h to cm/d
+    !> shape factor for root distribution with depth, which follows an exponential function [-] for forest
+    real(dp), dimension(nColPars) :: rootFractionCoefficient_forest
+    !> shape factor for root distribution with depth, which follows an exponential function [-] for impervious
+    real(dp), dimension(nColPars) :: rootFractionCoefficient_impervious
+    !> shape factor for root distribution with depth, which follows an exponential function [-] for pervious
+    real(dp), dimension(nColPars) :: rootFractionCoefficient_pervious
+    !> shape factor for partitioning effective precipitation into runoff and infiltration based on soil wetness [-]
+    real(dp), dimension(nColPars) :: infiltrationShapeFactor
+    real(dp), dimension(nColPars) :: FCmin_glob !< global field capacity minimum
+    real(dp), dimension(nColPars) :: FCdelta_glob !< difference between global field capacity minimum and maximum
+    real(dp), dimension(nColPars) :: rootFractionCoefficient_sand !< threshold for actual ET reduction for sand
+    real(dp), dimension(nColPars) :: rootFractionCoefficient_clay !< threshold for actual ET reduction for clay
+
+    namelist /soilmoisture4/ &
+      orgMatterContent_forest, &
+      orgMatterContent_impervious, &
+      orgMatterContent_pervious, &
+      PTF_lower66_5_constant, &
+      PTF_lower66_5_clay, &
+      PTF_lower66_5_Db, &
+      PTF_higher66_5_constant, &
+      PTF_higher66_5_clay, &
+      PTF_higher66_5_Db, &
+      PTF_Ks_constant, &
+      PTF_Ks_sand, &
+      PTF_Ks_clay, &
+      PTF_Ks_curveSlope, &
+      rootFractionCoefficient_forest, &
+      rootFractionCoefficient_impervious, &
+      rootFractionCoefficient_pervious, &
+      infiltrationShapeFactor, &
+      rootFractionCoefficient_sand, &
+      rootFractionCoefficient_clay, &
+      FCmin_glob, &
+      FCdelta_glob
+
+    if ( self%read_from_file ) then
+      call open_nml(file, unit, quiet=.true.)
+      call position_nml(self%name, unit)
+      read(unit, nml=soilmoisture4)
+      call close_nml(unit)
+      self%orgMatterContent_forest = orgMatterContent_forest
+      self%orgMatterContent_impervious = orgMatterContent_impervious
+      self%orgMatterContent_pervious = orgMatterContent_pervious
+      self%PTF_lower66_5_constant = PTF_lower66_5_constant
+      self%PTF_lower66_5_clay = PTF_lower66_5_clay
+      self%PTF_lower66_5_Db = PTF_lower66_5_Db
+      self%PTF_higher66_5_constant = PTF_higher66_5_constant
+      self%PTF_higher66_5_clay = PTF_higher66_5_clay
+      self%PTF_higher66_5_Db = PTF_higher66_5_Db
+      self%PTF_Ks_constant = PTF_Ks_constant
+      self%PTF_Ks_sand = PTF_Ks_sand
+      self%PTF_Ks_clay = PTF_Ks_clay
+      self%PTF_Ks_curveSlope = PTF_Ks_curveSlope
+      self%rootFractionCoefficient_forest = rootFractionCoefficient_forest
+      self%rootFractionCoefficient_impervious = rootFractionCoefficient_impervious
+      self%rootFractionCoefficient_pervious = rootFractionCoefficient_pervious
+      self%infiltrationShapeFactor = infiltrationShapeFactor
+      self%rootFractionCoefficient_sand = rootFractionCoefficient_sand
+      self%rootFractionCoefficient_clay = rootFractionCoefficient_clay
+      self%FCmin_glob = FCmin_glob
+      self%FCdelta_glob = FCdelta_glob
+      self%read_from_file = .false.
+    end if
+  end subroutine read_soilmoisture4
+
+  !> \brief Read 'directrunoff1' namelist content.
+  subroutine read_directrunoff1(self, file, unit)
+    implicit none
+    class(nml_directrunoff1_t), intent(inout) :: self
+    character(*), intent(in) :: file !< file containing the namelist
+    integer, intent(in) :: unit !< file unit to open the given file
+
+    real(dp), dimension(nColPars) :: imperviousStorageCapacity !< direct Runoff: Sealed Area storage capacity
+
+    namelist /directrunoff1/ &
+      imperviousStorageCapacity
+
+    if ( self%read_from_file ) then
+      call open_nml(file, unit, quiet=.true.)
+      call position_nml(self%name, unit)
+      read(unit, nml=directrunoff1)
+      call close_nml(unit)
+      self%imperviousStorageCapacity = imperviousStorageCapacity
+      self%read_from_file = .false.
+    end if
+  end subroutine read_directrunoff1
+
+  !> \brief Read 'petminus1' namelist content.
+  subroutine read_petminus1(self, file, unit)
+    implicit none
+    class(nml_petminus1_t), intent(inout) :: self
+    character(*), intent(in) :: file !< file containing the namelist
+    integer, intent(in) :: unit !< file unit to open the given file
+
+    real(dp), dimension(nColPars) :: PET_a_forest !< DSF=PET_a+PET_b*(1-exp(PET_c*LAI)) to correct PET as PET=DSF*PET
+    real(dp), dimension(nColPars) :: PET_a_impervious !< DSF=PET_a+PET_b*(1-exp(PET_c*LAI)) to correct PET as PET=DSF*PET
+    real(dp), dimension(nColPars) :: PET_a_pervious !< DSF=PET_a+PET_b*(1-exp(PET_c*LAI)) to correct PET as PET=DSF*PET
+    real(dp), dimension(nColPars) :: PET_b !< DSF=PET_a+PET_b*(1-exp(PET_c*LAI)) to correct PET as PET=DSF*PET
+    real(dp), dimension(nColPars) :: PET_c !< DSF=PET_a+PET_b*(1-exp(PET_c*LAI)) to correct PET as PET=DSF*PET
+
+    namelist /petminus1/ &
+      PET_a_forest, &
+      PET_a_impervious, &
+      PET_a_pervious, &
+      PET_b, &
+      PET_c
+
+    if ( self%read_from_file ) then
+      call open_nml(file, unit, quiet=.true.)
+      call position_nml(self%name, unit)
+      read(unit, nml=petminus1)
+      call close_nml(unit)
+      self%PET_a_forest = PET_a_forest
+      self%PET_a_impervious = PET_a_impervious
+      self%PET_a_pervious = PET_a_pervious
+      self%PET_b = PET_b
+      self%PET_c = PET_c
+      self%read_from_file = .false.
+    end if
+  end subroutine read_petminus1
+
+  !> \brief Read 'pet0' namelist content.
+  subroutine read_pet0(self, file, unit)
+    implicit none
+    class(nml_pet0_t), intent(inout) :: self
+    character(*), intent(in) :: file !< file containing the namelist
+    integer, intent(in) :: unit !< file unit to open the given file
+
+    real(dp), dimension(nColPars) :: minCorrectionFactorPET !< minimum factor for PET correction with aspect
+    real(dp), dimension(nColPars) :: maxCorrectionFactorPET !< maximum factor for PET correction with aspect
+    real(dp), dimension(nColPars) :: aspectTresholdPET !< aspect threshold for PET correction with aspect
+
+    namelist /pet0/ &
+      minCorrectionFactorPET, &
+      maxCorrectionFactorPET, &
+      aspectTresholdPET
+
+    if ( self%read_from_file ) then
+      call open_nml(file, unit, quiet=.true.)
+      call position_nml(self%name, unit)
+      read(unit, nml=pet0)
+      call close_nml(unit)
+      self%minCorrectionFactorPET = minCorrectionFactorPET
+      self%maxCorrectionFactorPET = maxCorrectionFactorPET
+      self%aspectTresholdPET = aspectTresholdPET
+      self%read_from_file = .false.
+    end if
+  end subroutine read_pet0
+
+  !> \brief Read 'pet1' namelist content.
+  subroutine read_pet1(self, file, unit)
+    implicit none
+    class(nml_pet1_t), intent(inout) :: self
+    character(*), intent(in) :: file !< file containing the namelist
+    integer, intent(in) :: unit !< file unit to open the given file
+
+    real(dp), dimension(nColPars) :: minCorrectionFactorPET !< minimum factor for PET correction with aspect
+    real(dp), dimension(nColPars) :: maxCorrectionFactorPET !< maximum factor for PET correction with aspect
+    real(dp), dimension(nColPars) :: aspectTresholdPET !< aspect threshold for PET correction with aspect
+    real(dp), dimension(nColPars) :: HargreavesSamaniCoeff !< coefficient for Hargreaves Samani
+
+    namelist /pet1/ &
+    minCorrectionFactorPET, &
+    maxCorrectionFactorPET, &
+    aspectTresholdPET, &
+    HargreavesSamaniCoeff
+
+    if ( self%read_from_file ) then
+      call open_nml(file, unit, quiet=.true.)
+      call position_nml(self%name, unit)
+      read(unit, nml=pet1)
+      call close_nml(unit)
+      self%minCorrectionFactorPET = minCorrectionFactorPET
+      self%maxCorrectionFactorPET = maxCorrectionFactorPET
+      self%aspectTresholdPET = aspectTresholdPET
+      self%HargreavesSamaniCoeff = HargreavesSamaniCoeff
+      self%read_from_file = .false.
+    end if
+  end subroutine read_pet1
+
+  !> \brief Read 'pet2' namelist content.
+  subroutine read_pet2(self, file, unit)
+    implicit none
+    class(nml_pet2_t), intent(inout) :: self
+    character(*), intent(in) :: file !< file containing the namelist
+    integer, intent(in) :: unit !< file unit to open the given file
+
+    real(dp), dimension(nColPars) :: PriestleyTaylorCoeff !< Priestley-Taylor coefficient
+    real(dp), dimension(nColPars) :: PriestleyTaylorLAIcorr !< Priestley-Taylor LAI correction factor
+
+    namelist /pet2/ &
+      PriestleyTaylorCoeff, &
+      PriestleyTaylorLAIcorr
+
+    if ( self%read_from_file ) then
+      call open_nml(file, unit, quiet=.true.)
+      call position_nml(self%name, unit)
+      read(unit, nml=pet2)
+      call close_nml(unit)
+      self%PriestleyTaylorCoeff = PriestleyTaylorCoeff
+      self%PriestleyTaylorLAIcorr = PriestleyTaylorLAIcorr
+      self%read_from_file = .false.
+    end if
+  end subroutine read_pet2
+
+  !> \brief Read 'pet3' namelist content.
+  subroutine read_pet3(self, file, unit)
+    implicit none
+    class(nml_pet3_t), intent(inout) :: self
+    character(*), intent(in) :: file !< file containing the namelist
+    integer, intent(in) :: unit !< file unit to open the given file
+
+    real(dp), dimension(nColPars) :: canopyheigth_forest !< canopy height for foreset
+    real(dp), dimension(nColPars) :: canopyheigth_impervious !< canopy height for impervious
+    real(dp), dimension(nColPars) :: canopyheigth_pervious !< canopy height for pervious
+    real(dp), dimension(nColPars) :: displacementheight_coeff !< displacement height coefficient
+    real(dp), dimension(nColPars) :: roughnesslength_momentum_coeff !< roughness length momentum coefficient
+    real(dp), dimension(nColPars) :: roughnesslength_heat_coeff !< roughness length heat coefficient
+    real(dp), dimension(nColPars) :: stomatal_resistance !< stomatal resistance
+
+    namelist /pet3/ &
+      canopyheigth_forest, &
+      canopyheigth_impervious, &
+      canopyheigth_pervious, &
+      displacementheight_coeff, &
+      roughnesslength_momentum_coeff, &
+      roughnesslength_heat_coeff, &
+      stomatal_resistance
+
+    if ( self%read_from_file ) then
+      call open_nml(file, unit, quiet=.true.)
+      call position_nml(self%name, unit)
+      read(unit, nml=pet3)
+      call close_nml(unit)
+      self%canopyheigth_forest = canopyheigth_forest
+      self%canopyheigth_impervious = canopyheigth_impervious
+      self%canopyheigth_pervious = canopyheigth_pervious
+      self%displacementheight_coeff = displacementheight_coeff
+      self%roughnesslength_momentum_coeff = roughnesslength_momentum_coeff
+      self%roughnesslength_heat_coeff = roughnesslength_heat_coeff
+      self%stomatal_resistance = stomatal_resistance
+      self%read_from_file = .false.
+    end if
+  end subroutine read_pet3
+
+  !> \brief Read 'interflow1' namelist content.
+  subroutine read_interflow1(self, file, unit)
+    implicit none
+    class(nml_interflow1_t), intent(inout) :: self
+    character(*), intent(in) :: file !< file containing the namelist
+    integer, intent(in) :: unit !< file unit to open the given file
+
+    real(dp), dimension(nColPars) :: interflowStorageCapacityFactor !< interflow storage capacity factor
+    real(dp), dimension(nColPars) :: interflowRecession_slope !< multiplier for slope to derive interflow recession constant
+    !> multiplier to derive fast interflow recession constant for forest
+    real(dp), dimension(nColPars) :: fastInterflowRecession_forest
+    !> multiplier for variability of saturated hydraulic conductivity to derive slow interflow recession constant
+    real(dp), dimension(nColPars) :: slowInterflowRecession_Ks
+    !> multiplier for variability of saturated hydraulic conductivity to derive slow interflow exponent
+    real(dp), dimension(nColPars) :: exponentSlowInterflow
+
+    namelist /interflow1/ &
+      interflowStorageCapacityFactor, &
+      interflowRecession_slope, &
+      fastInterflowRecession_forest, &
+      slowInterflowRecession_Ks, &
+      exponentSlowInterflow
+
+    if ( self%read_from_file ) then
+      call open_nml(file, unit, quiet=.true.)
+      call position_nml(self%name, unit)
+      read(unit, nml=interflow1)
+      call close_nml(unit)
+      self%interflowStorageCapacityFactor = interflowStorageCapacityFactor
+      self%interflowRecession_slope = interflowRecession_slope
+      self%fastInterflowRecession_forest = fastInterflowRecession_forest
+      self%slowInterflowRecession_Ks = slowInterflowRecession_Ks
+      self%exponentSlowInterflow = exponentSlowInterflow
+      self%read_from_file = .false.
+    end if
+  end subroutine read_interflow1
+
+  !> \brief Read 'percolation1' namelist content.
+  subroutine read_percolation1(self, file, unit)
+    implicit none
+    class(nml_percolation1_t), intent(inout) :: self
+    character(*), intent(in) :: file !< file containing the namelist
+    integer, intent(in) :: unit !< file unit to open the given file
+
+    real(dp), dimension(nColPars) :: rechargeCoefficient !< recharge coefficient
+    real(dp), dimension(nColPars) :: rechargeFactor_karstic !< recharge factor for karstic percolation
+    real(dp), dimension(nColPars) :: gain_loss_GWreservoir_karstic !< gain loss in ground water reservoir for karstic
+
+    namelist /percolation1/ &
+      rechargeCoefficient, &
+      rechargeFactor_karstic, &
+      gain_loss_GWreservoir_karstic
+
+    if ( self%read_from_file ) then
+      call open_nml(file, unit, quiet=.true.)
+      call position_nml(self%name, unit)
+      read(unit, nml=percolation1)
+      call close_nml(unit)
+      self%rechargeCoefficient = rechargeCoefficient
+      self%rechargeFactor_karstic = rechargeFactor_karstic
+      self%gain_loss_GWreservoir_karstic = gain_loss_GWreservoir_karstic
+      self%read_from_file = .false.
+    end if
+  end subroutine read_percolation1
+
+  !> \brief Read 'neutrons1' namelist content.
+  subroutine read_neutrons1(self, file, unit)
+    implicit none
+    class(nml_neutrons1_t), intent(inout) :: self
+    character(*), intent(in) :: file !< file containing the namelist
+    integer, intent(in) :: unit !< file unit to open the given file
+
+    real(dp), dimension(nColPars) :: Desilets_N0 !< Desilets N0 parameter
+    real(dp), dimension(nColPars) :: Desilets_LW0 !< Desilets LW0 parameter
+    real(dp), dimension(nColPars) :: Desilets_LW1 !< Desilets LW1 parameter
+
+    namelist /neutrons1/ &
+      Desilets_N0, &
+      Desilets_LW0, &
+      Desilets_LW1
+
+    if ( self%read_from_file ) then
+      call open_nml(file, unit, quiet=.true.)
+      call position_nml(self%name, unit)
+      read(unit, nml=neutrons1)
+      call close_nml(unit)
+      self%Desilets_N0 = Desilets_N0
+      self%Desilets_LW0 = Desilets_LW0
+      self%Desilets_LW1 = Desilets_LW1
+      self%read_from_file = .false.
+    end if
+  end subroutine read_neutrons1
+
+  !> \brief Read 'neutrons2' namelist content.
+  subroutine read_neutrons2(self, file, unit)
+    implicit none
+    class(nml_neutrons2_t), intent(inout) :: self
+    character(*), intent(in) :: file !< file containing the namelist
+    integer, intent(in) :: unit !< file unit to open the given file
+
+    real(dp), dimension(nColPars) :: COSMIC_N0 !< cosmic N0 parameter
+    real(dp), dimension(nColPars) :: COSMIC_N1 !< cosmic N1 parameter
+    real(dp), dimension(nColPars) :: COSMIC_N2 !< cosmic N2 parameter
+    real(dp), dimension(nColPars) :: COSMIC_alpha0 !< cosmic alpha0 parameter
+    real(dp), dimension(nColPars) :: COSMIC_alpha1 !< cosmic alpha1 parameter
+    real(dp), dimension(nColPars) :: COSMIC_L30 !< cosmic L30 parameter
+    real(dp), dimension(nColPars) :: COSMIC_L31 !< cosmic L31 parameter
+    real(dp), dimension(nColPars) :: COSMIC_LW0 !< cosmic LW0 parameter
+    real(dp), dimension(nColPars) :: COSMIC_LW1 !< cosmic LW1 parameter
+
+    namelist /neutrons2/ &
+      COSMIC_N0, &
+      COSMIC_N1, &
+      COSMIC_N2, &
+      COSMIC_alpha0, &
+      COSMIC_alpha1, &
+      COSMIC_L30, &
+      COSMIC_L31, &
+      COSMIC_LW0, &
+      COSMIC_LW1
+
+    if ( self%read_from_file ) then
+      call open_nml(file, unit, quiet=.true.)
+      call position_nml(self%name, unit)
+      read(unit, nml=neutrons2)
+      call close_nml(unit)
+      self%COSMIC_N0 = COSMIC_N0
+      self%COSMIC_N1 = COSMIC_N1
+      self%COSMIC_N2 = COSMIC_N2
+      self%COSMIC_alpha0 = COSMIC_alpha0
+      self%COSMIC_alpha1 = COSMIC_alpha1
+      self%COSMIC_L30 = COSMIC_L30
+      self%COSMIC_L31 = COSMIC_L31
+      self%COSMIC_LW0 = COSMIC_LW0
+      self%COSMIC_LW1 = COSMIC_LW1
+      self%read_from_file = .false.
+    end if
+  end subroutine read_neutrons2
+
+  !> \brief Read 'geoparameter' namelist content.
+  subroutine read_geoparameter(self, file, unit)
+    implicit none
+    class(nml_geoparameter_t), intent(inout) :: self
+    character(*), intent(in) :: file !< file containing the namelist
+    integer, intent(in) :: unit !< file unit to open the given file
+
+    !> geological parameters (ordering according to file 'geology_classdefinition.txt')
+    real(dp), dimension(maxGeoUnit, nColPars) :: GeoParam
+
+    namelist /geoparameter/ &
+      GeoParam
+
+    if ( self%read_from_file ) then
+      call open_nml(file, unit, quiet=.true.)
+      call position_nml(self%name, unit)
+      read(unit, nml=geoparameter)
+      call close_nml(unit)
+      self%GeoParam = GeoParam
+      self%read_from_file = .false.
+    end if
+  end subroutine read_geoparameter
 
   ! !> \brief Read 'directories_general' namelist content.
   ! subroutine read_directories_general(self, file, unit)
