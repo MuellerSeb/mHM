@@ -11,7 +11,7 @@ module mo_namelists
   use mo_nml, only : open_nml, close_nml, position_nml
   use mo_constants, only : YearMonths
   use mo_mhm_constants, only : nOutFlxState
-  use mo_common_constants, only : maxNLcovers, maxNoDomains, nColPars
+  use mo_common_constants, only : maxNLcovers, maxNoDomains, nColPars, nodata_dp
   use mo_common_variables, only : nProcesses, period
   use mo_common_mHM_mRM_variables, only : nerror_model
   use mo_mpr_constants, only : maxGeoUnit, maxNoSoilHorizons
@@ -2518,6 +2518,7 @@ contains
       GeoParam
 
     if ( self%read_from_file ) then
+      GeoParam = nodata_dp
       call open_nml(file, unit, quiet=.true.)
       call position_nml(self%name, unit)
       read(unit, nml=geoparameter)

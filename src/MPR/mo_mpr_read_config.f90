@@ -331,15 +331,14 @@ contains
     !===============================================================
     ! Read namelist global parameters
     !===============================================================
-    call open_nml(file_namelist_param, unamelist_param, quiet = .true.)
     ! decide which parameters to read depending on specified processes
 
     ! Process 1 - interception
     select case (processMatrix(1, 1))
       ! 1 - maximum Interception
     case(1)
-      call position_nml('interception1', unamelist_param)
-      read(unamelist_param, nml = interception1)
+      call nml_interception1%read(file_namelist_param, unamelist_param)
+      canopyInterceptionFactor = nml_interception1%canopyInterceptionFactor
 
       processMatrix(1, 2) = 1_i4
       processMatrix(1, 3) = 1_i4
@@ -349,15 +348,11 @@ contains
               'canopyInterceptionFactor'/))
 
       ! check if parameter are in range
-      if (.not. in_bound(global_parameters)) then
-        call message('***ERROR: parameter in namelist "interception1" out of bound in ', &
-                trim(adjustl(file_namelist_param)))
-        stop
-      end if
+      if (.not. in_bound(global_parameters)) &
+        call error_message('***ERROR: parameter in namelist "interception1" out of bound in ', trim(adjustl(file_namelist_param)))
 
     case DEFAULT
-      call message()
-      call message('***ERROR: Process description for process "interception" does not exist!')
+      call error_message('***ERROR: Process description for process "interception" does not exist!')
       stop
     end select
 
@@ -365,8 +360,15 @@ contains
     select case (processMatrix(2, 1))
       ! 1 - degree-day approach
     case(1)
-      call position_nml('snow1', unamelist_param)
-      read(unamelist_param, nml = snow1)
+      call nml_snow1%read(file_namelist_param, unamelist_param)
+      snowTreshholdTemperature = nml_snow1%snowTreshholdTemperature
+      degreeDayFactor_forest = nml_snow1%degreeDayFactor_forest
+      degreeDayFactor_impervious = nml_snow1%degreeDayFactor_impervious
+      degreeDayFactor_pervious = nml_snow1%degreeDayFactor_pervious
+      increaseDegreeDayFactorByPrecip = nml_snow1%increaseDegreeDayFactorByPrecip
+      maxDegreeDayFactor_forest = nml_snow1%maxDegreeDayFactor_forest
+      maxDegreeDayFactor_impervious = nml_snow1%maxDegreeDayFactor_impervious
+      maxDegreeDayFactor_pervious = nml_snow1%maxDegreeDayFactor_pervious
 
       processMatrix(2, 2) = 8_i4
       processMatrix(2, 3) = sum(processMatrix(1 : 2, 2))
@@ -381,25 +383,20 @@ contains
 
       call append(global_parameters_name, (/  &
               'snowTreshholdTemperature       ', &
-                      'degreeDayFactor_forest         ', &
-                      'degreeDayFactor_impervious     ', &
-                      'degreeDayFactor_pervious       ', &
-                      'increaseDegreeDayFactorByPrecip', &
-                      'maxDegreeDayFactor_forest      ', &
-                      'maxDegreeDayFactor_impervious  ', &
-                      'maxDegreeDayFactor_pervious    '/))
+              'degreeDayFactor_forest         ', &
+              'degreeDayFactor_impervious     ', &
+              'degreeDayFactor_pervious       ', &
+              'increaseDegreeDayFactorByPrecip', &
+              'maxDegreeDayFactor_forest      ', &
+              'maxDegreeDayFactor_impervious  ', &
+              'maxDegreeDayFactor_pervious    '/))
 
       ! check if parameter are in range
-      if (.not. in_bound(global_parameters)) then
-        call message('***ERROR: parameter in namelist "snow1" out of bound in ', &
-                trim(adjustl(file_namelist_param)))
-        stop
-      end if
+      if (.not. in_bound(global_parameters)) &
+        call error_message('***ERROR: parameter in namelist "snow1" out of bound in ', trim(adjustl(file_namelist_param)))
 
     case DEFAULT
-      call message()
-      call message('***ERROR: Process description for process "snow" does not exist!')
-      stop
+      call error_message('***ERROR: Process description for process "snow" does not exist!')
     end select
 
     ! Process 3 - soilmoisture
@@ -407,8 +404,25 @@ contains
 
       ! 1 - Feddes equation for PET reduction, bucket approach, Brooks-Corey like
     case(1)
-      call position_nml('soilmoisture1', unamelist_param)
-      read(unamelist_param, nml = soilmoisture1)
+      call nml_soilmoisture1%read(file_namelist_param, unamelist_param)
+      orgMatterContent_forest = nml_soilmoisture1%orgMatterContent_forest
+      orgMatterContent_impervious = nml_soilmoisture1%orgMatterContent_impervious
+      orgMatterContent_pervious = nml_soilmoisture1%orgMatterContent_pervious
+      PTF_lower66_5_constant = nml_soilmoisture1%PTF_lower66_5_constant
+      PTF_lower66_5_clay = nml_soilmoisture1%PTF_lower66_5_clay
+      PTF_lower66_5_Db = nml_soilmoisture1%PTF_lower66_5_Db
+      PTF_higher66_5_constant = nml_soilmoisture1%PTF_higher66_5_constant
+      PTF_higher66_5_clay = nml_soilmoisture1%PTF_higher66_5_clay
+      PTF_higher66_5_Db = nml_soilmoisture1%PTF_higher66_5_Db
+      PTF_Ks_constant = nml_soilmoisture1%PTF_Ks_constant
+      PTF_Ks_sand = nml_soilmoisture1%PTF_Ks_sand
+      PTF_Ks_clay = nml_soilmoisture1%PTF_Ks_clay
+      PTF_Ks_curveSlope = nml_soilmoisture1%PTF_Ks_curveSlope
+      rootFractionCoefficient_forest = nml_soilmoisture1%rootFractionCoefficient_forest
+      rootFractionCoefficient_impervious = nml_soilmoisture1%rootFractionCoefficient_impervious
+      rootFractionCoefficient_pervious = nml_soilmoisture1%rootFractionCoefficient_pervious
+      infiltrationShapeFactor = nml_soilmoisture1%infiltrationShapeFactor
+
       processMatrix(3, 2) = 17_i4
       processMatrix(3, 3) = sum(processMatrix(1 : 3, 2))
       call append(global_parameters, reshape(orgMatterContent_forest, (/1, nColPars/)))
@@ -431,34 +445,49 @@ contains
 
       call append(global_parameters_name, (/     &
               'orgMatterContent_forest           ', &
-                      'orgMatterContent_impervious       ', &
-                      'orgMatterContent_pervious         ', &
-                      'PTF_lower66_5_constant            ', &
-                      'PTF_lower66_5_clay                ', &
-                      'PTF_lower66_5_Db                  ', &
-                      'PTF_higher66_5_constant           ', &
-                      'PTF_higher66_5_clay               ', &
-                      'PTF_higher66_5_Db                 ', &
-                      'PTF_Ks_constant                   ', &
-                      'PTF_Ks_sand                       ', &
-                      'PTF_Ks_clay                       ', &
-                      'PTF_Ks_curveSlope                 ', &
-                      'rootFractionCoefficient_forest    ', &
-                      'rootFractionCoefficient_impervious', &
-                      'rootFractionCoefficient_pervious  ', &
-                      'infiltrationShapeFactor           '/))
+              'orgMatterContent_impervious       ', &
+              'orgMatterContent_pervious         ', &
+              'PTF_lower66_5_constant            ', &
+              'PTF_lower66_5_clay                ', &
+              'PTF_lower66_5_Db                  ', &
+              'PTF_higher66_5_constant           ', &
+              'PTF_higher66_5_clay               ', &
+              'PTF_higher66_5_Db                 ', &
+              'PTF_Ks_constant                   ', &
+              'PTF_Ks_sand                       ', &
+              'PTF_Ks_clay                       ', &
+              'PTF_Ks_curveSlope                 ', &
+              'rootFractionCoefficient_forest    ', &
+              'rootFractionCoefficient_impervious', &
+              'rootFractionCoefficient_pervious  ', &
+              'infiltrationShapeFactor           '/))
 
       ! check if parameter are in range
-      if (.not. in_bound(global_parameters)) then
-        call message('***ERROR: parameter in namelist "soilmoisture1" out of bound in ', &
-                trim(adjustl(file_namelist_param)))
-        stop
-      end if
+      if (.not. in_bound(global_parameters)) &
+        call error_message('***ERROR: parameter in namelist "soilmoisture1" out of bound in ', trim(adjustl(file_namelist_param)))
 
       ! 2- Jarvis equation for PET reduction, bucket approach, Brooks-Corey like
     case(2)
-      call position_nml('soilmoisture2', unamelist_param)
-      read(unamelist_param, nml = soilmoisture2)
+      call nml_soilmoisture2%read(file_namelist_param, unamelist_param)
+      orgMatterContent_forest = nml_soilmoisture2%orgMatterContent_forest
+      orgMatterContent_impervious = nml_soilmoisture2%orgMatterContent_impervious
+      orgMatterContent_pervious = nml_soilmoisture2%orgMatterContent_pervious
+      PTF_lower66_5_constant = nml_soilmoisture2%PTF_lower66_5_constant
+      PTF_lower66_5_clay = nml_soilmoisture2%PTF_lower66_5_clay
+      PTF_lower66_5_Db = nml_soilmoisture2%PTF_lower66_5_Db
+      PTF_higher66_5_constant = nml_soilmoisture2%PTF_higher66_5_constant
+      PTF_higher66_5_clay = nml_soilmoisture2%PTF_higher66_5_clay
+      PTF_higher66_5_Db = nml_soilmoisture2%PTF_higher66_5_Db
+      PTF_Ks_constant = nml_soilmoisture2%PTF_Ks_constant
+      PTF_Ks_sand = nml_soilmoisture2%PTF_Ks_sand
+      PTF_Ks_clay = nml_soilmoisture2%PTF_Ks_clay
+      PTF_Ks_curveSlope = nml_soilmoisture2%PTF_Ks_curveSlope
+      rootFractionCoefficient_forest = nml_soilmoisture2%rootFractionCoefficient_forest
+      rootFractionCoefficient_impervious = nml_soilmoisture2%rootFractionCoefficient_impervious
+      rootFractionCoefficient_pervious = nml_soilmoisture2%rootFractionCoefficient_pervious
+      infiltrationShapeFactor = nml_soilmoisture2%infiltrationShapeFactor
+      jarvis_sm_threshold_c1 = nml_soilmoisture2%jarvis_sm_threshold_c1
+
       processMatrix(3, 2) = 18_i4
       processMatrix(3, 3) = sum(processMatrix(1 : 3, 2))
       call append(global_parameters, reshape(orgMatterContent_forest, (/1, nColPars/)))
@@ -482,35 +511,54 @@ contains
 
       call append(global_parameters_name, (/     &
               'orgMatterContent_forest           ', &
-                      'orgMatterContent_impervious       ', &
-                      'orgMatterContent_pervious         ', &
-                      'PTF_lower66_5_constant            ', &
-                      'PTF_lower66_5_clay                ', &
-                      'PTF_lower66_5_Db                  ', &
-                      'PTF_higher66_5_constant           ', &
-                      'PTF_higher66_5_clay               ', &
-                      'PTF_higher66_5_Db                 ', &
-                      'PTF_Ks_constant                   ', &
-                      'PTF_Ks_sand                       ', &
-                      'PTF_Ks_clay                       ', &
-                      'PTF_Ks_curveSlope                 ', &
-                      'rootFractionCoefficient_forest    ', &
-                      'rootFractionCoefficient_impervious', &
-                      'rootFractionCoefficient_pervious  ', &
-                      'infiltrationShapeFactor           ', &
-                      'jarvis_sm_threshold_c1            '/))
+              'orgMatterContent_impervious       ', &
+              'orgMatterContent_pervious         ', &
+              'PTF_lower66_5_constant            ', &
+              'PTF_lower66_5_clay                ', &
+              'PTF_lower66_5_Db                  ', &
+              'PTF_higher66_5_constant           ', &
+              'PTF_higher66_5_clay               ', &
+              'PTF_higher66_5_Db                 ', &
+              'PTF_Ks_constant                   ', &
+              'PTF_Ks_sand                       ', &
+              'PTF_Ks_clay                       ', &
+              'PTF_Ks_curveSlope                 ', &
+              'rootFractionCoefficient_forest    ', &
+              'rootFractionCoefficient_impervious', &
+              'rootFractionCoefficient_pervious  ', &
+              'infiltrationShapeFactor           ', &
+              'jarvis_sm_threshold_c1            '/))
 
       ! check if parameter are in range
-      if (.not. in_bound(global_parameters)) then
-        call message('***ERROR: parameter in namelist "soilmoisture2" out of bound in ', &
-                trim(adjustl(file_namelist_param)))
-        stop
-      end if
+      if (.not. in_bound(global_parameters)) &
+        call error_message('***ERROR: parameter in namelist "soilmoisture2" out of bound in ', trim(adjustl(file_namelist_param)))
 
       ! 3- Jarvis equation for ET reduction and FC dependency on root fraction coefficient
     case(3)
-      call position_nml('soilmoisture3', unamelist_param)
-      read(unamelist_param, nml = soilmoisture3)
+      call nml_soilmoisture3%read(file_namelist_param, unamelist_param)
+      orgMatterContent_forest = nml_soilmoisture3%orgMatterContent_forest
+      orgMatterContent_impervious = nml_soilmoisture3%orgMatterContent_impervious
+      orgMatterContent_pervious = nml_soilmoisture3%orgMatterContent_pervious
+      PTF_lower66_5_constant = nml_soilmoisture3%PTF_lower66_5_constant
+      PTF_lower66_5_clay = nml_soilmoisture3%PTF_lower66_5_clay
+      PTF_lower66_5_Db = nml_soilmoisture3%PTF_lower66_5_Db
+      PTF_higher66_5_constant = nml_soilmoisture3%PTF_higher66_5_constant
+      PTF_higher66_5_clay = nml_soilmoisture3%PTF_higher66_5_clay
+      PTF_higher66_5_Db = nml_soilmoisture3%PTF_higher66_5_Db
+      PTF_Ks_constant = nml_soilmoisture3%PTF_Ks_constant
+      PTF_Ks_sand = nml_soilmoisture3%PTF_Ks_sand
+      PTF_Ks_clay = nml_soilmoisture3%PTF_Ks_clay
+      PTF_Ks_curveSlope = nml_soilmoisture3%PTF_Ks_curveSlope
+      rootFractionCoefficient_forest = nml_soilmoisture3%rootFractionCoefficient_forest
+      rootFractionCoefficient_impervious = nml_soilmoisture3%rootFractionCoefficient_impervious
+      rootFractionCoefficient_pervious = nml_soilmoisture3%rootFractionCoefficient_pervious
+      infiltrationShapeFactor = nml_soilmoisture3%infiltrationShapeFactor
+      rootFractionCoefficient_sand = nml_soilmoisture3%rootFractionCoefficient_sand
+      rootFractionCoefficient_clay = nml_soilmoisture3%rootFractionCoefficient_clay
+      FCmin_glob = nml_soilmoisture3%FCmin_glob
+      FCdelta_glob = nml_soilmoisture3%FCdelta_glob
+      jarvis_sm_threshold_c1 = nml_soilmoisture3%jarvis_sm_threshold_c1
+
       processMatrix(3, 2) = 22_i4
       processMatrix(3, 3) = sum(processMatrix(1 : 3, 2))
       call append(global_parameters, reshape(orgMatterContent_forest, (/1, nColPars/)))
@@ -536,42 +584,59 @@ contains
       call append(global_parameters, reshape(FCdelta_glob, (/1, nColPars/)))
       call append(global_parameters, reshape(jarvis_sm_threshold_c1, (/1, nColPars/)))
 
-
       call append(global_parameters_name, (/     &
-                      'orgMatterContent_forest           ', &
-                      'orgMatterContent_impervious       ', &
-                      'orgMatterContent_pervious         ', &
-                      'PTF_lower66_5_constant            ', &
-                      'PTF_lower66_5_clay                ', &
-                      'PTF_lower66_5_Db                  ', &
-                      'PTF_higher66_5_constant           ', &
-                      'PTF_higher66_5_clay               ', &
-                      'PTF_higher66_5_Db                 ', &
-                      'PTF_Ks_constant                   ', &
-                      'PTF_Ks_sand                       ', &
-                      'PTF_Ks_clay                       ', &
-                      'PTF_Ks_curveSlope                 ', &
-                      'rootFractionCoefficient_forest    ', &
-                      'rootFractionCoefficient_impervious', &
-                      'rootFractionCoefficient_pervious  ', &
-                      'infiltrationShapeFactor           ', &
-                      'rootFractionCoefficient_sand      ', &
-                      'rootFractionCoefficient_clay      ', &
-                      'FCmin_glob                        ', &
-                      'FCdelta_glob                      ', &
-                      'jarvis_sm_threshold_c1            '/))
+              'orgMatterContent_forest           ', &
+              'orgMatterContent_impervious       ', &
+              'orgMatterContent_pervious         ', &
+              'PTF_lower66_5_constant            ', &
+              'PTF_lower66_5_clay                ', &
+              'PTF_lower66_5_Db                  ', &
+              'PTF_higher66_5_constant           ', &
+              'PTF_higher66_5_clay               ', &
+              'PTF_higher66_5_Db                 ', &
+              'PTF_Ks_constant                   ', &
+              'PTF_Ks_sand                       ', &
+              'PTF_Ks_clay                       ', &
+              'PTF_Ks_curveSlope                 ', &
+              'rootFractionCoefficient_forest    ', &
+              'rootFractionCoefficient_impervious', &
+              'rootFractionCoefficient_pervious  ', &
+              'infiltrationShapeFactor           ', &
+              'rootFractionCoefficient_sand      ', &
+              'rootFractionCoefficient_clay      ', &
+              'FCmin_glob                        ', &
+              'FCdelta_glob                      ', &
+              'jarvis_sm_threshold_c1            '/))
 
       ! check if parameter are in range
-      if (.not. in_bound(global_parameters)) then
-        call message('***ERROR: parameter in namelist "soilmoisture3" out of bound in ', &
-                trim(adjustl(file_namelist_param)))
-        stop
-      end if
+      if (.not. in_bound(global_parameters)) &
+        call error_message('***ERROR: parameter in namelist "soilmoisture3" out of bound in ', trim(adjustl(file_namelist_param)))
 
       ! 4- Feddes equation for ET reduction and FC dependency on root fraction coefficient
     case(4)
-      call position_nml('soilmoisture4', unamelist_param)
-      read(unamelist_param, nml = soilmoisture4)
+      call nml_soilmoisture4%read(file_namelist_param, unamelist_param)
+      orgMatterContent_forest = nml_soilmoisture4%orgMatterContent_forest
+      orgMatterContent_impervious = nml_soilmoisture4%orgMatterContent_impervious
+      orgMatterContent_pervious = nml_soilmoisture4%orgMatterContent_pervious
+      PTF_lower66_5_constant = nml_soilmoisture4%PTF_lower66_5_constant
+      PTF_lower66_5_clay = nml_soilmoisture4%PTF_lower66_5_clay
+      PTF_lower66_5_Db = nml_soilmoisture4%PTF_lower66_5_Db
+      PTF_higher66_5_constant = nml_soilmoisture4%PTF_higher66_5_constant
+      PTF_higher66_5_clay = nml_soilmoisture4%PTF_higher66_5_clay
+      PTF_higher66_5_Db = nml_soilmoisture4%PTF_higher66_5_Db
+      PTF_Ks_constant = nml_soilmoisture4%PTF_Ks_constant
+      PTF_Ks_sand = nml_soilmoisture4%PTF_Ks_sand
+      PTF_Ks_clay = nml_soilmoisture4%PTF_Ks_clay
+      PTF_Ks_curveSlope = nml_soilmoisture4%PTF_Ks_curveSlope
+      rootFractionCoefficient_forest = nml_soilmoisture4%rootFractionCoefficient_forest
+      rootFractionCoefficient_impervious = nml_soilmoisture4%rootFractionCoefficient_impervious
+      rootFractionCoefficient_pervious = nml_soilmoisture4%rootFractionCoefficient_pervious
+      infiltrationShapeFactor = nml_soilmoisture4%infiltrationShapeFactor
+      rootFractionCoefficient_sand = nml_soilmoisture4%rootFractionCoefficient_sand
+      rootFractionCoefficient_clay = nml_soilmoisture4%rootFractionCoefficient_clay
+      FCmin_glob = nml_soilmoisture4%FCmin_glob
+      FCdelta_glob = nml_soilmoisture4%FCdelta_glob
+
       processMatrix(3, 2) = 21_i4
       processMatrix(3, 3) = sum(processMatrix(1 : 3, 2))
       call append(global_parameters, reshape(orgMatterContent_forest, (/1, nColPars/)))
@@ -597,48 +662,43 @@ contains
       call append(global_parameters, reshape(FCdelta_glob, (/1, nColPars/)))
 
       call append(global_parameters_name, (/     &
-                      'orgMatterContent_forest           ', &
-                      'orgMatterContent_impervious       ', &
-                      'orgMatterContent_pervious         ', &
-                      'PTF_lower66_5_constant            ', &
-                      'PTF_lower66_5_clay                ', &
-                      'PTF_lower66_5_Db                  ', &
-                      'PTF_higher66_5_constant           ', &
-                      'PTF_higher66_5_clay               ', &
-                      'PTF_higher66_5_Db                 ', &
-                      'PTF_Ks_constant                   ', &
-                      'PTF_Ks_sand                       ', &
-                      'PTF_Ks_clay                       ', &
-                      'PTF_Ks_curveSlope                 ', &
-                      'rootFractionCoefficient_forest    ', &
-                      'rootFractionCoefficient_impervious', &
-                      'rootFractionCoefficient_pervious  ', &
-                      'infiltrationShapeFactor           ', &
-                      'rootFractionCoefficient_sand      ', &
-                      'rootFractionCoefficient_clay      ', &
-                      'FCmin_glob                        ', &
-                      'FCdelta_glob                      '/))
+              'orgMatterContent_forest           ', &
+              'orgMatterContent_impervious       ', &
+              'orgMatterContent_pervious         ', &
+              'PTF_lower66_5_constant            ', &
+              'PTF_lower66_5_clay                ', &
+              'PTF_lower66_5_Db                  ', &
+              'PTF_higher66_5_constant           ', &
+              'PTF_higher66_5_clay               ', &
+              'PTF_higher66_5_Db                 ', &
+              'PTF_Ks_constant                   ', &
+              'PTF_Ks_sand                       ', &
+              'PTF_Ks_clay                       ', &
+              'PTF_Ks_curveSlope                 ', &
+              'rootFractionCoefficient_forest    ', &
+              'rootFractionCoefficient_impervious', &
+              'rootFractionCoefficient_pervious  ', &
+              'infiltrationShapeFactor           ', &
+              'rootFractionCoefficient_sand      ', &
+              'rootFractionCoefficient_clay      ', &
+              'FCmin_glob                        ', &
+              'FCdelta_glob                      '/))
 
       ! check if parameter are in range
-      if (.not. in_bound(global_parameters)) then
-        call message('***ERROR: parameter in namelist "soilmoisture4" out of bound in ', &
-                trim(adjustl(file_namelist_param)))
-        stop
-      end if
-
+      if (.not. in_bound(global_parameters)) &
+        call error_message('***ERROR: parameter in namelist "soilmoisture4" out of bound in ', trim(adjustl(file_namelist_param)))
 
     case DEFAULT
-      call message()
-      call message('***ERROR: Process description for process "soilmoisture" does not exist!')
-      stop
+      call error_message('***ERROR: Process description for process "soilmoisture" does not exist!')
     end select
 
     ! Process 4 - sealed area directRunoff
     select case (processMatrix(4, 1))
       ! 1 - bucket exceedance approach
     case(1)
-      call position_nml('directRunoff1', unamelist_param)
-      read(unamelist_param, nml = directRunoff1)
+      call nml_directrunoff1%read(file_namelist_param, unamelist_param)
+      imperviousStorageCapacity = nml_directrunoff1%imperviousStorageCapacity
+
       processMatrix(4, 2) = 1_i4
       processMatrix(4, 3) = sum(processMatrix(1 : 4, 2))
       call append(global_parameters, reshape(imperviousStorageCapacity, (/1, nColPars/)))
@@ -646,23 +706,23 @@ contains
       call append(global_parameters_name, (/'imperviousStorageCapacity'/))
 
       ! check if parameter are in range
-      if (.not. in_bound(global_parameters)) then
-        call message('***ERROR: parameter in namelist "directRunoff1" out of bound in ', &
-                trim(adjustl(file_namelist_param)))
-        stop
-      end if
+      if (.not. in_bound(global_parameters)) &
+        call error_message('***ERROR: parameter in namelist "directRunoff1" out of bound in ', trim(adjustl(file_namelist_param)))
 
     case DEFAULT
-      call message()
-      call message('***ERROR: Process description for process "directRunoff" does not exist!')
-      stop
+      call error_message('***ERROR: Process description for process "directRunoff" does not exist!')
     end select
 
     ! Process 5 - potential evapotranspiration (PET)
     select case (processMatrix(5, 1))
     case(-1) ! 0 - PET is input, correct PET by LAI
-      call position_nml('PETminus1', unamelist_param)
-      read(unamelist_param, nml = PETminus1)
+      call nml_petminus1%read(file_namelist_param, unamelist_param)
+      PET_a_forest = nml_petminus1%PET_a_forest
+      PET_a_impervious = nml_petminus1%PET_a_impervious
+      PET_a_pervious = nml_petminus1%PET_a_pervious
+      PET_b = nml_petminus1%PET_b
+      PET_c = nml_petminus1%PET_c
+
       processMatrix(5, 2) = 5_i4
       processMatrix(5, 3) = sum(processMatrix(1 : 5, 2))
       call append(global_parameters, reshape(PET_a_forest, (/1, nColPars/)))
@@ -672,22 +732,22 @@ contains
       call append(global_parameters, reshape(PET_c, (/1, nColPars/)))
 
       call append(global_parameters_name, (/ &
-                      'PET_a_forest     ', &
-                      'PET_a_impervious ', &
-                      'PET_a_pervious   ', &
-                      'PET_b            ', &
-                      'PET_c            '/))
+              'PET_a_forest     ', &
+              'PET_a_impervious ', &
+              'PET_a_pervious   ', &
+              'PET_b            ', &
+              'PET_c            '/))
 
       ! check if parameter are in range
-      if (.not. in_bound(global_parameters)) then
-        call message('***ERROR: parameter in namelist "PETminus1" out of bound  n ', &
-                trim(adjustl(file_namelist_param)))
-        stop 1
-      end if
+      if (.not. in_bound(global_parameters)) &
+        call error_message('***ERROR: parameter in namelist "PETminus1" out of bound  n ', trim(adjustl(file_namelist_param)))
 
     case(0) ! 0 - PET is input, correct PET by aspect
-      call position_nml('PET0', unamelist_param)
-      read(unamelist_param, nml = PET0)
+      call nml_pet0%read(file_namelist_param, unamelist_param)
+      minCorrectionFactorPET = nml_pet0%minCorrectionFactorPET
+      maxCorrectionFactorPET = nml_pet0%maxCorrectionFactorPET
+      aspectTresholdPET = nml_pet0%aspectTresholdPET
+
       processMatrix(5, 2) = 3_i4
       processMatrix(5, 3) = sum(processMatrix(1 : 5, 2))
       call append(global_parameters, reshape(minCorrectionFactorPET, (/1, nColPars/)))
@@ -695,20 +755,21 @@ contains
       call append(global_parameters, reshape(aspectTresholdPET, (/1, nColPars/)))
 
       call append(global_parameters_name, (/ &
-                  'minCorrectionFactorPET ', &
-                  'maxCorrectionFactorPET ', &
-                  'aspectTresholdPET      '/))
+              'minCorrectionFactorPET ', &
+              'maxCorrectionFactorPET ', &
+              'aspectTresholdPET      '/))
 
       ! check if parameter are in range
-      if (.not. in_bound(global_parameters)) then
-        call message('***ERROR: parameter in namelist "PET0" out of bound in ', &
-                trim(adjustl(file_namelist_param)))
-        stop
-      end if
+      if (.not. in_bound(global_parameters)) &
+        call error_message('***ERROR: parameter in namelist "PET0" out of bound in ', trim(adjustl(file_namelist_param)))
 
     case(1) ! 1 - Hargreaves-Samani method (HarSam) - additional input needed: Tmin, Tmax
-      call position_nml('PET1', unamelist_param)
-      read(unamelist_param, nml = PET1)
+      call nml_pet1%read(file_namelist_param, unamelist_param)
+      minCorrectionFactorPET = nml_pet1%minCorrectionFactorPET
+      maxCorrectionFactorPET = nml_pet1%maxCorrectionFactorPET
+      aspectTresholdPET = nml_pet1%aspectTresholdPET
+      HargreavesSamaniCoeff = nml_pet1%HargreavesSamaniCoeff
+
       processMatrix(5, 2) = 4_i4
       processMatrix(5, 3) = sum(processMatrix(1 : 5, 2))
       call append(global_parameters, reshape(minCorrectionFactorPET, (/1, nColPars/)))
@@ -716,39 +777,42 @@ contains
       call append(global_parameters, reshape(aspectTresholdPET, (/1, nColPars/)))
       call append(global_parameters, reshape(HargreavesSamaniCoeff, (/1, nColPars/)))
       call append(global_parameters_name, (/ &
-                   'minCorrectionFactorPET', &
-                   'maxCorrectionFactorPET', &
-                   'aspectTresholdPET     ', &
-                   'HargreavesSamaniCoeff '/))
+              'minCorrectionFactorPET', &
+              'maxCorrectionFactorPET', &
+              'aspectTresholdPET     ', &
+              'HargreavesSamaniCoeff '/))
 
       ! check if parameter are in range
-      if (.not. in_bound(global_parameters)) then
-        call message('***ERROR: parameter in namelist "PET1" out of bound in ', &
-                trim(adjustl(file_namelist_param)))
-        stop
-      end if
+      if (.not. in_bound(global_parameters)) &
+        call error_message('***ERROR: parameter in namelist "PET1" out of bound in ', trim(adjustl(file_namelist_param)))
 
     case(2) ! 2 - Priestley-Taylor method (PrieTay) - additional input needed: net_rad
-      call position_nml('PET2', unamelist_param)
-      read(unamelist_param, nml = PET2)
+      call nml_pet2%read(file_namelist_param, unamelist_param)
+      PriestleyTaylorCoeff = nml_pet2%PriestleyTaylorCoeff
+      PriestleyTaylorLAIcorr = nml_pet2%PriestleyTaylorLAIcorr
+
       processMatrix(5, 2) = 2_i4
       processMatrix(5, 3) = sum(processMatrix(1 : 5, 2))
       call append(global_parameters, reshape(PriestleyTaylorCoeff, (/1, nColPars/)))
       call append(global_parameters, reshape(PriestleyTaylorLAIcorr, (/1, nColPars/)))
       call append(global_parameters_name, (/ &
-                   'PriestleyTaylorCoeff  ', &
-                   'PriestleyTaylorLAIcorr'/))
+              'PriestleyTaylorCoeff  ', &
+              'PriestleyTaylorLAIcorr'/))
 
       ! check if parameter are in range
-      if (.not. in_bound(global_parameters)) then
-        call message('***ERROR: parameter in namelist "PET2" out of bound in ', &
-                trim(adjustl(file_namelist_param)))
-        stop
-      end if
+      if (.not. in_bound(global_parameters)) &
+        call error_message('***ERROR: parameter in namelist "PET2" out of bound in ', trim(adjustl(file_namelist_param)))
 
     case(3) ! 3 - Penman-Monteith method - additional input needed: net_rad, abs. vapour pressue, windspeed
-      call position_nml('PET3', unamelist_param)
-      read(unamelist_param, nml = PET3)
+      call nml_pet3%read(file_namelist_param, unamelist_param)
+      canopyheigth_forest = nml_pet3%canopyheigth_forest
+      canopyheigth_impervious = nml_pet3%canopyheigth_impervious
+      canopyheigth_pervious = nml_pet3%canopyheigth_pervious
+      displacementheight_coeff = nml_pet3%displacementheight_coeff
+      roughnesslength_momentum_coeff = nml_pet3%roughnesslength_momentum_coeff
+      roughnesslength_heat_coeff = nml_pet3%roughnesslength_heat_coeff
+      stomatal_resistance = nml_pet3%stomatal_resistance
+
       processMatrix(5, 2) = 7_i4
       processMatrix(5, 3) = sum(processMatrix(1 : 5, 2))
 
@@ -761,25 +825,20 @@ contains
       call append(global_parameters, reshape(stomatal_resistance, (/1, nColPars/)))
 
       call append(global_parameters_name, (/ &
-           'canopyheigth_forest           ', &
-           'canopyheigth_impervious       ', &
-           'canopyheigth_pervious         ', &
-           'displacementheight_coeff      ', &
-           'roughnesslength_momentum_coeff', &
-           'roughnesslength_heat_coeff    ', &
-           'stomatal_resistance           '/))
+              'canopyheigth_forest           ', &
+              'canopyheigth_impervious       ', &
+              'canopyheigth_pervious         ', &
+              'displacementheight_coeff      ', &
+              'roughnesslength_momentum_coeff', &
+              'roughnesslength_heat_coeff    ', &
+              'stomatal_resistance           '/))
 
       ! check if parameter are in range
-      if (.not. in_bound(global_parameters)) then
-        call message('***ERROR: parameter in namelist "PET3" out of bound in ', &
-                trim(adjustl(file_namelist_param)))
-        stop
-      end if
+      if (.not. in_bound(global_parameters)) &
+        call error_message('***ERROR: parameter in namelist "PET3" out of bound in ', trim(adjustl(file_namelist_param)))
 
     case DEFAULT
-      call message()
-      call message('***ERROR: Process description for process "actualET" does not exist!')
-      stop
+      call error_message('***ERROR: Process description for process "actualET" does not exist!')
     end select
 
 
@@ -787,8 +846,13 @@ contains
     select case (processMatrix(6, 1))
       ! 1 - parallel soil reservoir approach
     case(1)
-      call position_nml('interflow1', unamelist_param)
-      read(unamelist_param, nml = interflow1)
+      call nml_interflow1%read(file_namelist_param, unamelist_param)
+      interflowStorageCapacityFactor = nml_interflow1%interflowStorageCapacityFactor
+      interflowRecession_slope = nml_interflow1%interflowRecession_slope
+      fastInterflowRecession_forest = nml_interflow1%fastInterflowRecession_forest
+      slowInterflowRecession_Ks = nml_interflow1%slowInterflowRecession_Ks
+      exponentSlowInterflow = nml_interflow1%exponentSlowInterflow
+
       processMatrix(6, 2) = 5_i4
       processMatrix(6, 3) = sum(processMatrix(1 : 6, 2))
       call append(global_parameters, reshape(interflowStorageCapacityFactor, (/1, nColPars/)))
@@ -798,31 +862,29 @@ contains
       call append(global_parameters, reshape(exponentSlowInterflow, (/1, nColPars/)))
 
       call append(global_parameters_name, (/ &
-           'interflowStorageCapacityFactor', &
-           'interflowRecession_slope      ', &
-           'fastInterflowRecession_forest ', &
-           'slowInterflowRecession_Ks     ', &
-           'exponentSlowInterflow         '/))
+              'interflowStorageCapacityFactor', &
+              'interflowRecession_slope      ', &
+              'fastInterflowRecession_forest ', &
+              'slowInterflowRecession_Ks     ', &
+              'exponentSlowInterflow         '/))
 
       ! check if parameter are in range
-      if (.not. in_bound(global_parameters)) then
-        call message('***ERROR: parameter in namelist "interflow1" out of bound in ', &
-                trim(adjustl(file_namelist_param)))
-        stop
-      end if
+      if (.not. in_bound(global_parameters)) &
+        call error_message('***ERROR: parameter in namelist "interflow1" out of bound in ', trim(adjustl(file_namelist_param)))
 
     case DEFAULT
-      call message()
-      call message('***ERROR: Process description for process "interflow" does not exist!')
-      stop
+      call error_message('***ERROR: Process description for process "interflow" does not exist!')
     end select
 
     ! Process 7 - percolation
     select case (processMatrix(7, 1))
       ! 1 - GW layer is assumed as bucket
     case(1)
-      call position_nml('percolation1', unamelist_param)
-      read(unamelist_param, nml = percolation1)
+      call nml_percolation1%read(file_namelist_param, unamelist_param)
+      rechargeCoefficient = nml_percolation1%rechargeCoefficient
+      rechargeFactor_karstic = nml_percolation1%rechargeFactor_karstic
+      gain_loss_GWreservoir_karstic = nml_percolation1%gain_loss_GWreservoir_karstic
+
       processMatrix(7, 2) = 3_i4
       processMatrix(7, 3) = sum(processMatrix(1 : 7, 2))
       call append(global_parameters, reshape(rechargeCoefficient, (/1, nColPars/)))
@@ -835,16 +897,11 @@ contains
               'gain_loss_GWreservoir_karstic'/))
 
       ! check if parameter are in range
-      if (.not. in_bound(global_parameters)) then
-        call message('***ERROR: parameter in namelist "percolation1" out of bound in ', &
-                trim(adjustl(file_namelist_param)))
-        stop
-      end if
+      if (.not. in_bound(global_parameters)) &
+        call error_message('***ERROR: parameter in namelist "percolation1" out of bound in ', trim(adjustl(file_namelist_param)))
 
     case DEFAULT
-      call message()
-      call message('***ERROR: Process description for process "percolation" does not exist!')
-      stop
+      call error_message('***ERROR: Process description for process "percolation" does not exist!')
     end select
 
     ! Process 8 - routing
@@ -888,9 +945,8 @@ contains
     select case (processMatrix(9, 1))
     case(1)
       ! read in global parameters (NOT REGIONALIZED, i.e. these are <beta> and not <gamma>) for each geological formation used
-      call position_nml('geoparameter', unamelist_param)
-      GeoParam = nodata_dp
-      read(unamelist_param, nml = geoparameter)
+      call nml_geoparameter%read(file_namelist_param, unamelist_param)
+      GeoParam = nml_geoparameter%GeoParam
 
       ! search number of geological parameters
       do ii = 1, size(GeoParam, 1) ! no while loop to avoid risk of endless loop
@@ -913,16 +969,11 @@ contains
       end do
 
       ! check if parameter are in range
-      if (.not. in_bound(global_parameters)) then
-        call message('***ERROR: parameter in namelist "geoparameter" out of bound in ', &
-                trim(adjustl(file_namelist_param)))
-        stop
-      end if
+      if (.not. in_bound(global_parameters)) &
+        call error_message('***ERROR: parameter in namelist "geoparameter" out of bound in ', trim(adjustl(file_namelist_param)))
 
     case DEFAULT
-      call message()
-      call message('***ERROR: Process description for process "geoparameter" does not exist!')
-      stop
+      call error_message('***ERROR: Process description for process "geoparameter" does not exist!')
    end select
 
     !===============================================================
@@ -940,8 +991,10 @@ contains
 
     case(1)
       ! 1 - inverse N0 based on Desilets et al. 2010
-      call position_nml('neutrons1', unamelist_param)
-      read(unamelist_param, nml = neutrons1)
+      call nml_neutrons1%read(file_namelist_param, unamelist_param)
+      Desilets_N0 = nml_neutrons1%Desilets_N0
+      Desilets_LW0 = nml_neutrons1%Desilets_LW0
+      Desilets_LW1 = nml_neutrons1%Desilets_LW1
 
       processMatrix(10,2) = 3_i4
       processMatrix(10,3) = sum(processMatrix(1:10, 2))
@@ -950,21 +1003,26 @@ contains
       call append(global_parameters, reshape(Desilets_LW1, (/1, nColPars/)))
 
        call append(global_parameters_name, (/  &
-           'Desilets_N0   ', &
-           'Desilets_LW0  ', &
-           'Desilets_LW1  '/))
+               'Desilets_N0   ', &
+               'Desilets_LW0  ', &
+               'Desilets_LW1  '/))
 
       ! check if parameter are in range
-      if (.not. in_bound(global_parameters)) then
-        call message('***ERROR: parameter in namelist "neutrons1" out of bound in ', &
-                trim(adjustl(file_namelist_param)))
-        stop
-      end if
+      if (.not. in_bound(global_parameters)) &
+        call error_message('***ERROR: parameter in namelist "neutrons1" out of bound in ', trim(adjustl(file_namelist_param)))
 
     case(2)
       ! 2 - COSMIC version
-      call position_nml('neutrons2', unamelist_param)
-      read(unamelist_param, nml = neutrons2)
+      call nml_neutrons2%read(file_namelist_param, unamelist_param)
+      COSMIC_N0 = nml_neutrons2%COSMIC_N0
+      COSMIC_N1 = nml_neutrons2%COSMIC_N1
+      COSMIC_N2 = nml_neutrons2%COSMIC_N2
+      COSMIC_alpha0 = nml_neutrons2%COSMIC_alpha0
+      COSMIC_alpha1 = nml_neutrons2%COSMIC_alpha1
+      COSMIC_L30 = nml_neutrons2%COSMIC_L30
+      COSMIC_L31 = nml_neutrons2%COSMIC_L31
+      COSMIC_LW0 = nml_neutrons2%COSMIC_LW0
+      COSMIC_LW1 = nml_neutrons2%COSMIC_LW1
 
       processMatrix(10,2) = 9_i4
       processMatrix(10,3) = sum(processMatrix(1:10, 2))
@@ -979,30 +1037,22 @@ contains
       call append(global_parameters, reshape(COSMIC_LW1,    (/1, nColPars/)))
 
       call append(global_parameters_name, (/  &
-           'COSMIC_N0     ', &
-           'COSMIC_N1     ', &
-           'COSMIC_N2     ', &
-           'COSMIC_alpha0 ', &
-           'COSMIC_alpha1 ', &
-           'COSMIC_L30    ', &
-           'COSMIC_L31    ', &
-           'COSMIC_LW0    ', &
-           'COSMIC_LW1    '/))
+              'COSMIC_N0     ', &
+              'COSMIC_N1     ', &
+              'COSMIC_N2     ', &
+              'COSMIC_alpha0 ', &
+              'COSMIC_alpha1 ', &
+              'COSMIC_L30    ', &
+              'COSMIC_L31    ', &
+              'COSMIC_LW0    ', &
+              'COSMIC_LW1    '/))
       ! check if parameter are in range
-      if (.not. in_bound(global_parameters)) then
-        call message('***ERROR: parameter in namelist "neutrons2" out of bound in ', &
-                trim(adjustl(file_namelist_param)))
-        stop
-      end if
+      if (.not. in_bound(global_parameters)) &
+        call error_message('***ERROR: parameter in namelist "neutrons2" out of bound in ', trim(adjustl(file_namelist_param)))
 
-     case DEFAULT
-      call message()
-      call message('***ERROR: Process description for process "NEUTRON count" does not exist!')
-      stop
-   end select
-
-
-    call close_nml(unamelist_param)
+    case DEFAULT
+      call error_message('***ERROR: Process description for process "NEUTRON count" does not exist!')
+    end select
 
   end subroutine mpr_read_config
 
