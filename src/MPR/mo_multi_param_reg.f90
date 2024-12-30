@@ -11,7 +11,7 @@
 !> \ingroup f_mpr
 MODULE mo_multi_param_reg
 
-  use mo_kind, only : i4, dp
+  use mo_kind, only : i4, i8, dp
   use mo_common_constants, only : nodata_dp, nodata_i4
   use mo_message, only : message, error_message
 
@@ -87,9 +87,9 @@ subroutine mpr(mask0, geoUnit0, soilId0, Asp0, gridded_LAI0, LCover0, slope_emp0
     !> mask at level 0 field
     logical, dimension(:, :), intent(in) :: mask0
     !> L0 geological units
-    integer(i4), dimension(:), intent(in) :: geoUnit0
+    integer(i8), dimension(:), intent(in) :: geoUnit0
     !> soil Ids at level 0
-    integer(i4), dimension(:, :), intent(in) :: soilId0
+    integer(i8), dimension(:, :), intent(in) :: soilId0
     !> [degree] Aspect at Level 0
     real(dp), dimension(:), intent(in) :: Asp0
     !> LAI grid at level 0, with dim2 = time
@@ -697,7 +697,7 @@ subroutine mpr(mask0, geoUnit0, soilId0, Asp0, gridded_LAI0, LCover0, slope_emp0
     real(dp), dimension(:), intent(in) :: param
 
     ! ids of geological units at L0
-    integer(i4), dimension(:), intent(in) :: geoUnit0
+    integer(i8), dimension(:), intent(in) :: geoUnit0
 
     ! - baseflow recession parameter at Level 0
     real(dp), dimension(:), intent(out) :: k2_0
@@ -945,7 +945,7 @@ subroutine mpr(mask0, geoUnit0, soilId0, Asp0, gridded_LAI0, LCover0, slope_emp0
        left_bound1, right_bound1, karstLoss1, L1_Kp)
 
     use mo_mpr_global_variables, only : GeoUnitList, geoUnitKar
-    use mo_upscaling_operators, only : L0_fractionalCover_in_Lx, upscale_arithmetic_mean
+    use mo_upscaling_operators, only : L0_fractionalCover_in_Lx_i8, upscale_arithmetic_mean
     !$ use omp_lib
 
     implicit none
@@ -954,7 +954,7 @@ subroutine mpr(mask0, geoUnit0, soilId0, Asp0, gridded_LAI0, LCover0, slope_emp0
     real(dp), dimension(3), intent(in) :: param
 
     ! id of the Karstic formation
-    integer(i4), dimension(:), intent(in) :: geoUnit0
+    integer(i8), dimension(:), intent(in) :: geoUnit0
 
     ! mask at level 0
     logical, dimension(:, :), intent(in) :: mask0
@@ -1024,7 +1024,7 @@ subroutine mpr(mask0, geoUnit0, soilId0, Asp0, gridded_LAI0, LCover0, slope_emp0
 
     do i = 1, nGeoUnits
        if(GeoUnitKar(i) .eq. 0) cycle
-       fKarArea(:) = L0_fractionalCover_in_Lx(geoUnit0, geoUnitlist(i), mask0, &
+       fKarArea(:) = L0_fractionalCover_in_Lx_i8(geoUnit0, geoUnitlist(i), mask0, &
             upper_bound1, lower_bound1, left_bound1, right_bound1, n_subcells1)
     end do
 

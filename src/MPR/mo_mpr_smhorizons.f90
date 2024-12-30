@@ -11,7 +11,7 @@
 !> \ingroup f_mpr
 module mo_mpr_SMhorizons
 
-  use mo_kind, only : i4, dp
+  use mo_kind, only : i4, i8, dp
   use mo_common_constants, only : nodata_dp
 
   implicit none
@@ -157,7 +157,7 @@ contains
     integer(i4), dimension(:), intent(in) :: LCOVER0
 
     ! soil ID at level 0
-    integer(i4), dimension(:, :), intent(in) :: soilID0
+    integer(i8), dimension(:, :), intent(in) :: soilID0
 
     ! horizons per soil type
     integer(i4), dimension(:), intent(in) :: nHorizons

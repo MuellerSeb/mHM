@@ -14,7 +14,7 @@
 !> \ingroup f_common
 MODULE mo_common_constants
 
-  USE mo_kind, ONLY : i4, dp, sp
+  USE mo_kind, ONLY : i4, i8, dp, sp
 
   IMPLICIT NONE
 
@@ -28,6 +28,7 @@ MODULE mo_common_constants
 
   ! computational, these values need to be the same!!!
   integer(i4), public, parameter :: nodata_i4 = -9999_i4  ! [-]     global no data value
+  integer(i8), public, parameter :: nodata_i8 = -9999_i8  ! [-]     global no data value
   real(dp), public, parameter :: nodata_dp = -9999._dp ! [-]     global no data value
 
   ! default inital values for states and fluxes as well as parameter fields

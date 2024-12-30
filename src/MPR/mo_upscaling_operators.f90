@@ -15,7 +15,7 @@ module mo_upscaling_operators
 
   ! Written  Giovanni Dalmasso, Rohini Kumar, Dec 2012
 
-  use mo_kind, only : i4, dp
+  use mo_kind, only : i4, i8, dp
 
   implicit none
 
@@ -23,6 +23,7 @@ module mo_upscaling_operators
 
   public :: majority_statistics       ! upscale grid L0_fineScale_2D_data based on a majority statistics
   public :: L0_fractionalCover_in_Lx  ! fractional coverage of a given class of L0 fields in Lx field (Lx = L1 or L11)
+  public :: L0_fractionalCover_in_Lx_i8  ! fractional coverage of a given class of L0 fields in Lx field (Lx = L1 or L11)
   public :: upscale_arithmetic_mean   ! upscale grid L0_fineScale_2D_data based on a ARITHMETIC MEAN
   public :: upscale_harmonic_mean     ! upscale grid L0_fineScale_2D_data based on a HARMONIC MEAN
   public :: upscale_geometric_mean    ! upscale grid L0_fineScale_2D_data based on a GEOMETRIC MEAN
@@ -225,6 +226,115 @@ contains
     deallocate(dummy_Matrix, nodata_val)
 
   end function L0_fractionalCover_in_Lx
+
+  ! ------------------------------------------------------------------
+
+  !    NAME
+  !        L0_fractionalCover_in_Lx_i8
+
+  !    PURPOSE
+  !>       \brief fractional coverage of a given class of L0 fields in Lx field (Lx = L1 or L11)
+
+  !>       \details Fractional coverage of a given class of L0 fields in Lx field (Lx = L1 or L11).
+  !>       For example, this routine can be used for calculating the karstic fraction.
+
+  !    INTENT(IN)
+  !>       \param[in] "integer(i4), dimension(:) :: dataIn0"           input fields at finer scale
+  !>       \param[in] "integer(i4) :: classId"                         class id for which fraction has to be estimated
+  !>       \param[in] "logical, dimension(:, :) :: mask0"              finer scale L0 mask
+  !>       \param[in] "integer(i4), dimension(:) :: L0upBound_inLx"    row start at finer L0 scale
+  !>       \param[in] "integer(i4), dimension(:) :: L0downBound_inLx"  row end   at finer L0 scale
+  !>       \param[in] "integer(i4), dimension(:) :: L0leftBound_inLx"  col start at finer L0 scale
+  !>       \param[in] "integer(i4), dimension(:) :: L0rightBound_inLx" col end   at finer L0 scale
+  !>       \param[in] "integer(i4), dimension(:) :: nTCells0_inLx"     total number of valid L0 cells in a given Lx cell
+
+  !    RETURN
+  !>       \return real(dp) :: L0_fractionalCover_in_Lx_i8(:) &mdash; packed 1D fraction coverage (Lx) of given class id
+
+  !    HISTORY
+  !>       \authors Rohini Kumar
+
+  !>       \date Feb 2013
+
+  ! Modifications:
+  ! Robert Schweppe Jun 2018 - refactoring and reformatting
+
+  function L0_fractionalCover_in_Lx_i8(dataIn0, classId, mask0, L0upBound_inLx, L0downBound_inLx, L0leftBound_inLx, &
+                                   L0rightBound_inLx, nTCells0_inLx) result(frac_cover_Lx)
+
+    use mo_common_constants, only : nodata_i8
+
+    implicit none
+
+    ! input fields at finer scale
+    integer(i8), dimension(:), intent(in) :: dataIn0
+
+    ! class id for which fraction has to be estimated
+    integer(i4), intent(in) :: classId
+
+    ! finer scale L0 mask
+    logical, dimension(:, :), intent(in) :: mask0
+
+    ! row start at finer L0 scale
+    integer(i4), dimension(:), intent(in) :: L0upBound_inLx
+
+    ! row end   at finer L0 scale
+    integer(i4), dimension(:), intent(in) :: L0downBound_inLx
+
+    ! col start at finer L0 scale
+    integer(i4), dimension(:), intent(in) :: L0leftBound_inLx
+
+    ! col end   at finer L0 scale
+    integer(i4), dimension(:), intent(in) :: L0rightBound_inLx
+
+    ! total number of valid L0 cells in a given Lx cell
+    integer(i4), dimension(:), intent(in) :: nTCells0_inLx
+
+    real(dp), dimension(size(L0upBound_inLx, 1)) :: frac_cover_Lx
+
+    integer(i4) :: kk, iu, id, jl, jr, nT
+
+    integer(i4) :: nrows0, ncols0
+
+    integer(i8), dimension(:, :), allocatable :: dummy_Matrix
+
+    integer(i8), dimension(:, :), allocatable :: nodata_val
+
+    integer(i4) :: nCells1
+
+
+    ! estimate number of cells
+    nCells1 = size(L0upBound_inLx, 1)
+
+    ! get nrows and ncols
+    nrows0 = size(mask0, 1)
+    ncols0 = size(mask0, 2)
+
+    !unpack input data from 1D to 2D
+    allocate(dummy_Matrix(nrows0, ncols0))
+    allocate(nodata_val(nrows0, ncols0))
+    nodata_val(:, :) = nodata_i8
+    dummy_Matrix(:, :) = unpack(dataIn0(:), mask0(:, :), nodata_val(:, :))
+
+    ! initalize return variable
+    frac_cover_Lx(:) = 0.0_dp
+
+    ! start calculation
+    do kk = 1, nCells1
+      iu = L0upBound_inLx(kk)
+      id = L0downBound_inLx(kk)
+      jl = L0leftBound_inLx(kk)
+      jr = L0rightBound_inLx(kk)
+      nT = nTCells0_inLx(kk)
+
+      frac_cover_Lx(kk) = real(count(dummy_Matrix(iu : id, jl : jr) == classId), dp) / real(nT, dp)
+
+    end do
+
+    ! free space
+    deallocate(dummy_Matrix, nodata_val)
+
+  end function L0_fractionalCover_in_Lx_i8
 
   ! ----------------------------------------------------------------------------
 
