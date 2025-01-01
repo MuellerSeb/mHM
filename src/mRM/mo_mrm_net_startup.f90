@@ -1392,23 +1392,28 @@ contains
         tId = iD0(nLinkToRow(ii), nLinkToCol(ii))
 
         do while (.NOT. (fId == tId))
+
           ! Search flood plain from point(frow,fcol) upwards, keep co-ordinates in STACK
-          do while (ns > 0)
-            if (ns + 8 .gt. size(stack, 1)) then
-              call append(stack, append_chunk)
-            end if
-            call moveUp(elev0, fDir0, frow, fcol, stack, ns)
-            stack(1, 1) = 0
-            stack(1, 2) = 0
-            ! stack = cshift(stack, SHIFT = 1, DIM = 1)
-            ! substitute cshift <<<
-            dummy_1d = stack(1, :)
-            stack(: size(stack, dim = 1) - 1, :) = stack(2 :, :)
-            stack(size(stack, dim = 1), :) = dummy_1d
-            ! substitute cshift >>>
-            if (stack(1, 1) > 0 .and. stack(1, 2) > 0) floodPlain0(stack(1, 1), stack(1, 2)) = ii
-            ns = count(stack > 0) / 2
-          end do
+
+          ! flood plain calculation is expensive and only required for processCase = 1
+          if (processMatrix(8,1) == 1) then
+            do while (ns > 0)
+              if (ns + 8 .gt. size(stack, 1)) then
+                call append(stack, append_chunk)
+              end if
+              call moveUp(elev0, fDir0, frow, fcol, stack, ns)
+              stack(1, 1) = 0
+              stack(1, 2) = 0
+              ! stack = cshift(stack, SHIFT = 1, DIM = 1)
+              ! substitute cshift <<<
+              dummy_1d = stack(1, :)
+              stack(: size(stack, dim = 1) - 1, :) = stack(2 :, :)
+              stack(size(stack, dim = 1), :) = dummy_1d
+              ! substitute cshift >>>
+              if (stack(1, 1) > 0 .and. stack(1, 2) > 0) floodPlain0(stack(1, 1), stack(1, 2)) = ii
+              ns = count(stack > 0) / 2
+            end do
+          end if
 
           ! move downstream
           call moveDownOneCell(fDir0(frow, fcol), frow, fcol)
