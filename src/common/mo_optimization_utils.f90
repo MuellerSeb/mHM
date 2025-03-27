@@ -6,6 +6,7 @@ module mo_optimization_utils
 
   use mo_kind, only : dp
   use mo_optimizee, only: optimizee
+    use mo_message, only : error_message
 
   implicit none
 
