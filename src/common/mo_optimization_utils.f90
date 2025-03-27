@@ -2,6 +2,8 @@
 !> \copydoc mo_optimization_utils
 
 !> \brief Utility functions, such as interface definitions, for optimization routines.
+!> \copyright Copyright 2005-\today, the mHM Developers, Luis Samaniego, Sabine Attinger: All rights reserved.
+!! mHM is released under the LGPLv3+ license \license_note
 module mo_optimization_utils
 
   use mo_kind, only : dp

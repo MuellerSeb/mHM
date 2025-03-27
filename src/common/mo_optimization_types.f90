@@ -4,6 +4,8 @@
 !> \brief Type definitions for optimization routines
 !> \author Maren Kaluza
 !> \date Nov 2019
+!> \copyright Copyright 2005-\today, the mHM Developers, Luis Samaniego, Sabine Attinger: All rights reserved.
+!! mHM is released under the LGPLv3+ license \license_note
 MODULE mo_optimization_types
   use mo_kind, only : i4, dp
 
