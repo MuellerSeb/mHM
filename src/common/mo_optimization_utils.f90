@@ -5,6 +5,7 @@
 module mo_optimization_utils
 
   use mo_kind, only : dp
+  use mo_optimizee, only: optimizee
 
   implicit none
 
@@ -38,5 +39,37 @@ module mo_optimization_utils
       real(dp) :: objective_interface
     end function objective_interface
   end interface
+
+  !> \brief Optimizee for a eval-objective pair
+  type, extends(optimizee) :: mhm_optimizee
+    procedure(eval_interface), pointer, nopass :: eval_pointer => null()  !< Pointer to the eval
+    procedure(objective_interface), pointer, nopass :: obj_pointer => null()  !< Pointer to the objective
+  contains
+    procedure :: evaluate => evaluate_obj_eval
+  end type mhm_optimizee
+
+  contains
+
+  !> \brief Implementation of the evaluate procedure for a eval-objective pair
+  function evaluate_obj_eval(self, parameters, sigma, stddev_new, likeli_new) result(value)
+    class(mhm_optimizee), intent(inout) :: self
+    real(DP), dimension(:), intent(in) :: parameters
+    real(DP), intent(in),  optional :: sigma
+    real(DP), intent(out), optional :: stddev_new
+    real(DP), intent(out), optional :: likeli_new
+    real(DP) :: value
+
+    ! Ensure the eval function pointer is set
+    if (.not. associated(self%eval_pointer)) then
+      call error_message("Eval function pointer is not set in mhm_optimizee!")
+    end if
+    ! Ensure the objective function pointer is set
+    if (.not. associated(self%obj_pointer)) then
+      call error_message("Objective function pointer is not set in mhm_optimizee!")
+    end if
+
+    ! Call the objective function pointer
+    value = self%obj_pointer(parameters, self%eval_pointer, sigma, stddev_new, likeli_new)
+  end function evaluate_obj_eval
 
 end module mo_optimization_utils
