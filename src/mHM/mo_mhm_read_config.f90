@@ -145,52 +145,6 @@ CONTAINS
     allocate(BFI_obs(domainMeta%nDomains))
 
     !===============================================================
-    !  Read namelist for mainpaths
-    !===============================================================
-    call nml_directories_mHM%read(file_namelist, unamelist)
-    inputFormat_meteo_forcings = nml_directories_mHM%inputFormat_meteo_forcings
-    dir_Precipitation = nml_directories_mHM%dir_Precipitation
-    dir_Temperature = nml_directories_mHM%dir_Temperature
-    dir_ReferenceET = nml_directories_mHM%dir_ReferenceET
-    dir_MinTemperature = nml_directories_mHM%dir_MinTemperature
-    dir_MaxTemperature = nml_directories_mHM%dir_MaxTemperature
-    dir_absVapPressure = nml_directories_mHM%dir_absVapPressure
-    dir_windspeed = nml_directories_mHM%dir_windspeed
-    dir_NetRadiation = nml_directories_mHM%dir_NetRadiation
-    dir_Radiation = nml_directories_mHM%dir_Radiation
-    time_step_model_inputs = nml_directories_mHM%time_step_model_inputs
-
-    do iDomain = 1, domainMeta%nDomains
-      domainID = domainMeta%indices(iDomain)
-
-      dirPrecipitation(iDomain) = dir_Precipitation(domainID)
-      dirTemperature(iDomain) = dir_Temperature(domainID)
-      dirReferenceET(iDomain) = dir_ReferenceET(domainID)
-      dirMinTemperature(iDomain) = dir_MinTemperature(domainID)
-      dirMaxTemperature(iDomain) = dir_MaxTemperature(domainID)
-      dirNetRadiation(iDomain) = dir_NetRadiation(domainID)
-      dirwindspeed(iDomain) = dir_windspeed(domainID)
-      dirabsVapPressure(iDomain) = dir_absVapPressure(domainID)
-      timestep_model_inputs(iDomain) = time_step_model_inputs(domainID)
-      ! riv-temp related
-      dirRadiation(iDomain) = dir_Radiation(domainID)
-    end do
-
-    ! consistency check for timestep_model_inputs
-    if (any(timestep_model_inputs .ne. 0) .and. &
-            .not. all(timestep_model_inputs .ne. 0)) then
-      call message()
-      call message('***ERROR: timestep_model_inputs either have to be all zero or all non-zero')
-      stop
-    end if
-    ! check for optimzation and timestep_model_inputs options
-    if (optimize .and. (any(timestep_model_inputs .ne. 0))) then
-      call message()
-      call message('***ERROR: optimize and chunk read is switched on! (set timestep_model_inputs to zero)')
-      stop
-    end if
-
-    !===============================================================
     !  Read namelist of optional input data
     !===============================================================
     ! read optional optional data if necessary
@@ -277,23 +231,6 @@ CONTAINS
     ! Evap. coef. for free-water surfaces
     call nml_panEvapo%read(file_namelist, unamelist)
     evap_coeff = nml_panEvapo%evap_coeff
-    ! namelist for night-day ratio of precipitation, referenceET and temperature
-    call nml_nightDayRatio%read(file_namelist, unamelist)
-    read_meteo_weights = nml_nightDayRatio%read_meteo_weights
-    fnight_prec = nml_nightDayRatio%fnight_prec
-    fnight_pet = nml_nightDayRatio%fnight_pet
-    fnight_temp = nml_nightDayRatio%fnight_temp
-    fnight_ssrd = nml_nightDayRatio%fnight_ssrd
-    fnight_strd = nml_nightDayRatio%fnight_strd
-    !
-    fday_prec = 1.0_dp - fnight_prec
-    fday_pet = 1.0_dp - fnight_pet
-    fday_temp = -1.0_dp * fnight_temp
-    fday_ssrd = 1.0_dp - fnight_ssrd
-    fday_strd = 1.0_dp - fnight_strd
-
-    ! TODO-RIV-TEMP:
-    ! - add short- and long-wave raidiation weights (nc files)
 
     call common_check_resolution(.true., .false.)
 

@@ -12,11 +12,13 @@ module mo_namelists
   use mo_constants, only : YearMonths
   use mo_mhm_constants, only : nOutFlxState
   use mo_common_constants, only : maxNLcovers, maxNoDomains, nColPars, nodata_dp, nodata_i4
-  use mo_common_variables, only : nProcesses, period
+  use mo_common_variables, only : nProcesses
+  use mo_common_types, only : period
   use mo_common_mHM_mRM_variables, only : nerror_model
   use mo_mpr_constants, only : maxGeoUnit, maxNoSoilHorizons
   use mo_mrm_constants, only : maxNoGauges, mrm_nOutFlxState => nOutFlxState
   use mo_string_utils, only : num2str
+  use mo_sentinel, only : set_sentinel
 
   implicit none
 
@@ -173,6 +175,7 @@ module mo_namelists
     logical :: read_restart !< flag for reading restart output
     logical :: mrm_read_river_network !< flag to read the river network for mRM (read_restart = .True. forces .True.)
     logical :: read_old_style_restart_bounds !< flag to use an old-style restart file created by mhm<=v5.11
+    logical :: restart_reset_fluxes_states !< flag to reset fluxes and states read from restart to default values
     character(256), dimension(maxNoDomains) :: mhm_file_RestartIn !< mhm restart file paths
     character(256), dimension(maxNoDomains) :: mrm_file_RestartIn !< mrm restart file paths
   contains
@@ -252,7 +255,10 @@ module mo_namelists
   type, public :: nml_directories_mhm_t
     character(15) :: name = "directories_mhm" !< namelist name
     logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
+    !> .FALSE. to only warn about bound (lower, upper) violations in meteo files, default = .TRUE. - raise an error
+    logical :: bound_error = .true.
     character(256), public :: inputFormat_meteo_forcings !< format of meteo input data (nc)
+    character(256), dimension(maxNoDomains) :: dir_meteo_header !< Directory where the meteo header file is located
     character(256), dimension(maxNoDomains) :: dir_Precipitation !< Directory where precipitation files are located
     character(256), dimension(maxNoDomains) :: dir_Temperature !< Directory where temperature files are located
     character(256), dimension(maxNoDomains) :: dir_ReferenceET !< Directory where reference-ET files are located
@@ -1392,6 +1398,7 @@ contains
     logical :: read_restart !< flag for reading restart output
     logical :: mrm_read_river_network !< flag to read the river network for mRM (read_restart = .True. forces .True.)
     logical :: read_old_style_restart_bounds !< flag to use an old-style restart file created by mhm<=v5.11
+    logical :: restart_reset_fluxes_states !< flag to reset fluxes and states read from restart to default values
     character(256), dimension(maxNoDomains) :: mhm_file_RestartIn !< mhm restart file paths
     character(256), dimension(maxNoDomains) :: mrm_file_RestartIn !< mrm restart file paths
 
@@ -1405,6 +1412,7 @@ contains
       read_restart, &
       mrm_read_river_network, &
       read_old_style_restart_bounds, &
+      restart_reset_fluxes_states, &
       mhm_file_RestartIn, &
       mrm_file_RestartIn
 
@@ -1412,6 +1420,7 @@ contains
       ! set default values for optional arguments
       mrm_read_river_network = .false.
       read_old_style_restart_bounds = .false.
+      restart_reset_fluxes_states = .false.
       call open_nml(file, unit, quiet=.true.)
       call position_nml(self%name, unit)
       read(unit, nml=mainconfig_mhm_mrm)
@@ -1425,6 +1434,7 @@ contains
       self%read_restart = read_restart
       self%mrm_read_river_network = mrm_read_river_network
       self%read_old_style_restart_bounds = read_old_style_restart_bounds
+      self%restart_reset_fluxes_states = restart_reset_fluxes_states
       self%mhm_file_RestartIn = mhm_file_RestartIn
       self%mrm_file_RestartIn = mrm_file_RestartIn
       self%read_from_file = .false.
@@ -1510,6 +1520,9 @@ contains
     integer, intent(in) :: unit !< file unit to open the given file
 
     character(256) :: inputFormat_meteo_forcings !< format of meteo input data (nc)
+    !> .FALSE. to only warn about bound (lower, upper) violations in meteo files, default = .TRUE. - raise an error
+    logical :: bound_error
+    character(256), dimension(maxNoDomains) :: dir_meteo_header !< Directory where the meteo header file is located
     character(256), dimension(maxNoDomains) :: dir_Precipitation !< Directory where precipitation files are located
     character(256), dimension(maxNoDomains) :: dir_Temperature !< Directory where temperature files are located
     character(256), dimension(maxNoDomains) :: dir_ReferenceET !< Directory where reference-ET files are located
@@ -1523,6 +1536,8 @@ contains
 
     namelist /directories_mhm/ &
       inputFormat_meteo_forcings, &
+      bound_error, &
+      dir_meteo_header, &
       dir_Precipitation, &
       dir_Temperature, &
       dir_ReferenceET, &
@@ -1535,11 +1550,16 @@ contains
       time_step_model_inputs
 
     if ( self%read_from_file ) then
+      call set_sentinel(dir_meteo_header) ! set sentinal to check reading
+      inputFormat_meteo_forcings = "nc"
+      bound_error = .TRUE.
       call open_nml(file, unit, quiet=.true.)
       call position_nml(self%name, unit)
       read(unit, nml=directories_mhm)
       call close_nml(unit)
       self%inputFormat_meteo_forcings = inputFormat_meteo_forcings
+      self%bound_error = bound_error
+      self%dir_meteo_header = dir_meteo_header
       self%dir_Precipitation = dir_Precipitation
       self%dir_Temperature = dir_Temperature
       self%dir_ReferenceET = dir_ReferenceET

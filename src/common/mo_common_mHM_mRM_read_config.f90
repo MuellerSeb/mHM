@@ -83,6 +83,7 @@ CONTAINS
     read_restart = nml_mainconfig_mhm_mrm%read_restart
     mrm_read_river_network = nml_mainconfig_mhm_mrm%mrm_read_river_network
     read_old_style_restart_bounds = nml_mainconfig_mhm_mrm%read_old_style_restart_bounds
+    restart_reset_fluxes_states = nml_mainconfig_mhm_mrm%restart_reset_fluxes_states
     mhm_file_RestartIn = nml_mainconfig_mhm_mrm%mhm_file_RestartIn
     mrm_file_RestartIn = nml_mainconfig_mhm_mrm%mrm_file_RestartIn
     ! consistency between read_restart and mrm_read_river_network
