@@ -1,23 +1,32 @@
-!>       \file mo_mrm_global_variables.f90
+!> \dir mRM
+!> \brief \copybrief f_mrm
+!> \details \copydetails f_mrm
 
-!>       \brief Global variables for mRM only
-!>       \details
+!> \defgroup   f_mrm mRM - Fortran modules
+!> \brief      Core modules of mRM.
+!> \details    These modules provide the core components of mRM.
 
-!>       \details TODO: add description
+!> \file mo_mrm_global_variables.f90
+!> \brief \copybrief mo_mrm_global_variables
+!> \details \copydetails mo_mrm_global_variables
 
-!>       \authors Luis Samaniego, Stephan Thober
-
-!>       \date Aug 2015
-
-! Modifications:
-! Robert Schweppe Dec 2017 - merged duplicated variables with mhm into common variables
-! Robert Schweppe Jun 2018 - refactoring and reformatting
-
+!> \brief Global variables for mRM only
+!> \details Global variables used to run mRM for mHM.
+!> \changelog
+!! - Robert Schweppe Dec 2017
+!!   - merged duplicated variables with mhm into common variables
+!! - Robert Schweppe Jun 2018
+!!   - refactoring and reformatting
+!> \authors Luis Samaniego, Stephan Thober
+!> \date Aug 2015
+!> \copyright Copyright 2005-\today, the mHM Developers, Luis Samaniego, Sabine Attinger: All rights reserved.
+!! mHM is released under the LGPLv3+ license \license_note
+!> \ingroup f_mrm
 module mo_mrm_global_variables
 
   use mo_kind, only : i4, i8, dp
   use mo_mrm_constants, only : nOutFlxState
-  use mo_common_variables, only : Grid, GridRemapper
+  use mo_common_types, only : Grid, GridRemapper
   use mo_mrm_riv_temp_class, only : riv_temp_type
 
   implicit none
@@ -33,10 +42,11 @@ module mo_mrm_global_variables
   ! DEFINE OUTPUTS
   ! -------------------------------------------------------------------
   !
-  integer(i4) :: output_deflate_level_mrm
-  logical :: output_double_precision_mrm
-  integer(i4) :: timeStep_model_outputs_mrm ! timestep for writing model outputs
-  logical, dimension(nOutFlxState) :: outputFlxState_mrm         ! Define model outputs see "mhm_outputs.nml"
+  integer(i4) :: output_deflate_level_mrm !< compression of output nc files
+  integer(i4) :: output_time_reference_mrm !< time reference point location in output nc files
+  logical :: output_double_precision_mrm !< float precision in output nc files
+  integer(i4) :: timeStep_model_outputs_mrm !< timestep for writing model outputs
+  logical, dimension(nOutFlxState) :: outputFlxState_mrm         !< Define model outputs see "mhm_outputs.nml"
   !                                                            dim1 = number of output variables to be written
   logical :: readLatLon
 
@@ -61,7 +71,6 @@ module mo_mrm_global_variables
   ! -------------------------------------------------------------------
   type(Grid), dimension(:), allocatable, target, public :: level11 ! Reference of the routing variables
   type(GridRemapper), dimension(:), allocatable, public :: l0_l11_remap ! grid information at runoff level
-  type(GridRemapper), dimension(:), allocatable, public :: l1_l11_remap ! grid information at runoff level
 
 
   ! -----------------------------------------------------------------

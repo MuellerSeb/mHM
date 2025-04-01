@@ -1,20 +1,20 @@
-!>       \file mo_read_wrapper.f90
+!> \file mo_read_wrapper.f90
+!> \brief \copybrief mo_read_wrapper
+!> \details \copydetails mo_read_wrapper
 
-!>       \brief Wrapper for all reading routines.
-
-!>       \details This module is to wrap up all reading routines.
-!>       The general written reading routines are used to store now the read data into global variables.
-
-!>       \authors Juliane Mai, Matthias Zink
-
-!>       \date Jan 2013
-
-! Modifications:
-
+!> \brief Wrapper for all reading routines.
+!> \details This module is to wrap up all reading routines.
+!! The general written reading routines are used to store now the read data into global variables.
+!> \authors Juliane Mai, Matthias Zink
+!> \date Jan 2013
+!> \copyright Copyright 2005-\today, the mHM Developers, Luis Samaniego, Sabine Attinger: All rights reserved.
+!! mHM is released under the LGPLv3+ license \license_note
+!> \ingroup f_mpr
 MODULE mo_read_wrapper
 
   USE mo_kind, ONLY : i4, dp
   use mo_common_constants, only : nodata_dp, nodata_i4
+  use mo_message, only: message, error_message
 
   IMPLICIT NONE
 
@@ -66,9 +66,9 @@ CONTAINS
     use mo_append, only : append, paste
     use mo_constants, only : YearMonths
     use mo_common_read_data, only : read_dem, read_lcover
-    use mo_common_variables, only : Grid, dirCommonFiles, dirMorpho, &
-                                    global_parameters, level0, domainMeta, period, processMatrix
-    use mo_message, only : message
+    use mo_common_types, only: period, Grid
+    use mo_common_variables, only : dirCommonFiles, dirMorpho, &
+                                    global_parameters, level0, domainMeta, processMatrix
     use mo_mpr_file, only : file_aspect, file_geolut, file_hydrogeoclass, &
                             file_laiclass, file_lailut, file_slope, file_soil_database, file_soil_database_1, &
                             file_soilclass, uaspect, ugeolut, uhydrogeoclass, ulaiclass, ulailut, uslope, usoilclass
@@ -367,7 +367,6 @@ CONTAINS
 
   subroutine check_consistency_lut_map(data, lookuptable, filename, unique_values)
 
-    use mo_message, only : message, error_message
     use mo_orderpack, only : unista
     use mo_string_utils, only : num2str
 
@@ -406,10 +405,8 @@ CONTAINS
         ' which indicates a masking problem!' &
       )
       if (.not. ANY(lookuptable .EQ. temp(ielement))) then
-        call message()
-        call message('***ERROR: Class ', trim(adjustl(num2str(temp(ielement)))), ' is missing')
-        call message('          in input file ', trim(adjustl(filename)), ' ...')
-        stop
+        call error_message('***ERROR: Class ', trim(adjustl(num2str(temp(ielement)))), ' is missing', raise=.false.)
+        call error_message('          in input file ', trim(adjustl(filename)), ' ...')
       end if
     end do
 

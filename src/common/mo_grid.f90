@@ -1,15 +1,14 @@
-!>       \file mo_grid.f90
+!> \file mo_grid.f90
+!> \brief \copybrief mo_grid
+!> \details \copydetails mo_grid
 
-!>       \brief TODO: add description
-
-!>       \details TODO: add description
-
-!>       \authors Robert Schweppe
-
-!>       \date Jun 2018
-
-! Modifications:
-
+!> \brief gridding tools
+!> \details Common tools to deal with grids in mHM.
+!> \authors Robert Schweppe
+!> \date Jun 2018
+!> \copyright Copyright 2005-\today, the mHM Developers, Luis Samaniego, Sabine Attinger: All rights reserved.
+!! mHM is released under the LGPLv3+ license \license_note
+!> \ingroup f_common
 module mo_grid
   use mo_kind, only : dp, i4
 
@@ -59,7 +58,7 @@ contains
   subroutine init_lowres_level(highres, target_resolution, lowres, highres_lowres_remap)
 
     use mo_common_constants, only : nodata_dp, nodata_i4
-    use mo_common_variables, only : Grid, GridRemapper
+    use mo_common_types, only : Grid, GridRemapper
 
     implicit none
 
@@ -204,7 +203,7 @@ contains
 
   subroutine set_domain_indices(grids, indices)
 
-    use mo_common_variables, only : Grid
+    use mo_common_types, only: Grid
 
     implicit none
 
@@ -267,7 +266,8 @@ contains
 
   subroutine L0_grid_setup(new_grid)
 
-    use mo_common_variables, only : Grid, iFlag_cordinate_sys
+    use mo_common_types, only: Grid
+    use mo_common_variables, only : iFlag_cordinate_sys
     use mo_constants, only : RadiusEarth_dp, TWOPI_dp
 
     implicit none
@@ -369,7 +369,7 @@ contains
 
   subroutine mapCoordinates(level, y, x)
 
-    use mo_common_variables, only : Grid
+    use mo_common_types, only: Grid
 
     implicit none
 
@@ -432,7 +432,7 @@ contains
 
   subroutine geoCoordinates(level, lat, lon)
 
-    use mo_common_variables, only : Grid
+    use mo_common_types, only: Grid
 
     implicit none
 
@@ -489,7 +489,7 @@ contains
   subroutine calculate_grid_properties(nrowsIn, ncolsIn, xllcornerIn, yllcornerIn, cellsizeIn, aimingResolution, &
                                       nrowsOut, ncolsOut, xllcornerOut, yllcornerOut, cellsizeOut)
 
-    use mo_message, only : message
+    use mo_message, only : error_message
     use mo_string_utils, only : num2str
 
     implicit none
@@ -535,15 +535,14 @@ contains
     rounded = anint(cellFactor)
     rounded_int = nint(cellFactor)
 
-    if (abs(rounded - cellFactor) > 1.e-9_dp) then
-      call message()
-      call message('***ERROR: Two resolutions size do not confirm: ', &
-              trim(adjustl(num2str(nint(AimingResolution)))), &
-              trim(adjustl(num2str(nint(cellsizeIn)))))
-      stop 1
+    if (abs(rounded - cellFactor) > 1.e-7_dp) then
+      call error_message( &
+        '***ERROR: Two resolutions size do not confirm: ', &
+        trim(adjustl(num2str(nint(AimingResolution)))), &
+        trim(adjustl(num2str(nint(cellsizeIn)))))
     end if
 
-    cellsizeOut = cellsizeIn * rounded
+    cellsizeOut = aimingResolution
     ncolsOut = nint(real(ncolsIn, dp) / cellFactor)
     nrowsOut = nint(real(nrowsIn, dp) / cellFactor)
 
@@ -551,10 +550,9 @@ contains
     if ( ncolsOut * rounded_int < ncolsIn ) ncolsOut = ncolsOut + 1_i4
     if ( nrowsOut * rounded_int < nrowsIn ) nrowsOut = nrowsOut + 1_i4
 
-    xllcornerOut = xllcornerIn + real(ncolsIn, dp) * cellsizeIn - real(ncolsOut, dp) * cellsizeOut
-    yllcornerOut = yllcornerIn + real(nrowsIn, dp) * cellsizeIn - real(nrowsOut, dp) * cellsizeOut
+    xllcornerOut = xllcornerIn + real(ncolsIn, dp) * aimingResolution / rounded - real(ncolsOut, dp) * cellsizeOut
+    yllcornerOut = yllcornerIn + real(nrowsIn, dp) * aimingResolution / rounded - real(nrowsOut, dp) * cellsizeOut
 
   end subroutine calculate_grid_properties
 
 end module mo_grid
-

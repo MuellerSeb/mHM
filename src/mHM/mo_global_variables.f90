@@ -1,116 +1,103 @@
-!>       \file mo_global_variables.f90
+!> \dir src
+!> \brief Source code of mHM.
+!> \details All Fortran source files for mHM, mRM and MPR.
 
-!>       \brief Global variables ONLY used in reading, writing and startup.
+!> \dir mHM
+!> \brief \copybrief f_mhm
+!> \details \copydetails f_mhm
 
-!>       \details TODO: add description
+!> \defgroup   f_mhm mHM - Fortran modules
+!> \brief      Core modules of mHM.
+!> \details    These modules provide the core components of mHM.
 
-!>       \authors Luis Samaniego
+!> \file mo_global_variables.f90
+!> \brief \copybrief mo_global_variables
+!> \details \copydetails mo_global_variables
 
-!>       \date Dec 2012
-
-! Modifications:
-! Robert Schweppe Jun 2018 - refactoring and reformatting
-
-
+!> \brief Main global variables for mHM.
+!> \details Global variables ONLY used in reading, writing and startup.
+!> \changelog
+!! - Robert Schweppe Jun 2018
+!!   - refactoring and reformatting
+!! - Luis Samaniego,     Feb 2013
+!!   - new variable names, new modules, units
+!! - Rohini Kumar,       Jul 2013
+!!   - fraction of perfectly sealed area within city added
+!! - Rohini Kumar,       Aug 2013
+!!   - name changed "inputFormat" to "inputFormat_meteo_forcings"
+!! - Rohini Kumar,       Aug 2013
+!!   - name changed from "L0_LAI" to "L0_LCover_LAI"
+!! - Rohini Kumar,       Aug 2013
+!!   - added dirSoil_LUT and dirGeology_LUT
+!! - Luis Samaniego,     Nov 2013
+!!   - documentation of dimensions
+!! - Matthias Zink,      Nov 2013
+!!   - added "InflowGauge" and inflow gauge variabels in Domain
+!! - Rohini Kumar,       May 2014
+!!   - added options for the model run cordinate system
+!! - Stephan Thober,     Jun 2014
+!!   - added timeStep_model_inputs and readPer
+!! - Stephan Thober,     Jun 2014
+!!   - added perform_mpr, updated restart flags
+!! - Cuntz M. & Mai J.,  Nov 2014
+!!   - LAI input from daily, monthly or yearly files
+!! - Matthias Zink,      Dec 2014
+!!   - adopted inflow gauges to ignore headwater cells
+!! - Matthias Zink,      Mar 2015
+!!   - added optional soil mositure readin: dirSoil_moisture, L1_sm
+!! - Stephan Thober,     Aug 2015
+!!   - moved routing related variables to mRM
+!! - Oldrich Rakovec,    Oct 2015
+!!   - added definition of Domain averaged TWS data
+!! - Rohini Kumar,       Mar 2016
+!!   - new variables for handling different soil databases
+!! - Johann Brenner,     Feb 2017
+!!   - added optional evapotranspiration readin: dirEvapotranspiration, L1_et
+!! - Zink M. Demirel C., Mar 2017
+!!   - added Jarvis soil water stress variable for SM process(3)
+!! - Demirel M.C.        May 2017
+!!   - added L1_petLAIcorFactor for PET correction
+!! - O. Rakovec, R.Kumar Nov 2017
+!!   - added project description for the netcdf outputs
+!! - Robert Schweppe,    Dec 2017
+!!   - expanded dimensions of effective parameters
+!! - Robert Schweppe,    Dec 2017
+!!   - merged duplicated variables with mrm into common variables
+!> \authors Luis Samaniego
+!> \date Dec 2012
+!> \copyright Copyright 2005-\today, the mHM Developers, Luis Samaniego, Sabine Attinger: All rights reserved.
+!! mHM is released under the LGPLv3+ license \license_note
+!> \ingroup f_mhm
 MODULE mo_global_variables
-
-  ! This module provides
-
-  !
-  ! Written   Luis Samaniego,     Dec 2005
-  ! Modified  Luis Samaniego,     Feb 2013 - new variable names, new modules, units
-  !           Rohini Kumar,       Jul 2013 - fraction of perfectly sealed area within city added
-  !           Rohini Kumar,       Aug 2013 - name changed "inputFormat" to "inputFormat_meteo_forcings"
-  !           Rohini Kumar,       Aug 2013 - name changed from "L0_LAI" to "L0_LCover_LAI"
-  !           Rohini Kumar,       Aug 2013 - added dirSoil_LUT and dirGeology_LUT
-  !           Luis Samaniego,     Nov 2013 - documentation of dimensions
-  !           Matthias Zink,      Nov 2013 - added "InflowGauge" and inflow gauge variabels in Domain
-  !           Rohini Kumar,       May 2014 - added options for the model run cordinate system
-  !           Stephan Thober,     Jun 2014 - added timeStep_model_inputs and readPer
-  !           Stephan Thober,     Jun 2014 - added perform_mpr, updated restart flags
-  !           Cuntz M. & Mai J.,  Nov 2014 - LAI input from daily, monthly or yearly files
-  !           Matthias Zink,      Dec 2014 - adopted inflow gauges to ignore headwater cells
-  !           Matthias Zink,      Mar 2015 - added optional soil mositure readin: dirSoil_moisture, L1_sm
-  !           Stephan Thober,     Aug 2015 - moved routing related variables to mRM
-  !           Oldrich Rakovec,    Oct 2015 - added definition of Domain averaged TWS data
-  !           Rohini Kumar,       Mar 2016 - new variables for handling different soil databases
-  !           Johann Brenner,     Feb 2017 - added optional evapotranspiration readin: dirEvapotranspiration, L1_et
-  !           Zink M. Demirel C., Mar 2017 - added Jarvis soil water stress variable for SM process(3)
-  !           Demirel M.C.        May 2017 - added L1_petLAIcorFactor for PET correction
-  !           O. Rakovec, R.Kumar Nov 2017 - added project description for the netcdf outputs
-  !           Robert Schweppe,    Dec 2017 - expanded dimensions of effective parameters
-  !           Robert Schweppe,    Dec 2017 - merged duplicated variables with mrm into common variables
 
   USE mo_kind, ONLY : i4, dp
   USE mo_constants, ONLY : YearMonths
   USE mo_mhm_constants, ONLY : nOutFlxState
   USE mo_optimization_types, ONLY : optidata
-  use mo_common_variables, only : Grid
+  use mo_meteo_handler, only : meteo_handler_type
+  use mo_coupling_type, only : couple_cfg_type
 
   IMPLICIT NONE
+
+  ! -------------------------------------------------------------------
+  ! COUPLING CONFIG
+  ! -------------------------------------------------------------------
+  type(couple_cfg_type), public :: couple_cfg !< coupling configuration class
+
+  ! -------------------------------------------------------------------
+  ! METEO HANDLER
+  ! -------------------------------------------------------------------
+  type(meteo_handler_type), public :: meteo_handler !< the meteo handler class
 
   ! -------------------------------------------------------------------
   ! DEFINE OUTPUTS
   ! -------------------------------------------------------------------
   integer(i4) :: output_deflate_level   !< deflate level in nc files
+  integer(i4) :: output_time_reference   !< time reference point location in output nc files
   logical :: output_double_precision    !< output precision in nc files
   integer(i4) :: timeStep_model_outputs !< timestep for writing model outputs
   logical, dimension(nOutFlxState) :: outputFlxState         !< Define model outputs see "mhm_outputs.nml"
                                                              !< dim1 = number of output variables to be written
-  ! -------------------------------------------------------------------
-  ! INPUT variables for configuration of mHM
-  ! -------------------------------------------------------------------
-  integer(i4), dimension(:), allocatable, public :: timeStep_model_inputs !< frequency for reading meteo input
-  logical, public :: read_meteo_weights                                   !< read weights for tavg and pet
-  character(256), public :: inputFormat_meteo_forcings                    !< format of meteo input data (nc)
-  ! Optional data
-  ! ------------------------------------------------------------------
-  ! DIRECTORIES
-  ! ------------------------------------------------------------------
-  ! has the dimension of nDomains
-  character(256), dimension(:), allocatable, public :: dirPrecipitation   !< Directory where precipitation files are located
-  character(256), dimension(:), allocatable, public :: dirTemperature     !< Directory where temperature files are located
-  character(256), dimension(:), allocatable, public :: dirMinTemperature  !< Directory where minimum temp. files are located
-  character(256), dimension(:), allocatable, public :: dirMaxTemperature  !< Directory where maximum temp. files are located
-  character(256), dimension(:), allocatable, public :: dirNetRadiation    !< Directory where abs. vap. pressure files are located
-  character(256), dimension(:), allocatable, public :: dirabsVapPressure  !< Directory where abs. vap. pressure files are located
-  character(256), dimension(:), allocatable, public :: dirwindspeed       !< Directory where windspeed files are located
-  character(256), dimension(:), allocatable, public :: dirReferenceET     !< Directory where reference-ET files are located
-  ! riv-temp releated
-  character(256), dimension(:), allocatable, public :: dirRadiation       !< Directory where short/long-wave rad. files are located
-
-  ! ------------------------------------------------------------------
-  ! CONSTANT
-  ! ------------------------------------------------------------------
-  integer(i4), public, parameter :: routingStates = 2  !< [-]   Routing states (2=current, 1=past)
-
-  ! -------------------------------------------------------------------
-  ! GRID description
-  ! -------------------------------------------------------------------
-  type(Grid), dimension(:), allocatable, public :: level2       !< Reference of the metereological variables
-
-  ! -------------------------------------------------------------------
-  ! L1 DOMAIN description
-  ! -------------------------------------------------------------------
-  ! Forcings
-  ! dim1 = number grid cells L1
-  ! dim2 = number of meteorological time steps
-  real(dp), public, dimension(:, :, :), allocatable :: L1_temp_weights  !< hourly temperature weights for daily values
-  real(dp), public, dimension(:, :, :), allocatable :: L1_pet_weights   !< hourly pet weights for daily values
-  real(dp), public, dimension(:, :, :), allocatable :: L1_pre_weights   !< hourly pre weights for daily values
-  real(dp), public, dimension(:, :), allocatable :: L1_pre           !< [mm]    Precipitation
-  real(dp), public, dimension(:, :), allocatable :: L1_temp          !< [degC]  Air temperature
-  real(dp), public, dimension(:, :), allocatable :: L1_pet           !< [mm TS-1] Potential evapotranspiration
-  real(dp), public, dimension(:, :), allocatable :: L1_tmin          !< [degC]  minimum daily air temperature
-  real(dp), public, dimension(:, :), allocatable :: L1_tmax          !< [degC]  maximum daily air temperature
-  real(dp), public, dimension(:, :), allocatable :: L1_netrad        !< [W m2]  net radiation
-  real(dp), public, dimension(:, :), allocatable :: L1_absvappress   !< [Pa]    absolute vapour pressure
-  real(dp), public, dimension(:, :), allocatable :: L1_windspeed     !< [m s-1] windspeed
-  ! riv-temp related
-  real(dp), public, dimension(:, :), allocatable :: L1_ssrd          !< [W m2]  short wave radiation
-  real(dp), public, dimension(:, :), allocatable :: L1_strd          !< [W m2]  long wave radiation
-  real(dp), public, dimension(:, :), allocatable :: L1_tann          !< [degC]  annual mean air temperature
-
 
   ! soil moisture
   real(dp), public, dimension(:, :), allocatable :: L1_sm                  !< [-] soil moisture input for optimization
@@ -148,13 +135,14 @@ MODULE mo_global_variables
   real(dp), public, dimension(:), allocatable :: L1_satSTW       !< [mm]  groundwater storage
   real(dp), public, dimension(:), allocatable :: L1_neutrons     !< [mm]  Ground Albedo Neutrons
 
-
   ! Fluxes
   ! dim1 = number grid cells L1
-  ! dim2 = number model soil horizons
+  ! disaggregated meteo forcings
   real(dp), public, dimension(:), allocatable :: L1_pet_calc     !< [mm TS-1] estimated/corrected potential evapotranspiration
   real(dp), public, dimension(:), allocatable :: L1_temp_calc    !< [degC] temperature for current time step
   real(dp), public, dimension(:), allocatable :: L1_prec_calc    !< [mm TS-1] precipitation for current time step
+  ! dim2 = number model soil horizons
+  ! states and fluxes
   real(dp), public, dimension(:, :), allocatable :: L1_aETSoil   !< [mm TS-1] Actual ET from soil layers
   real(dp), public, dimension(:), allocatable :: L1_aETCanopy    !< [mm TS-1] Real evaporation intensity from canopy
   real(dp), public, dimension(:), allocatable :: L1_aETSealed    !< [mm TS-1] Real evap. from free water surfaces
@@ -177,16 +165,6 @@ MODULE mo_global_variables
   ! -------------------------------------------------------------------
   ! dim1 = number of months in a year
   real(dp), public, dimension(int(YearMonths, i4)) :: evap_coeff     !< [-] Evap. coef. for free-water surfaces
-  real(dp), public, dimension(int(YearMonths, i4)) :: fday_prec      !< [-] Day ratio precipitation < 1
-  real(dp), public, dimension(int(YearMonths, i4)) :: fnight_prec    !< [-] Night ratio precipitation < 1
-  real(dp), public, dimension(int(YearMonths, i4)) :: fday_pet       !< [-] Day ratio PET  < 1
-  real(dp), public, dimension(int(YearMonths, i4)) :: fnight_pet     !< [-] Night ratio PET  < 1
-  real(dp), public, dimension(int(YearMonths, i4)) :: fday_temp      !< [-] Day factor mean temp
-  real(dp), public, dimension(int(YearMonths, i4)) :: fnight_temp    !< [-] Night factor mean temp
-  real(dp), public, dimension(int(YearMonths, i4)) :: fday_ssrd      !< [-] Day factor short-wave rad.
-  real(dp), public, dimension(int(YearMonths, i4)) :: fnight_ssrd    !< [-] Night factor short-wave rad.
-  real(dp), public, dimension(int(YearMonths, i4)) :: fday_strd      !< [-] Day factor long-wave rad.
-  real(dp), public, dimension(int(YearMonths, i4)) :: fnight_strd    !< [-] Night factor long-wave rad.
 
   ! -------------------------------------------------------------------
   ! AUXILIARY VARIABLES

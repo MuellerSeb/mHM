@@ -1,22 +1,16 @@
-!>       \file mo_mpr_startup.f90
+!> \file mo_mpr_startup.f90
+!> \brief \copybrief mo_mpr_startup
+!> \details \copydetails mo_mpr_startup
 
-!>       \brief Startup procedures for mHM.
-
-!>       \details This module initializes all variables required to run mHM. This
-!>       module needs to be run only one time at the beginning of a simulation if
-!>       re-starting files do not exist.
-
-!>       \authors Luis Samaniego, Rohini Kumar
-
-!>       \date Dec 2012
-
-! Modifications:
-
+!> \brief Startup procedures for mHM.
+!> \details This module initializes all variables required to run mHM. This
+!! module needs to be run only one time at the beginning of a simulation if re-starting files do not exist.
+!> \authors Luis Samaniego, Rohini Kumar
+!> \date Dec 2012
+!> \copyright Copyright 2005-\today, the mHM Developers, Luis Samaniego, Sabine Attinger: All rights reserved.
+!! mHM is released under the LGPLv3+ license \license_note
+!> \ingroup f_mpr
 MODULE mo_mpr_startup
-
-  ! This module provides the startup routines for mHM.
-
-  ! Written Luis Samaniego, Rohini Kumar, Dec 2012
 
   USE mo_kind, ONLY : i4, dp
   use mo_common_constants, only : nodata_i4, nodata_dp   ! global nodata values (i4, dp)
@@ -29,45 +23,44 @@ MODULE mo_mpr_startup
 
 CONTAINS
 
-  ! ------------------------------------------------------------------
-
-  !    NAME
-  !        mpr_initialize
-
-  !    PURPOSE
-  !>       \brief Initialize main mHM variables
-
-  !>       \details Initialize main mHM variables for a given domain.
-  !>       Calls the following procedures in this order:
-  !>       - Constant initialization.
-  !>       - Generate soil database.
-  !>       - Checking inconsistencies input fields.
-  !>       - Variable initialization at level-0.
-  !>       - Variable initialization at level-1.
-  !>       - Variable initialization at level-11.
-  !>       - Space allocation of remaining variable/parameters.
-  !>       Global variables will be used at this stage.
-
-  !    HISTORY
-  !>       \authors Luis Samaniego, Rohini Kumar
-
-  !>       \date Dec 2012
-
-  ! Modifications:
-  ! Luis Samaniego Mar 2008 - fully distributed multilayer
-  ! Rohini Kumar   Oct 2010 - matrix to vector version
-  !                         - openmp parallelization
-  !                         - routing level 11
-  ! Luis Samaniego Jul 2012 - removal of IMSL dependencies
-  ! Luis Samaniego Dec 2012 - modular version
-  ! Rohini Kumar   May 2013 - code cleaned and error checks
-  ! Rohini Kumar   Nov 2013 - updated documentation
-  ! Stephan Thober Jun 2014 - copied L2 initialization from mo_meteo_forcings
-  ! Stephan Thober Jun 2014 - updated flag for read_restart
-  ! Stephan Thober Aug 2015 - removed initialisation of routing
-  ! Rohini Kumar   Mar 2016 - changes for handling multiple soil database options
-  ! Robert Schweppe Jun 2018 - refactoring and reformatting
-
+  !> \brief Initialize main mHM variables
+  !> \details Initialize main mHM variables for a given domain.
+  !! Calls the following procedures in this order:
+  !! - Constant initialization.
+  !! - Generate soil database.
+  !! - Checking inconsistencies input fields.
+  !! - Variable initialization at level-0.
+  !! - Variable initialization at level-1.
+  !! - Variable initialization at level-11.
+  !! - Space allocation of remaining variable/parameters.
+  !! Global variables will be used at this stage.
+  !> \changelog
+  !! - Luis Samaniego Mar 2008
+  !!   - fully distributed multilayer
+  !! - Rohini Kumar   Oct 2010
+  !!   - matrix to vector version
+  !!   - openmp parallelization
+  !!   - routing level 11
+  !! - Luis Samaniego Jul 2012
+  !!   - removal of IMSL dependencies
+  !! - Luis Samaniego Dec 2012
+  !!   - modular version
+  !! - Rohini Kumar   May 2013
+  !!   - code cleaned and error checks
+  !! - Rohini Kumar   Nov 2013
+  !!   - updated documentation
+  !! - Stephan Thober Jun 2014
+  !!   - copied L2 initialization from mo_meteo_forcings
+  !! - Stephan Thober Jun 2014
+  !!   - updated flag for read_restart
+  !! - Stephan Thober Aug 2015
+  !!   - removed initialisation of routing
+  !! - Rohini Kumar   Mar 2016
+  !!   - changes for handling multiple soil database options
+  !! - Robert Schweppe Jun 2018
+  !!   - refactoring and reformatting
+  !> \authors Luis Samaniego, Rohini Kumar
+  !> \date Dec 2012
   subroutine mpr_initialize
 
     use mo_common_variables, only : l0_l1_remap, level0, level1, domainMeta, resolutionHydrology
@@ -115,36 +108,26 @@ CONTAINS
   end subroutine mpr_initialize
 
 
-  ! ------------------------------------------------------------------
-
-  !    NAME
-  !        L0_check_input
-
-  !    PURPOSE
-  !>       \brief Check for errors in L0 input data
-
-  !>       \details Check for possible errors in input data (morphological and land cover) at level-0
-
-  !    INTENT(IN)
-  !>       \param[in] "integer(i4) :: iDomain" domain id
-
-  !    HISTORY
-  !>       \authors Rohini Kumar
-
-  !>       \date Jan 2013
-
-  ! Modifications:
-  ! Rohini Kumar   Aug  2013 - added iFlag_LAI_data_format to handle LAI options, and changed within the code made accordingly
-  ! Rohini  Kumar  Sep 2013 - read input data for routing processes according & Stephan Thober,           to process_matrix flag
-  ! Stephan Thober Aug 2015 - moved check of L0 routing variables to mRM
-  ! Rohini Kumar   Mar 2016 - changes for handling multiple soil database options
-  ! Robert Schweppe Jun 2018 - refactoring and reformatting
-
+  !> \brief Check for errors in L0 input data
+  !> \details Check for possible errors in input data (morphological and land cover) at level-0
+  !> \changelog
+  !! - Rohini Kumar   Aug  2013
+  !!   - added iFlag_LAI_data_format to handle LAI options, and changed within the code made accordingly
+  !! - Rohini  Kumar  Sep 2013
+  !!   - read input data for routing processes according & Stephan Thober, to process_matrix flag
+  !! - Stephan Thober Aug 2015
+  !!   - moved check of L0 routing variables to mRM
+  !! - Rohini Kumar   Mar 2016
+  !!   - changes for handling multiple soil database options
+  !! - Robert Schweppe Jun 2018
+  !!   - refactoring and reformatting
+  !> \authors Rohini Kumar
+  !> \date Jan 2013
   subroutine L0_check_input(iDomain)
 
     use mo_common_constants, only : eps_dp
     use mo_common_variables, only : L0_LCover, L0_elev, level0, nLCoverScene
-    use mo_message, only : message
+    use mo_message, only : error_message
     use mo_mpr_global_variables, only : L0_asp, L0_geoUnit, L0_gridded_LAI, &
                                         L0_slope, L0_soilId, iFlag_soilDB, nSoilHorizons_mHM, timeStep_LAI_input
     use mo_string_utils, only : num2str
@@ -152,7 +135,7 @@ CONTAINS
 
     implicit none
 
-    ! domain id
+    !> domain id
     integer(i4), intent(in) :: iDomain
 
     integer(i4) :: k, n, nH
@@ -165,25 +148,22 @@ CONTAINS
       ! elevation [m]
       if (abs(L0_elev(k) - nodata_dp) .lt. eps_dp) then
         message_text = trim(num2str(k, '(I5)')) // ',' // trim(num2str(iDomain, '(I5)'))
-        call message(' Error: elevation has missing value within the valid masked area at cell in domain ', &
+        call error_message(' Error: elevation has missing value within the valid masked area at cell in domain ', &
                 trim(message_text))
-        stop
       end if
 
       ! slope [%]
       if (abs(L0_slope(k) - nodata_dp) .lt. eps_dp) then
         message_text = trim(num2str(k, '(I5)')) // ',' // trim(num2str(iDomain, '(I5)'))
-        call message(' Error: slope has missing value within the valid masked area at cell in domain ', &
+        call error_message(' Error: slope has missing value within the valid masked area at cell in domain ', &
                 trim(message_text))
-        stop
       end if
 
       ! aspect [degree]
       if (abs(L0_asp(k) - nodata_dp) .lt. eps_dp) then
         message_text = trim(num2str(k, '(I5)')) // ',' // trim(num2str(iDomain, '(I5)'))
-        call message(' Error: aspect has missing values within the valid masked area at cell in domain ', &
+        call error_message(' Error: aspect has missing values within the valid masked area at cell in domain ', &
                 trim(message_text))
-        stop
       end if
 
       ! soil-Id [-]
@@ -193,27 +173,24 @@ CONTAINS
       do n = 1, nH
         if (L0_soilId(k, n) .eq. nodata_i4) then
           message_text = trim(num2str(k, '(I5)')) // ',' // trim(num2str(iDomain, '(I5)')) // ',' // trim(num2str(n, '(I5)'))
-          call message(' Error: soil id has missing values within the valid masked area at cell in domain and horizon ', &
+          call error_message(' Error: soil id has missing values within the valid masked area at cell in domain and horizon ', &
                   trim(message_text))
-          stop
         end if
       end do
 
       ! geological-Id [-]
       if (L0_geoUnit(k) .eq. nodata_i4) then
         message_text = trim(num2str(k, '(I5)')) // ',' // trim(num2str(iDomain, '(I5)'))
-        call message(' Error: geological formation id has missing values within the valid masked area at cell in domain ', &
+        call error_message(' Error: geological formation id has missing values within the valid masked area at cell in domain ', &
                 trim(message_text))
-        stop
       end if
 
       ! landcover scenes
       do  n = 1, nLCoverScene
         if (L0_LCover(k, n) .eq. nodata_i4) then
           message_text = trim(num2str(k, '(I5)')) // ',' // trim(num2str(iDomain, '(I5)')) // ',' // trim(num2str(n, '(I5)'))
-          call message(' Error: land cover id has missing values within the valid masked area at cell in domain and scene ', &
+          call error_message(' Error: land cover id has missing values within the valid masked area at cell in domain and scene ', &
                   trim(message_text))
-          stop
         end if
       end do
 
@@ -221,9 +198,8 @@ CONTAINS
       if(timeStep_LAI_input .EQ. 0) then
         if (eq(L0_gridded_LAI(k, 1), nodata_dp)) then
           message_text = trim(num2str(k, '(G5.3)')) // ',' // trim(num2str(iDomain, '(I5)'))
-          call message(' Error: gridded LAI has missing values within the valid masked area at cell in domain ', &
+          call error_message(' Error: gridded LAI has missing values within the valid masked area at cell in domain ', &
                   trim(message_text))
-          stop
         end if
       end if
 
@@ -231,43 +207,33 @@ CONTAINS
 
   end subroutine L0_check_input
 
-  ! ------------------------------------------------------------------
 
-  !    NAME
-  !        L0_variable_init
-
-  !    PURPOSE
-  !>       \brief level 0 variable initialization
-
-  !>       \details following tasks are performed for L0 data sets
-  !>       -  cell id & numbering
-  !>       -  storage of cell cordinates (row and coloum id)
-  !>       -  empirical dist. of terrain slope
-  !>       -  flag to determine the presence of a particular soil id
-  !>       in this configuration of the model run
-  !>       If a variable is added or removed here, then it also has to
-  !>       be added or removed in the subroutine config_variables_set in
-  !>       module mo_restart and in the subroutine set_config in module
-  !>       mo_set_netcdf_restart
-
-  !    INTENT(IN)
-  !>       \param[in] "integer(i4) :: iDomain" domain id
-
-  !    HISTORY
-  !>       \authors Rohini Kumar
-
-  !>       \date Jan 2013
-
-  ! Modifications:
-  ! Rohini Kumar & Matthias Cuntz  May 2014 - cell area calulation based on a regular lat-lon grid or
-  !                                           on a regular X-Y coordinate system
-  ! Matthias Cuntz                 May 2014 - changed empirical distribution function so that doubles get the same value
-  ! Matthias Zink & Matthias Cuntz Feb 2016 - code speed up due to reformulation of CDF calculation
-  ! Rohini Kumar                   Mar 2016 - changes for handling multiple soil database options
-  ! Maren Kaluza                   Feb 2018 - removed slope_val, temp, only sort the index to speed up
-  !                                           finding the empirical distribution slope_emp
-  ! Robert Schweppe                Jun 2018 - refactoring and reformatting
-
+  !> \brief level 0 variable initialization
+  !> \details following tasks are performed for L0 data sets
+  !! -  cell id & numbering
+  !! -  storage of cell cordinates (row and coloum id)
+  !! -  empirical dist. of terrain slope
+  !! -  flag to determine the presence of a particular soil id
+  !! in this configuration of the model run
+  !! If a variable is added or removed here, then it also has to
+  !! be added or removed in the subroutine config_variables_set in
+  !! module mo_restart and in the subroutine set_config in module
+  !! mo_set_netcdf_restart
+  !> \changelog
+  !! - Rohini Kumar & Matthias Cuntz  May 2014
+  !!   - cell area calulation based on a regular lat-lon grid or on a regular X-Y coordinate system
+  !! - Matthias Cuntz           May 2014
+  !!   - changed empirical distribution function so that doubles get the same value
+  !! - Matthias Zink & Matthias Cuntz Feb 2016
+  !!   - code speed up due to reformulation of CDF calculation
+  !! - Rohini Kumar             Mar 2016
+  !!   - changes for handling multiple soil database options
+  !! - Maren Kaluza             Feb 2018
+  !!   - removed slope_val, temp, only sort the index to speed up finding the empirical distribution slope_emp
+  !! - Robert Schweppe          Jun 2018
+  !!   - refactoring and reformatting
+  !> \authors Rohini Kumar
+  !> \date Jan 2013
   subroutine L0_variable_init(iDomain)
 
     use mo_append, only : append
@@ -280,7 +246,7 @@ CONTAINS
 
     implicit none
 
-    ! domain id
+    !> domain id
     integer(i4), intent(in) :: iDomain
 
     real(dp), dimension(:), allocatable :: slope_emp
@@ -370,42 +336,36 @@ CONTAINS
 
   end subroutine L0_variable_init
 
-  ! ------------------------------------------------------------------
 
-  !    NAME
-  !        init_eff_params
-
-  !    PURPOSE
-  !>       \brief Allocation of space for mHM related L1 and L11 variables.
-
-  !>       \details Allocation of space for mHM related L1 and L11 variables (e.g., states,
-  !>       fluxes, and parameters) for a given domain. Variables allocated here is
-  !>       defined in them mo_global_variables.f90 file. After allocating any variable
-  !>       in this routine, initalize them in the following variables_default_init
-  !>       subroutine:
-
-  !    INTENT(IN)
-  !>       \param[in] "integer(i4) :: ncells1"
-
-  !    HISTORY
-  !>       \authors Rohini Kumar
-
-  !>       \date Jan 2013
-
-  ! Modifications:
-  ! R. Kumar           Sep 2013 - documentation added according to the template
-  ! S. Thober          Aug 2015 - removed routing related variables
-  ! Zink M. Demirel C. Mar 2017 - Init Jarvis soil water stress variable at SM process(3)
-  ! Robert Schweppe    Dec 2017 - restructured allocation in variables_alloc, expanded dimensions of effective parameters
-  ! Robert Schweppe    Jun 2018 - refactoring and reformatting
-  ! Rohini Kumar       Oct 2021 - Added Neutron count module to mHM integrate into develop branch (5.11.2)
-
+  !> \brief Allocation of space for mHM related L1 and L11 variables.
+  !> \details Allocation of space for mHM related L1 and L11 variables (e.g., states,
+  !! fluxes, and parameters) for a given domain. Variables allocated here is
+  !! defined in them mo_global_variables.f90 file. After allocating any variable
+  !! in this routine, initalize them in the following variables_default_init
+  !! subroutine.
+  !> \changelog
+  !! - R. Kumar           Sep 2013
+  !!   - documentation added according to the template
+  !! - S. Thober          Aug 2015
+  !!   - removed routing related variables
+  !! - Zink M. Demirel C. Mar 2017
+  !!   - Init Jarvis soil water stress variable at SM process(3)
+  !! - Robert Schweppe    Dec 2017
+  !!   - restructured allocation in variables_alloc, expanded dimensions of effective parameters
+  !! - Robert Schweppe    Jun 2018
+  !!   - refactoring and reformatting
+  !! - Rohini Kumar       Oct 2021
+  !!   - Added Neutron count module to mHM integrate into develop branch (5.11.2)
+  !! - Sebastian Müller Mar 2023
+  !!   - made L1_alpha, L1_kSlowFlow, L1_kBaseFlow and L1_kPerco land cover dependent
+  !> \authors Rohini Kumar
+  !> \date Jan 2013
   subroutine init_eff_params(ncells1)
 
     use mo_append, only : append
     use mo_constants, only : YearMonths
     use mo_common_constants, only : P1_InitStateFluxes
-    use mo_common_variables, only : nLCoverScene 
+    use mo_common_variables, only : nLCoverScene
     use mo_mpr_global_variables, only : L1_HarSamCoeff, L1_PrieTayAlpha, L1_aeroResist, L1_alpha, L1_degDay, &
                                         L1_degDayInc, L1_degDayMax, L1_degDayNoPre, L1_fAsp, L1_fRoots, L1_fSealed, &
                                         L1_jarvis_thresh_c1, L1_kBaseFlow, L1_kPerco, L1_kSlowFlow, L1_karstLoss, &
@@ -416,6 +376,7 @@ CONTAINS
 
     implicit none
 
+    !> number of L1 cells
     integer(i4), intent(in) :: ncells1
 
     real(dp), dimension(:, :, :), allocatable :: dummy_3D
@@ -436,7 +397,7 @@ CONTAINS
     !-------------------------------------------
     call append(L1_fSealed, dummy_3D(:, 1 : 1, 1 : nLCoverScene))
     ! exponent for the upper reservoir
-    call append(L1_alpha, dummy_3D(:, 1 : 1, 1 : 1))
+    call append(L1_alpha, dummy_3D(:, 1 : 1, 1 : nLCoverScene))
     ! increase of the Degree-day factor per mm of increase in precipitation
     call append(L1_degDayInc, dummy_3D(:, 1 : 1, 1 : nLCoverScene))
     ! maximum degree-day factor
@@ -466,11 +427,11 @@ CONTAINS
     ! fast interflow recession coefficient
     call append(L1_kfastFlow, dummy_3D(:, 1 : 1, 1 : nLCoverScene))
     ! slow interflow recession coefficient
-    call append(L1_kSlowFlow, dummy_3D(:, 1 : 1, 1 : 1))
+    call append(L1_kSlowFlow, dummy_3D(:, 1 : 1, 1 : nLCoverScene))
     ! baseflow recession coefficient
-    call append(L1_kBaseFlow, dummy_3D(:, 1 : 1, 1 : 1))
+    call append(L1_kBaseFlow, dummy_3D(:, 1 : 1, 1 : nLCoverScene))
     ! percolation coefficient
-    call append(L1_kPerco, dummy_3D(:, 1 : 1, 1 : 1))
+    call append(L1_kPerco, dummy_3D(:, 1 : 1, 1 : nLCoverScene))
     ! Soil moisture below which actual ET is reduced linearly till PWP
     call append(L1_soilMoistFC, dummy_3D(:, 1 : nSoilHorizons_mHM, 1 : nLCoverScene))
     ! Saturation soil moisture for each horizon [mm]
@@ -487,12 +448,12 @@ CONTAINS
     call append(L1_sealedThresh, dummy_3D(:, 1 : 1, 1 : 1))
     ! Permanent wilting point
     call append(L1_wiltingPoint, dummy_3D(:, 1 : nSoilHorizons_mHM, 1 : nLCoverScene))
-    ! neutron count related parameters 
-    call append(L1_No_Count,     dummy_3D(:, 1:1,                 1:1))            ! N0 count   
+    ! neutron count related parameters
+    call append(L1_No_Count,     dummy_3D(:, 1:1,                 1:1))            ! N0 count
     call append(L1_bulkDens,     dummy_3D(:, 1:nSoilHorizons_mHM, 1:nLCoverScene)) ! bulk density
     call append(L1_latticeWater, dummy_3D(:, 1:nSoilHorizons_mHM, 1:nLCoverScene)) ! lattice water
     call append(L1_COSMICL3,     dummy_3D(:, 1:nSoilHorizons_mHM, 1:nLCoverScene)) ! cosmic L3 parameter
-   
+
     ! free space
     if (allocated(dummy_3D)) deallocate(dummy_3D)
 

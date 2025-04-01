@@ -1,20 +1,19 @@
-!>       \file mo_read_timeseries.f90
+!> \file mo_read_timeseries.f90
+!> \brief \copybrief mo_read_timeseries
+!> \details \copydetails mo_read_timeseries
 
-!>       \brief Routines to read files containing timeseries data.
-
-!>       \details This routine is reading time series input data for a particular time period. The files need to have a
-!>       specific header specified in the different routines.
-
-!>       \authors Matthias Zink, Juliane Mai
-
-!>       \date Jan 2013
-
-! Modifications:
-
+!> \brief Routines to read files containing timeseries data.
+!> \details This routine is reading time series input data for a particular time period. The files need to have a
+!! specific header specified in the different routines.
+!> \authors Matthias Zink, Juliane Mai
+!> \date Jan 2013
+!> \copyright Copyright 2005-\today, the mHM Developers, Luis Samaniego, Sabine Attinger: All rights reserved.
+!! mHM is released under the LGPLv3+ license \license_note
+!> \ingroup f_common
 MODULE mo_read_timeseries
 
   USE mo_kind, ONLY : i4, dp
-  USE mo_os, ONLY : path_isfile
+  USE mo_os, ONLY : check_path_isfile
 
   IMPLICIT NONE
 
@@ -74,7 +73,7 @@ CONTAINS
                             nMeasPerDay)
 
     use mo_julian, only : julday
-    use mo_message, only : message, error_message
+    use mo_message, only : error_message
     use mo_string_utils, only : num2str
 
     implicit none
@@ -161,7 +160,7 @@ CONTAINS
 
 
     !checking whether the file exists
-    call path_isfile(path = filename, quiet_ = .true., throwError_ = .true.)
+    call check_path_isfile(path = filename, raise=.true.)
     open(unit = fileunit, file = filename, action = 'read', status = 'old')
     ! read header
     read(fileunit, '(a256)') dummy
@@ -171,9 +170,8 @@ CONTAINS
     read(fileunit, *)        dummy, (periodEnd_file(i), i = 1, 3)
     dummy = dummy // ''   ! only to avoid warning
     if ((timestep_file .lt. 1_i4) .or. (timestep_file .gt. 1440_i4)) then
-      call message('***ERROR: Number of measurements per day has to be between 1 (daily) and 1440 (every minute)! ', &
+      call error_message('***ERROR: Number of measurements per day has to be between 1 (daily) and 1440 (every minute)! ', &
               trim(filename))
-      stop
     end if
 
     ! checking if period is covered by data in file
@@ -188,8 +186,7 @@ CONTAINS
             (opti_function .eq. 31_i4) .or. &
             (opti_function .eq. 33_i4))) then
       ! adjust this whenever a new opti function on discharge is added to mhm!
-      call message('***ERROR: Simulation period is not covered by observations! ', trim(filename))
-      stop
+      call error_message('***ERROR: Simulation period is not covered by observations! ', trim(filename))
     end if
 
     ! allocation of arrays

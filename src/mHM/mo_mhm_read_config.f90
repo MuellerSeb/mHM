@@ -1,20 +1,20 @@
-!>       \file mo_mhm_read_config.f90
+!> \file mo_mhm_read_config.f90
+!> \brief   \copybrief mo_mhm_read_config
+!> \details \copydetails mo_mhm_read_config
 
-!>       \brief Reading of main model configurations.
-
-!>       \details This routine reads the configurations of mHM including, input and
-!>       output directories, module usage specification, simulation time periods,
-!>       global parameters, ...
-
-!>       \authors Matthias Zink
-
-!>       \date Dec 2012
-
-! Modifications:
-
+!> \brief Reading of main model configurations.
+!> \details This routine reads the configurations of mHM including, input and
+!!       output directories, module usage specification, simulation time periods,
+!!       global parameters, ...
+!> \authors Matthias Zink
+!> \date Dec 2012
+!> \copyright Copyright 2005-\today, the mHM Developers, Luis Samaniego, Sabine Attinger: All rights reserved.
+!! mHM is released under the LGPLv3+ license \license_note
+!> \ingroup f_mhm
 MODULE mo_mhm_read_config
 
   USE mo_kind, ONLY : i4, dp
+  use mo_message, only: message, error_message
 
   IMPLICIT NONE
 
@@ -102,17 +102,11 @@ CONTAINS
     use mo_file, only : file_defOutput, udefOutput
     use mo_global_variables, only : &
       L1_twsaObs, L1_etObs, L1_smObs, L1_neutronsObs, &
-      dirMaxTemperature, dirMinTemperature, dirNetRadiation, dirPrecipitation, &
-      dirReferenceET, dirTemperature, dirabsVapPressure, dirwindspeed, dirRadiation, &
       evap_coeff, &
-      fday_pet, fday_prec, fday_temp, fday_ssrd, fday_strd, &
-      fnight_pet, fnight_prec, fnight_temp, fnight_ssrd, fnight_strd, &
-      inputFormat_meteo_forcings, nSoilHorizons_sm_input, outputFlxState, &
-      read_meteo_weights, timeStep_model_outputs, &
-      timestep_model_inputs, &
-      output_deflate_level, output_double_precision, &
+      nSoilHorizons_sm_input, outputFlxState, &
+      timeStep_model_outputs, &
+      output_deflate_level, output_double_precision, output_time_reference, &
       BFI_calc, BFI_obs
-    use mo_message, only : message
     use mo_mpr_constants, only : maxNoSoilHorizons
     use mo_mpr_global_variables, only : nSoilHorizons_mHM
     use mo_string_utils, only : num2str
@@ -124,27 +118,6 @@ CONTAINS
     integer, intent(in) :: unamelist
 
     integer(i4) :: iDomain, domainID
-
-    integer(i4), dimension(maxNoDomains) :: time_step_model_inputs
-
-    character(256), dimension(maxNoDomains) :: dir_Precipitation
-
-    character(256), dimension(maxNoDomains) :: dir_Temperature
-
-    character(256), dimension(maxNoDomains) :: dir_MinTemperature
-
-    character(256), dimension(maxNoDomains) :: dir_MaxTemperature
-
-    character(256), dimension(maxNoDomains) :: dir_NetRadiation
-
-    character(256), dimension(maxNoDomains) :: dir_windspeed
-
-    character(256), dimension(maxNoDomains) :: dir_absVapPressure
-
-    character(256), dimension(maxNoDomains) :: dir_ReferenceET
-
-    ! riv-temp related
-    character(256), dimension(maxNoDomains) :: dir_Radiation
 
     ! soil moisture input
     character(256), dimension(maxNoDomains) :: dir_soil_moisture
@@ -164,21 +137,10 @@ CONTAINS
     integer(i4) :: timeStep_neutrons_input    ! time step of optional data: neutrons
 
 
-    allocate(dirPrecipitation(domainMeta%nDomains))
-    allocate(dirTemperature(domainMeta%nDomains))
-    allocate(dirwindspeed(domainMeta%nDomains))
-    allocate(dirabsVapPressure(domainMeta%nDomains))
-    allocate(dirReferenceET(domainMeta%nDomains))
-    allocate(dirMinTemperature(domainMeta%nDomains))
-    allocate(dirMaxTemperature(domainMeta%nDomains))
-    allocate(dirNetRadiation(domainMeta%nDomains))
-    allocate(dirRadiation(domainMeta%nDomains))
     allocate(L1_twsaObs(domainMeta%nDomains))
     allocate(L1_etObs(domainMeta%nDomains))
     allocate(L1_smObs(domainMeta%nDomains))
     allocate(L1_neutronsObs(domainMeta%nDomains))
-    ! allocate time periods
-    allocate(timestep_model_inputs(domainMeta%nDomains))
     ! observed baseflow indizes
     allocate(BFI_obs(domainMeta%nDomains))
 
@@ -262,10 +224,8 @@ CONTAINS
             L1_smObs(iDomain)%varname = 'sm'
           end do
           if (nSoilHorizons_sm_input .GT. nSoilHorizons_mHM) then
-            call message()
-            call message('***ERROR: Number of soil horizons representative for input soil moisture exceeded')
-            call message('          defined number of soil horizions: ', adjustl(trim(num2str(maxNoSoilHorizons))), '!')
-            stop
+            call error_message('***ERROR: Number of soil horizons representative for input soil moisture exceeded', raise=.false.)
+            call error_message('          defined number of soil horizions: ', adjustl(trim(num2str(maxNoSoilHorizons))), '!')
           end if
         case(17)
           ! neutrons
@@ -312,7 +272,7 @@ CONTAINS
     end if
 
     !===============================================================
-    ! Read night-day ratios and pan evaporation
+    ! Read pan evaporation
     !===============================================================
     ! Evap. coef. for free-water surfaces
     call nml_panEvapo%read(file_namelist, unamelist)
@@ -354,6 +314,14 @@ CONTAINS
     else
       call message('  NetCDF output precision: single')
     end if
+    select case(output_time_reference)
+      case(0)
+        call message('    NetCDF output time reference point: start of time interval')
+      case(1)
+        call message('    NetCDF output time reference point: center of time interval')
+      case(2)
+        call message('    NetCDF output time reference point: end of time interval')
+    end select
     call message('  STATES:')
     if (outputFlxState(1)) then
       call message('    interceptional storage                          (L1_inter) [mm]')

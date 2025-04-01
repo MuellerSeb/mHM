@@ -1,12 +1,15 @@
 !> \file    mo_mhm_interface.f90
-!> \brief   Module providing interfaces for mHM.
+!> \brief   \copybrief mo_mhm_interface
 !> \details \copydetails mo_mhm_interface
 
 !> \brief   Module providing interfaces for mHM.
-!> \version 0.1
-!> \authors Sebastian Mueller
-!> \date    Oct 2021
 !> \details Interfaces to control the mHM workflow from outside (init, run, get infos, etc.).
+!> \authors Sebastian Mueller
+!> \version 0.1
+!> \date    Oct 2021
+!> \copyright Copyright 2005-\today, the mHM Developers, Luis Samaniego, Sabine Attinger: All rights reserved.
+!! mHM is released under the LGPLv3+ license \license_note
+!> \ingroup f_mhm
 module mo_mhm_interface
 
   use mo_kind, only: i4, dp
@@ -51,14 +54,18 @@ contains
       mrm_init, &
       mrm_configuration
     use mo_common_variables, only: &
+      level0, &
+      level1, &
       itimer, &
       domainMeta, &
       processMatrix
     use mo_common_mHM_mRM_variables, only : &
+      timeStep, &
       simPer, &
       optimize, &
       opti_function, &
-      mrm_coupling_mode
+      mrm_coupling_mode, &
+      read_restart
     use mo_mhm_messages, only: &
       startup_message, &
       domain_dir_check_message
@@ -72,20 +79,17 @@ contains
       unamelist_mhm, &
       unamelist_mhm_param
     use mo_global_variables, only: &
-      timestep_model_inputs, &
+      couple_cfg, &
+      meteo_handler, &
       L1_twsaObs, &
       L1_etObs, &
       L1_neutronsObs, &
       L1_smObs, &
       BFI_calc
-    use mo_meteo_forcings, only: prepare_meteo_forcings_data
     use mo_read_optional_data, only: readOptidataObs
     use mo_write_ascii, only: write_configfile
     use mo_mhm_bfi, only: calculate_BFI
-
-#ifdef NAG
-    use f90_unix_dir, only: chdir
-#endif
+    use mo_os, only: change_dir
 
     implicit none
 
@@ -108,17 +112,21 @@ contains
     if (present(namelist_mhm_output)) file_defOutput = namelist_mhm_output
     if (present(namelist_mrm_output)) mrm_file_defOutput = namelist_mrm_output
     ! change working directory
-    if (present(cwd)) call chdir(cwd)
+    if (present(cwd)) call change_dir(cwd)
 
     ! startup message
     call startup_message()
 
+    ! coupling configuration
+    call couple_cfg%read_config(file_namelist_mhm, unamelist_mhm)
     ! read configs
     call common_read_config(file_namelist_mhm, unamelist_mhm)
     call mpr_read_config(file_namelist_mhm, unamelist_mhm, file_namelist_mhm_param, unamelist_mhm_param)
     call common_mHM_mRM_read_config(file_namelist_mhm, unamelist_mhm)
     call mhm_read_config(file_namelist_mhm, unamelist_mhm)
-    mrm_coupling_mode = 2_i4
+    call couple_cfg%check(domainMeta, optimize)
+    call meteo_handler%config(file_namelist_mhm, unamelist_mhm, optimize, domainMeta, processMatrix, timestep, couple_cfg)
+    mrm_coupling_mode = 2_i4 ! TODO: this shouldn't be needed
     call mrm_configuration(file_namelist_mhm, unamelist_mhm, file_namelist_mhm_param, unamelist_mhm_param)
     call check_optimization_settings()
 
@@ -144,19 +152,22 @@ contains
 #endif
     call message()
 
-    call message('  Read data ...')
-    call timer_start(itimer)
-    ! for DEM, slope, ... define nGvar local
-    ! read_data has a domain loop inside
-    call read_data(simPer)
-    call timer_stop(itimer)
-    call message('    in ', trim(num2str(timer_get(itimer), '(F9.3)')), ' seconds.')
+    if (.not. read_restart) then
+      call message('  Read data ...')
+      call timer_start(itimer)
+      ! for DEM, slope, ... define nGvar local
+      ! read_data has a domain loop inside
+      call read_data(simPer)
+      call timer_stop(itimer)
+      call message('    in ', trim(num2str(timer_get(itimer), '(F9.3)')), ' seconds.')
+    end if
 
     ! read data for every domain
     itimer = itimer + 1
     call message('  Initialize domains ...')
     call timer_start(itimer)
     call mhm_initialize()
+    call meteo_handler%init_level2(level0, level1)
     call timer_stop(itimer)
     call message('  in ', trim(num2str(timer_get(itimer), '(F9.3)')), ' seconds.')
     if (processMatrix(8, 1) > 0) &
@@ -168,11 +179,8 @@ contains
 
     do iDomain = 1, domainMeta%nDomains
       domainID = domainMeta%indices(iDomain)
-      ! read meteorology now, if optimization is switched on
-      ! meteorological forcings (reading, upscaling or downscaling)
-      if (timestep_model_inputs(iDomain) .eq. 0_i4) then
-        call prepare_meteo_forcings_data(iDomain, domainID, 1)
-      end if
+      ! read meteorology now, if it should be loaded in one go
+      if (meteo_handler%single_read(iDomain)) call meteo_handler%prepare_data(1, iDomain, level1, simPer)
 
       ! read optional optional data if necessary
       if (optimize) then
@@ -211,7 +219,7 @@ contains
     call message('    in ', trim(num2str(timer_get(itimer), '(F9.3)')), ' seconds.')
 
     !this call may be moved to another position as it writes the master config out file for all domains
-    call write_configfile()
+    call write_configfile(meteo_handler%dirPrecipitation, meteo_handler%dirReferenceET, meteo_handler%dirTemperature)
 
 #ifdef MPI
     end if

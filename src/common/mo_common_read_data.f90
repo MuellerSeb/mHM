@@ -1,17 +1,17 @@
-!>       \file mo_common_read_data.f90
+!> \file mo_common_read_data.f90
+!> \brief   \copybrief mo_common_read_data
+!> \details \copydetails mo_common_read_data
 
-!>       \brief TODO: add description
-
-!>       \details TODO: add description
-
-!>       \authors Robert Schweppe
-
-!>       \date Jun 2018
-
-! Modifications:
-
+!> \brief Common reading routines
+!> \details Routines to read the DEM and landcover files.
+!> \authors Robert Schweppe
+!> \date Jun 2018
+!> \copyright Copyright 2005-\today, the mHM Developers, Luis Samaniego, Sabine Attinger: All rights reserved.
+!! mHM is released under the LGPLv3+ license \license_note
+!> \ingroup f_common
 module mo_common_read_data
   USE mo_kind, ONLY : i4, dp
+  use mo_message, only: message, error_message
 
   IMPLICIT NONE
 
@@ -43,10 +43,10 @@ CONTAINS
     use mo_append, only : append
     use mo_common_constants, only : nodata_dp
     use mo_common_file, only : file_dem, udem
-    use mo_common_variables, only : Grid,  L0_elev, dirMorpho, level0, domainMeta, &
+    use mo_common_types, only: Grid
+    use mo_common_variables, only : L0_elev, dirMorpho, level0, domainMeta, &
                                     resolutionHydrology
     use mo_grid, only : set_domain_indices
-    use mo_message, only : message
     use mo_read_spatial_data, only : read_header_ascii, read_spatial_data_ascii
     use mo_string_utils, only : num2str
 
@@ -98,10 +98,8 @@ CONTAINS
 
       ! check for L0 and L1 scale consistency
       if(resolutionHydrology(iDomain) .LT. level0_iDomain%cellsize) then
-        call message()
-        call message('***ERROR: resolutionHydrology (L1) should be smaller than the input data resolution (L0)')
-        call message('          check set-up (in mhm.nml) for domain: ', trim(adjustl(num2str(domainID))), ' ...')
-        stop
+        call error_message('***ERROR: resolutionHydrology (L1) should be smaller than the input data resolution (L0)', raise=.false.)
+        call error_message('          check set-up (in mhm.nml) for domain: ', trim(adjustl(num2str(domainID))), ' ...')
       end if
 
       ! DEM + overall mask creation
@@ -145,8 +143,8 @@ CONTAINS
     use mo_append, only : append, paste
     use mo_common_constants, only : nodata_i4
     use mo_common_file, only : ulcoverclass
-    use mo_common_variables, only : Grid, L0_LCover, LCfilename, dirLCover, level0, domainMeta, nLCoverScene
-    use mo_message, only : message
+    use mo_common_types, only: Grid
+    use mo_common_variables, only : L0_LCover, LCfilename, dirLCover, level0, domainMeta, nLCoverScene
     use mo_read_spatial_data, only : read_spatial_data_ascii
     use mo_string_utils, only : num2str
 

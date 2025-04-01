@@ -1,15 +1,14 @@
-!>       \file mo_snow_accum_melt.f90
+!> \file mo_snow_accum_melt.f90
+!> \brief \copybrief mo_snow_accum_melt
+!> \details \copydetails mo_snow_accum_melt
 
-!>       \brief Snow melting and accumulation.
-
-!>       \details This module calculates snow melting and accumulation.
-
-!>       \authors Vladyslav Prykhodko
-
-!>       \date Dec 2012
-
-! Modifications:
-
+!> \brief Snow melting and accumulation.
+!> \details This module calculates snow melting and accumulation.
+!> \authors Vladyslav Prykhodko
+!> \date Dec 2012
+!> \copyright Copyright 2005-\today, the mHM Developers, Luis Samaniego, Sabine Attinger: All rights reserved.
+!! mHM is released under the LGPLv3+ license \license_note
+!> \ingroup f_mhm
 MODULE mo_snow_accum_melt
 
   USE mo_kind, ONLY : dp

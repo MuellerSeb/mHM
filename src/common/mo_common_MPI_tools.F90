@@ -1,5 +1,5 @@
 !> \file    mo_common_mpi_tools.f90
-!> \brief   tools for MPI communication that are mHM or mRM specific
+!> \brief   \copybrief mo_common_mpi_tools
 !> \details \copydetails mo_common_mpi_tools
 
 !> \brief   tools for MPI communication that are mHM or mRM specific
@@ -8,11 +8,15 @@
 !> \date    2019-2021
 !> \details This module contains sending and receiving subroutines for
 !!          data that are specific for mHM or mRM
+!> \copyright Copyright 2005-\today, the mHM Developers, Luis Samaniego, Sabine Attinger: All rights reserved.
+!! mHM is released under the LGPLv3+ license \license_note
+!> \ingroup f_common
 MODULE mo_common_mpi_tools
 
-  use mo_kind, only : i4, dp
-
 #ifdef MPI
+  use mo_kind, only : i4, dp
+  use mo_message, only : message
+  use mo_string_utils, only : num2str
   use mo_common_variables, only: comm
   use mpi_f08
 #endif
@@ -81,7 +85,7 @@ contains
     call MPI_Comm_size(comm, nproc, ierror)
     ! find the number the process is referred to, called rank
     call MPI_Comm_rank(comm, rank, ierror)
-    write(*,*) 'MPI!, comm', rank, nproc
+    call message('MPI!, comm ', num2str(rank), num2str(nproc))
 #endif
 
   end subroutine mpi_tools_init
@@ -98,7 +102,7 @@ contains
     ! find number of processes nproc
     call MPI_Comm_size(comm, nproc, ierror)
     call MPI_Comm_rank(comm, rank, ierror)
-    write(*,*) 'MPI finished', rank, nproc
+    call message('MPI finished ', num2str(rank), num2str(nproc))
     call MPI_Finalize(ierror)
 #endif
 

@@ -1,20 +1,21 @@
-!>       \file mo_mrm_mpr.f90
+!> \file mo_mrm_mpr.f90
+!> \brief \copybrief mo_mrm_mpr
+!> \details \copydetails mo_mrm_mpr
 
-!>       \brief Perform Multiscale Parameter Regionalization on Routing Parameters
-
-!>       \details This module contains the subroutine for calculating the regionalized
-!>       routing parameters (beta-parameters) given the five global routing parameters
-!>       (gamma) at the level 0 scale.
-
-!>       \authors Luis Samaniego, Stephan Thober
-
-!>       \date Aug 2015
-
-! Modifications:
-
+!> \brief Perform Multiscale Parameter Regionalization on Routing Parameters
+!> \details This module contains the subroutine for calculating the regionalized
+!! routing parameters (beta-parameters) given the five global routing parameters (gamma) at the level 0 scale.
+!> \authors Luis Samaniego, Stephan Thober
+!> \date Aug 2015
+!> \copyright Copyright 2005-\today, the mHM Developers, Luis Samaniego, Sabine Attinger: All rights reserved.
+!! mHM is released under the LGPLv3+ license \license_note
+!> \ingroup f_mrm
 module mo_mrm_mpr
   use mo_kind, only : dp
+  use mo_message, only : message
+
   implicit none
+
   public :: reg_rout
   public :: mrm_init_param
   public :: mrm_update_param
@@ -147,7 +148,6 @@ contains
     use mo_common_mHM_mRM_variables, only : resolutionRouting, timeStep, optimize
     use mo_common_variables, only : iFlag_cordinate_sys, domainMeta, processMatrix
     use mo_kind, only : dp, i4
-    use mo_message, only : message
     use mo_mrm_constants, only : given_TS
     use mo_mrm_global_variables, only : level11, L11_tsRout, domain_mrm, L11_celerity
     use mo_string_utils, only : num2str
@@ -256,7 +256,6 @@ contains
     use mo_mrm_net_startup, only: L11_calc_celerity
     use mo_mrm_constants, only: given_TS
     use mo_constants, only: HourSecs
-    use mo_message, only: message
     use mo_string_utils, only: num2str
     use mo_utils, only: locate
 

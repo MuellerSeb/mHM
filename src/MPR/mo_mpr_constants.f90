@@ -1,15 +1,14 @@
-!>       \file mo_mpr_constants.f90
+!> \file mo_mpr_constants.f90
+!> \brief \copybrief mo_mpr_constants
+!> \details \copydetails mo_mpr_constants
 
-!>       \brief Provides MPR specific constants
-
-!>       \details Provides MPR specific constants such as flood plain elevation.
-
-!>       \authors Matthias Cuntz
-
-!>       \date Nov 2011
-
-! Modifications:
-
+!> \brief Provides MPR specific constants
+!> \details Provides MPR specific constants such as flood plain elevation.
+!> \authors Matthias Cuntz
+!> \date Nov 2011
+!> \copyright Copyright 2005-\today, the mHM Developers, Luis Samaniego, Sabine Attinger: All rights reserved.
+!! mHM is released under the LGPLv3+ license \license_note
+!> \ingroup f_mpr
 MODULE mo_mpr_constants
 
   USE mo_kind, ONLY : i4, dp

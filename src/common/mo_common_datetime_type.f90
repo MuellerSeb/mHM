@@ -1,18 +1,19 @@
 !> \file mo_common_datetime_type.f90
+!> \brief \copybrief mo_common_datetime_type
+!> \details \copydetails mo_common_datetime_type
 
-!< author: Maren Kaluza
-!< date: March 2019
-!< summary: type for date time information with an increment subroutine
-
-!< Contains a current day, month, year, hour matching newTime, aswell as
-!< previous day, month, year. Theses all get updated on increment
-!<
-!< also contains nTimestep, and tIndex_out for writing
-!<
-!< finally, contains iLAI and yId that are time dependent and updating routines
-!< for these, and a function returning a boolean for writeout, dependent on the
-!< timestep_model_input
-
+!> \brief type for date time information with an increment subroutine
+!> \details Contains a current day, month, year, hour matching newTime, aswell as
+!! previous day, month, year. Theses all get updated on increment
+!! also contains nTimestep, and tIndex_out for writing
+!! finally, contains iLAI and yId that are time dependent and updating routines
+!! for these, and a function returning a boolean for writeout, dependent on the
+!! timestep_model_input
+!> \author Maren Kaluza
+!> \date March 2019
+!> \copyright Copyright 2005-\today, the mHM Developers, Luis Samaniego, Sabine Attinger: All rights reserved.
+!! mHM is released under the LGPLv3+ license \license_note
+!> \ingroup f_common
 MODULE mo_common_datetime_type
   use mo_kind, only : i4, dp
 
@@ -68,7 +69,7 @@ MODULE mo_common_datetime_type
   contains
 
   subroutine datetimeinfo_init(this, iDomain)
-    use mo_common_mHM_mRM_variables, only : LCyearId, simPer, timeStep, nTstepDay
+    use mo_common_mHM_mRM_variables, only : LCyearId, simPer, nTstepDay
     use mo_julian, only : caldat
     class(datetimeinfo), intent(inout) :: this
     integer(i4),     intent(in)    :: iDomain
@@ -91,7 +92,7 @@ MODULE mo_common_datetime_type
 
     ! initialize arrays and counters
     this%yId  = LCyearId(this%year, iDomain)
-    this%hour = -timestep
+    this%hour = 0
     this%iLAI = 0
 
     ! this has no relevance yet. it is only so the variables are initialized
@@ -99,7 +100,7 @@ MODULE mo_common_datetime_type
     this%prev_month = this%month
     this%prev_year  = this%year
 
-    this%tIndex_out = 1 ! tt if write out of warming period
+    this%tIndex_out = 0 ! tt if write out of warming period
   end subroutine datetimeinfo_init
 
   subroutine datetimeinfo_increment(this)
@@ -118,9 +119,11 @@ MODULE mo_common_datetime_type
     this%is_new_year  = .false.
 
     ! increment of timestep
-    this%hour = mod(this%hour + timestep, 24)
-    this%newTime = julday(this%day, this%month, this%year)&
-            + real(this%hour + timestep, dp) / 24._dp
+    this%hour = this%hour + timestep
+    this%newTime = julday(this%day, this%month, this%year) + real(this%hour, dp) / 24._dp
+    ! get correct hour for current day
+    this%hour = mod(this%hour, 24)
+
     ! calculate new year, month and day
     call caldat(int(this%newTime), yy = this%year, mm = this%month, dd = this%day)
     ! update the flags

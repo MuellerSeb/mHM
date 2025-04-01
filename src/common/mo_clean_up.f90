@@ -1,10 +1,14 @@
 !> \file    mo_clean_up.f90
-!> \copydoc mo_clean_up
+!> \brief   \copybrief mo_clean_up
+!> \details \copydetails mo_clean_up
 
 !> \brief   Module to clean up after a mHM run.
 !> \version 0.1
 !> \authors Sebastian Mueller
 !> \date    May 2022
+!> \copyright Copyright 2005-\today, the mHM Developers, Luis Samaniego, Sabine Attinger: All rights reserved.
+!! mHM is released under the LGPLv3+ license \license_note
+!> \ingroup f_common
 module mo_clean_up
 
   implicit none
@@ -15,33 +19,11 @@ module mo_clean_up
 
   !> \brief Deallocate all global variables.
   subroutine deallocate_global_variables()
+    use mo_mhm_cli, only : set_verbosity_level
     use mo_common_run_variables, only : run_cfg
     use mo_global_variables, only : &
-      timeStep_model_inputs, &
-      dirPrecipitation, &
-      dirTemperature, &
-      dirMinTemperature, &
-      dirMaxTemperature, &
-      dirNetRadiation, &
-      dirabsVapPressure, &
-      dirwindspeed, &
-      dirReferenceET, &
-      dirRadiation, &
-      level2, &
-      L1_temp_weights, &
-      L1_pet_weights, &
-      L1_pre_weights, &
-      L1_pre, &
-      L1_temp, &
-      L1_pet, &
-      L1_tmin, &
-      L1_tmax, &
-      L1_netrad, &
-      L1_absvappress, &
-      L1_windspeed, &
-      L1_ssrd, &
-      L1_strd, &
-      L1_tann, &
+      couple_cfg, &
+      meteo_handler, &
       L1_sm, &
       L1_sm_mask, &
       L1_neutronsdata, &
@@ -154,7 +136,6 @@ module mo_clean_up
       dirBankfullRunoff, &
       level11, &
       l0_l11_remap, &
-      l1_l11_remap, &
       mRM_runoff, &
       domain_mrm, &
       L0_gaugeLoc, &
@@ -223,31 +204,6 @@ module mo_clean_up
       mrmFileRestartIn
 
     ! mo_global_variables
-    if ( allocated(timeStep_model_inputs) ) deallocate(timeStep_model_inputs)
-    if ( allocated(dirPrecipitation) ) deallocate(dirPrecipitation)
-    if ( allocated(dirTemperature) ) deallocate(dirTemperature)
-    if ( allocated(dirMinTemperature) ) deallocate(dirMinTemperature)
-    if ( allocated(dirMaxTemperature) ) deallocate(dirMaxTemperature)
-    if ( allocated(dirNetRadiation) ) deallocate(dirNetRadiation)
-    if ( allocated(dirabsVapPressure) ) deallocate(dirabsVapPressure)
-    if ( allocated(dirwindspeed) ) deallocate(dirwindspeed)
-    if ( allocated(dirReferenceET) ) deallocate(dirReferenceET)
-    if ( allocated(dirRadiation) ) deallocate(dirRadiation)
-    if ( allocated(level2) ) deallocate(level2)
-    if ( allocated(L1_temp_weights) ) deallocate(L1_temp_weights)
-    if ( allocated(L1_pet_weights) ) deallocate(L1_pet_weights)
-    if ( allocated(L1_pre_weights) ) deallocate(L1_pre_weights)
-    if ( allocated(L1_pre) ) deallocate(L1_pre)
-    if ( allocated(L1_temp) ) deallocate(L1_temp)
-    if ( allocated(L1_pet) ) deallocate(L1_pet)
-    if ( allocated(L1_tmin) ) deallocate(L1_tmin)
-    if ( allocated(L1_tmax) ) deallocate(L1_tmax)
-    if ( allocated(L1_netrad) ) deallocate(L1_netrad)
-    if ( allocated(L1_absvappress) ) deallocate(L1_absvappress)
-    if ( allocated(L1_windspeed) ) deallocate(L1_windspeed)
-    if ( allocated(L1_ssrd) ) deallocate(L1_ssrd)
-    if ( allocated(L1_strd) ) deallocate(L1_strd)
-    if ( allocated(L1_tann) ) deallocate(L1_tann)
     if ( allocated(L1_sm) ) deallocate(L1_sm)
     if ( allocated(L1_sm_mask) ) deallocate(L1_sm_mask)
     if ( allocated(L1_neutronsdata) ) deallocate(L1_neutronsdata)
@@ -383,7 +339,6 @@ module mo_clean_up
     if ( allocated(dirBankfullRunoff) ) deallocate(dirBankfullRunoff)
     if ( allocated(level11) ) deallocate(level11)
     if ( allocated(l0_l11_remap) ) deallocate(l0_l11_remap)
-    if ( allocated(l1_l11_remap) ) deallocate(l1_l11_remap)
     if ( allocated(mRM_runoff) ) deallocate(mRM_runoff)
     if ( allocated(domain_mrm) ) deallocate(domain_mrm)
     if ( allocated(L0_gaugeLoc) ) deallocate(L0_gaugeLoc)
@@ -461,6 +416,15 @@ module mo_clean_up
 
     ! mo_common_run_variables
     call run_cfg%clean_up()
+
+    ! meteo handler clean up
+    call meteo_handler%clean_up()
+
+    ! coupling config clean up
+    call couple_cfg%clean_up()
+
+    ! reset verbosity
+    call set_verbosity_level()
 
   end subroutine deallocate_global_variables
 

@@ -1,15 +1,14 @@
-!>       \file mo_mpr_file.f90
+!> \file mo_mpr_file.f90
+!> \brief \copybrief mo_mpr_file
+!> \details \copydetails mo_mpr_file
 
-!>       \brief Provides file names and units for mRM
-
-!>       \details Provides all filenames as well as all units used for the multiscale Routing Model mRM.
-
-!>       \authors Matthias Cuntz, Stephan Thober
-
-!>       \date Aug 2015
-
-! Modifications:
-
+!> \brief Provides file names and units for mRM
+!> \details Provides all filenames as well as all units used for the multiscale Routing Model mRM.
+!> \authors Matthias Cuntz, Stephan Thober
+!> \date Aug 2015
+!> \copyright Copyright 2005-\today, the mHM Developers, Luis Samaniego, Sabine Attinger: All rights reserved.
+!! mHM is released under the LGPLv3+ license \license_note
+!> \ingroup f_mpr
 MODULE mo_mpr_file
 
   IMPLICIT NONE
@@ -66,14 +65,5 @@ MODULE mo_mpr_file
   CHARACTER(len = *), PARAMETER :: file_lailut = 'LAI_classdefinition.txt'     ! LAI classes lookup table
   !> Unit for LAI classes lookup table file
   INTEGER, PARAMETER :: ulailut = 65                            !
-
-  !> Input nCols and nRows of binary meteo and LAI files are in header file
-  CHARACTER(len = *), PARAMETER :: file_meteo_header = 'header.txt'                  ! Meteo and LAI header
-  !> Unit for meteo header file
-  INTEGER, PARAMETER :: umeteo_header = 50                            !
-  !> File ending of meteo files
-  CHARACTER(len = *), PARAMETER :: file_meteo_binary_end = '.bin'                        ! Meteo and LAI
-  !> Unit for meteo files
-  INTEGER, PARAMETER :: umeteo = 51                            !
 
 END MODULE mo_mpr_file

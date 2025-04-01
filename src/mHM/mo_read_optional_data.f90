@@ -1,15 +1,14 @@
-!>       \file mo_read_optional_data.f90
+!> \file mo_read_optional_data.f90
+!> \brief   \copybrief mo_read_optional_data
+!> \details \copydetails mo_read_optional_data
 
-!>       \brief Read optional data for mHM calibration.
-
-!>       \details Data have to be provided in resolution of the hydrology.
-
-!>       \authors Matthias Zink
-
-!>       \date Mar 2015
-
-! Modifications:
-
+!> \brief Read optional data for mHM calibration.
+!> \details Data have to be provided in resolution of the hydrology.
+!> \authors Matthias Zink
+!> \date Mar 2015
+!> \copyright Copyright 2005-\today, the mHM Developers, Luis Samaniego, Sabine Attinger: All rights reserved.
+!! mHM is released under the LGPLv3+ license \license_note
+!> \ingroup f_mhm
 MODULE mo_read_optional_data
 
   USE mo_kind, ONLY : i4, dp
@@ -53,8 +52,6 @@ CONTAINS
 
   subroutine readOptidataObs(iDomain, domainID, L1_optiObs)
 
-    use mo_append, only : append
-    use mo_common_constants, only : nodata_dp
     use mo_common_mhm_mrm_variables, only : evalPer
     use mo_common_variables, only : level1
     use mo_optimization_types, only: optidata

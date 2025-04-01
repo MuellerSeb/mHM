@@ -1,27 +1,27 @@
-!>       \file mo_read_spatial_data.f90
+!> \file mo_read_spatial_data.f90
+!> \brief \copybrief mo_read_spatial_data
+!> \details \copydetails mo_read_spatial_data
 
-!>       \brief Reads spatial input data.
-
-!>       \details This module is to read spatial input data, e.g. dem, aspect, flow direction.
-!>       The module provides a subroutine for ASCII files.
-!>       (Subroutine for NetCDF files will come with release 5.1).
-!>       The data are read from the specified directory.
-
-!>       \authors Juliane Mai
-
-!>       \date Dec 2012
-
-! Modifications:
-
+!> \brief Reads spatial input data.
+!> \details This module is to read spatial input data, e.g. dem, aspect, flow direction.
+!! The module provides a subroutine for ASCII files.
+!! (Subroutine for NetCDF files will come with release 5.1).
+!! The data are read from the specified directory.
+!> \authors Juliane Mai
+!> \date Dec 2012
+!> \copyright Copyright 2005-\today, the mHM Developers, Luis Samaniego, Sabine Attinger: All rights reserved.
+!! mHM is released under the LGPLv3+ license \license_note
+!> \ingroup f_common
 MODULE mo_read_spatial_data
 
   ! This module provides routines to read spatial data.
 
   ! Written  Juliane Mai, Jan 2013
-  ! Modified 
+  ! Modified
 
   USE mo_kind, ONLY : i4, dp
-  USE mo_os, ONLY : path_isfile
+  USE mo_os, ONLY : check_path_isfile
+  use mo_message, only: error_message
 
   IMPLICIT NONE
 
@@ -154,15 +154,15 @@ CONTAINS
             file_ncols, file_nrows, &
             file_xllcorner, file_yllcorner, file_cellsize, file_nodata)
     if ((file_ncols .ne. header_ncols)) &
-            stop 'read_spatial_data_ascii: header not matching with reference header: ncols'
+             call error_message('read_spatial_data_ascii: header not matching with reference header: ncols')
     if ((file_nrows .ne. header_nrows)) &
-            stop 'read_spatial_data_ascii: header not matching with reference header: nrows'
+             call error_message('read_spatial_data_ascii: header not matching with reference header: nrows')
     if ((abs(file_xllcorner - header_xllcorner) .gt. tiny(1.0_dp))) &
-            stop 'read_spatial_data_ascii: header not matching with reference header: xllcorner'
+             call error_message('read_spatial_data_ascii: header not matching with reference header: xllcorner')
     if ((abs(file_yllcorner - header_yllcorner) .gt. tiny(1.0_dp))) &
-            stop 'read_spatial_data_ascii: header not matching with reference header: yllcorner'
+             call error_message('read_spatial_data_ascii: header not matching with reference header: yllcorner')
     if ((abs(file_cellsize - header_cellsize)   .gt. tiny(1.0_dp))) &
-            stop 'read_spatial_data_ascii: header not matching with reference header: cellsize'
+             call error_message('read_spatial_data_ascii: header not matching with reference header: cellsize')
 
     ! allocation and initialization of matrices
     allocate(tmp_data(file_nrows, file_ncols))
@@ -170,9 +170,9 @@ CONTAINS
     allocate(tmp_mask(file_nrows, file_ncols))
     tmp_mask = .true.
 
-    
+
     !checking whether the file exists
-    call path_isfile(path = filename, quiet_ = .true., throwError_ = .true.)
+    call check_path_isfile(path = filename, raise=.true.)
     ! read in
     ! recl is only a rough estimate on bytes per line in the ascii
     ! default for nag: recl=1024(byte) which is not enough for 100s of columns
@@ -294,15 +294,15 @@ CONTAINS
             file_ncols, file_nrows, &
             file_xllcorner, file_yllcorner, file_cellsize, file_nodata)
     if ((file_ncols .ne. header_ncols)) &
-            stop 'read_spatial_data_ascii: header not matching with reference header: ncols'
+             call error_message('read_spatial_data_ascii: header not matching with reference header: ncols')
     if ((file_nrows .ne. header_nrows)) &
-            stop 'read_spatial_data_ascii: header not matching with reference header: nrows'
+             call error_message('read_spatial_data_ascii: header not matching with reference header: nrows')
     if ((abs(file_xllcorner - header_xllcorner) .gt. tiny(1.0_dp))) &
-            stop 'read_spatial_data_ascii: header not matching with reference header: xllcorner'
+             call error_message('read_spatial_data_ascii: header not matching with reference header: xllcorner')
     if ((abs(file_yllcorner - header_yllcorner) .gt. tiny(1.0_dp))) &
-            stop 'read_spatial_data_ascii: header not matching with reference header: yllcorner'
+             call error_message('read_spatial_data_ascii: header not matching with reference header: yllcorner')
     if ((abs(file_cellsize - header_cellsize)   .gt. tiny(1.0_dp))) &
-            stop 'read_spatial_data_ascii: header not matching with reference header: cellsize'
+             call error_message('read_spatial_data_ascii: header not matching with reference header: cellsize')
 
     ! allocation and initialization of matrices
     allocate(tmp_data(file_nrows, file_ncols))
@@ -311,7 +311,7 @@ CONTAINS
     tmp_mask = .true.
 
     !checking whether the file exists
-    call path_isfile(path = filename, quiet_ = .true., throwError_ = .true.)
+    call check_path_isfile(path = filename, raise=.true.)
     ! read in
     ! recl is only a rough estimate on bytes per line in the ascii
     ! default for nag: recl=1024(byte) which is not enough for 100s of columns
@@ -374,6 +374,7 @@ CONTAINS
 
   subroutine read_header_ascii(filename, fileunit, header_ncols, header_nrows, header_xllcorner, header_yllcorner, &
                               header_cellsize, header_nodata)
+    use mo_common_constants, only : nodata_dp
     implicit none
 
     ! Name of file and its location
@@ -401,10 +402,10 @@ CONTAINS
     real(dp), intent(out) :: header_nodata
 
     character(5) :: dummy
-
+    integer(i4) :: io
 
     !checking whether the file exists
-    call path_isfile(path = filename, quiet_ = .true., throwError_ = .true.)
+    call check_path_isfile(path = filename, raise=.true.)
     ! reading header from a file
     open (unit = fileunit, file = filename, status = 'old')
     read (fileunit, *) dummy, header_nCols
@@ -412,7 +413,9 @@ CONTAINS
     read (fileunit, *) dummy, header_xllcorner
     read (fileunit, *) dummy, header_yllcorner
     read (fileunit, *) dummy, header_cellsize
-    read (fileunit, *) dummy, header_nodata
+    read (fileunit, *, iostat=io) dummy, header_nodata
+    ! EOF reached (nodata not present, use default value)
+    if (io < 0) header_nodata = nodata_dp
     close(fileunit)
     dummy = dummy // ''   ! only to avoid warning
 

@@ -1,19 +1,23 @@
-!>       \file mo_mpr_read_config.f90
+!> \file mo_mpr_read_config.f90
+!> \brief \copybrief mo_mpr_read_config
+!> \details \copydetails mo_mpr_read_config
 
-!>       \brief read mpr config
-
-!>       \details This module contains all mpr subroutines related to
-!>       reading the mpr configuration from file.
-
-!>       \authors Stephan Thober
-
-!>       \date Aug 2015
-
-! Modifications:
-! Robert Schweppe Dec 2017 - adapted for MPR
-! Robert Schweppe Jun 2018 - refactoring and reformatting
-! M. Cuneyd Demirel, Simon Stisen Jun 2020 - added Feddes and FC dependency on root fraction coefficient processCase(3) = 4
-! Rohini Kumar                    Oct 2021 - Added Neutron count module to mHM integrate into develop branch (5.11.2)
+!> \brief read mpr config
+!> \details This module contains all mpr subroutines related to reading the mpr configuration from file.
+!> \changelog
+!! - Robert Schweppe Dec 2017
+!!   - adapted for MPR
+!! - Robert Schweppe Jun 2018
+!!   - refactoring and reformatting
+!! - M. Cuneyd Demirel, Simon Stisen Jun 2020
+!!   - added Feddes and FC dependency on root fraction coefficient processCase(3) = 4
+!! - Rohini Kumar                    Oct 2021
+!!   - Added Neutron count module to mHM integrate into develop branch (5.11.2)
+!> \authors Stephan Thober
+!> \date Aug 2015
+!> \copyright Copyright 2005-\today, the mHM Developers, Luis Samaniego, Sabine Attinger: All rights reserved.
+!! mHM is released under the LGPLv3+ license \license_note
+!> \ingroup f_mpr
 module mo_mpr_read_config
 
   use mo_kind, only : i4, dp
@@ -81,6 +85,7 @@ contains
     use mo_common_constants, only : eps_dp, maxNoDomains, nColPars, nodata_dp
     use mo_common_functions, only : in_bound
     use mo_common_variables, only : global_parameters, global_parameters_name, domainMeta, processMatrix
+    use mo_message, only : message, error_message
     use mo_message, only : message, error_message
     use mo_mpr_constants, only : maxGeoUnit, &
                                  maxNoSoilHorizons
@@ -192,6 +197,7 @@ contains
     real(dp), dimension(nColPars) :: Desilets_LW0
     real(dp), dimension(nColPars) :: Desilets_LW1
 
+
     real(dp), dimension(nColPars) :: COSMIC_N0
     real(dp), dimension(nColPars) :: COSMIC_N1
     real(dp), dimension(nColPars) :: COSMIC_N2
@@ -240,6 +246,7 @@ contains
       ! classical mhm soil database
       HorizonDepth_mHM(nSoilHorizons_mHM) = 0.0_dp
     else if(iFlag_soilDB .ne. 1) then
+      call error_message('***ERROR: iFlag_soilDB option given does not exist. Only 0 and 1 is taken at the moment.')
       call error_message('***ERROR: iFlag_soilDB option given does not exist. Only 0 and 1 is taken at the moment.')
     end if
 
@@ -635,6 +642,7 @@ contains
 
     case DEFAULT
       call error_message('***ERROR: Process description for process "soilmoisture" does not exist!')
+      call error_message('***ERROR: Process description for process "soilmoisture" does not exist!')
     end select
 
     ! Process 4 - sealed area directRunoff
@@ -655,6 +663,7 @@ contains
         call error_message('***ERROR: parameter in namelist "directRunoff1" out of bound in ', trim(adjustl(file_namelist_param)))
 
     case DEFAULT
+      call error_message('***ERROR: Process description for process "directRunoff" does not exist!')
       call error_message('***ERROR: Process description for process "directRunoff" does not exist!')
     end select
 
@@ -784,6 +793,7 @@ contains
 
     case DEFAULT
       call error_message('***ERROR: Process description for process "actualET" does not exist!')
+      call error_message('***ERROR: Process description for process "actualET" does not exist!')
     end select
 
 
@@ -819,6 +829,7 @@ contains
 
     case DEFAULT
       call error_message('***ERROR: Process description for process "interflow" does not exist!')
+      call error_message('***ERROR: Process description for process "interflow" does not exist!')
     end select
 
     ! Process 7 - percolation
@@ -846,6 +857,7 @@ contains
         call error_message('***ERROR: parameter in namelist "percolation1" out of bound in ', trim(adjustl(file_namelist_param)))
 
     case DEFAULT
+      call error_message('***ERROR: Process description for process "percolation" does not exist!')
       call error_message('***ERROR: Process description for process "percolation" does not exist!')
     end select
 
@@ -876,9 +888,7 @@ contains
       call append(global_parameters, dummy_2d_dp_2)
       call append(global_parameters_name, (/'dummy'/))
     case DEFAULT
-      call message()
-      call message('***ERROR: Process description for process "routing" does not exist!')
-      stop
+      call error_message('***ERROR: Process description for process "routing" does not exist!')
     end select
 
     !===============================================================
@@ -933,6 +943,7 @@ contains
       ! 0 - deactivated
       call message()
       call message('***SELECTION: Neutron count routine is deativated! ')
+
 
     case(1)
       ! 1 - inverse N0 based on Desilets et al. 2010

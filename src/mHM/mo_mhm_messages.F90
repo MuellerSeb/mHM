@@ -1,12 +1,15 @@
 !> \file    mo_mhm_messages.f90
-!> \brief   Module for mHM messages.
+!> \brief   \copybrief mo_mhm_messages
 !> \details \copydetails mo_mhm_messages
 
 !> \brief   Module for mHM messages.
-!> \version 0.1
-!> \authors Sebastian Mueller
-!> \date    Oct 2021
 !> \details Write out messages of mHM (startup, checks, status, finish, ect.).
+!> \authors Sebastian Mueller
+!> \version 0.1
+!> \date    Oct 2021
+!> \copyright Copyright 2005-\today, the mHM Developers, Luis Samaniego, Sabine Attinger: All rights reserved.
+!! mHM is released under the LGPLv3+ license \license_note
+!> \ingroup f_mhm
 module mo_mhm_messages
 
     use mo_kind, only: i4
@@ -31,11 +34,8 @@ contains
       file_namelist_mhm, &
       file_namelist_mhm_param, &
       file_defOutput
-    use mo_os, only: path_isfile
+    use mo_os, only: check_path_isfile, get_cwd
     !$ use omp_lib, only: OMP_GET_NUM_THREADS
-#ifdef NAG
-    use f90_unix_dir, only: GETCWD
-#endif
 
     implicit none
 
@@ -51,7 +51,7 @@ contains
 #endif
 
     ! check for working dir (optional argument to the executable)
-    CALL getcwd(cur_work_dir)
+    CALL get_cwd(cur_work_dir)
 
     call message(separator)
     call message('              mHM-UFZ')
@@ -95,24 +95,16 @@ contains
     call message('     ', trim(file_defOutput))
     call message()
 
-    call path_isfile(path = file_namelist_mhm, quiet_ = .true., throwError_ = .true.)
-    call path_isfile(path = file_namelist_mhm_param, quiet_ = .true., throwError_ = .true.)
-    call path_isfile(path = file_defOutput, quiet_ = .true., throwError_ = .true.)
+    call check_path_isfile(path = file_namelist_mhm, raise=.true.)
+    call check_path_isfile(path = file_namelist_mhm_param, raise=.true.)
+    call check_path_isfile(path = file_defOutput, raise=.true.)
 
   end subroutine startup_message
 
   !> \brief Check input directories for mHM.
   subroutine domain_dir_check_message()
     use mo_check, only: check_dir
-    use mo_global_variables, only: &
-      dirPrecipitation, &
-      dirTemperature, &
-      dirReferenceET, &
-      dirMinTemperature, &
-      dirMaxTemperature, &
-      dirNetRadiation, &
-      dirabsVapPressure, &
-      dirwindspeed
+    use mo_global_variables, only: meteo_handler
     use mo_common_variables, only: &
       dirMorpho, &
       dirLCover, &
@@ -127,7 +119,7 @@ contains
     call message()
     call message('# of domains:         ', trim(num2str(domainMeta%overallNumberOfDomains)))
     call message()
-    call message('  Input data directories:')
+    call message('  Given data directories:')
     do iDomain = 1, domainMeta%nDomains
       domainID = domainMeta%indices(iDomain)
       call message('  --------------')
@@ -135,20 +127,31 @@ contains
       call message('  --------------')
       call check_dir(dirMorpho(iDomain), "Morphological directory:", .false., 4, 30)
       call check_dir(dirLCover(iDomain), "Land cover directory:", .false., 4, 30)
-      call check_dir(dirPrecipitation(iDomain), "Precipitation directory:", .false., 4, 30)
-      call check_dir(dirTemperature(iDomain), "Temperature directory:", .false., 4, 30)
+      if (.not. meteo_handler%couple_all) &
+        call check_dir(meteo_handler%dir_meteo_header(iDomain), "Level-2 header directory:", .false., 4, 30)
+      if (.not. meteo_handler%couple_pre) &
+        call check_dir(meteo_handler%dirPrecipitation(iDomain), "Precipitation directory:", .false., 4, 30)
+      if (.not. meteo_handler%couple_temp) &
+        call check_dir(meteo_handler%dirTemperature(iDomain), "Temperature directory:", .false., 4, 30)
       select case (processMatrix(5, 1))
         case(-1 : 0) ! PET is input
-          call check_dir(dirReferenceET(iDomain), "PET directory:", .false., 4, 30)
+          if (.not. meteo_handler%couple_pet) &
+            call check_dir(meteo_handler%dirReferenceET(iDomain), "PET directory:", .false., 4, 30)
         case(1) ! Hargreaves-Samani
-          call check_dir(dirMinTemperature(iDomain), "Min. temperature directory:", .false., 4, 30)
-          call check_dir(dirMaxTemperature(iDomain), "Max. temperature directory:", .false., 4, 30)
+          if (.not. meteo_handler%couple_tmin) &
+            call check_dir(meteo_handler%dirMinTemperature(iDomain), "Min. temperature directory:", .false., 4, 30)
+          if (.not. meteo_handler%couple_tmax) &
+            call check_dir(meteo_handler%dirMaxTemperature(iDomain), "Max. temperature directory:", .false., 4, 30)
         case(2) ! Priestely-Taylor
-          call check_dir(dirNetRadiation(iDomain), "Net radiation directory:", .false., 4, 30)
+          if (.not. meteo_handler%couple_netrad) &
+            call check_dir(meteo_handler%dirNetRadiation(iDomain), "Net radiation directory:", .false., 4, 30)
         case(3) ! Penman-Monteith
-          call check_dir(dirNetRadiation(iDomain), "Net radiation directory:", .false., 4, 30)
-          call check_dir(dirabsVapPressure(iDomain), "Abs. vap. press. directory:", .false., 4, 30)
-          call check_dir(dirwindspeed(iDomain), "Windspeed directory:", .false., 4, 30)
+          if (.not. meteo_handler%couple_netrad) &
+            call check_dir(meteo_handler%dirNetRadiation(iDomain), "Net radiation directory:", .false., 4, 30)
+          if (.not. meteo_handler%couple_absvappress) &
+            call check_dir(meteo_handler%dirabsVapPressure(iDomain), "Abs. vap. press. directory:", .false., 4, 30)
+          if (.not. meteo_handler%couple_windspeed) &
+            call check_dir(meteo_handler%dirwindspeed(iDomain), "Windspeed directory:", .false., 4, 30)
       end select
       call check_dir(dirOut(iDomain), "Output directory:", .true., 4, 30)
       call message()

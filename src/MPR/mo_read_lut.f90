@@ -1,25 +1,24 @@
-!>       \file mo_read_lut.f90
+!> \file mo_read_lut.f90
+!> \brief \copybrief mo_read_lut
+!> \details \copydetails mo_read_lut
 
-!>       \brief Routines reading lookup tables (lut).
-
-!>       \details This module contains routines reading various lookup tables (lut).
-!>       (1) LUT containing gauge information.
-!>       (2) LUT containing geological formation information.
-!>       (3) LUT containing LAI class information.
-
-!>       \authors Juliane Mai, Matthias Zink
-
-!>       \date Jan 2013
-
-! Modifications:
-
+!> \brief Routines reading lookup tables (lut).
+!> \details This module contains routines reading various lookup tables (lut).
+!! 1. LUT containing gauge information.
+!! 2. LUT containing geological formation information.
+!! 3. LUT containing LAI class information.
+!> \authors Juliane Mai, Matthias Zink
+!> \date Jan 2013
+!> \copyright Copyright 2005-\today, the mHM Developers, Luis Samaniego, Sabine Attinger: All rights reserved.
+!! mHM is released under the LGPLv3+ license \license_note
+!> \ingroup f_mpr
 MODULE mo_read_lut
 
   ! Written    Juliane Mai,    Jan 2013
   ! Modified   Matthias Zink,  Jan 2013 - add read_gauge_lut
 
   USE mo_kind, ONLY : i4, dp
-  USE mo_os, ONLY: path_isfile
+  USE mo_os, ONLY: check_path_isfile
   use mo_string_utils, ONLY: num2str
   use mo_message, ONLY: error_message
 
@@ -93,7 +92,7 @@ CONTAINS
     character(256) :: dummy
 
     !checking whether the file exists
-    call path_isfile(path = filename, quiet_ = .true., throwError_ = .true.)
+    call check_path_isfile(path = filename, raise=.true.)
     open(fileunit, file = filename, action = 'read', status = 'old')
 
     ! read header
@@ -180,7 +179,7 @@ CONTAINS
     character(256) :: dummy
 
     !checking whether the file exists
-    call path_isfile(path = filename, quiet_ = .true., throwError_ = .true.)
+    call check_path_isfile(path = filename, raise=.true.)
     open(fileunit, file = filename, action = 'read')
 
     ! read header

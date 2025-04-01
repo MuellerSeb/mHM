@@ -1,15 +1,19 @@
 !> \file mo_common_run_variables.f90
-!> \copydoc mo_common_run_variables
+!> \brief \copybrief mo_common_run_variables
+!> \details \copydetails mo_common_run_variables
 
 !> \brief Provides structures needed by mhm_eval to store current run config.
 !> \author Sebastian Mueller
 !> \date Jan 2022
 !> \version 0.1
+!> \copyright Copyright 2005-\today, the mHM Developers, Luis Samaniego, Sabine Attinger: All rights reserved.
+!! mHM is released under the LGPLv3+ license \license_note
+!> \ingroup f_common
 module mo_common_run_variables
 
   use mo_kind, only : i4, dp
   use mo_common_datetime_type, only : datetimeinfo
-  use mo_write_fluxes_states, only : OutputDataset
+  use mo_nc_output, only : OutputDataset
 
   implicit none
 
@@ -22,8 +26,6 @@ module mo_common_run_variables
     integer(i4) :: selected_domain
     !> number of domains simulated in this mhm_eval run. Depends on opti_function
     integer(i4) :: nDomains
-    !> flag wether forcings are given at hourly timestep
-    logical :: is_hourly_forcing
     !> output runoff
     logical :: output_runoff = .false.
     !> output BFI
@@ -34,8 +36,12 @@ module mo_common_run_variables
     integer(i4), dimension(:), allocatable :: domain_indices
     !> fraction of NOT sealed area
     real(dp), dimension(:, :, :), allocatable :: L1_fNotSealed
-    !> output NetCDF object
-    type(OutputDataset) :: nc
+    !> output mHM NetCDF object
+    type(OutputDataset) :: nc_mhm
+    !> output mRM NetCDF object
+    type(OutputDataset) :: nc_mrm
+    !> output groundwater NetCDF object
+    type(OutputDataset) :: nc_gw
     !> No. of cells at level 1 for current Domain
     integer(i4) :: nCells
     !> start and end index at level 1 for current Domain

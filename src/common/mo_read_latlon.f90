@@ -1,23 +1,19 @@
-!>       \file mo_read_latlon.f90
+!> \file mo_read_latlon.f90
+!> \brief \copybrief mo_read_latlon
+!> \details \copydetails mo_read_latlon
 
-!>       \brief reading latitude and longitude coordinates for each domain
-
-!>       \details TODO: add description
-
-!>       \authors Stephan Thober
-
-!>       \date Nov 2013
-
-! Modifications:
-
+!> \brief reading latitude and longitude coordinates for each domain
+!> \details This module provides routines for reading latitude and longitude coordinates from file.
+!> \authors Stephan Thober
+!> \date Nov 2013
+!> \copyright Copyright 2005-\today, the mHM Developers, Luis Samaniego, Sabine Attinger: All rights reserved.
+!! mHM is released under the LGPLv3+ license \license_note
+!> \ingroup f_common
 MODULE mo_read_latlon
 
-  ! This module provides routines for reading latitude and longitude coordinates
-  ! from file.
-
-  ! Written  Stephan Thober, Nov 2013
-
   USE mo_kind, ONLY : i4, dp
+  use mo_message, only: error_message
+  use mo_string_utils, only : num2str
 
   ! Of course
   IMPLICIT NONE
@@ -64,10 +60,9 @@ CONTAINS
 
   subroutine read_latlon(ii, lon_var_name, lat_var_name, level_name, level)
 
-    use mo_common_variables, only : Grid, fileLatLon
-    use mo_message, only : message
+    use mo_common_types, only: Grid
+    use mo_common_variables, only : fileLatLon
     use mo_netcdf, only : NcDataset, NcVariable
-    use mo_string_utils, only : num2str
 
     implicit none
 
@@ -107,13 +102,12 @@ CONTAINS
     ! consistency check
     if ((size(dummy, dim = 1) .NE. level%nrows) .or. &
             (size(dummy, dim = 2) .NE. level%ncols)) then
-      call message('   ***ERROR: subroutine mo_read_latlon: size mismatch in latlon file for ', trim(level_name), &
-              ' in domain ', trim(adjustl(num2str(ii))), '!')
-      call message('  Latitude expected to have following dimensions ... rows:', &
-              trim(adjustl(num2str(level%nrows))), ', cols:', trim(adjustl(num2str(level%ncols))))
-      call message('  Latitude provided ... rows:', &
+      call error_message('   ***ERROR: subroutine mo_read_latlon: size mismatch in latlon file for ', trim(level_name), &
+              ' in domain ', trim(adjustl(num2str(ii))), '!', raise=.false.)
+      call error_message('  Latitude expected to have following dimensions ... rows:', &
+              trim(adjustl(num2str(level%nrows))), ', cols:', trim(adjustl(num2str(level%ncols))), raise=.false.)
+      call error_message('  Latitude provided ... rows:', &
               trim(adjustl(num2str(size(dummy, dim = 1)))), ', cols:', trim(adjustl(num2str(size(dummy, dim = 2)))))
-      stop 1
     end if
     level%y = dummy
 
@@ -122,13 +116,12 @@ CONTAINS
     ! consistency check
     if ((size(dummy, dim = 1) .NE. level%nrows) .or. &
             (size(dummy, dim = 2) .NE. level%ncols)) then
-      call message('   ***ERROR: subroutine mo_read_latlon: size mismatch in latlon file for ', trim(level_name), &
-              ' in domain ', trim(adjustl(num2str(ii))), '!')
-      call message('  Longitude expected to have following dimensions ... rows:', &
-              trim(adjustl(num2str(level%nrows))), ', cols:', trim(adjustl(num2str(level%ncols))))
-      call message('  Longitude provided ... rows:', &
+      call error_message('   ***ERROR: subroutine mo_read_latlon: size mismatch in latlon file for ', trim(level_name), &
+              ' in domain ', trim(adjustl(num2str(ii))), '!', raise=.false.)
+      call error_message('  Longitude expected to have following dimensions ... rows:', &
+              trim(adjustl(num2str(level%nrows))), ', cols:', trim(adjustl(num2str(level%ncols))), raise=.false.)
+      call error_message('  Longitude provided ... rows:', &
               trim(adjustl(num2str(size(dummy, dim = 1)))), ', cols:', trim(adjustl(num2str(size(dummy, dim = 2)))))
-      stop 1
     end if
     level%x = dummy
 

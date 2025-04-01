@@ -32,7 +32,6 @@ To cite a certain version, have a look at the [Zenodo site][10].
 ## Install
 
 mHM can be compiled with cmake. See more details under [cmake manual][9].
-Please see the file [DEPENDENCIES][8] for external software required to run mHM.
 See also the [documentation][5] for detailed instructions to setup mHM.
 
 
@@ -42,12 +41,16 @@ See also the [documentation][5] for detailed instructions to setup mHM.
 2. Run mHM on the test domains with the command `./mhm`, which uses settings from [mhm.nml](mhm.nml).
 3. Explore the results in the [output directory](test_domain/), e.g. by using the NetCDF viewer `ncview`.
 
+
+## License
+
+LGPLv3 (c) 2005-2025 mHM-Developers
+
 [0]: https://git.ufz.de/mhm/mhm/-/releases
 [3]: doc/RELEASES.md
 [4]: https://git.ufz.de/mhm/mhm/tags/
 [5]: https://mhm.pages.ufz.de/mhm
 [6]: LICENSE
 [7]: https://mhm-ufz.org/about/publications/
-[8]: doc/DEPENDENCIES.md
 [9]: doc/INSTALL.md
 [10]: https://zenodo.org/record/3239055

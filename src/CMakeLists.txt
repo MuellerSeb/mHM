@@ -3,8 +3,10 @@ set (LIB_NAME mhm_lib)
 file(GLOB sources_mpr MPR/*mo_*.*90)
 file(GLOB sources_mhm mHM/*mo_*.*90)
 file(GLOB sources_mrm mRM/*mo_*.*90)
-file(GLOB sources_common common*/*mo_*.*90)
-list(APPEND sources ${sources_mpr} ${sources_mhm} ${sources_mrm} ${sources_common})
+file(GLOB sources_common common/*mo_*.*90)
+file(GLOB sources_meteo meteo/*mo_*.*90)
+file(GLOB sources_coupling coupling/*mo_*.*90)
+list(APPEND sources ${sources_mpr} ${sources_mhm} ${sources_mrm} ${sources_common} ${sources_meteo} ${sources_coupling})
 option(BUILD_MHM_LIB_SHARED "Build mhm library as shared." OFF)
 if(BUILD_MHM_LIB_SHARED)
   add_library(${LIB_NAME} SHARED ${sources})
@@ -13,21 +15,44 @@ else()
 endif()
 target_include_directories(${LIB_NAME} PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
 
-include(../cmake/cmake-modules/CPM.cmake)
+# add FORCES
+# when building sdist download forces to top folder with CPM by setting "source cache"
+if(${SKBUILD_STATE} MATCHES "sdist")
+  set(FORCES_WITH_NETCDF OFF)  # we don't need netcdf to create sdist
+  message(STATUS "mHM: downloading forces for sdist")
+  file(REMOVE_RECURSE "${CMAKE_CURRENT_SOURCE_DIR}/../forces")
+endif()
+# use CPM
+include(../cmake/CPM.cmake)
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../forces")
   message(STATUS "mHM: found local forces directory")
   set(CPM_forces_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/../forces" CACHE PATH "Local source path for FORCES.")
 else()
-  set(CPM_forces_SOURCE "" CACHE PATH "Local source path for FORCES.")
+  set(CPM_forces_SOURCE $ENV{MHM_BUILD_FORCES_PATH} CACHE PATH "Local source path for FORCES.")
 endif()
-CPMAddPackage("https://git.ufz.de/chs/forces.git@0.3.2")
+# check forces version file
+file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/../version_forces.txt" ver_forces LIMIT_COUNT 1)
+# cmake directive to specify forces version: CPM_forces_VERSION
+set(CPM_forces_VERSION "${ver_forces}" CACHE STRING "FORCES version to download with CPM.")
+CPMAddPackage("https://git.ufz.de/chs/forces.git#${CPM_forces_VERSION}")
 if(BUILD_MHM_LIB_SHARED)
   set_property(TARGET forces PROPERTY POSITION_INDEPENDENT_CODE ON)
 endif()
 target_link_libraries(${LIB_NAME} PUBLIC forces)
 
+if(${SKBUILD_STATE} MATCHES "sdist")
+    file(COPY "${FORCES_SOURCE_DIR}" DESTINATION "${CMAKE_CURRENT_SOURCE_DIR}/..")
+    get_filename_component(_fpath "${FORCES_SOURCE_DIR}" NAME)
+    file(RENAME "${CMAKE_CURRENT_SOURCE_DIR}/../${_fpath}" "${CMAKE_CURRENT_SOURCE_DIR}/../forces")
+    message(STATUS "mHM: copied forces from '${FORCES_SOURCE_DIR}' to './forces'.")
+endif()
+
+# check mhm specific env-vars
+if(DEFINED ENV{MHM_BUILD_PARALLEL})
+  set(CMAKE_WITH_OpenMP $ENV{MHM_BUILD_PARALLEL})
+endif()
 # add all compile options (MPI, OpenMP, Lapack, Coverage)
-include(../cmake/cmake-modules/compileoptions.cmake)
+include(../cmake/compileoptions.cmake)
 if (CMAKE_WITH_MPI)
   target_compile_definitions(${LIB_NAME} PRIVATE MPI)
   target_link_libraries(${LIB_NAME} PRIVATE MPI::MPI_Fortran)
@@ -41,8 +66,8 @@ endif()
 if(CMAKE_Fortran_COMPILER_ID MATCHES "GNU")
   target_compile_definitions(${LIB_NAME} PRIVATE GFORTRAN)
   target_compile_options(${LIB_NAME} PUBLIC
-    -ffree-form -ffixed-line-length-132
-    $<$<CONFIG:DEBUG>:-Og -g -Wall -Wextra -fimplicit-none -fbacktrace -fcheck=all -ffpe-trap=zero,overflow,underflow -finit-real=snan -pedantic-errors>
+    $<$<NOT:$<BOOL:${BUILD_MHM_PYBIND}>>:-ffree-form -ffixed-line-length-132>
+    $<$<CONFIG:DEBUG>:-Og -g -Wall -Wextra -fimplicit-none -fbacktrace -fcheck=all -ffpe-trap=zero,overflow,underflow -finit-real=snan -pedantic>
     $<$<CONFIG:RELEASE>:-O3>
     $<$<BOOL:${CMAKE_WITH_GPROF}>:-pg>
   )

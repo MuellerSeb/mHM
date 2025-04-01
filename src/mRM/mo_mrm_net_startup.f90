@@ -1,26 +1,32 @@
-!>       \file mo_mrm_net_startup.f90
+!> \file mo_mrm_net_startup.f90
+!> \brief \copybrief mo_mrm_net_startup
+!> \details \copydetails mo_mrm_net_startup
 
-!>       \brief Startup drainage network for mHM.
-
-!>       \details This module initializes the drainage network at L11 in mHM.
-!>       - Delineation of drainage network at level 11.
-!>       - Setting network topology (i.e. nodes and link).
-!>       - Determining routing order.
-!>       - Determining cell locations for network links.
-!>       - Find drainage outlet.
-!>       - Determine stream (links) features.
-
-!>       \authors Luis Samaniego
-
-!>       \date Dec 2012
-
-! Modifications:
-! Rohini Kumar May 2014 - cell area calulation based on a regular lat-lon grid or on a regular X-Y coordinate system
-! Robert Schweppe Jun 2018 - refactoring and reformatting
-
+!> \brief Startup drainage network for mHM.
+!> \details This module initializes the drainage network at L11 in mHM.
+!! - Delineation of drainage network at level 11.
+!! - Setting network topology (i.e. nodes and link).
+!! - Determining routing order.
+!! - Determining cell locations for network links.
+!! - Find drainage outlet.
+!! - Determine stream (links) features.
+!!
+!> \changelog
+!! - Rohini Kumar May 2014
+!!   - cell area calulation based on a regular lat-lon grid or on a regular X-Y coordinate system
+!! - Robert Schweppe Jun 2018
+!!   - refactoring and reformatting
+!> \authors Luis Samaniego
+!> \date Dec 2012
+!> \copyright Copyright 2005-\today, the mHM Developers, Luis Samaniego, Sabine Attinger: All rights reserved.
+!! mHM is released under the LGPLv3+ license \license_note
+!> \ingroup f_mrm
 module mo_mrm_net_startup
   use mo_kind, only : i4, dp
+  use mo_message, only : message, error_message
+
   implicit none
+
   PUBLIC :: L11_L1_mapping
   PUBLIC :: L11_flow_direction
   PUBLIC :: L11_set_network_topology
@@ -222,8 +228,8 @@ contains
 
     use mo_append, only : append
     use mo_common_constants, only : nodata_i4
-    use mo_common_variables, only : Grid, domainMeta, level0
-    use mo_message, only : message
+    use mo_common_types, only: Grid
+    use mo_common_variables, only : domainMeta, level0
     use mo_mrm_global_variables, only : L0_draSC, L0_fAcc, L0_fDir, L0_l11_remap, L11_colOut, L11_fDir, &
                                         L11_nOutlets, L11_rowOut, domain_mrm, level11
     use mo_string_utils, only : num2str
@@ -365,7 +371,7 @@ contains
         draSC0(ii, jj) = kk
       end do
 
-      ! case where routing and input data scale differs 
+      ! case where routing and input data scale differs
     ELSE
       ! =======================================================================
       ! ST: find all cells whose downstream cells are outside the domain
@@ -532,7 +538,7 @@ contains
           case (4)
             fDir11(ic, jc) = 64
           case default
-            stop 'Error L11_flow_direction: side = -1'
+             call error_message('Error L11_flow_direction: side = -1')
           end select
         end if
 
@@ -644,7 +650,7 @@ contains
 
 
     !     Routing network vectors have nNodes size instead of nLinks to
-    !     avoid the need of having two extra indices to identify a Domain. 
+    !     avoid the need of having two extra indices to identify a Domain.
     ! allocate
     allocate (nLinkFromN (level11(iDomain)%nCells))  ! valid from (1 : nLinks)
     allocate (nLinkToN   (level11(iDomain)%nCells))  ! "
@@ -658,7 +664,7 @@ contains
     nLinkToN(:) = nodata_i4
     fDir11(:, :) = nodata_i4
 
-    ! get grids of L11 
+    ! get grids of L11
     fDir11(:, :) = UNPACK(L11_fDir (level11(iDomain)%iStart : level11(iDomain)%iEnd), level11(iDomain)%mask, nodata_i4)
 
     ! ------------------------------------------------------------------
@@ -758,7 +764,7 @@ contains
 
     nLinks = level11(iDomain)%nCells - L11_nOutlets(iDomain)
     !  Routing network vectors have nNodes size instead of nLinks to
-    !  avoid the need of having two extra indices to identify a Domain. 
+    !  avoid the need of having two extra indices to identify a Domain.
 
     ! allocate
     allocate (nLinkFromN  (level11(iDomain)%nCells))  ! all vectors valid from (1 : nLinks)
@@ -779,7 +785,7 @@ contains
 
     ! for a single node model run
     if(level11(iDomain)%nCells .GT. 1) then
-      ! get network vectors of L11 
+      ! get network vectors of L11
       nLinkFromN(:) = L11_fromN (level11(iDomain)%iStart : level11(iDomain)%iEnd)
       nLinkToN(:) = L11_toN   (level11(iDomain)%iStart : level11(iDomain)%iEnd)
 
@@ -841,7 +847,7 @@ contains
     !--------------------------------------------------------
     ! Start padding up local variables to global variables
     !--------------------------------------------------------
-    ! L11 network data sets 
+    ! L11 network data sets
     call append(L11_rOrder, nLinkROrder(:))
     call append(L11_label, nLinkLabel(:))
     call append(L11_sink, nLinkSink(:))
@@ -882,8 +888,8 @@ contains
 
     use mo_append, only : append
     use mo_common_constants, only : nodata_i4
-    use mo_common_variables, only : Grid, domainMeta, level0
-    use mo_message, only : message
+    use mo_common_types, only: Grid
+    use mo_common_variables, only : domainMeta, level0
     use mo_mrm_global_variables, only : L0_draSC, L0_fDir, L11_colOut, L11_fCol, L11_fRow, L11_fromN, &
                                         L11_nOutlets, L11_netPerm, L11_rowOut, L11_tCol, L11_tRow, domain_mrm, level11
     use mo_string_utils, only : num2str
@@ -942,7 +948,7 @@ contains
     nLinks = level11(iDomain)%nCells - nOutlets
 
     !  Routing network vectors have level11(iDomain)%nCells size instead of nLinks to
-    !  avoid the need of having two extra indices to identify a Domain. 
+    !  avoid the need of having two extra indices to identify a Domain.
     ! allocate
     allocate (rowOut        (level11(iDomain)%nCells))
     allocate (colOut        (level11(iDomain)%nCells))
@@ -973,7 +979,7 @@ contains
       fDir0(:, :) = UNPACK(L0_fDir  (s0 : e0), level0_iDomain%mask, nodata_i4)
       draSC0(:, :) = UNPACK(L0_draSC (s0 : e0), level0_iDomain%mask, nodata_i4)
 
-      ! get network vectors of L11 
+      ! get network vectors of L11
       nLinkFromN(:) = L11_fromN   (level11(iDomain)%iStart : level11(iDomain)%iEnd)
       netPerm(:) = L11_netPerm (level11(iDomain)%iStart : level11(iDomain)%iEnd)
       rowOut(:) = L11_rowOut  (level11(iDomain)%iStart : level11(iDomain)%iEnd)
@@ -1018,10 +1024,9 @@ contains
               if (iRow .eq. oLoc(kk, 1) .and. jCol .eq. oLoc(kk, 2)) exit
             end do
             if (prevRow .eq. iRow .and. prevCol .eq. jCol) then
-              call message('Something went wrong during L11_link_location, ', &
+              call error_message('Something went wrong during L11_link_location, ', &
                   'movedownonecell got stuck in infinite loop at cell (', num2str(iRow), ' ', &
                   num2str(jCol))
-              stop 1
             end if
           end do
           ! set "to" cell (when an outlet is reached)
@@ -1037,7 +1042,7 @@ contains
     !--------------------------------------------------------
     ! Start padding up local variables to global variables
     !--------------------------------------------------------
-    ! L11 network data sets 
+    ! L11 network data sets
     call append(L11_fRow, nLinkFromRow(:))
     call append(L11_fCol, nLinkFromCol(:))
     call append(L11_tRow, nLinkToRow(:))
@@ -1084,7 +1089,8 @@ contains
 
     use mo_append, only : append
     use mo_common_constants, only : nodata_i4
-    use mo_common_variables, only : Grid, domainMeta, level0
+    use mo_common_types, only: Grid
+    use mo_common_variables, only : domainMeta, level0
     use mo_mrm_global_variables, only : L0_InflowgaugeLoc, L0_draCell, L0_draSC, L0_fDir, L0_gaugeLoc, domain_mrm, &
                                         l0_l11_remap
 
@@ -1154,7 +1160,7 @@ contains
       end do
       draCell0(ii, jj) = iSC
 
-      ! find cell at L11 corresponding to gauges in Domain at L0 !>> L11_on_L0 is Id of
+      ! find cell at L11 corresponding to gauges in Domain at L0 ! >> L11_on_L0 is Id of
       ! the routing cell at level-11
       if (gaugeLoc0(ii, jj) .NE. nodata_i4) then
         ! evaluation gauges
@@ -1228,7 +1234,8 @@ contains
 
     use mo_append, only : append
     use mo_common_constants, only : nodata_dp, nodata_i4
-    use mo_common_variables, only : Grid, domainMeta, L0_elev, iFlag_cordinate_sys, level0, processMatrix
+    use mo_common_types, only: Grid
+    use mo_common_variables, only : domainMeta, L0_elev, iFlag_cordinate_sys, level0, processMatrix
     use mo_mrm_global_variables, only : L0_fDir, &
         L0_floodPlain, L0_streamNet, L11_aFloodPlain, L11_fCol, L11_fRow, L11_length, &
         L11_nOutlets, L11_netPerm, L11_slope, L11_tCol, L11_tRow, level11
@@ -1305,7 +1312,7 @@ contains
 
     !  Routing network vectors have nNodes size instead of nLinks to
     !  avoid the need of having two extra indices to identify a Domain.
-    allocate (stack             (level11(iDomain)%nCells, 2)) !>> stack(nNodes, 2)
+    allocate (stack             (level11(iDomain)%nCells, 2)) ! >> stack(nNodes, 2)
     allocate (dummy_1d          (2))
     allocate (append_chunk      (8, 2))
     allocate (netPerm           (level11(iDomain)%nCells))
@@ -1504,7 +1511,8 @@ contains
 
     use mo_append, only : append
     use mo_common_constants, only : nodata_dp
-    use mo_common_variables, only : Grid, domainMeta, L0_LCover, level0, domainMeta, nLCoverScene
+    use mo_common_types, only: Grid
+    use mo_common_variables, only : domainMeta, L0_LCover, level0, domainMeta, nLCoverScene
     use mo_mrm_global_variables, only : L0_floodPlain, L11_aFloodPlain, &
                                         L11_nLinkFracFPimp, L11_nOutlets, level11
 
@@ -1822,7 +1830,8 @@ contains
 
   subroutine cellLength(iDomain, fDir, iRow, jCol, iCoorSystem, length)
 
-    use mo_common_variables, only : Grid, domainMeta, level0
+    use mo_common_types, only: Grid
+    use mo_common_variables, only : domainMeta, level0
     use mo_constants, only : SQRT2_dp
 
     implicit none
@@ -2165,7 +2174,7 @@ contains
   !>        \details L11 celerity based on L0 elevation and L0 fAcc
 
   !     INTENT(IN)
-  !>        \param[in] 
+  !>        \param[in]
 
   !     INTENT(INOUT)
   !         None
@@ -2206,8 +2215,8 @@ contains
     use mo_append, only: append
     use mo_mpr_global_variables, only: &
         L0_slope               ! IN:    slope [%]
+    use mo_common_types, only: Grid
     use mo_common_variables, only: &
-        Grid,                &
         domainMeta,          & ! IN:    for L0 Domain indexer
         level0                 ! IN:    level 0 grid
     use mo_mrm_global_variables, only: &
@@ -2215,10 +2224,10 @@ contains
         L0_fAcc,             & ! IN:    flow accumulation (number of cells)?
         L0_streamNet,        & ! IN:    stream Network at Level 0
         level11,             & ! IN:    level 11 grid
-        L11_fRow,            & ! IN:    from row in L0 grid 
+        L11_fRow,            & ! IN:    from row in L0 grid
         L11_fCol,            & ! IN:    from col in L0 grid
-        L11_tRow,            & ! IN:    to row in L0 grid 
-        L11_tCol,            & ! IN:    to col in L0 grid 
+        L11_tRow,            & ! IN:    to row in L0 grid
+        L11_tCol,            & ! IN:    to col in L0 grid
         L11_netPerm,         & ! IN:    routing order (permutation)
         L11_nOutlets,        & ! IN:    Number of Outlets/Sinks
         L11_celerity,        & ! INOUT: averaged celerity
@@ -2226,8 +2235,8 @@ contains
 
     implicit none
 
-    integer(i4), intent(in)                  :: iDomain         ! Domain 
-    real(dp), dimension(:), intent(in)       :: param 
+    integer(i4), intent(in)                  :: iDomain         ! Domain
+    real(dp), dimension(:), intent(in)       :: param
 
     ! local
     integer(i4)                              :: nCells0
@@ -2245,10 +2254,10 @@ contains
     real(dp),    dimension(:), allocatable :: slope_tmp
     real(dp),    dimension(:,:), allocatable :: cellarea0
     integer(i4), dimension(:),   allocatable :: netPerm         ! routing order (permutation)
-    integer(i4), dimension(:),   allocatable :: nLinkFromRow   
+    integer(i4), dimension(:),   allocatable :: nLinkFromRow
     integer(i4), dimension(:),   allocatable :: nLinkFromCol
-    integer(i4), dimension(:),   allocatable :: nLinkToRow     
-    integer(i4), dimension(:),   allocatable :: nLinkToCol  
+    integer(i4), dimension(:),   allocatable :: nLinkToRow
+    integer(i4), dimension(:),   allocatable :: nLinkToCol
     integer(i4)                              :: ii, rr, ns
     integer(i4)                              :: frow, fcol
     integer(i4)                              :: fId,  tId
@@ -2295,13 +2304,13 @@ contains
     !  Routing network vectors have nNodes size instead of nLinks to
     !  avoid the need of having two extra indices to identify a Domain.
     allocate ( stack       ( 1 ) )
-    allocate ( append_chunk( 1 ) ) 
+    allocate ( append_chunk( 1 ) )
     allocate ( dummy_1d    ( 2 ))
-    allocate ( netPerm     ( nNodes ) )  
+    allocate ( netPerm     ( nNodes ) )
     allocate ( nLinkFromRow( nNodes ) )
     allocate ( nLinkFromCol( nNodes ) )
-    allocate ( nLinkToRow  ( nNodes ) )  
-    allocate ( nLinkToCol  ( nNodes ) ) 
+    allocate ( nLinkToRow  ( nNodes ) )
+    allocate ( nLinkToCol  ( nNodes ) )
     allocate ( celerity11  ( nNodes ) )
     allocate ( slope_tmp   ( nNodes ) )
 
@@ -2350,7 +2359,7 @@ contains
       end if
       slope0(:,:) = UNPACK(slope_tmp,  mask0, nodata_dp_tmp )
 
-      ! get network vectors of L11 
+      ! get network vectors of L11
       netPerm(:)      = L11_netPerm ( iStart11 : iEnd11 )
       nLinkFromRow(:) = L11_fRow    ( iStart11 : iEnd11 )
       nLinkFromCol(:) = L11_fCol    ( iStart11 : iEnd11 )
@@ -2376,7 +2385,7 @@ contains
           stack(ns) = param(1) * sqrt(L0_link_slope)
 
           celerity0(frow, fcol) = stack(ns)
-          ns = ns + 1                
+          ns = ns + 1
           fId = iD0(frow, fcol)
           if( .NOT. (fID == tID)) then
             call append(stack, append_chunk)
@@ -2409,7 +2418,7 @@ contains
     deallocate (&
         mask0, iD0, slope_tmp, slopemask0, &
         slope0, fDir0, cellarea0,   &
-        stack, netPerm, nLinkFromRow, nLinkFromCol, nLinkToRow, nLinkToCol) 
+        stack, netPerm, nLinkFromRow, nLinkFromCol, nLinkToRow, nLinkToCol)
 
   end subroutine L11_calc_celerity
 

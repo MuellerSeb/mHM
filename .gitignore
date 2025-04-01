@@ -17,7 +17,13 @@ latex
 doxygen_warn.txt
 
 # Exclusions
-./mhm
+mhm
+!pybind/src/mhm
+mhm_debug
+mhm_mpi
+mhm_mpi_debug
+mhm_openmp
+mhm_openmp_debug
 *.g90
 *.o
 *.mod
@@ -26,14 +32,9 @@ doxygen_warn.txt
 mhm_env/
 src/*/*.release/
 src/*/*.debug/
-test_domain/output_b1/**
-!test_domain/output_b1/.gitkeep
-test_domain_2/output/**
-!test_domain_2/output/.gitkeep
-test_domain/restart/**
-!test_domain/restart/.gitkeep
-test_domain_2/restart/**
-!test_domain_2/restart/.gitkeep
+test_domain*/output*/*.nc
+test_domain*/output*/*.out
+test_domain*/restart/*.nc
 *prog_for_check
 *terminal
 
@@ -63,6 +64,9 @@ wheels/
 .installed.cfg
 *.egg
 MANIFEST
+_version.py
+*.whl
+_skbuild/
 
 # PyInstaller
 #  Usually these files are written by a python script from a template
@@ -636,3 +640,6 @@ GitHub.sublime-settings
 
 # VSCode settings file
 .vscode/
+
+# additional folders
+info/

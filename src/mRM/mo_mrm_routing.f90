@@ -1,19 +1,20 @@
-!>       \file mo_mrm_routing.f90
+!> \file mo_mrm_routing.f90
+!> \brief   \copybrief mo_mrm_routing
+!> \details \copydetails mo_mrm_routing
 
-!>       \brief Performs runoff routing for mHM at level L11.
-
-!>       \details This module performs flood routing at a given time step
-!>       through the stream network at level L11 to the sink cell.
-!>       The Muskingum flood routing algorithm is used.
-
-!>       \authors Luis Samaniego
-
-!>       \date Dec 2012
-
-! Modifications:
-! Stephan Thober Aug 2015 - adapted to mRM
-! Sebastian Mueller Jun 2020 - outsourcing helper functions
-
+!> \brief Performs runoff routing for mHM at level L11.
+!> \details This module performs flood routing at a given time step through the stream network at level L11 to the sink cell.
+!! The Muskingum flood routing algorithm is used.
+!> \changelog
+!! - Stephan Thober Aug 2015
+!!   - adapted to mRM
+!! - Sebastian Mueller Jun 2020
+!!   - outsourcing helper functions
+!> \authors Luis Samaniego
+!> \date Dec 2012
+!> \copyright Copyright 2005-\today, the mHM Developers, Luis Samaniego, Sabine Attinger: All rights reserved.
+!! mHM is released under the LGPLv3+ license \license_note
+!> \ingroup f_mrm
 MODULE mo_mrm_routing
 
   ! This module performs runoff flood routing for mHM.
@@ -409,7 +410,7 @@ CONTAINS
     ! [m3 s-1] Simulated routed discharge
     real(dp), dimension(nNodes), intent(out) :: netNode_Qmod
 
-    integer(i4) :: i, k, iNode, tNode
+    integer(i4) :: g, i, k, iNode, tNode
     ! current routing state (2)
     integer(i4), parameter :: IT = 2
     ! past routing state (1)
@@ -430,7 +431,7 @@ CONTAINS
     !--------------------------------------------------------------------------
     ! ST - decent parallelization has to be done!!!
     !!$OMP parallel
-    !!$OMP do private( i, inode, tnode)
+    !!$OMP do private(g, i, inode, tnode)
     do k = 1, nLinks
       ! get LINK routing order -> i
       i = netPerm(k)
@@ -447,9 +448,9 @@ CONTAINS
 
       ! check if the inflow from upstream cells should be deactivated
       if (nInflowGauges .GT. 0) then
-        do i = 1, nInflowGauges
+        do g = 1, nInflowGauges
           ! check if downstream Node (tNode) is inflow gauge and headwaters should be ignored
-          if ((tNode == InflowNodeList(i)) .AND. (.NOT. InflowHeadwater(i))) netNode_qTR(iNode, IT) = 0.0_dp
+          if ((tNode == InflowNodeList(g)) .AND. (.NOT. InflowHeadwater(g))) netNode_qTR(iNode, IT) = 0.0_dp
         end do
       end if
 

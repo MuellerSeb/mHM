@@ -1,16 +1,17 @@
-!>       \file mo_mrm_constants.f90
+!> \file mo_mrm_constants.f90
+!> \brief \copybrief mo_mrm_constants
+!> \details \copydetails mo_mrm_constants
 
-!>       \brief Provides mRM specific constants
-
-!>       \details Provides mRM specific constants such as flood plain elevation.
-
-!>       \authors Stephan Thober
-
-!>       \date Aug 2015
-
-! Modifications:
-! Robert Schweppe Jun 2018 - refactoring and reformatting
-
+!> \brief Provides mRM specific constants
+!> \details Provides mRM specific constants such as flood plain elevation.
+!> \changelog
+!! - Robert Schweppe Jun 2018
+!!   - refactoring and reformatting
+!> \authors Stephan Thober
+!> \date Aug 2015
+!> \copyright Copyright 2005-\today, the mHM Developers, Luis Samaniego, Sabine Attinger: All rights reserved.
+!! mHM is released under the LGPLv3+ license \license_note
+!> \ingroup f_mrm
 module mo_mrm_constants
   use mo_kind, only : i4, dp
   implicit none

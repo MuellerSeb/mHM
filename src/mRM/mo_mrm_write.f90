@@ -1,32 +1,28 @@
-!>       \file mo_mrm_write.f90
+!> \file mo_mrm_write.f90
+!> \brief   \copybrief mo_mrm_write
+!> \details \copydetails mo_mrm_write
 
-!>       \brief write of discharge and restart files
-
-!>       \details This module contains the subroutines for
-!>       writing the discharge files and optionally the restart
-!>       files.
-
-!>       \authors Stephan Thober
-
-!>       \date Aug 2015
-
-! Modifications:
-
+!> \brief write of discharge and restart files
+!> \details This module contains the subroutines for writing the discharge files and optionally the restart files.
+!> \authors Stephan Thober
+!> \date Aug 2015
+!> \copyright Copyright 2005-\today, the mHM Developers, Luis Samaniego, Sabine Attinger: All rights reserved.
+!! mHM is released under the LGPLv3+ license \license_note
+!> \ingroup f_mrm
 module mo_mrm_write
 
   use mo_kind, only : i4, dp
   use mo_mrm_write_fluxes_states, only : OutputDataset
+  use mo_mrm_global_variables, only : output_time_reference_mrm
+  use mo_message, only : message, error_message
 
   implicit none
 
   public :: mrm_write
-  public :: mrm_write_output_fluxes
   public :: mrm_write_optinamelist
   public :: mrm_write_optifile
 
   private
-
-  type(OutputDataset) :: nc ! netcdf Output Dataset
 
 contains
 
@@ -60,7 +56,6 @@ contains
     use mo_mrm_global_variables, only : domain_mrm, &
                                         gauge, mRM_runoff, nGaugesTotal, nMeasPerDay
     use mo_mrm_restart, only : mrm_write_restart
-    use mo_message, only : message
 
     implicit none
 
@@ -120,8 +115,7 @@ contains
     if (modulo(TPD_sim, TPD_obs) .eq. 0) then
       factor = TPD_sim / TPD_obs
     else
-      call message(' Error: Number of modelled datapoints is no multiple of measured datapoints per day')
-      stop
+      call error_message(' Error: Number of modelled datapoints is no multiple of measured datapoints per day')
     end if
 
 
@@ -263,14 +257,13 @@ contains
                                     global_parameters_name, level0, level1, domainMeta, nLCoverScene, processMatrix, &
                                     resolutionHydrology, write_restart
     use mo_kind, only : dp, i4
-    use mo_message, only : message
     use mo_mrm_file, only : version
     use mo_mrm_global_variables, only : InflowGauge, L11_L1_Id, L11_fromN, L11_label, &
                                         L11_length, L11_netPerm, L11_rOrder, L11_slope, L11_toN, L1_L11_Id, domain_mrm, &
                                         dirGauges, dirTotalRunoff, gauge, level11, nGaugesTotal, nInflowGaugesTotal
     use mo_string_utils, only : num2str
     use mo_utils, only : ge
-    use mo_os, only : path_isdir
+    use mo_os, only : check_path_isdir
 
     implicit none
 
@@ -285,12 +278,10 @@ contains
     call message()
     call message('  Log-file written to ', trim(fName))
     !checking whether the directory exists where the file shall be created or opened
-    call path_isdir(trim(adjustl(dirConfigOut)), quiet_=.true., throwError_=.true.)
+    call check_path_isdir(trim(adjustl(dirConfigOut)), raise=.true.)
     open(uconfig, file = fName, status = 'unknown', action = 'write', iostat = err)
     if (err .ne. 0) then
-      call message('  Problems while creating File')
-      call message('  Error-Code', num2str(err))
-      stop
+      call error_message('  Problems while creating File. Error-Code ', num2str(err))
     end if
     write(uconfig, 200)
     write(uconfig, 100) 'mRM-UFZ v-' // trim(version)
@@ -581,7 +572,6 @@ contains
     use mo_common_variables, only : dirOut, domainMeta
     use mo_errormeasures, only : kge, nse
     use mo_julian, only : dec2date
-    use mo_message, only : message
     use mo_mrm_file, only : file_daily_discharge, ncfile_discharge, udaily_discharge
     use mo_mrm_global_variables, only : domain_mrm, gauge
     use mo_string_utils, only : num2str
@@ -613,7 +603,7 @@ contains
 
     ! nc related variables
     type(NcDataset) :: nc_out
-    type(NcDimension) :: dim
+    type(NcDimension) :: dim, dim_bnd
     type(NcVariable) :: var
 
     ! initalize igauge_start
@@ -631,9 +621,7 @@ contains
       fName = trim(adjustl(dirOut(iDomain))) // trim(adjustl(file_daily_discharge))
       open(udaily_discharge, file = trim(fName), status = 'unknown', action = 'write', iostat = err)
       if(err .ne. 0) then
-        call message ('  IOError while openening ', trim(fName))
-        call message ('  Error-Code ', num2str(err))
-        stop
+        call error_message('  IOError while openening "', trim(fName), '". Error-Code ', num2str(err))
       end if
 
       ! header
@@ -665,7 +653,17 @@ contains
       tlength = evalPer(iDomain)%julEnd - evalPer(iDomain)%julStart + 1
       ! write time
       allocate(taxis(tlength))
-      forall(tt = 1 : tlength) taxis(tt) = tt * 24 - 1
+
+      ! tt is dependent on the unit of the time axis and is set to hours in mRM
+      select case( output_time_reference_mrm)
+        case(0)
+          forall(tt = 1 : tlength) taxis(tt) = (tt-1) * 24
+        case(1)
+          forall(tt = 1 : tlength) taxis(tt) = tt * 24 - 12
+        case(2)
+          forall(tt = 1 : tlength) taxis(tt) = tt * 24
+      end select
+
       call dec2date(real(evalPer(iDomain)%julStart, dp) - 0.5_dp, yy = year, mm = month, dd = day)
       dim = nc_out%setDimension("time", tlength)
       var = nc_out%setVariable("time", "i32", [dim])
@@ -675,6 +673,14 @@ contains
         'hours since '//trim(num2str(year))//'-'//trim(num2str(month, '(i2.2)'))//'-'//trim(num2str(day, '(i2.2)'))//' 00:00:00' &
       )
       call var%setAttribute("long_name", "time in hours")
+      call var%setAttribute("bounds", "time_bnds")
+      call var%setAttribute("axis", "T")
+      dim_bnd = nc_out%setDimension("bnds", 2)
+      var = nc_out%setVariable("time_bnds", "i32", [dim_bnd, dim])
+      do tt = 1, tlength
+        call var%setData((tt - 1) * 24, (/1, tt/))
+        call var%setData(tt * 24, (/2, tt/))
+      end do
       deallocate(taxis)
       ! write gauges
       do gg = igauge_start, igauge_end
@@ -759,7 +765,6 @@ contains
     use mo_common_variables, only : dirOut, domainMeta
     use mo_errormeasures, only : kge, nse
     use mo_julian, only : dec2date
-    use mo_message, only : message
     use mo_mrm_file, only : ncfile_subdaily_discharge, file_subdaily_discharge, &
                             usubdaily_discharge
     use mo_mrm_global_variables, only : domain_mrm, gauge, nMeasPerDay
@@ -795,9 +800,12 @@ contains
 
     ! nc related variables
     type(NcDataset) :: nc_out
-    type(NcDimension) :: dim
+    type(NcDimension) :: dim, dim_bnd
     type(NcVariable) :: var
 
+    ! use minutes if needed
+    logical :: use_minutes
+    integer(i4) :: time_unit_factor
 
     ! initalize igauge_start
     igauge_start = 1
@@ -819,9 +827,7 @@ contains
       fName = trim(adjustl(dirOut(iDomain))) // trim(adjustl(file_subdaily_discharge))
       open(usubdaily_discharge, file = trim(fName), status = 'unknown', action = 'write', iostat = err)
       if(err .ne. 0) then
-        call message ('  IOError while openening ', trim(fName))
-        call message ('  Error-Code ', num2str(err))
-        stop
+        call error_message('  IOError while openening "', trim(fName), '". Error-Code ', num2str(err))
       end if
 
       ! header
@@ -853,17 +859,51 @@ contains
       tlength = (evalPer(iDomain)%julEnd - evalPer(iDomain)%julStart + 1) * nMeasPerDay
       ! write time
       allocate(taxis(tlength))
-      forall(tt = 1 : tlength) taxis(tt) = (tt - 1) * factor
+
+      use_minutes = .false.
+      time_unit_factor = 1
+      if ( mod(factor, 2) == 1 ) then
+        use_minutes = .true.
+        time_unit_factor = 60
+      end if
+
+      ! tt is dependent on the unit of the time axis and is set to hours in mRM
+      select case( output_time_reference_mrm)
+        case(0)
+          forall(tt = 1 : tlength) taxis(tt) = (tt-1) * factor * time_unit_factor
+        case(1)
+          forall(tt = 1 : tlength) taxis(tt) = tt * factor - factor * time_unit_factor / 2
+        case(2)
+          forall(tt = 1 : tlength) taxis(tt) = tt * factor * time_unit_factor
+      end select
+
       call dec2date(real(evalPer(iDomain)%julStart, dp) - 0.5_dp, yy = year, mm = month, dd = day, hh = hour)
       dim = nc_out%setDimension("time", tlength)
       var = nc_out%setVariable("time", "i32", [dim])
       call var%setData(taxis)
-      call var%setAttribute( &
-        "units", &
-        'hours since '//trim(num2str(year))//'-'//trim(num2str(month, '(i2.2)'))//'-'//trim(num2str(day, '(i2.2)'))//' '// &
-        trim(num2str(hour, '(i2.2)'))//':00:00' &
-      )
-      call var%setAttribute("long_name", "time in hours")
+      if (use_minutes) then
+        call var%setAttribute( &
+          "units", &
+          'minutes since '//trim(num2str(year))//'-'//trim(num2str(month, '(i2.2)'))//'-'//trim(num2str(day, '(i2.2)'))//' '// &
+          trim(num2str(hour, '(i2.2)'))//':00:00' &
+        )
+        call var%setAttribute("long_name", "time in minutes")
+      else
+        call var%setAttribute( &
+          "units", &
+          'hours since '//trim(num2str(year))//'-'//trim(num2str(month, '(i2.2)'))//'-'//trim(num2str(day, '(i2.2)'))//' '// &
+          trim(num2str(hour, '(i2.2)'))//':00:00' &
+        )
+        call var%setAttribute("long_name", "time in hours")
+      end if
+      call var%setAttribute("bounds", "time_bnds")
+      call var%setAttribute("axis", "T")
+      dim_bnd = nc_out%setDimension("bnds", 2)
+      var = nc_out%setVariable("time_bnds", "i32", [dim_bnd, dim])
+      do tt = 1, tlength
+        call var%setData((tt - 1) * factor * time_unit_factor, (/1, tt/))
+        call var%setData(tt * factor * time_unit_factor, (/2, tt/))
+      end do
       deallocate(taxis)
       ! write gauges
       do gg = igauge_start, igauge_end
@@ -906,101 +946,6 @@ contains
     !
   end subroutine write_subdaily_obs_sim_discharge
 
-
-  ! ------------------------------------------------------------------
-
-  !    NAME
-  !        mrm_write_output_fluxes
-
-  !    PURPOSE
-  !>       \brief write fluxes to netcdf output files
-
-  !>       \details This subroutine creates a netcdf data set
-  !>       for writing L11_QTIN for different time averages.
-
-  !    INTENT(IN)
-  !>       \param[in] "integer(i4) :: iDomain"
-  !>       \param[in] "integer(i4) :: nCells"
-  !>       \param[in] "integer(i4) :: timeStep_model_outputs" timestep of model outputs
-  !>       \param[in] "integer(i4) :: warmingDays"            number of warming days
-  !>       \param[in] "real(dp) :: newTime"                   julian date of next time step
-  !>       \param[in] "integer(i4) :: nTimeSteps"             number of total timesteps
-  !>       \param[in] "integer(i4) :: nTStepDay"              number of timesteps per day
-  !>       \param[in] "integer(i4) :: tt"                     current model timestep
-  !>       \param[in] "integer(i4) :: day"                    current day of the year
-  !>       \param[in] "integer(i4) :: month"                  current month of the year
-  !>       \param[in] "integer(i4) :: year"                   current year
-  !>       \param[in] "integer(i4) :: timestep"               current model time resolution
-  !>       \param[in] "logical, dimension(:, :) :: mask11"    mask at level 11
-  !>       \param[in] "real(dp), dimension(:) :: L11_qMod"    current routed streamflow
-
-  !    HISTORY
-  !>       \authors Stephan Thober
-
-  !>       \date Aug 2015
-
-  ! Modifications:
-  ! Robert Schweppe Jun 2018 - refactoring and reformatting
-  ! Sebastian Mueller Jul 2020 - added output for river-temperature
-
-  subroutine mrm_write_output_fluxes(iDomain, nCells, timeStep_model_outputs, domainDateTime, &
-                                    tt, timestep, mask11, L11_qmod)
-
-    use mo_julian, only : caldat
-    use mo_kind, only : dp, i4
-    use mo_common_datetime_type, only : datetimeinfo
-    use mo_mrm_global_variables, only : riv_temp_pcs
-
-    implicit none
-
-    integer(i4), intent(in) :: iDomain
-
-    integer(i4), intent(in) :: nCells
-
-    ! timestep of model outputs
-    integer(i4), intent(in) :: timeStep_model_outputs
-
-    ! datetimeinfo variable
-    type(datetimeinfo), intent(in) :: domainDateTime
-
-    ! current model timestep
-    integer(i4), intent(in) :: tt
-
-    ! current model time resolution
-    integer(i4), intent(in) :: timestep
-
-    ! mask at level 11
-    logical, intent(in), dimension(:, :), pointer :: mask11
-
-    ! current routed streamflow
-    real(dp), intent(in), dimension(:) :: L11_qMod
-
-    ! update the counters
-
-    if ((domainDateTime%tIndex_out > 0_i4)) then
-
-      ! create output dataset
-      if (domainDateTime%tIndex_out == 1) nc = OutputDataset(iDomain, mask11, nCells)
-
-      ! update Dataset (riv-temp as optional input)
-      if ( riv_temp_pcs%active ) then
-        call nc%updateDataset(1, size(L11_Qmod), L11_Qmod, riv_temp_pcs%river_temp(riv_temp_pcs%s11 : riv_temp_pcs%e11))
-      else
-        call nc%updateDataset(1, size(L11_Qmod), L11_Qmod)
-      end if
-
-      ! write data
-      if (domainDateTime%writeout(timeStep_model_outputs, tt)) then
-        call nc%writeTimestep(domainDateTime%tIndex_out * timestep - 1)
-      end if
-
-      ! close dataset
-      if (tt == domainDateTime%nTimeSteps) call nc%close()
-
-    end if
-
-  end subroutine mrm_write_output_fluxes
-
   ! ------------------------------------------------------------------
 
   !    NAME
@@ -1034,7 +979,6 @@ contains
 
     use mo_common_mhm_mrm_file, only : file_opti, uopti
     use mo_common_variables, only : dirConfigOut
-    use mo_message, only : message
     use mo_string_utils, only : num2str
 
     implicit none
@@ -1059,9 +1003,7 @@ contains
     fName = trim(adjustl(dirConfigOut)) // trim(adjustl(file_opti))
     open(uopti, file = fName, status = 'unknown', action = 'write', iostat = err, recl = (n_params + 1) * 40)
     if(err .ne. 0) then
-      call message ('  IOError while openening ', trim(fName))
-      call message ('  Error-Code ', num2str(err))
-      stop
+      call error_message('  IOError while openening "', trim(fName), '" Error-Code ', num2str(err))
     end if
 
     ! header
@@ -1113,7 +1055,6 @@ contains
 
     use mo_common_mhm_mrm_file, only : file_opti_nml, uopti_nml
     use mo_common_variables, only : dirConfigOut, processMatrix
-    use mo_message, only : message
     use mo_string_utils, only : num2str
 
     implicit none
@@ -1140,9 +1081,7 @@ contains
     fName = trim(adjustl(dirConfigOut)) // trim(adjustl(file_opti_nml))
     open(uopti_nml, file = fName, status = 'unknown', action = 'write', iostat = err)
     if(err .ne. 0) then
-      call message ('  IOError while openening ', trim(fName))
-      call message ('  Error-Code ', num2str(err))
-      stop
+      call message ('  IOError while openening "', trim(fName), '" Error-Code ', num2str(err))
     end if
 
     write(uopti_nml, *) '!global_parameters'

@@ -1,17 +1,14 @@
-!>       \file mo_runoff.f90
+!> \file mo_runoff.f90
+!> \brief \copybrief mo_runoff
+!> \details \copydetails mo_runoff
 
-!>       \brief Runoff generation for the  unsaturated zone, saturated zone (or groundwater zone),
-!>       and runoff accumulation.
-
-!>       \details This module generates the runoff for the unsaturated and saturated zones and provides
-!>       runoff accumulation.
-
-!>       \authors Vladyslav Prykhodko
-
-!>       \date Dec 2012
-
-! Modifications:
-
+!> \brief Runoff generation.
+!> \details This module generates the runoff for the unsaturated and saturated zones and provides runoff accumulation.
+!> \authors Vladyslav Prykhodko
+!> \date Dec 2012
+!> \copyright Copyright 2005-\today, the mHM Developers, Luis Samaniego, Sabine Attinger: All rights reserved.
+!! mHM is released under the LGPLv3+ license \license_note
+!> \ingroup f_mhm
 MODULE mo_runoff
 
   USE mo_kind, ONLY : dp

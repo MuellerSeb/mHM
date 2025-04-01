@@ -1,34 +1,39 @@
-!>       \file mo_write_ascii.f90
+!> \file mo_write_ascii.f90
+!> \brief \copybrief mo_write_ascii
+!> \details \copydetails mo_write_ascii
 
-!>       \brief Module to write ascii file output.
-
-!>       \details Module to write ascii file output.
-!>       Writing model output to ASCII should be the exception. Therefore, output is written usually as NetCDF
-!>       and only:
-!>       (1) The configuration file of mHM,
-!>       (2) the final parameter set after optimization, and
-!>       (3) the simulated vs. observed daily discharge
-!>       is written in ASCII file format to allow for a quick assurance of proper model runs.
-
-!>       \authors Christoph Schneider, Juliane Mai, Luis Samaniego
-
-!>       \date May 2013
-
-! Modifications:
-
+!> \brief Module to write ascii file output.
+!> \details Module to write ascii file output.
+!! Writing model output to ASCII should be the exception. Therefore, output is written usually as NetCDF
+!! and only:
+!! 1. The configuration file of mHM,
+!! 2. the final parameter set after optimization, and
+!! 3. the simulated vs. observed daily discharge
+!!     is written in ASCII file format to allow for a quick assurance of proper model runs.
+!> \changelog
+!! - Modified, Juliane Mai,        May 2013
+!!   - module version and documentation
+!! - Modified, Luis Samaniego,     Nov 2013
+!!   - improving all formats
+!! - Modified, Luis Samaniego,     Mar 2014
+!!   - added inflow gauge information write out
+!! - Modified, Stephan Thober,     Jun 2014
+!!   - bug fixed: in writing network properties
+!! - Modified, Rohini Kumar,       Jun 2014
+!!   - bug fixed: writing of max and min value of discharge
+!! - Modified, Stephan Thober,     Aug 2015
+!!   - moved write_daily_obs_sim_discharge to mRM
+!> \authors Christoph Schneider, Juliane Mai, Luis Samaniego
+!> \date May 2013
+!> \copyright Copyright 2005-\today, the mHM Developers, Luis Samaniego, Sabine Attinger: All rights reserved.
+!! mHM is released under the LGPLv3+ license \license_note
+!> \ingroup f_mhm
 MODULE mo_write_ascii
 
-  ! This module is a template for the UFZ CHS mesoscale hydrologic model mHM.
-
-  ! Written  Christoph Schneider, May 2013
-  ! Modified, Juliane Mai,        May 2013 - module version and documentation
-  ! Modified, Luis Samaniego,     Nov 2013 - improving all formats
-  ! Modified, Luis Samaniego,     Mar 2014 - added inflow gauge information write out
-  ! Modified, Stephan Thober,     Jun 2014 - bug fixed: in writing network properties
-  ! Modified, Rohini Kumar,       Jun 2014 - bug fixed: writing of max and min value of discharge
-  ! Modified, Stephan Thober,     Aug 2015 - moved write_daily_obs_sim_discharge to mRM
 
   USE mo_kind, ONLY : i4, dp
+  use mo_message, only: message, error_message
+
   IMPLICIT NONE
 
   PUBLIC :: write_configfile                   ! Writes configuration file
@@ -82,7 +87,7 @@ CONTAINS
   ! P Shrestha, S Thober Aug 2018 - resolved bug while printing River Network in
   !                                 cases with multiple outlets.
 
-  Subroutine write_configfile
+  Subroutine write_configfile(dirPrecipitation, dirReferenceET, dirTemperature)
 
     use mo_common_file, only : file_config, uconfig
     use mo_common_mHM_mRM_variables, only : LCyearId, SimPer, evalPer, read_restart, timeStep, warmPer
@@ -91,12 +96,9 @@ CONTAINS
                                     global_parameters, global_parameters_name, iFlag_cordinate_sys, level0, level1, &
                                     domainMeta, nLCoverScene, resolutionHydrology, write_restart
     use mo_file, only : version
-    use mo_global_variables, only : dirPrecipitation, dirReferenceET, &
-                                    dirTemperature
     use mo_kind, only : i4
-    use mo_message, only : message
     use mo_string_utils, only : num2str
-    use mo_os, only : path_isdir
+    use mo_os, only : check_path_isdir
     use mo_common_constants, only : nodata_dp
     use mo_common_mHM_mRM_variables, only : resolutionRouting
     use mo_common_variables, only : processMatrix
@@ -105,6 +107,10 @@ CONTAINS
                                         nGaugesLocal, nInflowGaugesTotal, L11_nOutlets
 
     implicit none
+
+    character(256), dimension(:), intent(in) :: dirPrecipitation  !< Directory where precipitation files are located
+    character(256), dimension(:), intent(in) :: dirReferenceET    !< Directory where reference-ET files are located
+    character(256), dimension(:), intent(in) :: dirTemperature    !< Directory where temperature files are located
 
     character(256) :: fName
 
@@ -117,12 +123,10 @@ CONTAINS
     call message()
     call message('  Log-file written to ', trim(fName))
     !checking whether the directory exists where the file shall be created or opened
-    call path_isdir(trim(adjustl(dirConfigOut)), quiet_=.true., throwError_=.true.)
+    call check_path_isdir(trim(adjustl(dirConfigOut)), raise=.true.)
     open(uconfig, file = fName, status = 'unknown', action = 'write', iostat = err)
     if (err .ne. 0) then
-      call message('  Problems while creating File')
-      call message('  Error-Code', num2str(err))
-      stop
+      call error_message('  Problems while creating File. ', 'Error-Code ', num2str(err))
     end if
     write(uconfig, 200)
     write(uconfig, 100) 'mHM-UFZ v-' // trim(version)
@@ -428,9 +432,8 @@ CONTAINS
 
     use mo_common_mhm_mrm_file, only : file_opti, uopti
     use mo_common_variables, only : dirConfigOut
-    use mo_message, only : message
     use mo_string_utils, only : num2str
-    use mo_os, only : path_isdir
+    use mo_os, only : check_path_isdir
 
     implicit none
 
@@ -453,12 +456,10 @@ CONTAINS
     ! open file
     fName = trim(adjustl(dirConfigOut)) // trim(adjustl(file_opti))
     !checking whether the directory exists where the file shall be created or opened
-    call path_isdir(trim(adjustl(dirConfigOut)), quiet_=.true., throwError_=.true.)
+    call check_path_isdir(trim(adjustl(dirConfigOut)), raise=.true.)
     open(uopti, file = fName, status = 'unknown', action = 'write', iostat = err, recl = (n_params + 1) * 40)
     if(err .ne. 0) then
-      call message ('  IOError while openening ', trim(fName))
-      call message ('  Error-Code ', num2str(err))
-      stop
+      call error_message('  IOError while openening "', trim(fName), '". Error-Code ', num2str(err))
     end if
 
     ! header
@@ -515,9 +516,8 @@ CONTAINS
 
     use mo_common_mhm_mrm_file, only : file_opti_nml, uopti_nml
     use mo_common_variables, only : dirConfigOut, nProcesses
-    use mo_message, only : message
     use mo_string_utils, only : num2str
-    use mo_os, only : path_isdir
+    use mo_os, only : check_path_isdir
 
     implicit none
 
@@ -557,12 +557,10 @@ CONTAINS
     ! open file
     fName = trim(adjustl(dirConfigOut)) // trim(adjustl(file_opti_nml))
     !checking whether the directory exists where the file shall be created or opened
-    call path_isdir(trim(adjustl(dirConfigOut)), quiet_=.true., throwError_=.true.)
+    call check_path_isdir(trim(adjustl(dirConfigOut)), raise=.true.)
     open(uopti_nml, file = fName, status = 'unknown', action = 'write', iostat = err)
     if(err .ne. 0) then
-      call message ('  IOError while openening ', trim(fName))
-      call message ('  Error-Code ', num2str(err))
-      stop
+      call error_message('  IOError while openening "', trim(fName), '". Error-Code ', num2str(err))
     end if
 
     write(uopti_nml, *) '!global_parameters'

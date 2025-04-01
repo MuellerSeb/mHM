@@ -1,10 +1,14 @@
-!>       \file mo_mhm_eval.f90
-!>       \copydoc mo_mhm_eval
+!> \file mo_mhm_eval.f90
+!> \brief   \copybrief mo_mhm_eval
+!> \details \copydetails mo_mhm_eval
 
-!>       \brief Runs mhm with a specific parameter set and returns required variables, e.g. runoff.
-!>       \details Runs mhm with a specific parameter set and returns required variables, e.g. runoff.
-!>       \authors Juliane Mai, Rohini Kumar
-!>       \date Feb 2013
+!> \brief Runs mhm with a specific parameter set and returns required variables, e.g. runoff.
+!> \details Runs mhm with a specific parameter set and returns required variables, e.g. runoff.
+!> \authors Juliane Mai, Rohini Kumar
+!> \date Feb 2013
+!> \copyright Copyright 2005-\today, the mHM Developers, Luis Samaniego, Sabine Attinger: All rights reserved.
+!! mHM is released under the LGPLv3+ license \license_note
+!> \ingroup f_mhm
 MODULE mo_mhm_eval
 
   use mo_kind, only : i4, dp

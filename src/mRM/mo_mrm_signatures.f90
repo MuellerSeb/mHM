@@ -1,23 +1,24 @@
-!>       \file mo_mrm_signatures.f90
+!> \file mo_mrm_signatures.f90
+!> \brief   \copybrief mo_mrm_signatures
+!> \details \copydetails mo_mrm_signatures
 
-!>       \brief Module with calculations for several hydrological signatures.
-
-!>       \details This module contains calculations for hydrological signatures.
-!>       It contains:
-!>       * Autocorrelation
-!>       * Rising and declining limb densities
-!>       * Flow duration curves
-!>       * Peak distribution
-
-!>       \authors Remko Nijzink,
-
-!>       \date March 2014
-
-! Modifications:
-
+!> \brief Module with calculations for several hydrological signatures.
+!> \details This module contains calculations for hydrological signatures.
+!!
+!! It contains:
+!! - Autocorrelation
+!! - Rising and declining limb densities
+!! - Flow duration curves
+!! - Peak distribution
+!> \authors Remko Nijzink,
+!> \date March 2014
+!> \copyright Copyright 2005-\today, the mHM Developers, Luis Samaniego, Sabine Attinger: All rights reserved.
+!! mHM is released under the LGPLv3+ license \license_note
+!> \ingroup f_mrm
 MODULE mo_mrm_signatures
 
   USE mo_kind, ONLY : i4, sp, dp
+  use mo_message, only : message, error_message
 
   IMPLICIT NONE
 
@@ -27,7 +28,7 @@ MODULE mo_mrm_signatures
   PUBLIC :: Moments                 ! Moments of data and log-transformed data, e.g. mean and standard deviation.
   PUBLIC :: PeakDistribution        ! Peak distribution parameter
   PUBLIC :: RunoffRatio             ! Runoff ratio (accumulated daily discharge [mm/d] / accumulated daily precipitation [mm/d])
-  PUBLIC :: ZeroFlowRatio           ! Ratio of zero flow days to total observation days                             
+  PUBLIC :: ZeroFlowRatio           ! Ratio of zero flow days to total observation days
 
   ! ------------------------------------------------------------------
 
@@ -191,9 +192,9 @@ CONTAINS
   !>       \date March 2014
 
   ! Modifications:
-  ! Juliane Mai Jun 2015 - mask added 
-  !                      - function instead of subroutine 
-  !                      - use of percentile 
+  ! Juliane Mai Jun 2015 - mask added
+  !                      - function instead of subroutine
+  !                      - use of percentile
   !                      - add concavity_index
   ! Juliane Mai Jun 2015 - add mid_segment_slope, mhigh_segment_volume, high_segment_volume, low_segment_volume
   ! Robert Schweppe Jun 2018 - refactoring and reformatting
@@ -334,13 +335,11 @@ CONTAINS
   !>       \date March 2014
 
   ! Modifications:
-  ! Juliane Mai Jun 2015 - RLD and DLD as optional 
+  ! Juliane Mai Jun 2015 - RLD and DLD as optional
   !                      - optional mask for data can be given
   ! Robert Schweppe Jun 2018 - refactoring and reformatting
 
   SUBROUTINE Limb_densities(data, mask, RLD, DLD)
-
-    use mo_message, only : message
 
     implicit none
 
@@ -386,8 +385,7 @@ CONTAINS
     end if
 
     if ((.not. present(RLD)) .and. (.not. present(DLD))) then
-      call message('mo_signatures: limb_densities: Neither RLD or DLD is specified in calling sequence.')
-      stop
+      call error_message('mo_signatures: limb_densities: Neither RLD or DLD is specified in calling sequence.')
     end if
 
     ! initialize
@@ -513,7 +511,6 @@ CONTAINS
   FUNCTION MaximumMonthlyFlow(data, mask, yr_start, mo_start, dy_start)
 
     use mo_julian, only : date2dec, dec2date
-    use mo_message, only : message
 
     implicit none
 
@@ -560,8 +557,7 @@ CONTAINS
     end if
 
     if (.not. present(yr_start)) then
-      call message('mo_signatures: MaximumMonthlyFlow: Year of of data point has to be given!')
-      stop
+      call error_message('mo_signatures: MaximumMonthlyFlow: Year of of data point has to be given!')
     else
       yr = yr_start
     end if
@@ -593,9 +589,7 @@ CONTAINS
     end do
 
     if (any(counter == 0_i4)) then
-      call message('mo_signatures: MaximumMonthlyFlow: There are months with no data points!')
-      call message('                                   Aborted!')
-      stop
+      call error_message('mo_signatures: MaximumMonthlyFlow: There are months with no data points!')
     end if
 
     ! average
@@ -660,7 +654,6 @@ CONTAINS
   SUBROUTINE Moments(data, mask, mean_data, stddev_data, median_data, max_data, mean_log, stddev_log, median_log, &
                     max_log)
 
-    use mo_message, only : message
     use mo_moment, only : mean, stddev
     use mo_percentile, only : median
 
@@ -711,8 +704,7 @@ CONTAINS
             .not.(present(median_data)) .and. .not.(present(max_data)) .and. &
                     .not.(present(mean_log))  .and. .not.(present(stddev_log)) .and. &
                             .not.(present(median_log))  .and. .not.(present(max_log))) then
-      call message('mo_signatures: Moments: None of the optional output arguments is specified')
-      stop
+      call error_message('mo_signatures: Moments: None of the optional output arguments is specified')
     end if
 
     if (present(mean_data))   mean_data = mean(data, mask = maske)
@@ -780,8 +772,8 @@ CONTAINS
   !>       \date March 2014
 
   ! Modifications:
-  ! Juliane Mai Jun 2015 - mask added 
-  !                      - function instead of subroutine 
+  ! Juliane Mai Jun 2015 - mask added
+  !                      - function instead of subroutine
   !                      - use of percentile
   ! Robert Schweppe Jun 2018 - refactoring and reformatting
 
@@ -924,8 +916,6 @@ CONTAINS
 
   FUNCTION RunoffRatio(data, domain_area, mask, precip_series, precip_sum, log_data)
 
-    use mo_message, only : message
-
     implicit none
 
     ! array of data   [m**3/s]
@@ -975,17 +965,15 @@ CONTAINS
 
     if ((present(precip_series) .and. present(precip_sum)) .or. &
             (.not. present(precip_series) .and. .not. present(precip_sum))) then
-      call message('mo_signatures: RunoffRatio: Exactly one precipitation information')
-      call message('                            (precipitation series or sum of precipitation) ')
-      call message('                            has to be specified!')
-      stop
+      call error_message('mo_signatures: RunoffRatio: Exactly one precipitation information', raise=.false.)
+      call error_message('                            (precipitation series or sum of precipitation) ', raise=.false.)
+      call error_message('                            has to be specified!')
     end if
 
     if (present(mask) .and. present(precip_sum)) then
-      call message('mo_signatures: RunoffRatio: Already aggregated precipitation (precip_sum) and')
-      call message('                            mask can not be used together.')
-      call message('                            Precip_series should be used instead!')
-      stop
+      call error_message('mo_signatures: RunoffRatio: Already aggregated precipitation (precip_sum) and', raise=.false.)
+      call error_message('                            mask can not be used together.', raise=.false.)
+      call error_message('                            Precip_series should be used instead!')
     end if
 
     ! mhm output [m**3/s]  --> required [mm/d]
@@ -1044,7 +1032,6 @@ CONTAINS
 
   FUNCTION ZeroFlowRatio(data, mask)
 
-    use mo_message, only : message
     use mo_utils, only : eq
 
     implicit none
@@ -1081,8 +1068,7 @@ CONTAINS
     if (nall > 0) then
       ZeroFlowRatio = real(nzero, dp) / real(nall, dp)
     else
-      call message('mo_signatures: ZeroFlowRatio: all data points are masked')
-      stop
+      call error_message('mo_signatures: ZeroFlowRatio: all data points are masked')
     end if
 
   END FUNCTION ZeroFlowRatio
