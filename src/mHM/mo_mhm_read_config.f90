@@ -89,10 +89,8 @@ CONTAINS
   subroutine mhm_read_config(file_namelist, unamelist)
 
     use mo_namelists, only : &
-      nml_directories_mHM, &
       nml_optional_data, &
       nml_panEvapo, &
-      nml_nightDayRatio, &
       nml_NLoutputResults, &
       nml_baseflow_config
     use mo_common_constants, only : maxNoDomains, nodata_i4
