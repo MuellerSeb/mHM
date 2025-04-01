@@ -53,7 +53,7 @@ module mo_common_types
     ! general domain information
     integer(i4) :: ncols     !< Number of columns
     integer(i4) :: nrows     !< Number of rows
-    integer(i4) :: nCells    !< Number of cells in mask
+    integer(i4) :: ncells    !< Number of cells in mask
     real(dp) :: xllcorner    !< x coordinate of the lowerleft corner
     real(dp) :: yllcorner    !< y coordinate of the lowerleft corner
     real(dp) :: cellsize     !< Cellsize x = cellsize y

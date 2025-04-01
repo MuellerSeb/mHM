@@ -1,0 +1,67 @@
+module test_exchange
+  use funit
+
+  implicit none
+
+  private
+
+  public :: test_exchange_type
+
+contains
+
+  @test
+  subroutine test_exchange_type()
+    use mo_constants, only: nodata_dp
+    use mo_common_types, only: grid
+    use mo_exchange, only: exchange_t, dtype_dp
+    use mo_datetime, only: datetime
+    use mo_kind, only: dp, i4
+    type(exchange_t) :: exchange
+    type(grid) :: data_grid
+    type(datetime) :: in_date, out_date
+    integer(i4) :: grid_id, ro_var_id, sm_var_id
+    real(dp), target :: ro_in_data(3,2), sm_in_data(3,2)
+    real(dp), pointer :: ro_out_data(:), sm_out_data(:,:)
+    real(dp) :: t=1.0E-5_dp
+
+    data_grid%nrows = 3
+    data_grid%ncols = 2
+    data_grid%xllcorner = 0.0_dp
+    data_grid%yllcorner = 0.0_dp
+    data_grid%cellsize = 1.0_dp
+    data_grid%ncells = 3
+    data_grid%nodata_value = nodata_dp
+    allocate(data_grid%mask(3,2))
+    data_grid%mask = reshape([.true.,.false.,.false.,.false.,.true.,.true.], [3,2])
+    allocate(data_grid%CellArea(3))
+    data_grid%CellArea(:) = 1.0_dp
+
+    in_date = datetime(2025,4,1, 12, 0)
+    out_date = in_date
+
+    ro_in_data = reshape([10.0_dp, 11.0_dp, 9.0_dp, 11.0_dp, 12.0_dp, 7.0_dp], [3,2])
+    sm_in_data = reshape([12.0_dp, 13.0_dp, 20.0_dp, 15.0_dp, 14.0_dp, 8.0_dp], [3,2])
+
+    exchange%horizons = 2
+    exchange%current_time = in_date
+    grid_id = exchange%add_grid(data_grid)
+
+    ro_var_id = exchange%add_variable(name="runoff", unit="mm", dtype=dtype_dp, grid=grid_id)
+    sm_var_id = exchange%add_variable(name="soilmoisture", unit="mm", dtype=dtype_dp, grid=grid_id, ndim=2)
+
+    ! set data (output of component during runtime)
+    call exchange%set_data(ro_in_data(:,1), "runoff", timestamp=in_date)  ! point to contiguous sub-array
+    call exchange%set_data(sm_in_data, "soilmoisture", timestamp=in_date)
+
+    ! get data (input for component with local pointer, out and in date should match)
+    call exchange%get_data(ro_out_data, "runoff", timestamp=out_date)
+    call exchange%get_data(sm_out_data, "soilmoisture", timestamp=out_date)
+
+    @assertTrue(associated(ro_out_data, ro_in_data(:,1)), message='exchange: check runoff correctly associated')
+    @assertTrue(associated(sm_out_data, sm_in_data), message='exchange: check soilmoisture correctly associated')
+    @assertEqual(ro_out_data, ro_in_data(:,1), tolerance=t, message='exchange: check runoff correctly associated')
+
+  end subroutine test_exchange_type
+
+
+end module test_exchange

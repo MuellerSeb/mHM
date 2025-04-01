@@ -39,8 +39,8 @@ module mo_exchange
     logical :: static = .false. !< flag to indicated static data (.false. by default)
     logical :: provided = .false. !< flag to indicate that data is provided by a component (.false. by default)
     logical :: required = .false. !< flag to indicate that data is required by a component (.false. by default)
-    integer(i4) :: dtype !< data type (either real (dtype_dp), integer (dtype_i4) or logical (dtype_lg))
-    integer(i4) :: ndim  !< number of dimensions (1 or 2)
+    integer(i4) :: dtype=dtype_dp !< data type (either real (dtype_dp), integer (dtype_i4) or logical (dtype_lg))
+    integer(i4) :: ndim=1_i4  !< number of dimensions (1 or 2)
     real(dp), dimension(:), pointer :: ptr_1d_dp => null() !< 1D real pointer (n-cells)
     real(dp), dimension(:,:), pointer :: ptr_2d_dp => null() !< 2D real pointer (n-cells, horizons)
     integer(i4), dimension(:), pointer :: ptr_1d_i4 => null() !< 1D integer pointer (n-cells)
@@ -52,6 +52,7 @@ module mo_exchange
   type, public :: exchange_t
     type(grid_t), dimension(:), allocatable :: grids !< list of all grids used in the run
     type(variable_t), dimension(:), allocatable :: variables !< list of all variables exchanged in the run
+    integer(i4) :: horizons !< number of horizons
     integer(i4) :: time_step = 0_i4 !< current time step
     type(datetime) :: current_time !< time-stamp for the current time step
   contains
@@ -60,6 +61,7 @@ module mo_exchange
     procedure, public  :: has_variable => exchange_has_variable
     procedure, public  :: get_variable_id => exchange_get_variable_id
     procedure, private :: check_timestamp => exchange_check_timestamp
+    procedure, private :: check_shape => exchange_check_shape
     procedure, private :: exchange_get_data_1d_dp
     procedure, private :: exchange_get_data_2d_dp
     procedure, private :: exchange_get_data_1d_i4
@@ -82,6 +84,15 @@ module mo_exchange
 
   contains
 
+  ! !> \brief Check timestamp for given variable
+  ! subroutine exchange_init(this, horizons, current_time)
+  !   class(exchange_t), target, intent(inout) :: this  !< exchange container
+  !   integer(i4), intent(in) :: horizons !< id for the variable (will be determined by name if not present)
+  !   type(datetime), intent(in), optional :: current_time !< time stamp for the request
+  !   this%horizons = horizons
+  !   if (present(current_time)) this%current_time = current_time
+  ! end subroutine exchange_init
+
   !> \brief Add a new variable to the exchange container.
   !> \return ID of added variable as integer
   integer(i4) function exchange_add_variable(this, name, unit, dtype, grid, ndim, long_name, standard_name, static)
@@ -96,6 +107,7 @@ module mo_exchange
     logical, optional, intent(in)      :: static !< flag to indicated static data (.false. by default)
 
     type(variable_t) :: add_variable
+    integer(i4) :: i_grid_max
 
     if (this%has_variable(name)) call error_message('exchange: variable name "', trim(name), '" already present.')
 
@@ -103,12 +115,18 @@ module mo_exchange
     add_variable%unit = trim(unit)
 
     if (.not.any(dtype == [dtype_dp, dtype_i4, dtype_lg])) &
-      call error_message("exchange: unknown dtype '", n2s(dtype), "' for variable '", trim(name), "'.")
+      call error_message("exchange: unknown dtype '", trim(adjustl(n2s(dtype))), "' for variable '", trim(name), "'.")
     add_variable%dtype = dtype
+
+    i_grid_max = 0_i4
+    if (allocated(this%grids)) i_grid_max = size(this%grids)
+    if (grid > i_grid_max .or. grid < 0_i4) &
+      call error_message("exchange: grid id '", trim(adjustl(n2s(grid))), "' for variable '", trim(name), "' not present.")
+    add_variable%grid = grid
 
     if (present(ndim)) then
       if (.not.any(ndim == [1_i4, 2_i4])) &
-        call error_message("exchange: unsupported number of dimensions '", n2s(ndim), "' for variable '", trim(name), "'.")
+        call error_message("exchange: unsupported dimensions '", trim(adjustl(n2s(ndim))), "' for variable '", trim(name), "'.")
       add_variable%ndim = ndim
     end if
 
@@ -153,7 +171,7 @@ module mo_exchange
   logical function exchange_has_variable(this, name)
     class(exchange_t), intent(in)  :: this  !< exchange container
     character(*), intent(in)      :: name  !< variable name
-    exchange_has_variable = this%get_variable_id(name) > 0
+    exchange_has_variable = this%get_variable_id(name, raise=.false.) > 0
   end function exchange_has_variable
 
   !> \brief Get variable ID
@@ -178,7 +196,7 @@ module mo_exchange
         exchange_get_variable_id = -1
       else
         if (trim(this%variables(id)%name) /= trim(name)) &
-          call error_message('exchange: The variable name "', trim(name), '" has other ID than provided.')
+          call error_message('exchange: The variable name "', trim(name), '" has different ID than provided.')
         exchange_get_variable_id = id
       end if
     else
@@ -197,26 +215,43 @@ module mo_exchange
   end function exchange_get_variable_id
 
   !> \brief Check timestamp for given variable
-  subroutine exchange_check_timestamp(this, name, timestamp, id, new)
+  subroutine exchange_check_timestamp(this, id, timestamp, new)
     class(exchange_t), target, intent(in) :: this  !< exchange container
-    character(*), intent(in) :: name !< name of the variable
     type(datetime), intent(in), optional :: timestamp !< time stamp for the request
     integer(i4), intent(in), optional :: id !< id for the variable (will be determined by name if not present)
     logical, intent(in), optional :: new !< flag to indicate a new (to be written) time-stamp
-    integer(i4) :: id_
+    character(:), allocatable :: name
     logical :: new_
-    id_ = this%get_variable_id(name, id)
     new_ = .false.
     if (present(new)) new_ = new
-    if (.not.this%variables(id_)%static) then
+    name = this%variables(id)%name
+    if (.not.this%variables(id)%static) then
       if (.not.present(timestamp)) &
         call error_message('exchange: The variable "', trim(name), '" is not static, but no timestamp was provided.')
-      if (.not.new_.and.(this%variables(id_)%timestamp /= timestamp)) &
-        call error_message('exchange: The variable "', trim(name), '" has other timestamp than requested. ', &
-        "Requested: ", timestamp%str() , " Provided: ", this%variables(id_)%timestamp%str())
+      if (.not.new_.and.(this%variables(id)%timestamp /= timestamp)) &
+        call error_message('exchange: The variable "', trim(name), '" has different timestamp than requested. ', &
+        "Requested: ", timestamp%str() , " Provided: ", this%variables(id)%timestamp%str())
     end if
     ! TODO: raise error if timestamp present but variable is static?
+    ! TODO: compare timestamp to current time in the exchange container?
   end subroutine exchange_check_timestamp
+
+  !> \brief Check data shape for given variable
+  subroutine exchange_check_shape(this, id, data_shape)
+    class(exchange_t), target, intent(in) :: this  !< exchange container
+    integer(i4), intent(in) :: id !< ID of the variable
+    integer(i4), dimension(:), intent(in) :: data_shape !< shape of the provided data
+    character(:), allocatable :: name
+    name = this%variables(id)%name
+    if (size(data_shape) /= this%variables(id)%ndim) &
+      call error_message('exchange: The variable "', trim(name), '" has different number of dimensions than the provided target.')
+    if (data_shape(1) /= this%grids(this%variables(id)%grid)%ncells) &
+      call error_message('exchange: The variable "', trim(name), '" has different number of cells than the provided target.')
+    if (this%variables(id)%ndim == 2) then
+      if (data_shape(2) /= this%horizons) &
+        call error_message('exchange: The variable "', trim(name), '" has different number of horizons than the provided target.')
+    end if
+  end subroutine exchange_check_shape
 
   !> \brief Get data by setting pointer
   subroutine exchange_get_data_1d_dp(this, ptr, name, timestamp, id)
@@ -234,7 +269,7 @@ module mo_exchange
       call error_message('exchange: The variable "', trim(name), '" is not of real type as requested.')
     if (.not.associated(this%variables(id_)%ptr_1d_dp)) &
       call error_message('exchange: The variable "', trim(name), '" has no associated data.')
-    call this%check_timestamp(name, timestamp, id_)
+    call this%check_timestamp(id_, timestamp)
     ! set pointer
     ptr => this%variables(id_)%ptr_1d_dp
   end subroutine exchange_get_data_1d_dp
@@ -255,7 +290,7 @@ module mo_exchange
       call error_message('exchange: The variable "', trim(name), '" is not of real type as requested.')
     if (.not.associated(this%variables(id_)%ptr_2d_dp)) &
       call error_message('exchange: The variable "', trim(name), '" has no associated data.')
-    call this%check_timestamp(name, timestamp, id_)
+    call this%check_timestamp(id_, timestamp)
     ! set pointer
     ptr => this%variables(id_)%ptr_2d_dp
   end subroutine exchange_get_data_2d_dp
@@ -276,7 +311,7 @@ module mo_exchange
       call error_message('exchange: The variable "', trim(name), '" is not of integer type as requested.')
     if (.not.associated(this%variables(id_)%ptr_1d_i4)) &
       call error_message('exchange: The variable "', trim(name), '" has no associated data.')
-    call this%check_timestamp(name, timestamp, id_)
+    call this%check_timestamp(id_, timestamp)
     ! set pointer
     ptr => this%variables(id_)%ptr_1d_i4
   end subroutine exchange_get_data_1d_i4
@@ -297,7 +332,7 @@ module mo_exchange
       call error_message('exchange: The variable "', trim(name), '" is not of integer type as requested.')
     if (.not.associated(this%variables(id_)%ptr_2d_i4)) &
       call error_message('exchange: The variable "', trim(name), '" has no associated data.')
-    call this%check_timestamp(name, timestamp, id_)
+    call this%check_timestamp(id_, timestamp)
     ! set pointer
     ptr => this%variables(id_)%ptr_2d_i4
   end subroutine exchange_get_data_2d_i4
@@ -318,7 +353,7 @@ module mo_exchange
       call error_message('exchange: The variable "', trim(name), '" is not of logical type as requested.')
     if (.not.associated(this%variables(id_)%ptr_1d_lg)) &
       call error_message('exchange: The variable "', trim(name), '" has no associated data.')
-    call this%check_timestamp(name, timestamp, id_)
+    call this%check_timestamp(id_, timestamp)
     ! set pointer
     ptr => this%variables(id_)%ptr_1d_lg
   end subroutine exchange_get_data_1d_lg
@@ -339,7 +374,7 @@ module mo_exchange
       call error_message('exchange: The variable "', trim(name), '" is not of logical type as requested.')
     if (.not.associated(this%variables(id_)%ptr_2d_lg)) &
       call error_message('exchange: The variable "', trim(name), '" has no associated data.')
-    call this%check_timestamp(name, timestamp, id_)
+    call this%check_timestamp(id_, timestamp)
     ! set pointer
     ptr => this%variables(id_)%ptr_2d_lg
   end subroutine exchange_get_data_2d_lg
@@ -353,12 +388,12 @@ module mo_exchange
     integer(i4), intent(in), optional :: id !< id for the variable (will be determined by name if not present)
     integer(i4) :: id_
     id_ = this%get_variable_id(name, id)
-
     if (this%variables(id_)%ndim /= 1_i4) &
       call error_message('exchange: The variable "', trim(name), '" is not 1D as requested.')
     if (this%variables(id_)%dtype /= dtype_dp) &
       call error_message('exchange: The variable "', trim(name), '" is not of real type as requested.')
-    call this%check_timestamp(name, timestamp, id_, new=.true.)
+    call this%check_timestamp(id_, timestamp, new=.true.)
+    call this%check_shape(id_, shape(tgt, kind=i4))
     if (present(timestamp)) this%variables(id_)%timestamp = timestamp
     this%variables(id_)%ptr_1d_dp => tgt
   end subroutine exchange_set_data_1d_dp
@@ -377,7 +412,8 @@ module mo_exchange
       call error_message('exchange: The variable "', trim(name), '" is not 2D as requested.')
     if (this%variables(id_)%dtype /= dtype_dp) &
       call error_message('exchange: The variable "', trim(name), '" is not of real type as requested.')
-    call this%check_timestamp(name, timestamp, id_, new=.true.)
+    call this%check_timestamp(id_, timestamp, new=.true.)
+    call this%check_shape(id_, shape(tgt, kind=i4))
     if (present(timestamp)) this%variables(id_)%timestamp = timestamp
     this%variables(id_)%ptr_2d_dp => tgt
   end subroutine exchange_set_data_2d_dp
@@ -396,7 +432,8 @@ module mo_exchange
       call error_message('exchange: The variable "', trim(name), '" is not 1D as requested.')
     if (this%variables(id_)%dtype /= dtype_i4) &
       call error_message('exchange: The variable "', trim(name), '" is not of integer type as requested.')
-    call this%check_timestamp(name, timestamp, id_, new=.true.)
+    call this%check_timestamp(id_, timestamp, new=.true.)
+    call this%check_shape(id_, shape(tgt, kind=i4))
     if (present(timestamp)) this%variables(id_)%timestamp = timestamp
     this%variables(id_)%ptr_1d_i4 => tgt
   end subroutine exchange_set_data_1d_i4
@@ -415,7 +452,8 @@ module mo_exchange
       call error_message('exchange: The variable "', trim(name), '" is not 2D as requested.')
     if (this%variables(id_)%dtype /= dtype_i4) &
       call error_message('exchange: The variable "', trim(name), '" is not of integer type as requested.')
-    call this%check_timestamp(name, timestamp, id_, new=.true.)
+    call this%check_timestamp(id_, timestamp, new=.true.)
+    call this%check_shape(id_, shape(tgt, kind=i4))
     if (present(timestamp)) this%variables(id_)%timestamp = timestamp
     this%variables(id_)%ptr_2d_i4 => tgt
   end subroutine exchange_set_data_2d_i4
@@ -434,7 +472,8 @@ module mo_exchange
       call error_message('exchange: The variable "', trim(name), '" is not 1D as requested.')
     if (this%variables(id_)%dtype /= dtype_lg) &
       call error_message('exchange: The variable "', trim(name), '" is not of logical type as requested.')
-    call this%check_timestamp(name, timestamp, id_, new=.true.)
+    call this%check_timestamp(id_, timestamp, new=.true.)
+    call this%check_shape(id_, shape(tgt, kind=i4))
     if (present(timestamp)) this%variables(id_)%timestamp = timestamp
     this%variables(id_)%ptr_1d_lg => tgt
   end subroutine exchange_set_data_1d_lg
@@ -453,7 +492,8 @@ module mo_exchange
       call error_message('exchange: The variable "', trim(name), '" is not 2D as requested.')
     if (this%variables(id_)%dtype /= dtype_lg) &
       call error_message('exchange: The variable "', trim(name), '" is not of logical type as requested.')
-    call this%check_timestamp(name, timestamp, id_, new=.true.)
+    call this%check_timestamp(id_, timestamp, new=.true.)
+    call this%check_shape(id_, shape(tgt, kind=i4))
     if (present(timestamp)) this%variables(id_)%timestamp = timestamp
     this%variables(id_)%ptr_2d_lg => tgt
   end subroutine exchange_set_data_2d_lg
