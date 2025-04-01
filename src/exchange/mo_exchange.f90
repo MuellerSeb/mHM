@@ -95,7 +95,7 @@ module mo_exchange
 
   !> \brief Add a new variable to the exchange container.
   !> \return ID of added variable as integer
-  integer(i4) function exchange_add_variable(this, name, unit, dtype, grid, ndim, long_name, standard_name, static)
+  function exchange_add_variable(this, name, unit, dtype, grid, ndim, long_name, standard_name, static) result(id)
     class(exchange_t), intent(inout)    :: this  !< exchange container
     character(*), intent(in)           :: name  !< variable name
     character(*), intent(in)           :: unit  !< variable name
@@ -105,65 +105,61 @@ module mo_exchange
     character(*), optional, intent(in) :: long_name !< long name of the variable
     character(*), optional, intent(in) :: standard_name !< standard name of the variable
     logical, optional, intent(in)      :: static !< flag to indicated static data (.false. by default)
+    integer(i4)                        :: id !< id of added variable
 
-    type(variable_t) :: add_variable
+    type(variable_t), allocatable :: new_variables(:)
     integer(i4) :: i_grid_max
 
     if (this%has_variable(name)) call error_message('exchange: variable name "', trim(name), '" already present.')
 
-    add_variable%name = trim(name)
-    add_variable%unit = trim(unit)
+    id = 1_i4
+    if (allocated(this%variables)) id = size(this%variables) + id
+    allocate(new_variables(id))
+
+    new_variables(id)%name = trim(name)
+    new_variables(id)%unit = trim(unit)
 
     if (.not.any(dtype == [dtype_dp, dtype_i4, dtype_lg])) &
       call error_message("exchange: unknown dtype '", trim(adjustl(n2s(dtype))), "' for variable '", trim(name), "'.")
-    add_variable%dtype = dtype
+    new_variables(id)%dtype = dtype
 
     i_grid_max = 0_i4
     if (allocated(this%grids)) i_grid_max = size(this%grids)
     if (grid > i_grid_max .or. grid < 0_i4) &
       call error_message("exchange: grid id '", trim(adjustl(n2s(grid))), "' for variable '", trim(name), "' not present.")
-    add_variable%grid = grid
+    new_variables(id)%grid = grid
 
     if (present(ndim)) then
       if (.not.any(ndim == [1_i4, 2_i4])) &
         call error_message("exchange: unsupported dimensions '", trim(adjustl(n2s(ndim))), "' for variable '", trim(name), "'.")
-      add_variable%ndim = ndim
+      new_variables(id)%ndim = ndim
     end if
 
     ! their presence can be check by allocation status afterwards
-    if (present(long_name)) add_variable%long_name = trim(long_name)
-    if (present(standard_name)) add_variable%standard_name = trim(standard_name)
+    if (present(long_name)) new_variables(id)%long_name = trim(long_name)
+    if (present(standard_name)) new_variables(id)%standard_name = trim(standard_name)
+    if (present(static)) new_variables(id)%static = static
 
-    if (present(static)) add_variable%static = static
-
-    if (allocated(this%variables)) then
-      this%variables = [this%variables, add_variable]
-    else
-      allocate(this%variables(1))
-      this%variables(1)=add_variable
-    end if
-
-    ! new variable is at the end of the array
-    exchange_add_variable = size(this%variables)
+    if (allocated(this%variables)) new_variables(1:id-1) = this%variables
+    call move_alloc(new_variables, this%variables)
 
   end function exchange_add_variable
 
   !> \brief Add a new grid to the exchange container.
   !> \return ID of added grid as integer
-  integer(i4) function exchange_add_grid(this, grid)
+  function exchange_add_grid(this, grid) result(id)
     class(exchange_t), intent(inout) :: this  !< exchange container
-    type(grid_t), intent(in)        :: grid !< grid to add
+    type(grid_t), intent(in)         :: grid !< grid to add
+    integer(i4)                      :: id !< id of added grid
 
-    if (allocated(this%grids)) then
-      this%grids = [this%grids, grid]
-    else
-      allocate(this%grids(1))
-      this%grids(1)=grid
-    end if
+    type(grid_t), allocatable :: new_grids(:)
 
-    ! new grid is at the end of the array
-    exchange_add_grid = size(this%grids)
-
+    id = 1_i4
+    if (allocated(this%grids)) id = size(this%grids) + id
+    allocate(new_grids(id))
+    new_grids(id) = grid
+    if (allocated(this%grids)) new_grids(1:id-1) = this%grids
+    call move_alloc(new_grids, this%grids)
   end function exchange_add_grid
 
   !> \brief Check if variable is present in the exchange container.
