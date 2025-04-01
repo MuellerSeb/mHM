@@ -308,6 +308,7 @@ contains
     call nml_mrm_outputs%read(file_defOutput, udefOutput)
     output_deflate_level_mrm = nml_mrm_outputs%output_deflate_level_mrm
     output_double_precision_mrm = nml_mrm_outputs%output_double_precision_mrm
+    output_time_reference_mrm = nml_mrm_outputs%output_time_reference_mrm
     timeStep_model_outputs_mrm = nml_mrm_outputs%timeStep_model_outputs_mrm
     outputFlxState_mrm = nml_mrm_outputs%outputFlxState_mrm
 

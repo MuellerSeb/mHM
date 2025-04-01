@@ -94,7 +94,7 @@ CONTAINS
       nml_panEvapo, &
       nml_nightDayRatio, &
       nml_NLoutputResults, &
-      nml_BFI_inputs
+      nml_baseflow_config
     use mo_common_constants, only : maxNoDomains, nodata_i4
     use mo_common_mHM_mRM_read_config, only : common_check_resolution
     use mo_common_mhm_mrm_variables, only : opti_function, optimize
@@ -209,9 +209,9 @@ CONTAINS
           timeStep_et_input = nml_optional_data%timeStep_et_input
           timeStep_tws_input = nml_optional_data%timeStep_tws_input
         case(34)
-          call nml_BFI_inputs%read(file_namelist, unamelist)
-          BFI_calc = nml_BFI_inputs%BFI_calc
-          BFI_obs = nml_BFI_inputs%BFI_obs(1:size(BFI_obs))
+          call nml_baseflow_config%read(file_namelist, unamelist)
+          BFI_calc = nml_baseflow_config%BFI_calc
+          BFI_obs = nml_baseflow_config%BFI_obs(1:size(BFI_obs))
       end select
 
       select case (opti_function)
@@ -305,6 +305,7 @@ CONTAINS
     output_double_precision = nml_NLoutputResults%output_double_precision
     timeStep_model_outputs = nml_NLoutputResults%timeStep_model_outputs
     outputFlxState = nml_NLoutputResults%outputFlxState
+    output_time_reference = nml_NLoutputResults%output_time_reference
 
     call message('')
     call message('Following output will be written:')

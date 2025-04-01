@@ -358,6 +358,7 @@ module mo_namelists
     integer(i4) :: output_deflate_level !< deflate level in nc files
     logical :: output_double_precision !< output precision in nc files
     integer(i4) :: timeStep_model_outputs !< timestep for writing model outputs
+    integer(i4) :: output_time_reference !< time reference point location in output nc files
     logical, dimension(nOutFlxState) :: outputFlxState !< Define model outputs see "mhm_outputs.nml"
   contains
     !> \copydoc mo_namelists::read_nloutputresults
@@ -366,23 +367,23 @@ module mo_namelists
   !> 'nloutputresults' namelist content
   type(nml_nloutputresults_t), public :: nml_nloutputresults
 
-  ! namelist /bfi_inputs/ &
+  ! namelist /baseflow_config/ &
   !   BFI_calc, &
   !   BFI_obs
   !
-  !> \class   nml_bfi_inputs_t
-  !> \brief   'bfi_inputs' namelist content
-  type, public :: nml_bfi_inputs_t
-    character(10) :: name = "bfi_inputs" !< namelist name
+  !> \class   nml_baseflow_config_t
+  !> \brief   'baseflow_config' namelist content
+  type, public :: nml_baseflow_config_t
+    character(10) :: name = "baseflow_config" !< namelist name
     logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
     logical :: BFI_calc !< calculate observed BFI from gauges with Eckhardt filter
     real(dp), dimension(maxNoDomains) :: BFI_obs !< given base-flow index per domain
 contains
-    !> \copydoc mo_namelists::read_bfi_inputs
-    procedure, public :: read => read_bfi_inputs !< \see mo_namelists::read_bfi_inputs
-  end type nml_bfi_inputs_t
-  !> 'bfi_inputs' namelist content
-  type(nml_bfi_inputs_t), public :: nml_bfi_inputs
+    !> \copydoc mo_namelists::read_baseflow_config
+    procedure, public :: read => read_baseflow_config !< \see mo_namelists::read_baseflow_config
+  end type nml_baseflow_config_t
+  !> 'baseflow_config' namelist content
+  type(nml_baseflow_config_t), public :: nml_baseflow_config
 
   !######## mo_mpr_read_config
   ! namelist /directories_MPR/ &
@@ -1096,6 +1097,7 @@ contains
     logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
     integer(i4) :: output_deflate_level_mrm !< netcdf deflate level
     logical :: output_double_precision_mrm !< switch to enable double precision in netcdf
+    integer(i4) :: output_time_reference_mrm !< time reference point location in output nc files
     integer(i4) :: timeStep_model_outputs_mrm !< timestep for writing model outputs
     logical, dimension(mrm_nOutFlxState) :: outputFlxState_mrm !< Define model outputs see "mhm_outputs.nml"
   contains
@@ -1669,12 +1671,14 @@ contains
 
     integer(i4) :: output_deflate_level !< deflate level in nc files
     logical :: output_double_precision !< output precision in nc files
+    integer(i4) :: output_time_reference !< time reference point location in output nc files
     integer(i4) :: timeStep_model_outputs !< timestep for writing model outputs
     logical, dimension(nOutFlxState) :: outputFlxState !< Define model outputs see "mhm_outputs.nml"
 
     namelist /nloutputresults/ &
       output_deflate_level, &
       output_double_precision, &
+      output_time_reference, &
       timeStep_model_outputs, &
       outputFlxState
 
@@ -1682,6 +1686,7 @@ contains
       ! default values
       output_deflate_level = 6
       output_double_precision = .true.
+      output_time_reference = 0
       outputFlxState = .FALSE.
       call open_nml(file, unit, quiet=.true.)
       call position_nml(self%name, unit)
@@ -1690,22 +1695,23 @@ contains
       self%output_deflate_level = output_deflate_level
       self%output_double_precision = output_double_precision
       self%timeStep_model_outputs = timeStep_model_outputs
+      self%output_time_reference = output_time_reference
       self%outputFlxState = outputFlxState
       self%read_from_file = .false.
     end if
   end subroutine read_nloutputresults
 
-  !> \brief Read 'bfi_inputs' namelist content.
-  subroutine read_bfi_inputs(self, file, unit)
+  !> \brief Read 'baseflow_config' namelist content.
+  subroutine read_baseflow_config(self, file, unit)
     implicit none
-    class(nml_bfi_inputs_t), intent(inout) :: self
+    class(nml_baseflow_config_t), intent(inout) :: self
     character(*), intent(in) :: file !< file containing the namelist
     integer, intent(in) :: unit !< file unit to open the given file
 
     logical :: BFI_calc !< calculate observed BFI from gauges with Eckhardt filter
     real(dp), dimension(maxNoDomains) :: BFI_obs !< given base-flow index per domain
 
-    namelist /bfi_inputs/ &
+    namelist /baseflow_config/ &
       BFI_calc, &
       BFI_obs
 
@@ -1714,13 +1720,13 @@ contains
       BFI_obs = -1.0_dp  ! negative value to flag missing values
       call open_nml(file, unit, quiet=.true.)
       call position_nml(self%name, unit)
-      read(unit, nml=bfi_inputs)
+      read(unit, nml=baseflow_config)
       call close_nml(unit)
       self%BFI_calc = BFI_calc
       self%BFI_obs = BFI_obs
       self%read_from_file = .false.
     end if
-  end subroutine read_bfi_inputs
+  end subroutine read_baseflow_config
 
   !> \brief Read 'directories_mpr' namelist content.
   subroutine read_directories_mpr(self, file, unit)
@@ -2717,6 +2723,7 @@ contains
 
     integer(i4) :: output_deflate_level_mrm !< netcdf deflate level
     logical :: output_double_precision_mrm !< switch to enable double precision in netcdf
+    integer(i4) :: output_time_reference_mrm !< time reference point location in output nc files
     integer(i4) :: timeStep_model_outputs_mrm !< timestep for writing model outputs
     logical, dimension(mrm_nOutFlxState) :: outputFlxState_mrm !< Define model outputs see "mhm_outputs.nml"
 
@@ -2725,12 +2732,14 @@ contains
     namelist /nloutputresults/ &
       output_deflate_level_mrm, &
       output_double_precision_mrm, &
+      output_time_reference_mrm, &
       timeStep_model_outputs_mrm, &
       outputFlxState_mrm
 
     if ( self%read_from_file ) then
       output_deflate_level_mrm = 6
       output_double_precision_mrm = .true.
+      output_time_reference_mrm = 0
       outputFlxState_mrm = .FALSE.
       timeStep_model_outputs_mrm = -2
       inquire(file = file, exist = file_exists)
@@ -2744,6 +2753,7 @@ contains
       end if
       self%output_deflate_level_mrm = output_deflate_level_mrm
       self%output_double_precision_mrm = output_double_precision_mrm
+      self%output_time_reference_mrm = output_time_reference_mrm
       self%timeStep_model_outputs_mrm = timeStep_model_outputs_mrm
       self%outputFlxState_mrm = outputFlxState_mrm
       self%read_from_file = .false.
