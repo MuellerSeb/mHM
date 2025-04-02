@@ -14,14 +14,15 @@ contains
     use mo_constants, only: nodata_dp
     use mo_common_types, only: grid
     use mo_exchange, only: exchange_t, dtype_dp
-    use mo_datetime, only: datetime
+    use mo_datetime, only: datetime, timedelta
     use mo_kind, only: dp, i4
     type(exchange_t) :: exchange
     type(grid) :: data_grid
     type(datetime) :: in_date, out_date
-    integer(i4) :: grid_id, ro_var_id, sm_var_id
-    real(dp), target :: ro_in_data(3,2), sm_in_data(3,2)
-    real(dp), pointer :: ro_out_data(:), sm_out_data(:,:)
+    type(timedelta) :: step
+    integer(i4) :: grid_id, ro_var_id, sm_var_id, dem_var_id
+    real(dp), target :: ro_in_data(3,2), sm_in_data(3,2), dem(3)
+    real(dp), pointer :: ro_out_data(:), sm_out_data(:,:), dem_out(:)
     real(dp) :: t=1.0E-5_dp
 
     data_grid%nrows = 3
@@ -37,6 +38,7 @@ contains
     data_grid%CellArea(:) = 1.0_dp
 
     in_date = datetime(2025,4,1, 12, 0)
+    step = timedelta(days=1)
     out_date = in_date
 
     ro_in_data = reshape([10.0_dp, 11.0_dp, 9.0_dp, 11.0_dp, 12.0_dp, 7.0_dp], [3,2])
@@ -48,20 +50,34 @@ contains
 
     ro_var_id = exchange%add_variable(name="runoff", unit="mm", dtype=dtype_dp, grid=grid_id)
     sm_var_id = exchange%add_variable(name="soilmoisture", unit="mm", dtype=dtype_dp, grid=grid_id, ndim=2)
+    dem_var_id = exchange%add_variable( &
+      name="dem", &
+      unit="m", &
+      standard_name="surface_altitude", &
+      dtype=dtype_dp, &
+      grid=grid_id, &
+      static=.true.)
 
     ! set data (output of component during runtime)
     call exchange%set_data(ro_in_data(:,1), "runoff", timestamp=in_date)  ! point to contiguous sub-array
     call exchange%set_data(sm_in_data, "soilmoisture", timestamp=in_date)
+    call exchange%set_data(dem, "dem")
 
     ! get data (input for component with local pointer, out and in date should match)
     call exchange%get_data(ro_out_data, "runoff", timestamp=out_date)
     call exchange%get_data(sm_out_data, "soilmoisture", timestamp=out_date)
+    call exchange%get_data(dem_out, "dem")
 
-    @assertTrue(associated(ro_out_data, ro_in_data(:,1)), message='exchange: check runoff correctly associated')
+    @assertTrue(associated(ro_out_data, ro_in_data(:,1)), message='exchange: check runoff correctly associated step 1')
     @assertTrue(associated(sm_out_data, sm_in_data), message='exchange: check soilmoisture correctly associated')
-    @assertEqual(ro_out_data, ro_in_data(:,1), tolerance=t, message='exchange: check runoff correctly associated')
+    @assertTrue(associated(dem_out, dem), message='exchange: check soilmoisture correctly associated')
+    @assertEqual(ro_out_data, ro_in_data(:,1), tolerance=t, message='exchange: check runoff values step 1')
+
+    call exchange%set_data(ro_in_data(:,2), "runoff", timestamp=in_date+step)  ! point to contiguous sub-array
+    call exchange%get_data(ro_out_data, "runoff", timestamp=out_date+step)
+    @assertTrue(associated(ro_out_data, ro_in_data(:,2)), message='exchange: check runoff correctly associated step 2')
+    @assertEqual(ro_out_data, ro_in_data(:,2), tolerance=t, message='exchange: check runoff values step 2')
 
   end subroutine test_exchange_type
-
 
 end module test_exchange
