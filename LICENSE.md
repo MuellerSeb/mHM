@@ -117,6 +117,18 @@ have been taken:
 > the original code of mHM.
 
 
+## Logo and Figures License
+
+Notwithstanding the licensing terms applied to the software and its documentation as detailed above, the logo of mHM (doc/figures/logo) and the figures of the documentation (doc/figures) are made available under the Creative Commons Attribution 4.0 International License (CC BY 4.0). This grants permission to use, share, and adapt the logo and figures, provided appropriate credit is given, and any changes are indicated. For more information on this license, visit https://creativecommons.org/licenses/by/4.0/.
+
+To attribute correctly, please include the following:
+
+- Credit to mHM and, if possible, a link back to our website or the relevant repository.
+- Indication if changes were made to the logo and/or the figures.
+
+This licensing applies solely to the logo and the figures and is independent of the software's licensing terms, including its documentation, which may be subject to different licensing terms as specified in other sections of this document.
+
+
 ## Breach of the Copyright
 
 The following are the potential causes for the Breach of mHM Copyright.

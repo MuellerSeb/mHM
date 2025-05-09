@@ -460,10 +460,13 @@ pages:
   only:
     - develop
   stage: deploy
-  dependencies:
-    - documentation
-    - documentation_stable
-    - coverage
+  needs:
+    - job: documentation
+      artifacts: true
+    - job: documentation_stable
+      artifacts: true
+    - job: coverage
+      artifacts: true
   script:
     # create public dir (remove if already present)
     - test -d public && rm -rf public
