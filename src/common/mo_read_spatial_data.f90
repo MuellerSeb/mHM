@@ -19,7 +19,7 @@ MODULE mo_read_spatial_data
   ! Written  Juliane Mai, Jan 2013
   ! Modified
 
-  USE mo_kind, ONLY : i4, i8, dp
+  USE mo_kind, ONLY : i4, dp
   USE mo_os, ONLY : check_path_isfile
   use mo_message, only: error_message
 
@@ -50,7 +50,7 @@ MODULE mo_read_spatial_data
   ! Robert Schweppe Jun 2018 - refactoring and reformatting
 
   INTERFACE  read_spatial_data_ascii
-    MODULE PROCEDURE read_spatial_data_ascii_i4, read_spatial_data_ascii_i8, read_spatial_data_ascii_dp
+    MODULE PROCEDURE read_spatial_data_ascii_i4, read_spatial_data_ascii_dp
   END INTERFACE read_spatial_data_ascii
 
   ! ------------------------------------------------------------------
@@ -341,146 +341,6 @@ CONTAINS
     deallocate(tmp_mask)
 
   end subroutine read_spatial_data_ascii_i4
-
-  !    NAME
-  !        read_spatial_data_ascii_i8
-
-  !    PURPOSE
-  !>       \brief TODO: add description
-
-  !>       \details TODO: add description
-
-  !    INTENT(IN)
-  !>       \param[in] "character(len = *) :: filename" filename with location
-  !>       \param[in] "integer(i4) :: fileunit"        unit for opening the file
-  !>       \param[in] "integer(i4) :: header_nCols"    number of columns of data fields:
-  !>       \param[in] "integer(i4) :: header_nRows"    number of rows of data fields:
-  !>       \param[in] "real(dp) :: header_xllcorner"   header read in lower left corner
-  !>       \param[in] "real(dp) :: header_yllcorner"   header read in lower left corner
-  !>       \param[in] "real(dp) :: header_cellsize"    header read in cellsize
-
-  !    INTENT(OUT)
-  !>       \param[out] "integer(i4), dimension(:, :) :: data" data
-  !>       \param[out] "logical, dimension(:, :) :: mask"     mask
-
-  !    HISTORY
-  !>       \authors Robert Schweppe
-
-  !>       \date Jun 2018
-
-  ! Modifications:
-
-  subroutine read_spatial_data_ascii_i8(filename, fileunit, header_ncols, header_nrows, header_xllcorner, &
-                                       header_yllcorner, header_cellsize, data, mask)
-    implicit none
-
-    ! filename with location
-    character(len = *), intent(in) :: filename
-
-    ! unit for opening the file
-    integer(i4), intent(in) :: fileunit
-
-    ! number of rows of data fields:
-    integer(i4), intent(in) :: header_nRows
-
-    ! number of columns of data fields:
-    integer(i4), intent(in) :: header_nCols
-
-    ! header read in lower left corner
-    real(dp), intent(in) :: header_xllcorner
-
-    ! header read in lower left corner
-    real(dp), intent(in) :: header_yllcorner
-
-    ! header read in cellsize
-    real(dp), intent(in) :: header_cellsize
-
-    ! data
-    integer(i8), dimension(:, :), allocatable, intent(out) :: data
-
-    ! mask
-    logical, dimension(:, :), allocatable, intent(out) :: mask
-
-    ! number of rows of data fields:
-    integer(i4) :: file_nRows
-
-    ! number of columns of data fields:
-    integer(i4) :: file_nCols
-
-    ! file read in lower left corner
-    real(dp) :: file_xllcorner
-
-    ! file read in lower left corner
-    real(dp) :: file_yllcorner
-
-    ! file read in cellsize
-    real(dp) :: file_cellsize
-
-    ! file read in nodata value
-    real(dp) :: file_nodata
-
-    integer(i4) :: i, j
-
-    ! data
-    integer(i8), dimension(:, :), allocatable :: tmp_data
-
-    ! mask
-    logical, dimension(:, :), allocatable :: tmp_mask
-
-
-    ! compare headers always with reference header (intent in)
-    call read_header_ascii(filename, fileunit, &
-            file_ncols, file_nrows, &
-            file_xllcorner, file_yllcorner, file_cellsize, file_nodata)
-    if ((file_ncols .ne. header_ncols)) &
-             call error_message('read_spatial_data_ascii: header not matching with reference header: ncols')
-    if ((file_nrows .ne. header_nrows)) &
-             call error_message('read_spatial_data_ascii: header not matching with reference header: nrows')
-    if ((abs(file_xllcorner - header_xllcorner) .gt. tiny(1.0_dp))) &
-             call error_message('read_spatial_data_ascii: header not matching with reference header: xllcorner')
-    if ((abs(file_yllcorner - header_yllcorner) .gt. tiny(1.0_dp))) &
-             call error_message('read_spatial_data_ascii: header not matching with reference header: yllcorner')
-    if ((abs(file_cellsize - header_cellsize)   .gt. tiny(1.0_dp))) &
-             call error_message('read_spatial_data_ascii: header not matching with reference header: cellsize')
-
-    ! allocation and initialization of matrices
-    allocate(tmp_data(file_nrows, file_ncols))
-    tmp_data = int(file_nodata, i8)
-    allocate(tmp_mask(file_nrows, file_ncols))
-    tmp_mask = .true.
-
-    !checking whether the file exists
-    call check_path_isfile(path = filename, raise=.true.)
-    ! read in
-    ! recl is only a rough estimate on bytes per line in the ascii
-    ! default for nag: recl=1024(byte) which is not enough for 100s of columns
-    open (unit = fileunit, file = filename, action = 'read', status = 'old', recl = 48 * file_ncols)
-    ! (a) skip header
-    do i = 1, 6
-      read(fileunit, *)
-    end do
-    ! (b) read data
-    do i = 1, file_nrows
-      read(fileunit, *) (tmp_data(i, j), j = 1, file_ncols)
-    end do
-    close(fileunit)
-
-    ! set mask .false. if nodata value appeared
-    where (tmp_data .EQ. int(file_nodata, i8))
-      tmp_mask = .false.
-    end where
-
-    ! transpose of data due to longitude-latitude ordering
-    allocate(data(file_ncols, file_nrows))
-    data = transpose(tmp_data)
-    deallocate(tmp_data)
-
-    allocate(mask(file_ncols, file_nrows))
-    mask = transpose(tmp_mask)
-    deallocate(tmp_mask)
-
-  end subroutine read_spatial_data_ascii_i8
-
 
   ! ------------------------------------------------------------------
 

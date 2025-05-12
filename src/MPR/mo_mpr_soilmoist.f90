@@ -11,7 +11,7 @@
 !> \ingroup f_mpr
 module mo_mpr_soilmoist
 
-  use mo_kind, only : i4, i8, dp
+  use mo_kind, only : i4, dp
   use mo_message, only : message, error_message
 
   implicit none
@@ -136,7 +136,7 @@ contains
     integer(i4), dimension(:), intent(in) :: ID0
 
     ! soil ids at level 0
-    integer(i8), dimension(:, :), intent(in) :: soilId0
+    integer(i4), dimension(:, :), intent(in) :: soilId0
 
     ! land cover ids at level 0
     integer(i4), dimension(:), intent(in) :: LCOVER0

@@ -19,7 +19,7 @@
 !> \ingroup f_mpr
 module mo_mpr_global_variables
 
-  use mo_kind, only : i4, i8, dp
+  use mo_kind, only : i4, dp
   use mo_common_types, only: period
 
   implicit none
@@ -111,8 +111,8 @@ module mo_mpr_global_variables
   real(dp), public, dimension(:), allocatable :: L0_slope    ! [%]      Slope
   real(dp), public, dimension(:), allocatable :: L0_asp     ! [degree]  Aspect degree
   !  [dim1=number grid cells, dim2=Number of soil horizons] note: for iFlag_soilDB=0, dim2=1
-  integer(i8), public, dimension(:, :), allocatable :: L0_soilId  !           soil id (iFlag_soilDB = 0)
-  integer(i8), public, dimension(:), allocatable :: L0_geoUnit  !      Geologic formation (unit)
+  integer(i4), public, dimension(:, :), allocatable :: L0_soilId  !           soil id (iFlag_soilDB = 0)
+  integer(i4), public, dimension(:), allocatable :: L0_geoUnit  !      Geologic formation (unit)
 
   ! ------------------------------------------------------------------
   ! DIRECTORIES

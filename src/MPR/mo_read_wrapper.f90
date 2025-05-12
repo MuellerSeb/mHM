@@ -12,8 +12,8 @@
 !> \ingroup f_mpr
 MODULE mo_read_wrapper
 
-  USE mo_kind, ONLY : i4, i8, dp
-  use mo_common_constants, only : nodata_dp, nodata_i4, nodata_i8
+  USE mo_kind, ONLY : i4, dp
+  use mo_common_constants, only : nodata_dp, nodata_i4
   use mo_message, only: message, error_message
 
   IMPLICIT NONE
@@ -103,13 +103,13 @@ CONTAINS
 
     real(dp), dimension(:, :), allocatable :: data_dp_2d
 
-    integer(i8), dimension(:, :), allocatable :: data_i8_2d
+    integer(i4), dimension(:, :), allocatable :: data_i4_2d
 
-    integer(i8), dimension(:, :), allocatable :: dataMatrix_i8
+    integer(i4), dimension(:, :), allocatable :: dataMatrix_i4
 
     logical, dimension(:, :), allocatable :: mask_2d
 
-    integer(i8), dimension(:), allocatable :: dummy_i8
+    integer(i4), dimension(:), allocatable :: dummy_i4
 
     type(Grid), pointer :: level0_iDomain
 
@@ -222,25 +222,25 @@ CONTAINS
         end if
         call read_spatial_data_ascii(trim(fName), usoilclass, &
                 level0_iDomain%nrows, level0_iDomain%ncols, level0_iDomain%xllcorner, &
-                level0_iDomain%yllcorner, level0_iDomain%cellsize, data_i8_2d, mask_2d)
+                level0_iDomain%yllcorner, level0_iDomain%cellsize, data_i4_2d, mask_2d)
         ! put global nodata value into array (probably not all grid cells have values)
-        data_i8_2d = merge(data_i8_2d, nodata_i8, mask_2d)
-        call paste(dataMatrix_i8, pack(data_i8_2d, level0_iDomain%mask), nodata_i8)
-        deallocate(data_i8_2d)
+        data_i4_2d = merge(data_i4_2d, nodata_i4, mask_2d)
+        call paste(dataMatrix_i4, pack(data_i4_2d, level0_iDomain%mask), nodata_i4)
+        deallocate(data_i4_2d)
       end do
-      call append(L0_soilId, dataMatrix_i8)
-      deallocate(dataMatrix_i8)
+      call append(L0_soilId, dataMatrix_i4)
+      deallocate(dataMatrix_i4)
 
       ! read geoUnit
       fName = trim(adjustl(dirMorpho(iDomain))) // trim(adjustl(file_hydrogeoclass))
       ! reading and transposing
       call read_spatial_data_ascii(trim(fName), uhydrogeoclass, &
               level0_iDomain%nrows, level0_iDomain%ncols, level0_iDomain%xllcorner, &
-              level0_iDomain%yllcorner, level0_iDomain%cellsize, data_i8_2d, mask_2d)
+              level0_iDomain%yllcorner, level0_iDomain%cellsize, data_i4_2d, mask_2d)
       ! put global nodata value into array (probably not all grid cells have values)
-      data_i8_2d = merge(data_i8_2d, nodata_i8, mask_2d)
-      call append(L0_geoUnit, pack(data_i8_2d, level0_iDomain%mask))
-      deallocate(data_i8_2d, mask_2d)
+      data_i4_2d = merge(data_i4_2d, nodata_i4, mask_2d)
+      call append(L0_geoUnit, pack(data_i4_2d, level0_iDomain%mask))
+      deallocate(data_i4_2d, mask_2d)
 
       ! LAI values
       call message('      Reading LAI ...')
@@ -260,24 +260,24 @@ CONTAINS
         ! reading and transposing
         call read_spatial_data_ascii(trim(fName), ulaiclass, &
                 level0_iDomain%nrows, level0_iDomain%ncols, level0_iDomain%xllcorner, &
-                level0_iDomain%yllcorner, level0_iDomain%cellsize, data_i8_2d, mask_2d)
+                level0_iDomain%yllcorner, level0_iDomain%cellsize, data_i4_2d, mask_2d)
         ! put global nodata value into array (probably not all grid cells have values)
-        data_i8_2d = merge(data_i8_2d, nodata_i8, mask_2d)
-        allocate(dummy_i8(count(level0_iDomain%mask)))
-        dummy_i8 = pack(data_i8_2d, level0_iDomain%mask)
-        deallocate(data_i8_2d, mask_2d)
+        data_i4_2d = merge(data_i4_2d, nodata_i4, mask_2d)
+        allocate(dummy_i4(count(level0_iDomain%mask)))
+        dummy_i4 = pack(data_i4_2d, level0_iDomain%mask)
+        deallocate(data_i4_2d, mask_2d)
 
-        call check_consistency_lut_map(dummy_i8, LAIUnitList, file_laiclass)
+        ! call check_consistency_lut_map(dummy_i4, LAIUnitList, file_laiclass)
 
         allocate(data_dp_2d(count(level0_iDomain%mask), nLAI))
         do iMon = 1, nLAI
           ! determine LAIs per month
           do ll = 1, size(LAILUT, dim = 1)
-            data_dp_2d(:, iMon) = merge(LAILUT(ll, iMon), data_dp_2d(:, iMon), dummy_i8(:) .EQ. LAIUnitList(ll))
+            data_dp_2d(:, iMon) = merge(LAILUT(ll, iMon), data_dp_2d(:, iMon), dummy_i4(:) .EQ. LAIUnitList(ll))
           end do
         end do
         call append(L0_gridded_LAI, data_dp_2d(:, :))
-        deallocate(dummy_i8, data_dp_2d)
+        deallocate(dummy_i4, data_dp_2d)
         ! correction for 0 LAI values to avoid numerical instabilities
         L0_gridded_LAI(:, :) = merge(1.00E-10_dp, L0_gridded_LAI(:, :), L0_gridded_LAI(:, :) .LT. 1.00E-10_dp)
         L0_gridded_LAI(:, :) = merge(30.0_dp, L0_gridded_LAI(:, :), L0_gridded_LAI(:, :) .GT. 30.0_dp)
@@ -307,26 +307,26 @@ CONTAINS
       fName = file_soil_database_1
     end if
 
-    ! If you are getting segmentation fault with intel on large file (e.g. here on soils), then
-    ! make sure to include following into your Marefile: INTEL_EXCLUDE  := mo_read_wrapper.f90
-    call check_consistency_lut_map(reshape(L0_soilId, (/ size(L0_soilId, 1) * size(L0_soilId, 2) /)), &
-            soilDB%id(:), fName)
-    ! Geology
-    call check_consistency_lut_map(L0_geoUnit, GeoUnitList, file_hydrogeoclass, dummy_i8)
+    ! ! If you are getting segmentation fault with intel on large file (e.g. here on soils), then
+    ! ! make sure to include following into your Marefile: INTEL_EXCLUDE  := mo_read_wrapper.f90
+    ! call check_consistency_lut_map(reshape(L0_soilId, (/ size(L0_soilId, 1) * size(L0_soilId, 2) /)), &
+    !         soilDB%id(:), fName)
+    ! ! Geology
+    ! call check_consistency_lut_map(L0_geoUnit, GeoUnitList, file_hydrogeoclass, dummy_i4)
 
-    ! deactivate parameters of non existing geological classes in study domain for optimization
-    ! loop over geological units in look up list
-    do iVar = 1, size(GeoUnitList, 1)
-      ! check if unit appears in geological map (dummy_i8 is unique number in L0_geoUnit)
-      if (.not. ANY(dummy_i8 .EQ. GeoUnitList(iVar))) then
-        ! deactivate optimization flag (dim=4 from global_parameters)
-        global_parameters(processMatrix(9, 3) - processMatrix(9, 2) + iVar, 4) = 0
-        call message('***WARNING: Geological unit ', trim(adjustl(num2str(GeoUnitList(iVar)))))
-        call message('            is not appearing in study domain.')
-      end if
-    end do
+    ! ! deactivate parameters of non existing geological classes in study domain for optimization
+    ! ! loop over geological units in look up list
+    ! do iVar = 1, size(GeoUnitList, 1)
+    !   ! check if unit appears in geological map (dummy_i4 is unique number in L0_geoUnit)
+    !   if (.not. ANY(dummy_i4 .EQ. GeoUnitList(iVar))) then
+    !     ! deactivate optimization flag (dim=4 from global_parameters)
+    !     global_parameters(processMatrix(9, 3) - processMatrix(9, 2) + iVar, 4) = 0
+    !     call message('***WARNING: Geological unit ', trim(adjustl(num2str(GeoUnitList(iVar)))))
+    !     call message('            is not appearing in study domain.')
+    !   end if
+    ! end do
 
-    deallocate(dummy_i8) ! is allocated in subroutine check_consistency_lut_map - geology
+    ! deallocate(dummy_i4) ! is allocated in subroutine check_consistency_lut_map - geology
 
     !----------------------------------------------------------------
     ! Correction for slope and aspect -- min value set above
@@ -373,7 +373,7 @@ CONTAINS
     implicit none
 
     ! map of study domain
-    integer(i8), dimension(:), intent(in) :: data
+    integer(i4), dimension(:), intent(in) :: data
 
     ! look up table corresponding to map
     integer(i4), dimension(:), intent(in) :: lookuptable
@@ -382,13 +382,13 @@ CONTAINS
     character(*), intent(in) :: filename
 
     ! array of unique values in dataone
-    integer(i8), dimension(:), allocatable, intent(out), optional :: unique_values
+    integer(i4), dimension(:), allocatable, intent(out), optional :: unique_values
 
     integer(i4) :: n_unique_elements
 
     integer(i4) :: ielement
 
-    integer(i8), dimension(:), allocatable :: temp
+    integer(i4), dimension(:), allocatable :: temp
 
 
     allocate(temp(size(data, 1)))
@@ -399,7 +399,7 @@ CONTAINS
     call unista(temp, n_unique_elements)
     ! check if unit exists in look up table
     do ielement = 1, n_unique_elements
-      if ( temp(ielement) == nodata_i8 ) call error_message( &
+      if ( temp(ielement) == nodata_i4 ) call error_message( &
         '***ERROR: Class ', trim(adjustl(num2str(temp(ielement)))), &
         ' was searched in ', trim(adjustl(filename)), &
         ' which indicates a masking problem!' &
