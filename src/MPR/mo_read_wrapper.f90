@@ -267,7 +267,7 @@ CONTAINS
         dummy_i4 = pack(data_i4_2d, level0_iDomain%mask)
         deallocate(data_i4_2d, mask_2d)
 
-        ! call check_consistency_lut_map(dummy_i4, LAIUnitList, file_laiclass)
+        call check_consistency_lut_map(dummy_i4, LAIUnitList, file_laiclass)
 
         allocate(data_dp_2d(count(level0_iDomain%mask), nLAI))
         do iMon = 1, nLAI
@@ -307,26 +307,26 @@ CONTAINS
       fName = file_soil_database_1
     end if
 
-    ! ! If you are getting segmentation fault with intel on large file (e.g. here on soils), then
-    ! ! make sure to include following into your Marefile: INTEL_EXCLUDE  := mo_read_wrapper.f90
-    ! call check_consistency_lut_map(reshape(L0_soilId, (/ size(L0_soilId, 1) * size(L0_soilId, 2) /)), &
-    !         soilDB%id(:), fName)
-    ! ! Geology
-    ! call check_consistency_lut_map(L0_geoUnit, GeoUnitList, file_hydrogeoclass, dummy_i4)
+    ! If you are getting segmentation fault with intel on large file (e.g. here on soils), then
+    ! make sure to include following into your Marefile: INTEL_EXCLUDE  := mo_read_wrapper.f90
+    call check_consistency_lut_map(reshape(L0_soilId, (/ size(L0_soilId, 1) * size(L0_soilId, 2) /)), &
+            soilDB%id(:), fName)
+    ! Geology
+    call check_consistency_lut_map(L0_geoUnit, GeoUnitList, file_hydrogeoclass, dummy_i4)
 
-    ! ! deactivate parameters of non existing geological classes in study domain for optimization
-    ! ! loop over geological units in look up list
-    ! do iVar = 1, size(GeoUnitList, 1)
-    !   ! check if unit appears in geological map (dummy_i4 is unique number in L0_geoUnit)
-    !   if (.not. ANY(dummy_i4 .EQ. GeoUnitList(iVar))) then
-    !     ! deactivate optimization flag (dim=4 from global_parameters)
-    !     global_parameters(processMatrix(9, 3) - processMatrix(9, 2) + iVar, 4) = 0
-    !     call message('***WARNING: Geological unit ', trim(adjustl(num2str(GeoUnitList(iVar)))))
-    !     call message('            is not appearing in study domain.')
-    !   end if
-    ! end do
+    ! deactivate parameters of non existing geological classes in study domain for optimization
+    ! loop over geological units in look up list
+    do iVar = 1, size(GeoUnitList, 1)
+      ! check if unit appears in geological map (dummy_i4 is unique number in L0_geoUnit)
+      if (.not. ANY(dummy_i4 .EQ. GeoUnitList(iVar))) then
+        ! deactivate optimization flag (dim=4 from global_parameters)
+        global_parameters(processMatrix(9, 3) - processMatrix(9, 2) + iVar, 4) = 0
+        call message('***WARNING: Geological unit ', trim(adjustl(num2str(GeoUnitList(iVar)))))
+        call message('            is not appearing in study domain.')
+      end if
+    end do
 
-    ! deallocate(dummy_i4) ! is allocated in subroutine check_consistency_lut_map - geology
+    deallocate(dummy_i4) ! is allocated in subroutine check_consistency_lut_map - geology
 
     !----------------------------------------------------------------
     ! Correction for slope and aspect -- min value set above
