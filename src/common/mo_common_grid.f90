@@ -1,6 +1,6 @@
-!> \file mo_grid.f90
-!> \brief \copybrief mo_grid
-!> \details \copydetails mo_grid
+!> \file mo_common_grid.f90
+!> \brief \copybrief mo_common_grid
+!> \details \copydetails mo_common_grid
 
 !> \brief gridding tools
 !> \details Common tools to deal with grids in mHM.
@@ -9,7 +9,7 @@
 !> \copyright Copyright 2005-\today, the mHM Developers, Luis Samaniego, Sabine Attinger: All rights reserved.
 !! mHM is released under the LGPLv3+ license \license_note
 !> \ingroup f_common
-module mo_grid
+module mo_common_grid
   use mo_kind, only : dp, i4
 
   IMPLICIT NONE
@@ -555,4 +555,4 @@ contains
 
   end subroutine calculate_grid_properties
 
-end module mo_grid
+end module mo_common_grid

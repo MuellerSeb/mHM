@@ -64,7 +64,7 @@ CONTAINS
   subroutine mpr_initialize
 
     use mo_common_variables, only : l0_l1_remap, level0, level1, domainMeta, resolutionHydrology
-    use mo_grid, only : init_lowres_level, set_domain_indices
+    use mo_common_grid, only : init_lowres_level, set_domain_indices
     use mo_kind, only : i4
     use mo_read_latlon, only : read_latlon
     use mo_soil_database, only : generate_soil_database
@@ -238,7 +238,7 @@ CONTAINS
 
     use mo_append, only : append
     use mo_common_variables, only : level0
-    use mo_grid, only : L0_grid_setup
+    use mo_common_grid, only : L0_grid_setup
     use mo_mpr_global_variables, only : L0_slope, L0_slope_emp, L0_soilId, iFlag_soilDB, nSoilHorizons_mHM, &
             nSoilTypes, soilDB
     use mo_orderpack, only : sort_index

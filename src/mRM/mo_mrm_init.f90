@@ -106,7 +106,7 @@ CONTAINS
     use mo_common_restart, only : read_grid_info
     use mo_common_variables, only : global_parameters, l0_l1_remap, level0, level1, domainMeta, &
                                     processMatrix, resolutionHydrology
-    use mo_grid, only : L0_grid_setup, init_lowres_level, set_domain_indices
+    use mo_common_grid, only : L0_grid_setup, init_lowres_level, set_domain_indices
     use mo_kind, only : i4
     use mo_mrm_global_variables, only : domain_mrm, &
                                         l0_l11_remap, level11, &

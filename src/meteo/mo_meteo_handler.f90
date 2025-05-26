@@ -504,9 +504,9 @@ contains
   !> \brief Initialize meteo data and level-2 grid
   subroutine init_level2(self, level0, level1)
 
-    use mo_grid, only : set_domain_indices
+    use mo_common_grid, only : set_domain_indices
     use mo_common_types, only : grid
-    use mo_grid, only : init_lowres_level
+    use mo_common_grid, only : init_lowres_level
     use mo_read_spatial_data, only : read_header_ascii
     use mo_string_utils, only : num2str
 
