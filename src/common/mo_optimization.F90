@@ -11,7 +11,7 @@
 !> \ingroup f_common
 module mo_optimization
   use mo_kind, only : i4, i8, dp
-  use mo_optimization_utils, only : eval_interface, objective_interface
+  use mo_optimization_utils, only : eval_interface, objective_interface, mhm_optimizee
   implicit none
   private
   public :: optimization
@@ -70,6 +70,9 @@ contains
 
     ! - objective function used in the optimization
     procedure(objective_interface), intent(in), pointer :: objective
+
+    ! - objective target, using objective and eval
+    type(mhm_optimizee) :: optimize_target
 
     ! - directory where to write ascii output
     character(len = *), intent(in) :: dirConfigOut
@@ -132,6 +135,9 @@ contains
       end if
     end do
 
+    optimize_target%eval_pointer => eval
+    optimize_target%obj_pointer => objective
+
     ! add two extra parameter for optimisation of likelihood
     if (opti_function == 8) then
       allocate(local_parameters(npara + 2, size(global_parameters, 2)))
@@ -182,7 +188,7 @@ contains
       select case (opti_function)
       case (8)
         call message('    Use MCMC')
-        call mcmc(eval, objective, local_parameters(:, 3), local_parameters(:, 1 : 2), mcmc_paras, burnin_paras, &
+        call mcmc(optimize_target, local_parameters(:, 3), local_parameters(:, 1 : 2), mcmc_paras, burnin_paras, &
                 ParaSelectMode_in = 2_i4, tmp_file = tFile, &
                 maskpara_in = local_maskpara, &
                 restart = optimize_restart, restart_file = 'mo_mcmc.restart', &
@@ -193,7 +199,7 @@ contains
           call error_message('ERROR: A restart of this optimization method is not implemented yet!')
         end if
         call message('    Use MCMC_STDDEV')
-        call mcmc_stddev(eval, objective, local_parameters(:, 3), local_parameters(:, 1 : 2), mcmc_paras, burnin_paras, &
+        call mcmc_stddev(optimize_target, local_parameters(:, 3), local_parameters(:, 1 : 2), mcmc_paras, burnin_paras, &
                 ParaSelectMode_in = 2_i4, tmp_file = tFile, &
                 maskpara_in = local_maskpara, &
                 seed_in = iseed, loglike_in = .true., printflag_in = .true.)
@@ -211,12 +217,12 @@ contains
       end if
       ! use fixed user-defined seed
 #ifdef MPI
-      local_parameters(:, 3) = dds(eval, objective, local_parameters(:, 3), local_parameters(:, 1 : 2), &
+      local_parameters(:, 3) = dds(optimize_target, local_parameters(:, 3), local_parameters(:, 1 : 2), &
               maxiter = int(nIterations, i8), r = dds_r, seed = iseed, &
               tmp_file = tFile, comm = domainMeta%comMaster, mask = local_maskpara, &
               funcbest = funcbest)
 #else
-      local_parameters(:, 3) = dds(eval, objective, local_parameters(:, 3), local_parameters(:, 1 : 2), &
+      local_parameters(:, 3) = dds(optimize_target, local_parameters(:, 3), local_parameters(:, 1 : 2), &
               maxiter = int(nIterations, i8), r = dds_r, seed = iseed, &
               tmp_file = tFile, mask = local_maskpara, &
               funcbest = funcbest)
@@ -233,13 +239,13 @@ contains
 
       if (sa_temp .gt. 0.0_dp) then
         ! use fixed user-defined seed and user-defined initial temperature
-        local_parameters(:, 3) = anneal(eval, objective, local_parameters(:, 3), local_parameters(:, 1 : 2), &
+        local_parameters(:, 3) = anneal(optimize_target, local_parameters(:, 3), local_parameters(:, 1 : 2), &
                 temp = sa_temp, seeds = (/iseed, iseed + 1000_i8, iseed + 2000_i8/), nITERmax = nIterations, &
                 tmp_file = tFile, maskpara = local_maskpara, &
                 funcbest = funcbest)
       else
         ! use fixed user-defined seed and adaptive initial temperature
-        local_parameters(:, 3) = anneal(eval, objective, local_parameters(:, 3), local_parameters(:, 1 : 2), &
+        local_parameters(:, 3) = anneal(optimize_target, local_parameters(:, 3), local_parameters(:, 1 : 2), &
                 seeds = (/iseed, iseed + 1000_i8, iseed + 2000_i8/), nITERmax = nIterations, &
                 tmp_file = tFile, maskpara = local_maskpara, &
                 funcbest = funcbest)
@@ -251,7 +257,7 @@ contains
       pFile = trim(adjustl(dirConfigOut)) // 'sce_population.out'
 
       ! use fixed user-defined seed
-      local_parameters(:, 3) = sce(eval, objective, local_parameters(:, 3), local_parameters(:, 1 : 2), &
+      local_parameters(:, 3) = sce(optimize_target, local_parameters(:, 3), local_parameters(:, 1 : 2), &
               mymaxn = int(nIterations, i8), myseed = iseed, myngs = sce_ngs, mynpg = sce_npg, mynps = sce_nps, &
               parallel = .false., mymask = local_maskpara, &
               restart = optimize_restart, restart_file = 'mo_sce.restart', &
