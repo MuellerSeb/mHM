@@ -70,7 +70,7 @@ CONTAINS
     use mo_common_mHM_mRM_variables, only : mhmFileRestartIn, read_restart
     use mo_common_restart, only : read_grid_info, read_nLAI_and_check_dims
     use mo_common_variables, only : level0, level1, domainMeta
-    use mo_grid, only : set_domain_indices
+    use mo_common_grid, only : set_domain_indices
     use mo_init_states, only : variables_alloc
     use mo_mpr_startup, only : init_eff_params, mpr_initialize
     use mo_mpr_global_variables, only: nLAI
