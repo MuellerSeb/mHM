@@ -236,18 +236,21 @@ contains
     class(river_t), intent(in) :: this
     character(*), intent(in) :: path !< path to the file
     type(output_dataset) :: ds
+    type(var), allocatable :: vars
     integer(i8) :: i
-    call ds%init(path, this%grid, &
-      [var("fdir", "flow direction", dtype="i32", static=.true.), &
-       var("facc", "flow accumulation", dtype="i32", kind="i8", static=.true.), &
-       var("id", "cell id", dtype="i32", kind="i8", static=.true.), &
-       var("scc", "scc catchment id", dtype="i32", static=.true.)])
+    allocate(vars(0))
+    vars = [vars, var("fdir", "flow direction", dtype="i32", static=.true.)]
+    vars = [vars, var("id", "cell id", dtype="i32", kind="i8", static=.true.)]
+    if (allocated(this%facc)) vars = [vars, var("facc", "flow accumulation", dtype="i32", kind="i8", static=.true.)]
+    if (allocated(this%scc_id)) vars = [vars, var("scc", "scc catchment id", dtype="i32", static=.true.)]
+    call ds%init(path, this%grid, vars)
     call ds%update("fdir", this%fdir)
-    call ds%update("facc", this%facc)
     call ds%update("id", [(i, i=1_i8, this%grid%ncells)])
-    call ds%update("scc", this%scc_id)
+    if (allocated(this%facc)) call ds%update("facc", this%facc)
+    if (allocated(this%scc_id)) call ds%update("scc", this%scc_id)
     call ds%write()
     call ds%close()
+    deallocate(vars)
   end subroutine river_export
 
 end module mo_river
