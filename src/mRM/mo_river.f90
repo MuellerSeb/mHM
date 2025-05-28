@@ -236,7 +236,7 @@ contains
     class(river_t), intent(in) :: this
     character(*), intent(in) :: path !< path to the file
     type(output_dataset) :: ds
-    type(var), allocatable :: vars
+    type(var), allocatable :: vars(:)
     integer(i8) :: i
     allocate(vars(0))
     vars = [vars, var("fdir", "flow direction", dtype="i32", static=.true.)]
