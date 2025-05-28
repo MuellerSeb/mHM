@@ -10,7 +10,7 @@
 !! This code is released under the LGPLv3+ license \license_note
 module mo_river
 
-  use mo_kind,   only: i4, i8, dp
+  use mo_kind,   only: i2, i4, i8, dp
   use mo_dag, only: dag, order_t, traversal_visit
   use mo_grid, only: grid_t, bottom_up
   use mo_grid_io, only: var, output_dataset
@@ -44,9 +44,11 @@ module mo_river
     integer(i4), allocatable :: fdir(:) !< D8 flow direction
     integer(i8), allocatable :: facc(:) !< D8 flow accumulation
     integer(i8), allocatable :: down(:) !< downstream cell by id
-    integer(i4), allocatable :: scc_id(:) !< sub catchment id
+    integer(i8), allocatable :: outlets(:) !< cell ids of outlets
+    integer(i4) :: nsub = 1_i4 !< number of sub catchments
+    integer(i4), allocatable :: sub_map(:) !< sub catchment id
+    integer(i8), allocatable :: sub_gauge(:) !< id of gauge for sub catchment size(nsub-1)
     integer(i4) :: dy !< delta-y based on y-axis direction to correctly interpret fdir (top-down: 1, bottom-up: -1)
-    integer(i4) :: outlets !< number of outlets (indicated by `0` in down)
     type(order_t) :: order !< level based order of the network
   contains
     procedure, public :: from_fdir => river_from_fdir
@@ -138,7 +140,7 @@ contains
     integer(i4) :: n_up ! number of upstream neighbor cells
     integer(i8), dimension(8) :: up ! all upstream neighbor cells
     integer(i8) :: down ! the downstream cell
-    integer(i8) :: i
+    integer(i8) :: i, j, nout
     call this%init(grid%ncells)
     this%grid => grid
     this%fdir = fdir
@@ -162,7 +164,19 @@ contains
     end do
     !$omp end parallel do
     deallocate(cells)
-    this%outlets = count(this%down == 0_i8)
+    ! determine outlets
+    nout = count(this%down == 0_i8)
+    allocate(this%outlets(nout))
+    j = 0_i8
+    do i = 1_i8, this%grid%ncells
+      if (this%down(i) == 0_i8) then
+        j = j + 1_i8
+        this%outlets(j) = i
+      end if
+    end do
+    allocate(this%sub_map(this%grid%ncells), source=1_i4)
+    allocate(this%sub_gauge(0))
+
   end subroutine river_from_fdir
 
   !> \brief Get river node order by levels
@@ -203,32 +217,50 @@ contains
     logical, dimension(size(gauges, dim=2)) :: gauge_mask
     integer(i8), dimension(size(gauges, dim=2)) :: gauge_facc
     integer(i8), dimension(size(gauges, dim=2)) :: gauge_order
+    integer(i8), allocatable :: order(:)
     type(dag) :: scc_tree
     type(traversal_visit) :: handler
-    integer(i4) :: i, j
+    integer(i4) :: i, j, n
+    integer(i8) :: istat
+    n = size(gauges, dim=2)
+    this%nsub = n + 1_i4
     if (.not.allocated(this%facc)) call error_message("river: facc not initialized")
     ! find gauge cell ids
-    do i = 1_i4, size(gauge_cell)
+    do i = 1_i4, n
       cell_loc = (this%grid%cell_ij(:, 1) == gauges(1, i)).and.(this%grid%cell_ij(:, 2) == gauges(2, i))
       gauge_cell(i) = findloc(cell_loc, .true., dim=1, kind=i8)
       if (gauge_cell(i) == 0_i8) call error_message("river: gauge location not found")
       gauge_facc(i) = this%facc(gauge_cell(i))
     end do
 
-    allocate(this%scc_id(this%grid%ncells), source=0_i4)
+    this%sub_map = n+1_i4 ! base catchment gets id n+1
+    deallocate(this%sub_gauge)
+    allocate(this%sub_gauge(n))
     allocate(handler%visited(this%grid%ncells))
     ! sort gauges by facc from highest to lowest
     gauge_mask = .true.
-    do i = 1_i4, size(gauge_cell)
+    do i = 1_i4, n
       j = maxloc(gauge_facc, mask=gauge_mask, dim=1)
+      this%sub_gauge(i) = gauge_cell(i)
       gauge_mask(j) = .false.
       handler%visited = .false. ! reset traverse handler
       call this%traverse(handler, [gauge_cell(j)])
-      where (handler%visited) this%scc_id = j
+      where (handler%visited) this%sub_map = j
     end do
     deallocate(handler%visited)
 
-    call scc_tree%init(size(gauge_cell, kind=i8) + 1_i8)
+    call scc_tree%init(int(n+1_i4, kind=i8))
+    do i = 1_i4, n
+      if (this%down(this%sub_gauge(i)) == 0_i8) cycle ! sub gauge is an outlet
+      print*, "edge", int(this%sub_map(this%down(this%sub_gauge(i))), i8), int(i, i8)
+      call scc_tree%add_edge(int(this%sub_map(this%down(this%sub_gauge(i))), i8), int(i, i8))
+    end do
+    call scc_tree%toposort(order, istat)
+    print*, "istat", istat
+    if (istat==0_i8) print*, int(order, i2)
+    do i = 1_i4, n+1
+      if (scc_tree%nodes(i)%nedges()>0) print*, "node", i, ":", scc_tree%nodes(i)%edges
+    end do
 
   end subroutine river_scc
 
@@ -242,12 +274,12 @@ contains
     vars = [vars, var("fdir", "flow direction", dtype="i32", static=.true.)]
     vars = [vars, var("id", "cell id", dtype="i32", kind="i8", static=.true.)]
     if (allocated(this%facc)) vars = [vars, var("facc", "flow accumulation", dtype="i32", kind="i8", static=.true.)]
-    if (allocated(this%scc_id)) vars = [vars, var("scc", "scc catchment id", dtype="i32", static=.true.)]
+    if (allocated(this%sub_map)) vars = [vars, var("scc", "scc catchment id", dtype="i32", static=.true.)]
     call ds%init(path, this%grid, vars)
     call ds%update("fdir", this%fdir)
     call ds%update("id", [(i, i=1_i8, this%grid%ncells)])
     if (allocated(this%facc)) call ds%update("facc", this%facc)
-    if (allocated(this%scc_id)) call ds%update("scc", this%scc_id)
+    if (allocated(this%sub_map)) call ds%update("scc", this%sub_map)
     call ds%write()
     call ds%close()
     deallocate(vars)
