@@ -12,7 +12,7 @@ module mo_river_upscaler
 
   use mo_kind, only: i4, i8, dp
   use mo_river, only: river_t, dir_E, dir_S, dir_W, dir_N, dir_SE, dir_SW, dir_NW, dir_NE
-  use mo_grid, only: grid_t, id_bounds, bottom_up
+  use mo_grid, only: grid_t, bottom_up
   use mo_grid_scaler, only: regridder, up_scaling
 
   implicit none
