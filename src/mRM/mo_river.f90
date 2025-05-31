@@ -12,7 +12,7 @@ module mo_river
 
   use mo_kind,   only: i2, i4, i8, dp
   use mo_dag, only: dag, order_t, traversal_visit
-  use mo_grid, only: grid_t, bottom_up
+  use mo_grid, only: grid_t, bottom_up, cartesian
   use mo_grid_io, only: var, output_dataset
   use mo_message, only: error_message
 
@@ -44,10 +44,16 @@ module mo_river
     integer(i4), allocatable :: fdir(:) !< D8 flow direction
     integer(i8), allocatable :: facc(:) !< D8 flow accumulation
     integer(i8), allocatable :: down(:) !< downstream cell by id
+    logical, allocatable :: is_sink(:) !< flag to indicate sinks
+    real(dp), allocatable :: slope(:) !< slope of cell (in percent)
+    real(dp), allocatable :: celerity(:) !< celerity of cell derived form slope
+    real(dp), allocatable :: link_length(:) !< link length from this cell to the next (0 if outlet)
     integer(i8), allocatable :: outlets(:) !< cell ids of outlets
     integer(i4) :: nsub = 1_i4 !< number of sub catchments
-    integer(i4), allocatable :: sub_map(:) !< sub catchment id
+    integer(i4), allocatable :: sub_map(:) !< sub catchment id (id 'nsub' indicates base-catchment)
     integer(i8), allocatable :: sub_gauge(:) !< id of gauge for sub catchment size(nsub-1)
+    type(dag) :: scc_tree !< dependency tree of sub-catchments
+    integer(i8), allocatable :: scc_order(:) !< calculation order of sub catchments
     integer(i4) :: dy !< delta-y based on y-axis direction to correctly interpret fdir (top-down: 1, bottom-up: -1)
     type(order_t) :: order !< level based order of the network
   contains
@@ -55,6 +61,7 @@ module mo_river
     procedure, public :: calc_order => river_order
     procedure, public :: calc_facc => river_facc
     procedure, public :: calc_scc => river_scc
+    procedure, public :: calc_link_length => river_length
     procedure, public :: export => river_export
   end type river_t
 
@@ -140,16 +147,16 @@ contains
     integer(i4) :: n_up ! number of upstream neighbor cells
     integer(i8), dimension(8) :: up ! all upstream neighbor cells
     integer(i8) :: down ! the downstream cell
-    integer(i8) :: i, j, nout
+    integer(i8) :: i, j
     call this%init(grid%ncells)
     this%grid => grid
     this%fdir = fdir
     allocate(this%down(this%grid%ncells))
 
-    cells = this%grid%unpack([(i, i=1_i8, this%grid%ncells)])
     this%dy = 1_i4
     if (this%grid%y_direction==bottom_up) this%dy = -1_i4
 
+    cells = this%grid%unpack([(i, i=1_i8, this%grid%ncells)])
     !$omp parallel do default(shared) private(i, n_up, up, down)
     do i = 1_i8, this%grid%ncells
       call get_links(this%grid%mask, cells, this%fdir, this%grid%cell_ij(i,1), this%grid%cell_ij(i,2), this%dy, n_up, up, down)
@@ -164,18 +171,22 @@ contains
     end do
     !$omp end parallel do
     deallocate(cells)
+
     ! determine outlets
-    nout = count(this%down == 0_i8)
-    allocate(this%outlets(nout))
+    this%is_sink = (this%down == 0_i8)
+    allocate(this%outlets(count(this%is_sink)))
     j = 0_i8
     do i = 1_i8, this%grid%ncells
-      if (this%down(i) == 0_i8) then
-        j = j + 1_i8
-        this%outlets(j) = i
-      end if
+      if (.not.this%is_sink(i)) cycle
+      j = j + 1_i8
+      this%outlets(j) = i
     end do
+
+    ! scc related attributes for a single base catchment only
     allocate(this%sub_map(this%grid%ncells), source=1_i4)
     allocate(this%sub_gauge(0))
+    call this%scc_tree%init(1_i8)
+    this%scc_order = [1_i8]
 
   end subroutine river_from_fdir
 
@@ -216,9 +227,6 @@ contains
     logical, dimension(this%grid%ncells) :: cell_loc
     logical, dimension(size(gauges, dim=2)) :: gauge_mask
     integer(i8), dimension(size(gauges, dim=2)) :: gauge_facc
-    integer(i8), dimension(size(gauges, dim=2)) :: gauge_order
-    integer(i8), allocatable :: order(:)
-    type(dag) :: scc_tree
     type(traversal_visit) :: handler
     integer(i4) :: i, j, n
     integer(i8) :: istat
@@ -240,6 +248,7 @@ contains
     ! sort gauges by facc from highest to lowest
     gauge_mask = .true.
     do i = 1_i4, n
+      ! sort sub-gauges by facc (high to low)
       j = maxloc(gauge_facc, mask=gauge_mask, dim=1)
       this%sub_gauge(i) = gauge_cell(i)
       gauge_mask(j) = .false.
@@ -249,40 +258,108 @@ contains
     end do
     deallocate(handler%visited)
 
-    call scc_tree%init(int(n+1_i4, kind=i8))
+    ! generate scc dependency tree
+    call this%scc_tree%init(int(n+1_i4, kind=i8))
     do i = 1_i4, n
-      if (this%down(this%sub_gauge(i)) == 0_i8) cycle ! sub gauge is an outlet
-      print*, "edge", int(this%sub_map(this%down(this%sub_gauge(i))), i8), int(i, i8)
-      call scc_tree%add_edge(int(this%sub_map(this%down(this%sub_gauge(i))), i8), int(i, i8))
+      if (this%is_sink(this%sub_gauge(i))) cycle ! sub gauge is an outlet
+      call this%scc_tree%add_edge(int(this%sub_map(this%down(this%sub_gauge(i))), i8), int(i, i8))
     end do
-    call scc_tree%toposort(order, istat)
-    print*, "istat", istat
-    if (istat==0_i8) print*, int(order, i2)
-    do i = 1_i4, n+1
-      if (scc_tree%nodes(i)%nedges()>0) print*, "node", i, ":", scc_tree%nodes(i)%edges
-    end do
+    ! determine sub-catchment calculation order
+    if (allocated(this%scc_order)) deallocate(this%scc_order)
+    call this%scc_tree%toposort(this%scc_order, istat)
 
   end subroutine river_scc
 
+  !> \brief Calculate link lengths
+  subroutine river_length(this)
+    use mo_constants, only: SQRT2_dp
+    class(river_t), intent(inout) :: this
+    integer(i8) :: i, to
+    if (allocated(this%link_length)) deallocate(this%link_length)
+    allocate(this%link_length(this%grid%ncells), source=0.0_dp)
+    if (this%grid%coordsys == cartesian) then
+      !$omp parallel do default(shared) private(i)
+      do i = 1_i8, this%grid%ncells
+        if (this%down(i) == 0_i8) cycle ! sinks ain't links
+        select case (this%fdir(i))
+          case(dir_E, dir_S, dir_W, dir_N)
+            this%link_length(i) = this%grid%cellsize
+          case(dir_SE, dir_SW, dir_NW, dir_NE)
+            this%link_length(i) = SQRT2_dp * this%grid%cellsize
+        end select
+      end do
+      !$omp end parallel do
+    else
+      !$omp parallel do default(shared) private(i, to)
+      do i = 1_i8, this%grid%ncells
+        to = this%down(i)
+        if (to == 0_i8) cycle ! sinks ain't links
+        this%link_length(i) = dist_latlon( &
+          lat1=this%grid%lat(this%grid%cell_ij(i, 1), this%grid%cell_ij(i, 2)), &
+          lon1=this%grid%lon(this%grid%cell_ij(i, 1), this%grid%cell_ij(i, 2)), &
+          lat2=this%grid%lat(this%grid%cell_ij(to, 1), this%grid%cell_ij(to, 2)), &
+          lon2=this%grid%lon(this%grid%cell_ij(to, 1), this%grid%cell_ij(to, 2)))
+      end do
+      !$omp end parallel do
+    end if
+  end subroutine river_length
+
+  !> \brief Export river arrays to netcdf
   subroutine river_export(this, path)
     class(river_t), intent(in) :: this
     character(*), intent(in) :: path !< path to the file
     type(output_dataset) :: ds
     type(var), allocatable :: vars(:)
     integer(i8) :: i
+    integer(i4) :: j
+    integer(i4), allocatable :: level(:)
     allocate(vars(0))
     vars = [vars, var("fdir", "flow direction", dtype="i32", static=.true.)]
     vars = [vars, var("id", "cell id", dtype="i32", kind="i8", static=.true.)]
     if (allocated(this%facc)) vars = [vars, var("facc", "flow accumulation", dtype="i32", kind="i8", static=.true.)]
     if (allocated(this%sub_map)) vars = [vars, var("scc", "scc catchment id", dtype="i32", static=.true.)]
+    if (allocated(this%order%id)) vars = [vars, var("level", "order level", dtype="i32", static=.true.)]
+    if (allocated(this%link_length)) vars = [vars, var("length", "link length", dtype="f64", static=.true.)]
     call ds%init(path, this%grid, vars)
     call ds%update("fdir", this%fdir)
     call ds%update("id", [(i, i=1_i8, this%grid%ncells)])
     if (allocated(this%facc)) call ds%update("facc", this%facc)
     if (allocated(this%sub_map)) call ds%update("scc", this%sub_map)
+    if (allocated(this%order%id)) then
+      allocate(level(this%grid%ncells))
+      do j = 1_i4, size(this%order%level_start)
+        do i = this%order%level_start(j), this%order%level_end(j)
+          level(this%order%id(i)) = j
+        end do
+      end do
+      call ds%update("level", level)
+    end if
+    if (allocated(this%link_length)) call ds%update("length", this%link_length)
     call ds%write()
     call ds%close()
     deallocate(vars)
   end subroutine river_export
+
+  !> \brief distance between two points on the sphere [m]
+  pure real(dp) function dist_latlon(lat1, lon1, lat2, lon2)
+    use mo_constants, only : RadiusEarth_dp, deg2rad_dp
+    real(dp), intent(in) :: lat1
+    real(dp), intent(in) :: lon1
+    real(dp), intent(in) :: lat2
+    real(dp), intent(in) :: lon2
+    real(dp) :: theta1, phi1, theta2, phi2
+    real(dp) :: term1, term2, term3, temp
+
+    theta1 = deg2rad_dp * lon1
+    phi1 = deg2rad_dp * lat1
+    theta2 = deg2rad_dp * lon2
+    phi2 = deg2rad_dp * lat2
+
+    term1 = cos(phi1) * cos(theta1) * cos(phi2) * cos(theta2)
+    term2 = cos(phi1) * sin(theta1) * cos(phi2) * sin(theta2)
+    term3 = sin(phi1) * sin(phi2)
+    temp = min(term1 + term2 + term3, 1.0_dp)
+    dist_latlon = RadiusEarth_dp * acos(temp);
+  end function dist_latlon
 
 end module mo_river
