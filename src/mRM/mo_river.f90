@@ -12,7 +12,7 @@ module mo_river
 
   use mo_kind,   only: i2, i4, i8, dp
   use mo_dag, only: dag, order_t, traversal_visit
-  use mo_grid, only: grid_t, bottom_up, cartesian
+  use mo_grid, only: grid_t, bottom_up, cartesian, dist_latlon
   use mo_grid_io, only: var, output_dataset
   use mo_message, only: error_message
 
@@ -40,29 +40,26 @@ module mo_river
   !> \class river_t
   !> \brief River network representation
   type, extends(dag), public :: river_t
-    integer(i8) :: n_nodes !< number of nodes in the river (D8-river: number of grid cells, SCC-river: all nodes)
+    integer(i8) :: n_nodes !< number of nodes in the river (D8-river: number of grid cells, SCC-river: number of all nodes)
     type(grid_t), pointer :: grid !< grid the river network is defined on
-    integer(i4), allocatable :: fdir(:) !< D8 flow direction (only for a D8-river)
-    integer(i8), allocatable :: facc(:) !< flow accumulation
-    integer(i8), allocatable :: down(:) !< downstream cell by id
-    logical, allocatable :: is_sink(:) !< flag to indicate sinks
-    integer(i8), allocatable :: outlets(:) !< node ids of outlets
-    real(dp), allocatable :: link_length(:) !< link length of node (0 if node is sink)
-    real(dp), allocatable :: link_slope(:) !< slope of node (in [0,1])
-    real(dp), allocatable :: celerity(:) !< celerity of node derived form slope
+    integer(i4), allocatable :: fdir(:) !< D8 flow direction (only for a D8-river) size(ncells)
+    integer(i8), allocatable :: facc(:) !< flow accumulation size(n_nodes)
+    integer(i8), allocatable :: down(:) !< downstream cell by id size(n_nodes)
+    logical, allocatable :: is_sink(:) !< flag to indicate sinks size(n_nodes)
+    integer(i8), allocatable :: sinks(:) !< node ids of sinks
+    real(dp), allocatable :: link_length(:) !< length of link starting at node (0 if node is sink) size(n_nodes)
+    real(dp), allocatable :: link_slope(:) !< slope of link starting at node (in [0,1]) size(n_nodes)
+    real(dp), allocatable :: celerity(:) !< celerity of link starting at node derived form slope size(n_nodes)
     type(order_t) :: order !< level based order of the network
-    logical :: scc = .false. !< indicate that this river is a SCC-river (not D8)
     ! scc related attributes
-    integer(i4) :: nsub = 1_i4 !< number of sub catchments
-    integer(i4), allocatable :: sub_map(:) !< sub catchment id (id 'nsub' indicates base-catchment)
-    integer(i8), allocatable :: sub_gauge(:) !< id of gauge for sub catchment size(nsub-1)
-    type(dag) :: scc_tree !< dependency tree of sub-catchments
-    integer(i8), allocatable :: scc_order(:) !< calculation order of sub catchments
+    logical :: scc = .false. !< indicate that this river is a SCC-river (not D8)
+    integer(i8), allocatable :: node_cell(:) !< map node to grid cell id size(n_nodes)
+    real(dp), allocatable :: area_fraction(:) !< area fraction for each node in cell size(n_nodes)
   contains
     procedure, public :: from_fdir => river_from_fdir
     procedure, public :: calc_order => river_order
+    procedure, public :: calc_fdir => river_fdir
     procedure, public :: calc_facc => river_facc
-    procedure, public :: calc_scc => river_scc
     procedure, public :: calc_d8_length => river_length
     procedure, public :: export => river_export
   end type river_t
@@ -149,6 +146,32 @@ contains
     end select
   end subroutine next
 
+  !> \brief Get next matrix indices from flow direction: (i,j) -> (ni,nj)
+  pure integer(i4) function get_fdir(from, to, dy)
+    integer(i4), intent(in) :: from(2) !< from-cell indices
+    integer(i4), intent(in) :: to(2) !< to-cell indices
+    integer(i4), intent(in) :: dy !< direction of north in the grid matrix (1/-1)
+    if (from(1)==(to(1)+1_i4) .and. from(2)==to(2)) then
+      get_fdir = dir_E
+    else if (from(1)==(to(1)+1_i4) .and. from(2)==(to(2)-dy)) then
+      get_fdir = dir_SE
+    else if (from(1)==to(1) .and. from(2)==(to(2)-dy)) then
+      get_fdir = dir_S
+    else if (from(1)==(to(1)-1_i4) .and. from(2)==(to(2)-dy)) then
+      get_fdir = dir_SW
+    else if (from(1)==(to(1)-1_i4) .and. from(2)==to(2)) then
+      get_fdir = dir_W
+    else if (from(1)==(to(1)-1_i4) .and. from(2)==(to(2)+dy)) then
+      get_fdir = dir_NW
+    else if (from(1)==to(1) .and. from(2)==(to(2)+dy)) then
+      get_fdir = dir_N
+    else if (from(1)==(to(1)+1_i4) .and. from(2)==(to(2)+dy)) then
+      get_fdir = dir_NE
+    else
+      get_fdir = sink
+    end if
+  end function get_fdir
+
   !> \brief Initialize river network from flow direction.
   subroutine river_from_fdir(this, grid, fdir)
     class(river_t), intent(inout) :: this
@@ -166,6 +189,9 @@ contains
     this%fdir = fdir
     allocate(this%down(this%grid%ncells))
     this%n_nodes = this%grid%ncells
+    this%scc = .false. ! if derived from fdir, this is a D8-river
+    this%node_cell = [(i, i=1_i4,this%grid%ncells)] ! nodes correspond to cells
+    allocate(this%area_fraction(this%n_nodes), source=1.0_dp) ! D8 has no area fraction
 
     periodic = this%grid%is_periodic()
     dy = -1_i4 ! top-down grid starts north
@@ -187,21 +213,15 @@ contains
     !$omp end parallel do
     deallocate(cells)
 
-    ! determine outlets
+    ! determine sinks
     this%is_sink = (this%down == 0_i8)
-    allocate(this%outlets(count(this%is_sink)))
+    allocate(this%sinks(count(this%is_sink)))
     j = 0_i8
     do i = 1_i8, this%grid%ncells
       if (.not.this%is_sink(i)) cycle
       j = j + 1_i8
-      this%outlets(j) = i
+      this%sinks(j) = i
     end do
-
-    ! scc related attributes for a single base catchment only
-    allocate(this%sub_map(this%grid%ncells), source=1_i4)
-    allocate(this%sub_gauge(0))
-    call this%scc_tree%init(1_i8)
-    this%scc_order = [1_i8]
 
   end subroutine river_from_fdir
 
@@ -221,7 +241,8 @@ contains
     use mo_message, only: error_message
     class(river_t), intent(inout) :: this
     integer(i8) :: i, j, n, m
-    if (.not.allocated(this%facc)) allocate(this%facc(this%n_nodes))
+    if (allocated(this%facc)) deallocate(this%facc)
+    allocate(this%facc(this%n_nodes))
     if (.not.allocated(this%order%id)) call error_message("river: order not initialized")
     do i = 1_i8, size(this%order%level_start, kind=i8)
       !$omp parallel do default(shared) private(j, n, m)
@@ -236,57 +257,36 @@ contains
     end do
   end subroutine river_facc
 
-  !> \brief Generate SCC map
-  subroutine river_scc(this, gauges)
+  !> \brief Calculate D8 flow direction from network
+  subroutine river_fdir(this)
     use mo_message, only: error_message
     class(river_t), intent(inout) :: this
-    integer(i4), dimension(:,:), intent(in) :: gauges !< gauge locations dim 1: x/y, dim 2: gauge id
-    integer(i8), dimension(size(gauges, dim=2)) :: gauge_cell
-    logical, dimension(this%grid%ncells) :: cell_loc
-    logical, dimension(size(gauges, dim=2)) :: gauge_mask
-    integer(i8), dimension(size(gauges, dim=2)) :: gauge_facc
-    type(traversal_visit) :: handler
-    integer(i4) :: i, j, n
-    integer(i8) :: istat
-    n = size(gauges, dim=2)
-    this%nsub = n + 1_i4
-    if (.not.allocated(this%facc)) call error_message("river: facc not initialized")
-    ! find gauge cell ids
-    do i = 1_i4, n
-      cell_loc = (this%grid%cell_ij(:, 1) == gauges(1, i)).and.(this%grid%cell_ij(:, 2) == gauges(2, i))
-      gauge_cell(i) = findloc(cell_loc, .true., dim=1, kind=i8)
-      if (gauge_cell(i) == 0_i8) call error_message("river: gauge location not found")
-      gauge_facc(i) = this%facc(gauge_cell(i))
+    integer(i4) :: from(2), to(2)
+    integer(i8) :: i, j
+    integer(i4) :: dy ! direction of north in the grid matrix (1/-1)
+    logical :: periodic ! periodic latlon grid
+    if (this%scc) call error_message("river%calc_fdir: can not calculated fdir for a SCC river")
+    if (allocated(this%fdir)) deallocate(this%fdir)
+    allocate(this%fdir(this%n_nodes), source=0_i4)
+    periodic = this%grid%is_periodic()
+    dy = -1_i4 ! top-down grid starts north
+    if (this%grid%y_direction==bottom_up) dy = 1_i4
+    !$omp parallel do default(shared) private(i, j, from, to)
+    do i = 1_i4, this%n_nodes
+      j = this%down(i)
+      if (j==0_i4) cycle ! sink
+      from = this%grid%cell_ij(i,:)
+      to = this%grid%cell_ij(j,:)
+      ! the pathological case here is a periodic grid with 2 cells along lon-axis (*lol*)
+      if (periodic .and. abs(from(1)-to(1))>1_i4) then
+        ! set the node at the grid end to the begining
+        if (from(1)==this%grid%nx) from(1) = 0_i4
+        if (to(1)==this%grid%nx) to(1) = 0_i4
+      end if
+      this%fdir(i) = get_fdir(from, to, dy)
     end do
-
-    this%sub_map = n+1_i4 ! base catchment gets id n+1
-    deallocate(this%sub_gauge)
-    allocate(this%sub_gauge(n))
-    allocate(handler%visited(this%grid%ncells))
-    ! sort gauges by facc from highest to lowest
-    gauge_mask = .true.
-    do i = 1_i4, n
-      ! sort sub-gauges by facc (high to low)
-      j = maxloc(gauge_facc, mask=gauge_mask, dim=1)
-      this%sub_gauge(i) = gauge_cell(i)
-      gauge_mask(j) = .false.
-      handler%visited = .false. ! reset traverse handler
-      call this%traverse(handler, [gauge_cell(j)])
-      where (handler%visited) this%sub_map = j
-    end do
-    deallocate(handler%visited)
-
-    ! generate scc dependency tree
-    call this%scc_tree%init(int(n+1_i4, kind=i8))
-    do i = 1_i4, n
-      if (this%is_sink(this%sub_gauge(i))) cycle ! sub gauge is an outlet
-      call this%scc_tree%add_edge(int(this%sub_map(this%down(this%sub_gauge(i))), i8), int(i, i8))
-    end do
-    ! determine sub-catchment calculation order
-    if (allocated(this%scc_order)) deallocate(this%scc_order)
-    call this%scc_tree%toposort(this%scc_order, istat)
-
-  end subroutine river_scc
+    !$omp end parallel do
+  end subroutine river_fdir
 
   !> \brief Calculate link lengths
   subroutine river_length(this)
@@ -323,26 +323,25 @@ contains
   end subroutine river_length
 
   !> \brief Export river arrays to netcdf
-  subroutine river_export(this, path)
+  subroutine river_export(this, path, sub_map)
     class(river_t), intent(in) :: this
     character(*), intent(in) :: path !< path to the file
+    integer(i4), intent(in), optional :: sub_map(this%n_nodes) !< map of sub-catchment IDs
     type(output_dataset) :: ds
     type(var), allocatable :: vars(:)
     integer(i8) :: i
     integer(i4) :: j
     integer(i4), allocatable :: level(:)
+    if (this%scc) call error_message("river%export: can not export SCC river to gridded netcdf")
     allocate(vars(0))
     vars = [vars, var("fdir", "flow direction", dtype="i32", static=.true.)]
-    vars = [vars, var("id", "cell id", dtype="i32", kind="i8", static=.true.)]
     if (allocated(this%facc)) vars = [vars, var("facc", "flow accumulation", dtype="i32", kind="i8", static=.true.)]
-    if (allocated(this%sub_map)) vars = [vars, var("scc", "scc catchment id", dtype="i32", static=.true.)]
     if (allocated(this%order%id)) vars = [vars, var("level", "order level", dtype="i32", static=.true.)]
     if (allocated(this%link_length)) vars = [vars, var("length", "link length", dtype="f64", static=.true.)]
+    if (present(sub_map)) vars = [vars, var("scc", "scc catchment id", dtype="i32", static=.true.)]
     call ds%init(path, this%grid, vars)
     call ds%update("fdir", this%fdir)
-    call ds%update("id", [(i, i=1_i8, this%grid%ncells)])
     if (allocated(this%facc)) call ds%update("facc", this%facc)
-    if (allocated(this%sub_map)) call ds%update("scc", this%sub_map)
     if (allocated(this%order%id)) then
       allocate(level(this%grid%ncells))
       do j = 1_i4, size(this%order%level_start)
@@ -353,31 +352,10 @@ contains
       call ds%update("level", level)
     end if
     if (allocated(this%link_length)) call ds%update("length", this%link_length)
+    if (present(sub_map)) call ds%update("scc", sub_map)
     call ds%write()
     call ds%close()
     deallocate(vars)
   end subroutine river_export
-
-  !> \brief distance between two points on the sphere [m]
-  pure real(dp) function dist_latlon(lat1, lon1, lat2, lon2)
-    use mo_constants, only : RadiusEarth_dp, deg2rad_dp
-    real(dp), intent(in) :: lat1
-    real(dp), intent(in) :: lon1
-    real(dp), intent(in) :: lat2
-    real(dp), intent(in) :: lon2
-    real(dp) :: theta1, phi1, theta2, phi2
-    real(dp) :: term1, term2, term3, temp
-
-    theta1 = deg2rad_dp * lon1
-    phi1 = deg2rad_dp * lat1
-    theta2 = deg2rad_dp * lon2
-    phi2 = deg2rad_dp * lat2
-
-    term1 = cos(phi1) * cos(theta1) * cos(phi2) * cos(theta2)
-    term2 = cos(phi1) * sin(theta1) * cos(phi2) * sin(theta2)
-    term3 = sin(phi1) * sin(phi2)
-    temp = min(term1 + term2 + term3, 1.0_dp)
-    dist_latlon = RadiusEarth_dp * acos(temp);
-  end function dist_latlon
 
 end module mo_river
