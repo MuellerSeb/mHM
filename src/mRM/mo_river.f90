@@ -151,21 +151,21 @@ contains
     integer(i4), intent(in) :: from(2) !< from-cell indices
     integer(i4), intent(in) :: to(2) !< to-cell indices
     integer(i4), intent(in) :: dy !< direction of north in the grid matrix (1/-1)
-    if (from(1)==(to(1)+1_i4) .and. from(2)==to(2)) then
+    if (to(1)==(from(1)+1_i4) .and. to(2)==from(2)) then
       get_fdir = dir_E
-    else if (from(1)==(to(1)+1_i4) .and. from(2)==(to(2)-dy)) then
+    else if (to(1)==(from(1)+1_i4) .and. to(2)==(from(2)-dy)) then
       get_fdir = dir_SE
-    else if (from(1)==to(1) .and. from(2)==(to(2)-dy)) then
+    else if (to(1)==from(1) .and. to(2)==(from(2)-dy)) then
       get_fdir = dir_S
-    else if (from(1)==(to(1)-1_i4) .and. from(2)==(to(2)-dy)) then
+    else if (to(1)==(from(1)-1_i4) .and. to(2)==(from(2)-dy)) then
       get_fdir = dir_SW
-    else if (from(1)==(to(1)-1_i4) .and. from(2)==to(2)) then
+    else if (to(1)==(from(1)-1_i4) .and. to(2)==from(2)) then
       get_fdir = dir_W
-    else if (from(1)==(to(1)-1_i4) .and. from(2)==(to(2)+dy)) then
+    else if (to(1)==(from(1)-1_i4) .and. to(2)==(from(2)+dy)) then
       get_fdir = dir_NW
-    else if (from(1)==to(1) .and. from(2)==(to(2)+dy)) then
+    else if (to(1)==from(1) .and. to(2)==(from(2)+dy)) then
       get_fdir = dir_N
-    else if (from(1)==(to(1)+1_i4) .and. from(2)==(to(2)+dy)) then
+    else if (to(1)==(from(1)+1_i4) .and. to(2)==(from(2)+dy)) then
       get_fdir = dir_NE
     else
       get_fdir = sink
