@@ -11,6 +11,7 @@
 module mo_river_upscaler
 
   use mo_kind, only: i4, i8, dp
+  use mo_dag, only: dag
   use mo_river, only: river_t, dir_E, dir_S, dir_W, dir_N, dir_SE, dir_SW, dir_NW, dir_NE
   use mo_grid, only: grid_t, bottom_up
   use mo_grid_scaler, only: regridder, up_scaling
@@ -35,6 +36,15 @@ module mo_river_upscaler
     real(dp), allocatable :: floodplain_area(:) !< floodplain area for a coarse river node size(n_nodes)
     integer(i8), allocatable :: link_from(:) !< starting cell at fine grid of coarse river node (0 for sink) size(n_nodes)
     integer(i8), allocatable :: link_to(:) !< end cell at fine grid of coarse river node (0 for sink) size(n_nodes)
+    ! scc related attributes
+    integer(i4) :: nsub = 1_i4 !< number of sub catchments
+    integer(i4), allocatable :: sub_map(:) !< sub catchment id (id 'nsub' indicates base-catchment)
+    integer(i8), allocatable :: sub_gauge(:) !< id of gauge for sub catchment size(nsub-1)
+    type(dag) :: scc_tree !< dependency tree of sub-catchments
+    integer(i8), allocatable :: scc_order(:) !< calculation order of sub catchments
+    ! scc related attributes
+    logical :: scc !< .true. if river has multiple sub-catchments
+    logical, allocatable :: has_sub(:,:) !< flag if coarse cell contains node of a sub-catchment size(coarse\%ncells,nsub)
     real(dp), allocatable :: scc_fraction(:) !< area fraction for each coarse river node in source cell (link_from) size(n_nodes)
     integer(i4), allocatable :: n_scc_nodes(:) !< number of scc nodes per coarse grid cell size(coarse\%ncells)
     integer(i8), allocatable :: node_cell(:) !< map node to coarse grid cell id size(n_nodes)
@@ -55,120 +65,122 @@ contains
     integer(i8), allocatable :: cells(:,:)
     integer(i4), allocatable :: scc_map(:,:)
     integer(i8) :: i, k
-    integer(i4) :: j, sub, ix, iy, y_Nb, y_Sb ! north and south bound depending on grid y-direction
+    integer(i4) :: j, ix, iy
+    integer(i4) :: yl, yu, xl, xu ! lower and upper bounds for x and y
+    integer(i4) :: yn, ys ! north and south y-bound depending on grid y-direction
 
     this%fine_river => fine_river
     this%coarse_grid => coarse_grid
     call this%upscaler%init(this%fine_river%grid, this%coarse_grid, tol=tol)
     if (this%upscaler%scaling_mode /= up_scaling) call error_message("river_upscaler: target grid needs to be coarser then input!")
+    this%scc = this%fine_river%nsub > 1_i4
 
     ! find all leaving cells (fine cells at coarse cell borders pointing out the coarse cell)
     !------------------------------------------------------------------
-    !                             x_lb    x_ub
-    !                        y_Nb  NW--N--NE       sides:   E, S, W, N
-    !                              |       |       corners: SE,SW,NW,NE
-    !                              W  (i)  E       y_ub and y_lb with inverse sky direction if grid is top-down
-    !                              |       |
-    !                        y_Sb  SW--S--SE
+    !                            xl     xu
+    !                        yn  NW--N--NE       sides:   E, S, W, N
+    !                            |       |       corners: SE,SW,NW,NE
+    !                            W  (i)  E       yu and yl with inverse sky direction if grid is top-down -> yn and ys
+    !                            |       |
+    !                        ys  SW--S--SE
     !------------------------------------------------------------------
     cells = this%fine_river%grid%unpack([(i, i=1_i8, this%fine_river%grid%ncells)])
     scc_map = this%fine_river%grid%unpack(this%fine_river%sub_map)
     allocate(this%leaving_cells(this%fine_river%grid%ncells), source=.false.)
-    if (this%fine_river%nsub > 1_i4) then
+    if (this%scc) then
       allocate(this%n_scc_nodes(this%coarse_grid%ncells), source=0_i4)
+      allocate(this%has_sub(this%coarse_grid%ncells, this%fine_river%nsub), source=.false.)
     else
       allocate(this%n_scc_nodes(this%coarse_grid%ncells), source=1_i4)
+      allocate(this%has_sub(this%coarse_grid%ncells, this%fine_river%nsub), source=.true.)
     end if
 
-    !$omp parallel do default(shared) private(i, y_Nb, y_Sb, ix, iy, j)
+    !$omp parallel do default(shared) private(i, yn, ys, ix, iy, j, yl, yu, xl, xu)
     do i = 1_i8, this%coarse_grid%ncells
+      yl = this%upscaler%y_lb(i) ! lower y-bound
+      yu = this%upscaler%y_ub(i) ! upper y-bound
+      xl = this%upscaler%x_lb(i) ! lower x-bound
+      xu = this%upscaler%x_ub(i) ! upper x-bound
       ! determine north and south bound depending on y-direction
       if (this%fine_river%grid%y_direction == bottom_up) then
-        y_Nb = this%upscaler%y_ub(i)
-        y_Sb = this%upscaler%y_lb(i)
-      else
-        y_Nb = this%upscaler%y_lb(i)
-        y_Sb = this%upscaler%y_ub(i)
+        yn = yu ! north y-bound is up
+        ys = yl ! south y-bound is down
+      else ! top_down
+        yn = yl ! north y-bound is down
+        ys = yu ! south y-bound is up
       end if
+
       ! searching on side E
-      ix = this%upscaler%x_ub(i)
-      do iy = this%upscaler%y_lb(i) + 1_i4, this%upscaler%y_ub(i) - 1_i4
-        if (any(this%fine_river%fdir(cells(ix,iy))==[dir_NE, dir_E, dir_SE])) this%leaving_cells(cells(ix,iy)) = .true.
+      do iy = yl + 1_i4, yu - 1_i4
+        if (any(this%fine_river%fdir(cells(xu,iy))==[dir_NE, dir_E, dir_SE])) this%leaving_cells(cells(xu,iy)) = .true.
       end do
       ! searching on side S
-      iy = y_Sb
-      do ix = this%upscaler%x_lb(i) + 1_i4, this%upscaler%x_ub(i) - 1_i4
-        if (any(this%fine_river%fdir(cells(ix,iy))==[dir_SE, dir_S, dir_SW])) this%leaving_cells(cells(ix,iy)) = .true.
+      do ix = xl + 1_i4, xu - 1_i4
+        if (any(this%fine_river%fdir(cells(ix,ys))==[dir_SE, dir_S, dir_SW])) this%leaving_cells(cells(ix,ys)) = .true.
       end do
       ! searching on side W
-      ix = this%upscaler%x_lb(i)
-      do iy = this%upscaler%y_lb(i) + 1_i4, this%upscaler%y_ub(i) - 1_i4
-        if (any(this%fine_river%fdir(cells(ix,iy))==[dir_NW, dir_W, dir_SW])) this%leaving_cells(cells(ix,iy)) = .true.
+      do iy = yl + 1_i4, yu - 1_i4
+        if (any(this%fine_river%fdir(cells(xl,iy))==[dir_NW, dir_W, dir_SW])) this%leaving_cells(cells(xl,iy)) = .true.
       end do
       ! searching on side N
-      iy = y_Nb
-      do ix = this%upscaler%x_lb(i) + 1_i4, this%upscaler%x_ub(i) - 1_i4
-        if (any(this%fine_river%fdir(cells(ix,iy))==[dir_NE, dir_N, dir_NW])) this%leaving_cells(cells(ix,iy)) = .true.
+      do ix = xl + 1_i4, xu - 1_i4
+        if (any(this%fine_river%fdir(cells(ix,yn))==[dir_NE, dir_N, dir_NW])) this%leaving_cells(cells(ix,yn)) = .true.
       end do
-      ! south corners
-      iy = y_Sb
       ! searching on corner SE
-      ix = this%upscaler%x_ub(i)
-      if (any(this%fine_river%fdir(cells(ix,iy))==[dir_NE, dir_E, dir_SE, dir_S, dir_SW])) this%leaving_cells(cells(ix,iy)) = .true.
+      if (any(this%fine_river%fdir(cells(xu,ys))==[dir_NE, dir_E, dir_SE, dir_S, dir_SW])) this%leaving_cells(cells(xu,ys)) = .true.
       ! searching on corner SW
-      ix = this%upscaler%x_lb(i)
-      if (any(this%fine_river%fdir(cells(ix,iy))==[dir_NW, dir_W, dir_SW, dir_S, dir_SE])) this%leaving_cells(cells(ix,iy)) = .true.
-      ! north corners
-      iy = y_Nb
+      if (any(this%fine_river%fdir(cells(xl,ys))==[dir_NW, dir_W, dir_SW, dir_S, dir_SE])) this%leaving_cells(cells(xl,ys)) = .true.
       ! searching on corner NE
-      ix = this%upscaler%x_ub(i)
-      if (any(this%fine_river%fdir(cells(ix,iy))==[dir_NW, dir_N, dir_NE, dir_E, dir_SE])) this%leaving_cells(cells(ix,iy)) = .true.
+      if (any(this%fine_river%fdir(cells(xu,yn))==[dir_NW, dir_N, dir_NE, dir_E, dir_SE])) this%leaving_cells(cells(xu,yn)) = .true.
       ! searching on corner NW
-      ix = this%upscaler%x_lb(i)
-      if (any(this%fine_river%fdir(cells(ix,iy))==[dir_SW, dir_W, dir_NW, dir_N, dir_NE])) this%leaving_cells(cells(ix,iy)) = .true.
+      if (any(this%fine_river%fdir(cells(xl,yn))==[dir_SW, dir_W, dir_NW, dir_N, dir_NE])) this%leaving_cells(cells(xl,yn)) = .true.
 
       ! count number of scc nodes
-      if (this%fine_river%nsub > 1_i4) then
+      if (this%scc) then
         do j = 1_i4, this%fine_river%nsub
-          if (any(scc_map(this%upscaler%x_lb(i):this%upscaler%x_ub(i),this%upscaler%y_lb(i):this%upscaler%y_ub(i))==j)) then
-            this%n_scc_nodes(i) = this%n_scc_nodes(i) + 1_i4
-          end if
+          if (any(scc_map(xl:xu,yl:yu)==j)) this%has_sub(i, j) = .true.
         end do
       end if
     end do
     !$omp end parallel do
 
-    ! total number of nodes in coarse river
-    this%n_nodes = sum(this%n_scc_nodes)
     ! determine attributes for scc
-    allocate(this%node_cell(this%n_nodes))
-    allocate(this%node_sub(this%n_nodes))
-    allocate(this%sub_size(this%fine_river%nsub), source=0_i8)
-    k = 0_i8
-    ! loop over sub-catchments in reverse order to start with base catchment (target cells need to exist first)
-    do j = this%fine_river%nsub, 1_i4, -1_i4
-      sub = int(this%fine_river%scc_order(j), i4)
-      do i = 1_i8, this%coarse_grid%ncells
-        if (any(scc_map(this%upscaler%x_lb(i):this%upscaler%x_ub(i),this%upscaler%y_lb(i):this%upscaler%y_ub(i))==sub)) then
+    if (this%scc) then
+      this%n_nodes = count(this%has_sub, kind=i8)
+      allocate(this%node_cell(this%n_nodes))
+      allocate(this%node_sub(this%n_nodes))
+      allocate(this%scc_fraction(this%n_nodes))
+      this%sub_size = count(this%has_sub, dim=1, kind=i8)
+      this%n_scc_nodes = count(this%has_sub, dim=2, kind=i4)
+      ! loop over sub-catchments
+      !$omp parallel do default(shared) private(j, k, i)
+      do j = 1_i4, this%fine_river%nsub
+        k = sum(this%sub_size(1_i4:j-1_i4)) ! count of nodes from previous sub-catchments
+        do i = 1_i8, this%coarse_grid%ncells
+          if (.not.this%has_sub(i, j)) cycle
           k = k + 1_i8
           this%node_cell(k) = i
-          this%node_sub(k) = sub
-          this%sub_size(sub) = this%sub_size(sub) + 1_i8
-        end if
+          this%node_sub(k) = j
+        end do
       end do
-    end do
-    if (k /= this%n_nodes) call error_message("river_upscaler: couldn't determine coarse cell for all scc nodes!")
-
-    ! calcuate fractions in parallel
-    allocate(this%scc_fraction(this%n_nodes))
-    !$omp parallel do default(shared) private(k, i)
-    do k = 1_i8, this%n_nodes
-      i = this%node_cell(k)
-      this%scc_fraction(k) = sum( &
-        this%upscaler%weights, &
-        mask=(scc_map(this%upscaler%x_lb(i):this%upscaler%x_ub(i),this%upscaler%y_lb(i):this%upscaler%y_ub(i))==this%node_sub(k)))
-    end do
-    !$omp end parallel do
+      !$omp end parallel do
+      ! calcuate scc fractions in parallel
+      !$omp parallel do default(shared) private(k, i)
+      do k = 1_i8, this%n_nodes
+        i = this%node_cell(k)
+        this%scc_fraction(k) = sum( &
+          this%upscaler%weights(this%upscaler%x_lb(i):this%upscaler%x_ub(i),this%upscaler%y_lb(i):this%upscaler%y_ub(i)), &
+          mask=(scc_map(this%upscaler%x_lb(i):this%upscaler%x_ub(i),this%upscaler%y_lb(i):this%upscaler%y_ub(i))==this%node_sub(k)))
+      end do
+      !$omp end parallel do
+    else
+      this%n_nodes = this%coarse_grid%ncells
+      allocate(this%sub_size(1), source=this%coarse_grid%ncells)
+      allocate(this%n_scc_nodes(this%coarse_grid%ncells), source=1_i4)
+      allocate(this%node_sub(this%n_nodes), source=1_i4)
+      allocate(this%scc_fraction(this%n_nodes), source=1.0_dp)
+      this%node_cell = [(i, i=1_i8, this%coarse_grid%ncells)] ! implicit allocation
+    end if
 
     call this%coarse_river%init(this%n_nodes)
     ! TODO: determine edges of coarse river
