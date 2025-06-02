@@ -40,41 +40,44 @@ module mo_river
   !> \class river_t
   !> \brief River network representation
   type, extends(dag), public :: river_t
+    integer(i8) :: n_nodes !< number of nodes in the river (D8-river: number of grid cells, SCC-river: all nodes)
     type(grid_t), pointer :: grid !< grid the river network is defined on
-    integer(i4), allocatable :: fdir(:) !< D8 flow direction
-    integer(i8), allocatable :: facc(:) !< D8 flow accumulation
+    integer(i4), allocatable :: fdir(:) !< D8 flow direction (only for a D8-river)
+    integer(i8), allocatable :: facc(:) !< flow accumulation
     integer(i8), allocatable :: down(:) !< downstream cell by id
     logical, allocatable :: is_sink(:) !< flag to indicate sinks
-    real(dp), allocatable :: slope(:) !< slope of cell (in percent)
-    real(dp), allocatable :: celerity(:) !< celerity of cell derived form slope
-    real(dp), allocatable :: link_length(:) !< link length from this cell to the next (0 if outlet)
-    integer(i8), allocatable :: outlets(:) !< cell ids of outlets
+    integer(i8), allocatable :: outlets(:) !< node ids of outlets
+    real(dp), allocatable :: link_length(:) !< link length of node (0 if node is sink)
+    real(dp), allocatable :: link_slope(:) !< slope of node (in [0,1])
+    real(dp), allocatable :: celerity(:) !< celerity of node derived form slope
+    type(order_t) :: order !< level based order of the network
+    logical :: scc = .false. !< indicate that this river is a SCC-river (not D8)
+    ! scc related attributes
     integer(i4) :: nsub = 1_i4 !< number of sub catchments
     integer(i4), allocatable :: sub_map(:) !< sub catchment id (id 'nsub' indicates base-catchment)
     integer(i8), allocatable :: sub_gauge(:) !< id of gauge for sub catchment size(nsub-1)
     type(dag) :: scc_tree !< dependency tree of sub-catchments
     integer(i8), allocatable :: scc_order(:) !< calculation order of sub catchments
-    integer(i4) :: dy !< delta-y based on y-axis direction to correctly interpret fdir (top-down: 1, bottom-up: -1)
-    type(order_t) :: order !< level based order of the network
   contains
     procedure, public :: from_fdir => river_from_fdir
     procedure, public :: calc_order => river_order
     procedure, public :: calc_facc => river_facc
     procedure, public :: calc_scc => river_scc
-    procedure, public :: calc_link_length => river_length
+    procedure, public :: calc_d8_length => river_length
     procedure, public :: export => river_export
   end type river_t
 
 contains
 
   !> \brief Get all links to and from given cell depending on flow direction
-  pure subroutine get_links(mask, cells, fdir, i, j, dy, n_up, up, down)
+  pure subroutine get_links(mask, cells, fdir, i, j, dy, periodic, n_up, up, down)
     logical, dimension(:,:), intent(in) :: mask !< grid mask
     integer(i8), dimension(:,:), intent(in) :: cells !< cells id matrix
     integer(i4), dimension(:), intent(in) :: fdir !< flow direction array
     integer(i4), intent(in) :: i !< i index of current cell (on x-axis)
     integer(i4), intent(in) :: j !< j index of current cell (on y-axis)
-    integer(i4), intent(in) :: dy !< direction of south in the grid matrix (1/-1)
+    integer(i4), intent(in) :: dy !< direction of north in the grid matrix (1/-1)
+    logical, intent(in) :: periodic !< flag to indicate periodic latlon grid (360 deg lon axis)
     integer(i4), intent(out) :: n_up !< number of upstream neighbor cells
     integer(i8), dimension(8), intent(out) :: up !< all upstream neighbor cells
     integer(i8), intent(out) :: down !< the downstream cell
@@ -85,6 +88,10 @@ contains
     n_up = 0_i4
     do k = 1_i4, 8_i4
       call next(dirs(k), dy, i, j, ni, nj) ! check all directions
+      if (periodic) then ! sinks still indicated by nj=0
+        if (ni < 1_i4) ni = imax
+        if (imax < ni) ni = 1_i4
+      end if
       if (ni < 1_i4 .or. imax < ni .or. nj < 1_i4 .or. jmax < nj ) cycle ! outside matrix / sink
       if (.not.mask(ni,nj)) cycle ! outside mask
       if (fdir(cells(ni,nj)) /= back(k)) cycle ! check if this next cell is pointing back
@@ -94,6 +101,10 @@ contains
     ! downstream
     down = 0_i8
     call next(fdir(cells(i,j)), dy, i, j, ni, nj) ! get downstream cell
+    if (periodic) then ! sinks still indicated by nj=0
+      if (ni < 1_i4) ni = imax
+      if (imax < ni) ni = 1_i4
+    end if
     if (ni < 1_i4 .or. imax < ni .or. nj < 1_i4 .or. jmax < nj ) return ! outside matrix / sink
     if (.not.mask(ni,nj)) return ! outside mask
     down = cells(ni,nj)
@@ -102,7 +113,7 @@ contains
   !> \brief Get next matrix indices from flow direction: (i,j) -> (ni,nj)
   pure subroutine next(fdir, dy, i, j, ni, nj)
     integer(i4), intent(in) :: fdir !< flow direction
-    integer(i4), intent(in) :: dy !< direction of south in the grid matrix (1/-1)
+    integer(i4), intent(in) :: dy !< direction of north in the grid matrix (1/-1)
     integer(i4), intent(in) :: i !< i index of current cell (on x-axis)
     integer(i4), intent(in) :: j !< j index of current cell (on y-axis)
     integer(i4), intent(out) :: ni !< i index of next cell (on x-axis)
@@ -113,25 +124,25 @@ contains
         nj = j
       case(dir_SE) ! SE
         ni = i+1_i4
-        nj = j+dy
+        nj = j-dy
       case(dir_S) ! S
         ni = i
-        nj = j+dy
+        nj = j-dy
       case(dir_SW) ! SW
         ni = i-1_i4
-        nj = j+dy
+        nj = j-dy
       case(dir_W) ! W
         ni = i-1_i4
         nj = j
       case(dir_NW) ! NW
         ni = i-1_i4
-        nj = j-dy
+        nj = j+dy
       case(dir_N) ! N
         ni = i
-        nj = j-dy
+        nj = j+dy
       case(dir_NE) ! NE
         ni = i+1_i4
-        nj = j-dy
+        nj = j+dy
       case default ! sink/outlet
         ni = 0_i4
         nj = 0_i4
@@ -144,22 +155,26 @@ contains
     type(grid_t), pointer, intent(in) :: grid !< grid the river network is defined on
     integer(i4), dimension(:) :: fdir !< D8 flow direction
     integer(i8), allocatable :: cells(:,:)
+    integer(i4) :: dy ! direction of north in the grid matrix (1/-1)
     integer(i4) :: n_up ! number of upstream neighbor cells
     integer(i8), dimension(8) :: up ! all upstream neighbor cells
     integer(i8) :: down ! the downstream cell
     integer(i8) :: i, j
+    logical :: periodic ! periodic latlon grid
     call this%init(grid%ncells)
     this%grid => grid
     this%fdir = fdir
     allocate(this%down(this%grid%ncells))
+    this%n_nodes = this%grid%ncells
 
-    this%dy = 1_i4
-    if (this%grid%y_direction==bottom_up) this%dy = -1_i4
+    periodic = this%grid%is_periodic()
+    dy = -1_i4 ! top-down grid starts north
+    if (this%grid%y_direction==bottom_up) dy = 1_i4
 
-    cells = this%grid%unpack([(i, i=1_i8, this%grid%ncells)])
+    cells = this%grid%id_matrix()
     !$omp parallel do default(shared) private(i, n_up, up, down)
     do i = 1_i8, this%grid%ncells
-      call get_links(this%grid%mask, cells, this%fdir, this%grid%cell_ij(i,1), this%grid%cell_ij(i,2), this%dy, n_up, up, down)
+      call get_links(this%grid%mask, cells, this%fdir, this%grid%cell_ij(i,1), this%grid%cell_ij(i,2), dy, periodic, n_up, up, down)
       ! implicit (re-)allocation of LHS not working with intel-llvm + openmp
       allocate(this%nodes(i)%edges(n_up))
       this%nodes(i)%edges(:) = up(1_i4:n_up)
@@ -194,6 +209,9 @@ contains
   subroutine river_order(this)
     class(river_t), intent(inout) :: this
     integer(i8) :: istat
+    if (allocated(this%order%id)) deallocate(this%order%id)
+    if (allocated(this%order%level_start)) deallocate(this%order%level_start)
+    if (allocated(this%order%level_end)) deallocate(this%order%level_end)
     call this%levelsort(this%order, istat)
     if (istat /= 0_i8) call error_message("river%order: found cycle")
   end subroutine river_order
@@ -203,7 +221,7 @@ contains
     use mo_message, only: error_message
     class(river_t), intent(inout) :: this
     integer(i8) :: i, j, n, m
-    if (.not.allocated(this%facc)) allocate(this%facc(this%grid%ncells))
+    if (.not.allocated(this%facc)) allocate(this%facc(this%n_nodes))
     if (.not.allocated(this%order%id)) call error_message("river: order not initialized")
     do i = 1_i8, size(this%order%level_start, kind=i8)
       !$omp parallel do default(shared) private(j, n, m)
