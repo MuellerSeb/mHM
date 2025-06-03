@@ -31,9 +31,9 @@ module mo_river
   integer(i4), public, parameter :: dir_NW = 32_i4 !< north-west
   integer(i4), public, parameter :: dir_N = 64_i4 !< north
   integer(i4), public, parameter :: dir_NE = 128_i4 !< north-east
-  ! all directions as array
+  !> all directions as array
   integer(i4), public, dimension(8), parameter :: dirs = [dir_E, dir_SE, dir_S, dir_SW, dir_W, dir_NW, dir_N, dir_NE]
-  ! all back pointing directions as array
+  !> matching back pointing directions as array
   integer(i4), public, dimension(8), parameter :: back = [dir_W, dir_NW, dir_N, dir_NE, dir_E, dir_SE, dir_S, dir_SW]
   !!@}
 
@@ -41,7 +41,7 @@ module mo_river
   !> \brief River network representation
   type, extends(dag), public :: river_t
     integer(i8) :: n_nodes !< number of nodes in the river (D8-river: number of grid cells, SCC-river: number of all nodes)
-    type(grid_t), pointer :: grid !< grid the river network is defined on
+    type(grid_t), pointer :: grid => null() !< grid the river network is defined on
     integer(i4), allocatable :: fdir(:) !< D8 flow direction (only for a D8-river) size(ncells)
     integer(i8), allocatable :: facc(:) !< flow accumulation size(n_nodes)
     integer(i8), allocatable :: down(:) !< downstream cell by id size(n_nodes)
@@ -173,10 +173,10 @@ contains
   end function get_fdir
 
   !> \brief Initialize river network from flow direction.
-  subroutine river_from_fdir(this, grid, fdir)
+  subroutine river_from_fdir(this, fdir, grid)
     class(river_t), intent(inout) :: this
-    type(grid_t), pointer, intent(in) :: grid !< grid the river network is defined on
     integer(i4), dimension(:) :: fdir !< D8 flow direction
+    type(grid_t), pointer, intent(in), optional :: grid !< grid the river network is defined on
     integer(i8), allocatable :: cells(:,:)
     integer(i4) :: dy ! direction of north in the grid matrix (1/-1)
     integer(i4) :: n_up ! number of upstream neighbor cells
@@ -184,8 +184,9 @@ contains
     integer(i8) :: down ! the downstream cell
     integer(i8) :: i, j
     logical :: periodic ! periodic latlon grid
-    call this%init(grid%ncells)
-    this%grid => grid
+    if (present(grid)) this%grid => grid
+    if (.not.associated(this%grid)) call error_message("river%from_fdir: grid not associated")
+    call this%init(this%grid%ncells)
     this%fdir = fdir
     allocate(this%down(this%grid%ncells))
     this%n_nodes = this%grid%ncells
@@ -243,7 +244,7 @@ contains
     integer(i8) :: i, j, n, m
     if (allocated(this%facc)) deallocate(this%facc)
     allocate(this%facc(this%n_nodes))
-    if (.not.allocated(this%order%id)) call error_message("river: order not initialized")
+    if (.not.allocated(this%order%id)) call error_message("river%calc_facc: order not initialized")
     do i = 1_i8, size(this%order%level_start, kind=i8)
       !$omp parallel do default(shared) private(j, n, m)
       do j = this%order%level_start(i), this%order%level_end(i)
@@ -323,10 +324,11 @@ contains
   end subroutine river_length
 
   !> \brief Export river arrays to netcdf
-  subroutine river_export(this, path, sub_map)
+  subroutine river_export(this, path, sub_map, leaving)
     class(river_t), intent(in) :: this
     character(*), intent(in) :: path !< path to the file
     integer(i4), intent(in), optional :: sub_map(this%n_nodes) !< map of sub-catchment IDs
+    integer(i4), intent(in), optional :: leaving(this%n_nodes) !< map of sub-catchment IDs
     type(output_dataset) :: ds
     type(var), allocatable :: vars(:)
     integer(i8) :: i
@@ -339,6 +341,7 @@ contains
     if (allocated(this%order%id)) vars = [vars, var("level", "order level", dtype="i32", static=.true.)]
     if (allocated(this%link_length)) vars = [vars, var("length", "link length", dtype="f64", static=.true.)]
     if (present(sub_map)) vars = [vars, var("scc", "scc catchment id", dtype="i32", static=.true.)]
+    if (present(leaving)) vars = [vars, var("leaving", "leaving", dtype="i32", static=.true.)]
     call ds%init(path, this%grid, vars)
     call ds%update("fdir", this%fdir)
     if (allocated(this%facc)) call ds%update("facc", this%facc)
@@ -353,6 +356,7 @@ contains
     end if
     if (allocated(this%link_length)) call ds%update("length", this%link_length)
     if (present(sub_map)) call ds%update("scc", sub_map)
+    if (present(leaving)) call ds%update("leaving", leaving)
     call ds%write()
     call ds%close()
     deallocate(vars)
