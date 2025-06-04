@@ -60,7 +60,7 @@ module mo_river
     procedure, public :: calc_order => river_order
     procedure, public :: calc_fdir => river_fdir
     procedure, public :: calc_facc => river_facc
-    procedure, public :: calc_d8_length => river_length
+    procedure, public :: calc_length => river_length
     procedure, public :: export => river_export
   end type river_t
 
@@ -266,7 +266,7 @@ contains
     integer(i8) :: i, j
     integer(i4) :: dy ! direction of north in the grid matrix (1/-1)
     logical :: periodic ! periodic latlon grid
-    if (this%scc) call error_message("river%calc_fdir: can not calculated fdir for a SCC river")
+    if (this%scc) call error_message("river%calc_fdir: can not calculated fdir for a SCC river.")
     if (allocated(this%fdir)) deallocate(this%fdir)
     allocate(this%fdir(this%n_nodes), source=0_i4)
     periodic = this%grid%is_periodic()
@@ -294,6 +294,8 @@ contains
     use mo_constants, only: SQRT2_dp
     class(river_t), intent(inout) :: this
     integer(i8) :: i, to
+    real(dp), allocatable, dimension(:) :: x_axis, y_axis
+    if (this%scc) call error_message("river%calc_length: can't calculate D8 link lengths for a SCC river.")
     if (allocated(this%link_length)) deallocate(this%link_length)
     allocate(this%link_length(this%grid%ncells), source=0.0_dp)
     if (this%grid%coordsys == cartesian) then
@@ -309,15 +311,17 @@ contains
       end do
       !$omp end parallel do
     else
+      x_axis = this%grid%x_axis()
+      y_axis = this%grid%y_axis()
       !$omp parallel do default(shared) private(i, to)
       do i = 1_i8, this%grid%ncells
         to = this%down(i)
         if (to == 0_i8) cycle ! sinks ain't links
         this%link_length(i) = dist_latlon( &
-          lat1=this%grid%lat(this%grid%cell_ij(i, 1), this%grid%cell_ij(i, 2)), &
-          lon1=this%grid%lon(this%grid%cell_ij(i, 1), this%grid%cell_ij(i, 2)), &
-          lat2=this%grid%lat(this%grid%cell_ij(to, 1), this%grid%cell_ij(to, 2)), &
-          lon2=this%grid%lon(this%grid%cell_ij(to, 1), this%grid%cell_ij(to, 2)))
+          lat1=y_axis(this%grid%cell_ij(i, 2)), &
+          lon1=x_axis(this%grid%cell_ij(i, 1)), &
+          lat2=y_axis(this%grid%cell_ij(to, 2)), &
+          lon2=x_axis(this%grid%cell_ij(to, 1)))
       end do
       !$omp end parallel do
     end if
