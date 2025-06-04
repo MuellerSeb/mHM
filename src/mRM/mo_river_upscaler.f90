@@ -47,7 +47,7 @@ module mo_river_upscaler
     integer(i4) :: nsub = 1_i4 !< number of sub catchments
     logical, allocatable :: has_sub(:,:) !< flag if coarse cell contains node of a sub-catchment size(coarse\%ncells,nsub)
     integer(i4), allocatable :: n_sub_nodes(:) !< number of scc nodes per coarse grid cell size(coarse\%ncells)
-    integer(i4), allocatable :: node_sub(:) !< map node to sub catchment id size(n_nodes)
+    integer(i4), allocatable :: node_sub(:) !< map coarse node to sub catchment id size(coarse\%n_nodes)
     integer(i8), allocatable :: sub_size(:) !< number of coarse river nodes in each sub catchment size(nsub)
   contains
     procedure, public :: init => river_upscaler_init
@@ -146,7 +146,7 @@ contains
     this%coarse_river%scc = this%nsub > 1_i4
   end subroutine river_upscaler_init_scc
 
-  !> \brief Setup river upscaler from fine river and coarse target grid.
+  !> \brief Find all leaving cells of fine grid on a coarse cell border.
   subroutine river_upscaler_leaving(this)
     implicit none
     class(river_upscaler_t), intent(inout) :: this
@@ -238,7 +238,7 @@ contains
     !$omp end parallel do
   end subroutine river_upscaler_leaving
 
-  !> \brief Setup river upscaler from fine river and coarse target grid.
+  !> \brief Setup coarse river with scc.
   subroutine river_upscaler_scc(this)
     implicit none
     class(river_upscaler_t), intent(inout) :: this
@@ -367,6 +367,19 @@ contains
     !$omp end parallel do
     deallocate(dep_mask, all_nodes)
   end subroutine river_upscaler_scc
+
+  !> \brief Setup stream features.
+  subroutine river_upscaler_stream(this)
+    implicit none
+    class(river_upscaler_t), intent(inout) :: this
+    integer(i8), allocatable :: facc(:,:), all_nodes(:)
+    integer(i4), allocatable :: scc_map(:,:)
+    logical, allocatable :: base_mask(:,:), dep_mask(:)
+    integer(i8) :: i, k, node, next
+    integer(i4) :: j, sub
+    integer(i4) :: yl, yu, xl, xu ! lower and upper bounds for x and y
+
+  end subroutine river_upscaler_stream
 
   !> \brief Setup coarse river from upscaled D8 fdir.
   subroutine river_upscaler_fdir(this)
@@ -497,7 +510,11 @@ contains
     integer(i8), intent(in) :: cell !< cell id on coarse river grid (1..coarse\%ncells)
     integer(i4), intent(in) :: sub !< sub-catchment id from scc (1..nsub)
     integer(i8) :: id
-    !if (.not.this%has_sub(cell, sub)) call error_message("river_upscaler: given cell doesn't contain the specified sub-catchment.")
+    if (.not.this%has_sub(cell, sub)) then
+      ! given cell doesn't contain the specified sub-catchment
+      id = 0_i8
+      return
+    end if
     id = sum(this%sub_size(1_i4:sub-1_i4)) ! count of nodes from previous sub-catchments
     id = id + count(this%has_sub(1_i8:cell, sub), kind=i8)
   end function river_upscaler_cell_sub
