@@ -11,6 +11,7 @@
 module mo_river_upscaler
 
   use mo_kind, only: i4, i8, dp
+  use mo_constants, only: nodata_i4
   use mo_dag, only: traversal_visit
   use mo_river, only: river_t, dir_E, dir_S, dir_W, dir_N, dir_SE, dir_SW, dir_NW, dir_NE
   use mo_grid, only: grid_t, bottom_up
@@ -32,8 +33,10 @@ module mo_river_upscaler
     ! coarse attributes derived from fine grid
     logical, allocatable :: leaving_cells(:) !< mask marking fine cells leaving a coarse cell size(fine\%ncells)
     logical, allocatable :: stream_mask(:) !< mask marking the upscaled stream at fine grid size(fine\%ncells)
+    integer(i4), allocatable :: stream_sub(:) !< sub-catchment ID for stream cell at fine grid size(fine\%ncells)
     integer(i8), allocatable :: floodplain(:) !< map marking floodplain of a coarse river node with their id size(fine\%ncells)
     real(dp), allocatable :: floodplain_area(:) !< floodplain area for a coarse river node size(n_nodes)
+    logical, allocatable :: is_link_start(:) !< mask starting cell at fine grid of coarse river node size(fine\%n_nodes)
     integer(i8), allocatable :: link_start(:) !< starting cell at fine grid of coarse river node (0 for sink) size(n_nodes)
     integer(i8), allocatable :: link_from(:) !< first cell after start at fine grid of coarse river node (0 for sink) size(n_nodes)
     integer(i8), allocatable :: link_to(:) !< end cell at fine grid of coarse river node (0 for sink) size(n_nodes)
@@ -55,6 +58,7 @@ module mo_river_upscaler
     procedure, public :: find_leaving_cells => river_upscaler_leaving
     procedure, public :: upscale_scc => river_upscaler_scc
     procedure, public :: upscale_fdir => river_upscaler_fdir
+    procedure, public :: calc_stream => river_upscaler_stream
     procedure, public :: node_from_cell_sub => river_upscaler_cell_sub
   end type river_upscaler_t
 
@@ -88,6 +92,10 @@ contains
     else
       call this%upscale_fdir()
     end if
+
+    ! calculate stream features (stream mask, link lengths)
+    call this%calc_stream()
+
   end subroutine river_upscaler_init
 
   !> \brief Initialize SCC related variables
@@ -368,19 +376,6 @@ contains
     deallocate(dep_mask, all_nodes)
   end subroutine river_upscaler_scc
 
-  !> \brief Setup stream features.
-  subroutine river_upscaler_stream(this)
-    implicit none
-    class(river_upscaler_t), intent(inout) :: this
-    integer(i8), allocatable :: facc(:,:), all_nodes(:)
-    integer(i4), allocatable :: scc_map(:,:)
-    logical, allocatable :: base_mask(:,:), dep_mask(:)
-    integer(i8) :: i, k, node, next
-    integer(i4) :: j, sub
-    integer(i4) :: yl, yu, xl, xu ! lower and upper bounds for x and y
-
-  end subroutine river_upscaler_stream
-
   !> \brief Setup coarse river from upscaled D8 fdir.
   subroutine river_upscaler_fdir(this)
     implicit none
@@ -497,6 +492,47 @@ contains
     ! cleanup
     deallocate(fdir)
   end subroutine river_upscaler_fdir
+
+  !> \brief Setup stream features.
+  subroutine river_upscaler_stream(this)
+    implicit none
+    class(river_upscaler_t), intent(inout) :: this
+    integer(i8) :: i, cell
+
+    allocate(this%is_link_start(this%fine_river%n_nodes), source=.false.)
+    do i = 1_i8, this%coarse_river%n_nodes
+      if (this%coarse_river%is_sink(i)) cycle ! skip sinks
+      this%is_link_start(this%link_start(i)) = .true.
+    end do
+
+    allocate(this%coarse_river%link_length(this%coarse_river%n_nodes), source=0.0_dp)
+    allocate(this%stream_mask(this%fine_river%n_nodes), source=.false.)
+    allocate(this%stream_sub(this%fine_river%n_nodes), source=nodata_i4)
+    allocate(this%link_from(this%coarse_river%n_nodes), source=0_i8)
+    allocate(this%link_to(this%coarse_river%n_nodes), source=0_i8)
+
+    !$omp parallel do default(shared) private(i, cell)
+    do i = 1_i8, this%coarse_river%n_nodes
+      if (this%coarse_river%is_sink(i)) cycle ! skip sinks
+      cell = this%link_start(i)
+      this%link_from(i) = this%fine_river%down(cell)
+      ! go down the river
+      do
+        this%stream_mask(cell) = .true.
+        this%stream_sub(cell) = this%node_sub(i)
+        this%coarse_river%link_length(i) = this%coarse_river%link_length(i) + this%fine_river%link_length(cell)
+        cell = this%fine_river%down(cell)
+        if (cell == 0_i8) exit ! end at sink
+        ! TODO: decide if ending at leaving cell or another link-start of a coarse grid cell (legacy behavior)
+        ! if (this%leaving_cells(cell)) exit ! end at leaving cell
+        if (this%is_link_start(cell)) exit ! end at another link-start
+        if (this%is_scc_gauge(cell)) exit ! end at scc gauge
+      end do
+      this%link_to(i) = cell
+    end do
+    !$omp end parallel do
+
+  end subroutine river_upscaler_stream
 
   !> \brief determine node ID from coarse cell and sub-catchment id
   !> \details Nodes are ordered by sub-catchments:
