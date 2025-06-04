@@ -328,11 +328,14 @@ contains
   end subroutine river_length
 
   !> \brief Export river arrays to netcdf
-  subroutine river_export(this, path, sub_map, leaving)
+  subroutine river_export(this, path, sub_map, leaving, stream_mask, stream_sub)
     class(river_t), intent(in) :: this
     character(*), intent(in) :: path !< path to the file
     integer(i4), intent(in), optional :: sub_map(this%n_nodes) !< map of sub-catchment IDs
-    integer(i4), intent(in), optional :: leaving(this%n_nodes) !< map of sub-catchment IDs
+    logical, intent(in), optional :: leaving(this%n_nodes) !< mask of leaving cells
+    logical, intent(in), optional :: stream_mask(this%n_nodes) !< stream mask
+    integer(i4), intent(in), optional :: stream_sub(this%n_nodes) !< steam sub catchment ID
+    integer(i4), allocatable :: tmp(:)
     type(output_dataset) :: ds
     type(var), allocatable :: vars(:)
     integer(i8) :: i
@@ -346,6 +349,8 @@ contains
     if (allocated(this%link_length)) vars = [vars, var("length", "link length", dtype="f64", static=.true.)]
     if (present(sub_map)) vars = [vars, var("scc", "scc catchment id", dtype="i32", static=.true.)]
     if (present(leaving)) vars = [vars, var("leaving", "leaving", dtype="i32", static=.true.)]
+    if (present(stream_mask)) vars = [vars, var("stream", "stream mask", dtype="i32", static=.true.)]
+    if (present(stream_sub)) vars = [vars, var("stream_sub", "stream sub catchment ID", dtype="i32", static=.true.)]
     call ds%init(path, this%grid, vars)
     call ds%update("fdir", this%fdir)
     if (allocated(this%facc)) call ds%update("facc", this%facc)
@@ -360,7 +365,19 @@ contains
     end if
     if (allocated(this%link_length)) call ds%update("length", this%link_length)
     if (present(sub_map)) call ds%update("scc", sub_map)
-    if (present(leaving)) call ds%update("leaving", leaving)
+    if (present(leaving)) then
+      allocate(tmp(this%n_nodes), source=0_i4)
+      where(leaving) tmp = 1_i4
+      call ds%update("leaving", tmp)
+      deallocate(tmp)
+    end if
+    if (present(stream_mask)) then
+      allocate(tmp(this%n_nodes), source=0_i4)
+      where(stream_mask) tmp = 1_i4
+      call ds%update("stream", tmp)
+      deallocate(tmp)
+    end if
+    if (present(stream_sub)) call ds%update("stream_sub", stream_sub)
     call ds%write()
     call ds%close()
     deallocate(vars)
