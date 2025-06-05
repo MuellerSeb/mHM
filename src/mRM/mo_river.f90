@@ -328,20 +328,34 @@ contains
   end subroutine river_length
 
   !> \brief Export river arrays to netcdf
-  subroutine river_export(this, path, sub_map, leaving, stream_mask, stream_sub)
+  subroutine river_export(this, path, sub_map, leaving, stream_mask, stream_sub, highlight, factor)
     class(river_t), intent(in) :: this
     character(*), intent(in) :: path !< path to the file
     integer(i4), intent(in), optional :: sub_map(this%n_nodes) !< map of sub-catchment IDs
     logical, intent(in), optional :: leaving(this%n_nodes) !< mask of leaving cells
     logical, intent(in), optional :: stream_mask(this%n_nodes) !< stream mask
     integer(i4), intent(in), optional :: stream_sub(this%n_nodes) !< steam sub catchment ID
+    logical, intent(in), optional :: highlight(:) !< highlight cells in leaving/stream_mask/stream_sub
+    integer(i4), intent(in), optional :: factor !< upscaling factor for checkerboard pattern -1/0
     integer(i4), allocatable :: tmp(:)
     type(output_dataset) :: ds
     type(var), allocatable :: vars(:)
     integer(i8) :: i
-    integer(i4) :: j
-    integer(i4), allocatable :: level(:)
+    integer(i4) :: j, px, py
+    integer(i4), allocatable :: level(:), pattern(:)
     if (this%scc) call error_message("river%export: can not export SCC river to gridded netcdf")
+    if (present(factor)) then
+      allocate(pattern(this%grid%ncells), source=0_i4)
+      do i=1_i8, this%grid%ncells
+        px = mod((this%grid%cell_ij(i, 1) - 1_i4) / factor, 2_i4)
+        if (this%grid%y_direction==bottom_up) then
+          py = mod((this%grid%cell_ij(i, 2) - 1_i4) / factor, 2_i4)
+        else
+          py = mod((this%grid%ny - this%grid%cell_ij(i, 2)) / factor, 2_i4)
+        end if
+        if (px+py==1_i4) pattern(i) = -1_i4
+      end do
+    end if
     allocate(vars(0))
     vars = [vars, var("fdir", "flow direction", dtype="i32", static=.true.)]
     if (allocated(this%facc)) vars = [vars, var("facc", "flow accumulation", dtype="i32", kind="i8", static=.true.)]
@@ -367,17 +381,30 @@ contains
     if (present(sub_map)) call ds%update("scc", sub_map)
     if (present(leaving)) then
       allocate(tmp(this%n_nodes), source=0_i4)
+      if (present(factor)) tmp = pattern
       where(leaving) tmp = 1_i4
+      if (present(highlight)) where(highlight) tmp = 2_i4
       call ds%update("leaving", tmp)
       deallocate(tmp)
     end if
     if (present(stream_mask)) then
       allocate(tmp(this%n_nodes), source=0_i4)
+      if (present(factor)) tmp = pattern
       where(stream_mask) tmp = 1_i4
+      if (present(highlight)) where(highlight) tmp = 2_i4
       call ds%update("stream", tmp)
       deallocate(tmp)
     end if
-    if (present(stream_sub)) call ds%update("stream_sub", stream_sub)
+    if (present(stream_sub)) then
+      if (present(factor)) then
+        tmp = pattern
+        where(stream_sub>0) tmp = stream_sub
+        if (present(highlight)) where(highlight) tmp = maxval(stream_sub) + 1_i4
+        call ds%update("stream_sub", tmp)
+      else
+        call ds%update("stream_sub", stream_sub)
+      end if
+    end if
     call ds%write()
     call ds%close()
     deallocate(vars)
