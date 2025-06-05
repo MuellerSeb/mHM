@@ -35,11 +35,12 @@ module mo_river_upscaler
     logical, allocatable :: stream_mask(:) !< mask marking the upscaled stream at fine grid size(fine\%ncells)
     integer(i4), allocatable :: stream_sub(:) !< sub-catchment ID for stream cell at fine grid size(fine\%ncells)
     integer(i8), allocatable :: floodplain(:) !< map marking floodplain of a coarse river node with their id size(fine\%ncells)
-    real(dp), allocatable :: floodplain_area(:) !< floodplain area for a coarse river node size(n_nodes)
+    real(dp), allocatable :: floodplain_area(:) !< floodplain area for a coarse river node size(coarse\%n_nodes)
     logical, allocatable :: is_link_start(:) !< mask starting cell at fine grid of coarse river node size(fine\%n_nodes)
-    integer(i8), allocatable :: link_start(:) !< starting cell at fine grid of coarse river node (0 for sink) size(n_nodes)
-    integer(i8), allocatable :: link_from(:) !< first cell after start at fine grid of coarse river node (0 for sink) size(n_nodes)
-    integer(i8), allocatable :: link_to(:) !< end cell at fine grid of coarse river node (0 for sink) size(n_nodes)
+    integer(i8), allocatable :: link_start(:) !< starting cell at fine grid of coarse river node (0 for sink) size(coarse\%n_nodes)
+    integer(i8), allocatable :: link_from(:) !< first fine cell after start for coarse river node (0 for sink) size(coarse\%n_nodes)
+    integer(i8), allocatable :: link_to(:) !< end cell at fine grid of coarse river node (0 for sink) size(coarse\%n_nodes)
+    integer(i8), allocatable :: sink_map(:) !< id of defining fine cell for a coarse sink (0 for no sink) size(coarse\%n_nodes)
     ! scc related attributes
     integer(i4), allocatable :: scc_map(:) !< sub catchment id map (id 'nsub' indicates base-catchment) size(fine\%n_nodes)
     integer(i8), allocatable :: scc_gauges(:) !< id of gauge for sub catchment on fine grid size(nsub-1)
@@ -92,6 +93,9 @@ contains
     else
       call this%upscale_fdir()
     end if
+
+    ! order the coarse river
+    call this%coarse_river%calc_order()
 
     ! calculate stream features (stream mask, link lengths)
     call this%calc_stream()
@@ -307,6 +311,7 @@ contains
     facc = this%fine_river%grid%unpack(this%fine_river%facc)
     base_mask = this%fine_river%grid%unpack(this%scc_map==this%nsub)
     allocate(this%coarse_river%is_sink(this%coarse_river%n_nodes), source=.false.)
+    allocate(this%sink_map(this%coarse_river%n_nodes), source=0_i8)
     !$omp parallel do default(shared) private(j, i, k, sub, yl, yu, xl, xu, node)
     do j = 1_i4, size(this%fine_river%sinks)
       i = this%fine_river%sinks(j) ! node ID is cell ID for a D8 river
@@ -323,6 +328,7 @@ contains
       end if
       node = this%node_from_cell_sub(k, sub) ! get node ID (respecting scc)
       this%coarse_river%is_sink(node) = .true. ! mark coarse node as sink
+      this%sink_map(node) = i ! store corresponding fine sink
     end do
     !$omp end parallel do
     deallocate(base_mask, facc)
@@ -401,6 +407,7 @@ contains
 
     ! find outlets of of coarse grid
     allocate(fdir(this%coarse_river%grid%ncells), source=-1_i4) ! sinks to be determined
+    allocate(this%sink_map(this%coarse_river%n_nodes), source=0_i8)
     !$omp parallel do default(shared) private(j, i, k, yl, yu, xl, xu)
     do j = 1_i4, size(this%fine_river%sinks)
       k = this%fine_river%sinks(j)
@@ -412,6 +419,7 @@ contains
       ! skip if facc is not max
       if (this%fine_river%facc(k) < maxval(facc(xl:xu,yl:yu), mask=this%fine_river%grid%mask(xl:xu,yl:yu))) cycle
       fdir(i) = 0_i4 ! mark coarse node as sink
+      this%sink_map(i) = k ! store corresponding fine sink
     end do
     !$omp end parallel do
 
@@ -499,11 +507,14 @@ contains
     class(river_upscaler_t), intent(inout) :: this
     integer(i8) :: i, cell
 
+    ! create is_link_start array
     allocate(this%is_link_start(this%fine_river%n_nodes), source=.false.)
+    !$omp parallel do default(shared) private(i)
     do i = 1_i8, this%coarse_river%n_nodes
       if (this%coarse_river%is_sink(i)) cycle ! skip sinks
       this%is_link_start(this%link_start(i)) = .true.
     end do
+    !$omp end parallel do
 
     allocate(this%coarse_river%link_length(this%coarse_river%n_nodes), source=0.0_dp)
     allocate(this%stream_mask(this%fine_river%n_nodes), source=.false.)
@@ -513,24 +524,35 @@ contains
 
     !$omp parallel do default(shared) private(i, cell)
     do i = 1_i8, this%coarse_river%n_nodes
-      if (this%coarse_river%is_sink(i)) cycle ! skip sinks
+      if (this%coarse_river%is_sink(i)) then
+        this%stream_mask(this%sink_map(i)) = .true. ! mark sinks as part of stream
+        cycle ! skip sinks
+      end if
       cell = this%link_start(i)
+      ! TODO: link_from could be simply link_start
       this%link_from(i) = this%fine_river%down(cell)
       ! go down the river
       do
+        ! this can cause a "benign race condition" with OpenMP, but since it is only flipping to true, outcome does not change
+        !!$omp atomic write
         this%stream_mask(cell) = .true.
-        this%stream_sub(cell) = this%node_sub(i)
+        ! add up river link length
         this%coarse_river%link_length(i) = this%coarse_river%link_length(i) + this%fine_river%link_length(cell)
         cell = this%fine_river%down(cell)
-        if (cell == 0_i8) exit ! end at sink
         ! TODO: decide if ending at leaving cell or another link-start of a coarse grid cell (legacy behavior)
-        ! if (this%leaving_cells(cell)) exit ! end at leaving cell
-        if (this%is_link_start(cell)) exit ! end at another link-start
+        if (this%leaving_cells(cell)) exit ! end at leaving cell (every link-start is a leaving cell)
+        ! if (this%is_link_start(cell)) exit ! end at another link-start
         if (this%is_scc_gauge(cell)) exit ! end at scc gauge
+        if (this%fine_river%is_sink(cell)) exit ! end at fine sink
       end do
+      ! mask the to-node as well (again "benign race condition")
+      this%stream_mask(cell) = .true.
       this%link_to(i) = cell
     end do
     !$omp end parallel do
+
+    ! generate stream sub-catchment map from mask
+    where(this%stream_mask) this%stream_sub = this%scc_map
 
   end subroutine river_upscaler_stream
 
