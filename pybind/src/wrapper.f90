@@ -593,7 +593,11 @@ contains
       L1_baseflow, & ! 1d
       L1_percol, & ! 1d
       L1_infilSoil, & ! 2d
-      L1_preEffect ! 1d
+      L1_preEffect, & ! 1d
+      L1_melt, & ! 1d
+      L1_rain, & ! 1d
+      L1_snow, & ! 1d
+      L1_Throughfall ! 1d
     implicit none
     integer(i4) :: n !< size of the variable
     real(dp), intent(out) :: output(n) !< the desired variable
@@ -655,6 +659,14 @@ contains
         output = L1_aETSoil(run_cfg%s1 : run_cfg%e1, idx)
       case("L1_INFILSOIL")
         output = L1_infilSoil(run_cfg%s1 : run_cfg%e1, idx)
+      case("L1_MELT")
+        output = L1_melt(run_cfg%s1 : run_cfg%e1)
+      case("L1_RAIN")
+        output = L1_rain(run_cfg%s1 : run_cfg%e1)
+      case("L1_SNOW")
+        output = L1_snow(run_cfg%s1 : run_cfg%e1)
+      case("L1_THROUGHFALL")
+        output = L1_Throughfall(run_cfg%s1 : run_cfg%e1)
       case default
         call error_message("mhm.get.L1_variable: unkown variable name: ", name)
     end select
