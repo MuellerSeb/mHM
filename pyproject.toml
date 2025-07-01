@@ -136,7 +136,7 @@ show_missing = true
 # verbose output for debugging purpose
 build-verbosity = 1
 # skip py37, pypy and musl
-skip = ["cp38-macosx*", "cp37*", "pp*", "*-musllinux_*"]
+skip = ["cp37*", "pp*", "*-musllinux_*"]
 # check command
 test-command = "mhm -h && mhm {project}"
 manylinux-x86_64-image = "manylinux_2_28"
@@ -146,7 +146,7 @@ environment = { FC="gfortran", F77="gfortran", CC="gcc", CXX="g++" }
 before-all = "source CI-scripts/install-deps -c -p /usr"
 
 [tool.cibuildwheel.macos]
-environment = { FC="gfortran-14", F77="gfortran-14", CC="gcc-14", CXX="g++-14", MACOSX_DEPLOYMENT_TARGET="13.0" }
+environment = { FC="gfortran-15", F77="gfortran-15", CC="gcc-15", CXX="g++-15", MACOSX_DEPLOYMENT_TARGET="13.0" }
 before-all = "brew install netcdf-fortran"
 
 [[tool.cibuildwheel.overrides]]
