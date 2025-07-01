@@ -136,7 +136,7 @@ show_missing = true
 # verbose output for debugging purpose
 build-verbosity = 1
 # skip py37, pypy and musl
-skip = ["cp37*", "pp*", "*-musllinux_*"]
+skip = ["cp38-macosx*", "cp37*", "pp*", "*-musllinux_*"]
 # check command
 test-command = "mhm -h && mhm {project}"
 manylinux-x86_64-image = "manylinux_2_28"
