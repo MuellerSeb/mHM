@@ -2,7 +2,7 @@
 requires = [
     "scikit_build_core>=0.10,<0.11",
     "setuptools_scm>=8",
-    "numpy>=2.0.0",
+    "numpy>=2.0,<3",
     "fypp",
 ]
 build-backend = "scikit_build_core.build"
@@ -134,7 +134,7 @@ show_missing = true
 # verbose output for debugging purpose
 build-verbosity = 1
 # skip py38, pypy and musl
-skip = ["cp38*", "pp*", "*-musllinux_*"]
+skip = ["cp38*", "*-musllinux_*"]
 # check command
 test-extras = "test"
 test-command = "mhm -h && python -m pytest pybind/tests/"

@@ -14,7 +14,7 @@ if(BUILD_MHM_DRIVER)
   if (APPLE)
     set_target_properties(mhm
       PROPERTIES
-      # LINK_FLAGS  "-Wl,-dylib,-undefined,dynamic_lookup"
+      LINK_FLAGS  "-Wl,-undefined,dynamic_lookup"
       INSTALL_RPATH "@loader_path"
       BUILD_RPATH "@loader_path"
     )
