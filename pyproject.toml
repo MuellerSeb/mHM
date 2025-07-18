@@ -136,6 +136,7 @@ build-verbosity = 1
 # skip py38, pypy and musl
 skip = ["cp38*", "pp*", "*-musllinux_*"]
 # check command
+test-extras = "test"
 test-command = "mhm -h && python -m pytest pybind/tests/"
 test-sources = ["pybind/tests/", "pyproject.toml"]
 # force binary numpy dep
