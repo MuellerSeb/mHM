@@ -133,11 +133,11 @@ show_missing = true
 [tool.cibuildwheel]
 # verbose output for debugging purpose
 build-verbosity = 1
-# skip py37, pypy and musl
+# skip py38, pypy and musl
 skip = ["cp38*", "pp*", "*-musllinux_*"]
 # check command
-test-command = "mhm -h && python -m pytest tests"
-test-sources = ["tests", "pyproject.toml"]
+test-command = "mhm -h && python -m pytest pybind/tests/"
+test-sources = ["pybind/tests/", "pyproject.toml"]
 # force binary numpy dep
 environment.PIP_ONLY_BINARY = "numpy"
 environment.PIP_PREFER_BINARY = "1"
