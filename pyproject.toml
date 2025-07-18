@@ -2,14 +2,13 @@
 requires = [
     "scikit_build_core>=0.10,<0.11",
     "setuptools_scm>=8",
-    "numpy>=2.0.0rc1; python_version >= '3.9'",
-    "oldest-supported-numpy; python_version < '3.9'",
+    "numpy>=2.0.0",
     "fypp",
 ]
 build-backend = "scikit_build_core.build"
 
 [project]
-requires-python = ">=3.8"
+requires-python = ">=3.9"
 name = "mhm"
 description = "Python distribution of mHM with bindings."
 authors = [{name = "mHM Developers", email = "mhm-admin@ufz.de"}]
@@ -30,7 +29,6 @@ classifiers = [
     "Programming Language :: Python",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3 :: Only",
-    "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
@@ -118,7 +116,7 @@ search_parent_directories = true
 
 [tool.black]
 exclude = "_version.py"
-target-version = ["py38"]
+target-version = ["py39"]
 
 [tool.isort]
 profile = "black"
@@ -136,10 +134,13 @@ show_missing = true
 # verbose output for debugging purpose
 build-verbosity = 1
 # skip py37, pypy and musl
-skip = ["cp37*", "pp*", "*-musllinux_*"]
+skip = ["cp38*", "pp*", "*-musllinux_*"]
 # check command
-test-command = "mhm -h && mhm {project}"
-manylinux-x86_64-image = "manylinux_2_28"
+test-command = "mhm -h && python -m pytest tests"
+test-sources = ["tests", "pyproject.toml"]
+# force binary numpy dep
+environment.PIP_ONLY_BINARY = "numpy"
+environment.PIP_PREFER_BINARY = "1"
 
 [tool.cibuildwheel.linux]
 environment = { FC="gfortran", F77="gfortran", CC="gcc", CXX="g++" }
