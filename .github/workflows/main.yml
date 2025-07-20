@@ -62,6 +62,7 @@ jobs:
           path-type: inherit
           install: |
             mingw-w64-x86_64-gcc-fortran
+            mingw-w64-x86_64-netcdf-fortran
 
       - name: Build wheels
         uses: pypa/cibuildwheel@v3.0.1

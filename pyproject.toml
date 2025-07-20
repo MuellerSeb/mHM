@@ -153,7 +153,6 @@ before-all = "source CI-scripts/install-deps -s -p /opt/local" # "brew install n
 
 [tool.cibuildwheel.windows]
 environment = { FC="gfortran", F77="gfortran", CC="gcc", CXX="g++" }
-before-all = "source CI-scripts/install-deps -c -p /usr"
 before-build = "pip install delvewheel"
 repair-wheel-command = "delvewheel repair -w {dest_dir} {wheel}"
 
