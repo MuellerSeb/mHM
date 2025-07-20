@@ -70,24 +70,22 @@ python_add_library(${f2py_module_name}
 target_include_directories(${f2py_module_name} PUBLIC ${F2PY_INCLUDE_DIR})
 target_link_libraries(${f2py_module_name} PUBLIC mhm_lib Python::NumPy)
 
-# linker flags (rpath)
-if (UNIX)
-  if (APPLE)
-    set_target_properties(${f2py_module_name}
-      PROPERTIES
-      LINK_FLAGS  "-Wl,-dylib,-undefined,dynamic_lookup"
-      INSTALL_RPATH "@loader_path"
-      BUILD_RPATH "@loader_path"
-    )
-  else()
-    set_target_properties(${f2py_module_name}
-      PROPERTIES
-      LINK_FLAGS  "-Wl,--allow-shlib-undefined"
-      BUILD_RPATH_USE_ORIGIN ON
-      INSTALL_RPATH "$ORIGIN"
-      BUILD_RPATH "$ORIGIN"
-    )
-  endif()
+# linker flags (rpath, could use "if (UNIX)" around)
+if (APPLE)
+  set_target_properties(${f2py_module_name}
+    PROPERTIES
+    LINK_FLAGS  "-Wl,-dylib,-undefined,dynamic_lookup"
+    INSTALL_RPATH "@loader_path"
+    BUILD_RPATH "@loader_path"
+  )
+else()
+  set_target_properties(${f2py_module_name}
+    PROPERTIES
+    LINK_FLAGS  "-Wl,--allow-shlib-undefined"
+    BUILD_RPATH_USE_ORIGIN ON
+    INSTALL_RPATH "$ORIGIN"
+    BUILD_RPATH "$ORIGIN"
+  )
 endif()
 add_dependencies(${f2py_module_name} genpyf)
 

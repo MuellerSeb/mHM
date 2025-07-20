@@ -133,7 +133,7 @@ show_missing = true
 [tool.cibuildwheel]
 # verbose output for debugging purpose
 build-verbosity = 1
-# skip py38, pypy and musl
+# skip py38 and musl
 skip = ["cp38*", "*-musllinux_*"]
 # check command
 test-extras = "test"
@@ -150,6 +150,12 @@ before-all = "source CI-scripts/install-deps -c -p /usr"
 [tool.cibuildwheel.macos]
 environment = { FC="gfortran-14", F77="gfortran-14", CC="gcc-14", CXX="g++-14", MACOSX_DEPLOYMENT_TARGET="13.0" }
 before-all = "source CI-scripts/install-deps -s -p /opt/local" # "brew install netcdf-fortran"
+
+[tool.cibuildwheel.windows]
+environment = { FC="gfortran", F77="gfortran", CC="gcc", CXX="g++" }
+before-all = "source CI-scripts/install-deps -c -p /usr"
+before-build = "pip install delvewheel"
+repair-wheel-command = "delvewheel repair -w {dest_dir} {wheel}"
 
 [[tool.cibuildwheel.overrides]]
 select = "*-macosx_arm64"
