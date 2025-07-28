@@ -127,12 +127,12 @@ MODULE mo_global_variables
   ! State variables
   ! dim1 = number grid cells L1
   ! dim2 = number model soil horizons
-  real(dp), public, dimension(:), allocatable :: L1_inter        !< [mm]  Interception
-  real(dp), public, dimension(:), allocatable :: L1_snowPack     !< [mm]  Snowpack
-  real(dp), public, dimension(:), allocatable :: L1_sealSTW      !< [mm]  Retention storage of impervious areas
-  real(dp), public, dimension(:, :), allocatable :: L1_soilMoist !< [mm]  Soil moisture of each horizon
-  real(dp), public, dimension(:), allocatable :: L1_unsatSTW     !< [mm]  upper soil storage
-  real(dp), public, dimension(:), allocatable :: L1_satSTW       !< [mm]  groundwater storage
+  real(dp), public, dimension(:), allocatable :: L1_inter        !< [mm]  Interception (x1)
+  real(dp), public, dimension(:), allocatable :: L1_snowPack     !< [mm]  Snowpack (x2)
+  real(dp), public, dimension(:, :), allocatable :: L1_soilMoist !< [mm]  Soil moisture of each horizon (x3)
+  real(dp), public, dimension(:), allocatable :: L1_sealSTW      !< [mm]  Retention storage of impervious areas (x4)
+  real(dp), public, dimension(:), allocatable :: L1_unsatSTW     !< [mm]  upper soil storage (x5)
+  real(dp), public, dimension(:), allocatable :: L1_satSTW       !< [mm]  groundwater storage (x6)
   real(dp), public, dimension(:), allocatable :: L1_neutrons     !< [mm]  Ground Albedo Neutrons
 
   ! Fluxes
@@ -143,20 +143,20 @@ MODULE mo_global_variables
   real(dp), public, dimension(:), allocatable :: L1_prec_calc    !< [mm TS-1] precipitation for current time step
   ! dim2 = number model soil horizons
   ! states and fluxes
+  real(dp), public, dimension(:), allocatable :: L1_percol       !< [mm TS-1] Percolation.
+  real(dp), public, dimension(:, :), allocatable :: L1_infilSoil !< [mm TS-1] Infiltration intensity each soil horizon
   real(dp), public, dimension(:, :), allocatable :: L1_aETSoil   !< [mm TS-1] Actual ET from soil layers
   real(dp), public, dimension(:), allocatable :: L1_aETCanopy    !< [mm TS-1] Real evaporation intensity from canopy
   real(dp), public, dimension(:), allocatable :: L1_aETSealed    !< [mm TS-1] Real evap. from free water surfaces
-  real(dp), public, dimension(:), allocatable :: L1_baseflow     !< [mm TS-1] Baseflow
-  real(dp), public, dimension(:, :), allocatable :: L1_infilSoil !< [mm TS-1] Infiltration intensity each soil horizon
-  real(dp), public, dimension(:), allocatable :: L1_fastRunoff   !< [mm TS-1] Fast runoff component
   real(dp), public, dimension(:), allocatable :: L1_melt         !< [mm TS-1] Melting snow depth.
-  real(dp), public, dimension(:), allocatable :: L1_percol       !< [mm TS-1] Percolation.
   real(dp), public, dimension(:), allocatable :: L1_preEffect    !< [mm TS-1] Effective precip. depth (snow melt + rain)
   real(dp), public, dimension(:), allocatable :: L1_rain         !< [mm TS-1] Rain precipitation depth
-  real(dp), public, dimension(:), allocatable :: L1_runoffSeal   !< [mm TS-1] Direct runoff from impervious areas
-  real(dp), public, dimension(:), allocatable :: L1_slowRunoff   !< [mm TS-1] Slow runoff component
   real(dp), public, dimension(:), allocatable :: L1_snow         !< [mm TS-1] Snow precipitation depth
   real(dp), public, dimension(:), allocatable :: L1_Throughfall  !< [mm TS-1] Throughfall.
+  real(dp), public, dimension(:), allocatable :: L1_runoffSeal   !< [mm TS-1] Direct runoff from impervious areas
+  real(dp), public, dimension(:), allocatable :: L1_fastRunoff   !< [mm TS-1] Fast runoff component
+  real(dp), public, dimension(:), allocatable :: L1_slowRunoff   !< [mm TS-1] Slow runoff component
+  real(dp), public, dimension(:), allocatable :: L1_baseflow     !< [mm TS-1] Baseflow
   real(dp), public, dimension(:), allocatable :: L1_total_runoff !< [m3 TS-1] Generated runoff
 
   ! -------------------------------------------------------------------
