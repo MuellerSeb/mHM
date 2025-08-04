@@ -2,10 +2,10 @@
 !> \brief   \copybrief mo_domain
 !> \details \copydetails mo_domain
 
-!> \brief   Module to provide the exchange type.
+!> \brief   Module for a domain container.
 !> \version 0.1
 !> \authors Sebastian Mueller
-!> \date    Mar 2025
+!> \date    Aug 2025
 !> \copyright Copyright 2005-\today, the mHM Developers, Luis Samaniego, Sabine Attinger: All rights reserved.
 !! mHM is released under the LGPLv3+ license \license_note
 !> \ingroup f_exchange
