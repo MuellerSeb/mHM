@@ -160,32 +160,38 @@ module mo_exchange_type
     type(var_dp) :: degday              !< Degree-day factor [mm TS-1 degC-1] on level l1
 
     ! MPR results (level1)
-    type(var_dp) :: alpha               !< Exponent for the upper reservoir [1] on level l1
+    ! PET
+    type(var_dp) :: pet_coeff_pt        !< PET calculation coefficient for Priestley Taylor (alpha) [1] on level l1
+    type(var_dp) :: pet_coeff_hs        !< PET calculation coefficient for Hargreaves Samani [1] on level l1
+    type(var_dp) :: pet_fac_aspect      !< PET correction based on aspect [1] on level l1
+    type(var_dp) :: pet_fac_lai         !< PET correction based on LAI [1] on level l1
+    type(var_dp) :: resist_aero         !< aerodynamical resistance [s m-1] on level l1
+    type(var_dp) :: resist_surf         !< bulk surface resistance [s m-1] on level l1
+    ! canopy
+    type(var_dp) :: max_interception    !< Maximum interception [mm] on level l1
+    ! snow
     type(var_dp) :: degday_inc          !< Increase of the degree-day factor per precipitation [TS-1 degC-1] on level l1
     type(var_dp) :: degday_max          !< Maximum degree-day factor [mm TS-1 degC-1] on level l1
     type(var_dp) :: degday_dry          !< Degree-day factor for no precipitation [mm TS-1 degC-1] on level l1
-    type(var2d_dp) :: f_roots           !< Fraction of roots in soil horizons [1] on level l1
+    type(var_dp) :: thresh_temp         !< Threshold temperature for phase transition snow and rain [degC] on level l1
+    ! soil moisture
     type(var_dp) :: f_sealed            !< Fraction of sealed area [1] on level l1
-    type(var_dp) :: f_karst_loss        !< Fraction of karstic percolation loss [1] on level l1
-    type(var_dp) :: pet_fac_aspect      !< PET correction based on aspect [1] on level l1
-    type(var_dp) :: pet_fac_lai         !< PET correction based on LAI [1] on level l1
-    type(var_dp) :: pet_coeff_hs        !< PET calculation coefficient for Hargreaves Samani [1] on level l1
-    type(var_dp) :: pet_coeff_pt        !< PET calculation coefficient for Priestley Taylor (alpha) [1] on level l1
-    type(var_dp) :: resist_aero         !< aerodynamical resistance [s m-1] on level l1
-    type(var_dp) :: resist_surf         !< bulk surface resistance [s m-1] on level l1
-    type(var_dp) :: k_fastflow          !< Fast interflow recession coefficient [TS-1] on level l1
-    type(var_dp) :: k_slowflow          !< Slow interflow recession coefficient [TS-1] on level l1
-    type(var_dp) :: k_baseflow          !< Baseflow recession coefficient [TS-1] on level l1
-    type(var_dp) :: k_percolation       !< Percolation coefficient [TS-1] on level l1
+    type(var2d_dp) :: f_roots           !< Fraction of roots in soil horizons [1] on level l1
     type(var2d_dp) :: sm_saturation     !< Saturation soil moisture [mm] on level l1
     type(var2d_dp) :: sm_exponent       !< Exponential parameter controlling non-linearity of soil water retention [1] on level l1
     type(var2d_dp) :: sm_field_capacity !< Field capacity - soil moisture below which actual ET is reduced [mm] on level l1
     type(var2d_dp) :: wilting_point     !< permanent wilting point [mm] on level l1
-    type(var_dp) :: thresh_temp         !< Threshold temperature for phase transition snow and rain [degC] on level l1
+    type(var_dp) :: thresh_jarvis       !< Jarvis critical value (C1) for normalized soil water content [1] on level l1
+    ! runoff
+    type(var_dp) :: alpha               !< Exponent for the upper reservoir [1] on level l1
+    type(var_dp) :: k_fastflow          !< Fast interflow recession coefficient [TS-1] on level l1
+    type(var_dp) :: k_slowflow          !< Slow interflow recession coefficient [TS-1] on level l1
+    type(var_dp) :: k_baseflow          !< Baseflow recession coefficient [TS-1] on level l1
+    type(var_dp) :: k_percolation       !< Percolation coefficient [TS-1] on level l1
+    type(var_dp) :: f_karst_loss        !< Fraction of karstic percolation loss [1] on level l1
     type(var_dp) :: thresh_unsat        !< Threshold water depth for fast interflow [mm] on level l1
     type(var_dp) :: thresh_sealed       !< Threshold water depth for runoff on sealed surfaces [mm] on level l1
-    type(var_dp) :: thresh_jarvis       !< Jarvis critical value (C1) for normalized soil water content [1] on level l1
-    type(var_dp) :: max_interception    !< Maximum interception [mm] on level l1
+    ! neutrons
     type(var_dp) :: desilets_n0         !< neutron count rate under dry reference conditions (N_0 in Desilets eq.) [count h-1] on level l1
     type(var2d_dp) :: bulk_density      !< bulk density [g cm-3] on level l1
     type(var2d_dp) :: lattice_water     !< Ratio of structurally bound water [g g-1] on level l1
@@ -246,82 +252,82 @@ contains
 
     ! hydrology (level1)
     ! canopy
-    self%interception = var_dp(grid=l1, name="interception", units="mm", long_name="canopy interception storage")
-    self%throughfall  = var_dp(grid=l1, name="throughfall",  units="mm", long_name="throughfall amount")
+    self%interception      =   var_dp(grid=l1, name="interception",      units="mm",  long_name="canopy interception storage")
+    self%throughfall       =   var_dp(grid=l1, name="throughfall",       units="mm",  long_name="throughfall amount")
     ! storage and SM
-    self%soil_moisture = var2d_dp(grid=l1, name="soil_moisture", units="mm", long_name="soil water content of soil layer")
-    self%sealed_storage  = var_dp(grid=l1, name="sealedSTW",     units="mm", long_name="reservoir of sealed areas")
-    self%unsat_storage   = var_dp(grid=l1, name="unsatSTW",      units="mm", long_name="reservoir of unsaturated zone")
-    self%sat_storage     = var_dp(grid=l1, name="satSTW",        units="mm", long_name="water level in groundwater reservoir")
+    self%soil_moisture     = var2d_dp(grid=l1, name="soil_moisture",     units="mm",  long_name="soil water content of soil layer")
+    self%sealed_storage    =   var_dp(grid=l1, name="sealedSTW",         units="mm",  long_name="reservoir of sealed areas")
+    self%unsat_storage     =   var_dp(grid=l1, name="unsatSTW",          units="mm",  long_name="reservoir of unsaturated zone")
+    self%sat_storage       =   var_dp(grid=l1, name="satSTW",            units="mm",  long_name="water level in groundwater reservoir")
     ! AET
-    self%aet_canopy = var_dp(grid=l1, name="aet_canopy", units="mm", long_name="actual evapotranspiration from canopy")
-    self%aet_sealed = var_dp(grid=l1, name="aet_sealed", units="mm", long_name="actual evapotranspiration from free water surfaces")
-    self%aet_soil = var2d_dp(grid=l1, name="aet_soil",   units="mm", long_name="actual evapotranspiration from soil layer")
+    self%aet_canopy        =   var_dp(grid=l1, name="aet_canopy",        units="mm",  long_name="actual evapotranspiration from canopy")
+    self%aet_sealed        =   var_dp(grid=l1, name="aet_sealed",        units="mm",  long_name="actual evapotranspiration from free water surfaces")
+    self%aet_soil          = var2d_dp(grid=l1, name="aet_soil",          units="mm",  long_name="actual evapotranspiration from soil layer")
     ! rain/snow
-    self%snowpack = var_dp(grid=l1, name="snowpack", units="mm", long_name="depth of snowpack", standard_name="surface_snow_amount")
-    self%rain     = var_dp(grid=l1, name="rain",     units="mm", long_name="rain precipitation", standard_name="rainfall_amount")
-    self%snow     = var_dp(grid=l1, name="snow",     units="mm", long_name="snow precipitation", standard_name="snowfall_amount")
-    self%melt     = var_dp(grid=l1, name="melt",     units="mm", long_name="melting snow", standard_name="surface_snow_melt_amount")
-    self%pre_eff  = var_dp(grid=l1, name="pre_eff",  units="mm", long_name="effective precipitation") ! rain + melt
+    self%snowpack          =   var_dp(grid=l1, name="snowpack",          units="mm",  long_name="depth of snowpack", standard_name="surface_snow_amount")
+    self%rain              =   var_dp(grid=l1, name="rain",              units="mm",  long_name="rain precipitation", standard_name="rainfall_amount")
+    self%snow              =   var_dp(grid=l1, name="snow",              units="mm",  long_name="snow precipitation", standard_name="snowfall_amount")
+    self%melt              =   var_dp(grid=l1, name="melt",              units="mm",  long_name="melting snow", standard_name="surface_snow_melt_amount")
+    self%pre_eff           =   var_dp(grid=l1, name="pre_eff",           units="mm",  long_name="effective precipitation") ! rain + melt
     ! vertical soil water movement
-    self%infiltration = var2d_dp(grid=l1, name="infiltration", units="mm", long_name="infiltration intensity in soil layer")
-    self%percolation  =   var_dp(grid=l1, name="percolation",  units="mm", long_name="percolation")
+    self%infiltration      = var2d_dp(grid=l1, name="infiltration",      units="mm",  long_name="infiltration intensity in soil layer")
+    self%percolation       =   var_dp(grid=l1, name="percolation",       units="mm",  long_name="percolation")
     ! lateral water movement
-    self%runoff_total   = var_dp(grid=l1, name="Q",   units="mm", long_name="total runoff", standard_name="runoff_amount")
-    self%runoff_sealed  = var_dp(grid=l1, name="QD",  units="mm", long_name="direct runoff from impervious areas", standard_name="surface_runoff_amount")
-    self%interflow_fast = var_dp(grid=l1, name="QIf", units="mm", long_name="fast runoff component", standard_name="subsurface_runoff_amount")
-    self%interflow_slow = var_dp(grid=l1, name="QIs", units="mm", long_name="slow runoff component", standard_name="subsurface_runoff_amount")
-    self%baseflow       = var_dp(grid=l1, name="QB",  units="mm", long_name="baseflow", standard_name="baseflow_amount")
+    self%runoff_total      =   var_dp(grid=l1, name="Q",                 units="mm",  long_name="total runoff", standard_name="runoff_amount")
+    self%runoff_sealed     =   var_dp(grid=l1, name="QD",                units="mm",  long_name="direct runoff from impervious areas", standard_name="surface_runoff_amount")
+    self%interflow_fast    =   var_dp(grid=l1, name="QIf",               units="mm",  long_name="fast runoff component", standard_name="subsurface_runoff_amount")
+    self%interflow_slow    =   var_dp(grid=l1, name="QIs",               units="mm",  long_name="slow runoff component", standard_name="subsurface_runoff_amount")
+    self%baseflow          =   var_dp(grid=l1, name="QB",                units="mm",  long_name="baseflow", standard_name="baseflow_amount")
     ! neutrons
-    self%neutrons = var_dp(grid=l1, name="neutrons", units="cph", long_name="ground albedo neutrons")
+    self%neutrons          =   var_dp(grid=l1, name="neutrons",          units="cph", long_name="ground albedo neutrons")
 
     ! MPR results (level1)
     ! PET
-    self%pet_fac_aspect    =   var_dp(grid=l1, name="pet_fac_aspect",    units="1", static=.true., long_name="PET correction factor based on aspect")
-    self%pet_fac_lai       =   var_dp(grid=l1, name="pet_fac_lai",       units="1", long_name="PET correction factor based on LAI")
-    self%pet_coeff_hs      =   var_dp(grid=l1, name="pet_coeff_hs",      units="1", long_name="PET calculation coefficient for Hargreaves Samani")
-    self%pet_coeff_pt      =   var_dp(grid=l1, name="pet_coeff_pt",      units="1", long_name="PET calculation coefficient for Priestley Taylor (alpha)")
-    self%resist_aero       =   var_dp(grid=l1, name="resist_aero",       units="s m-1", long_name="aerodynamical resistance")
-    self%resist_surf       =   var_dp(grid=l1, name="resist_surf",       units="s m-1", long_name="bulk surface resistance")
+    self%pet_coeff_pt      =   var_dp(grid=l1, name="pet_coeff_pt",      units="1",                 long_name="PET calculation coefficient for Priestley Taylor (alpha)")
+    self%pet_coeff_hs      =   var_dp(grid=l1, name="pet_coeff_hs",      units="1", static=.true.,  long_name="PET calculation coefficient for Hargreaves Samani")
+    self%pet_fac_aspect    =   var_dp(grid=l1, name="pet_fac_aspect",    units="1", static=.true.,  long_name="PET correction factor based on aspect")
+    self%pet_fac_lai       =   var_dp(grid=l1, name="pet_fac_lai",       units="1",                 long_name="PET correction factor based on LAI")
+    self%resist_aero       =   var_dp(grid=l1, name="resist_aero",       units="s m-1",             long_name="aerodynamical resistance")
+    self%resist_surf       =   var_dp(grid=l1, name="resist_surf",       units="s m-1",             long_name="bulk surface resistance")
     ! canopy
-    self%max_interception  =   var_dp(grid=l1, name="max_interception",  units="mm", long_name="Maximum interception")
+    self%max_interception  =   var_dp(grid=l1, name="max_interception",  units="mm",                long_name="Maximum interception")
     ! snow
-    self%degday_inc        =   var_dp(grid=l1, name="degday_inc",        units="TS-1 degC-1", long_name="Increase of the degree-day factor per precipitation")
-    self%degday_max        =   var_dp(grid=l1, name="degday_max",        units="mm TS-1 degC-1", long_name="Maximum degree-day factor")
-    self%degday_dry        =   var_dp(grid=l1, name="degday_dry",        units="mm TS-1 degC-1", long_name="Degree-day factor for no precipitation")
-    self%thresh_temp       =   var_dp(grid=l1, name="thresh_temp",       units="degC", long_name="Threshold temperature for phase transition snow and rain")
+    self%degday_inc        =   var_dp(grid=l1, name="degday_inc",        units="TS-1 degC-1",       long_name="Increase of the degree-day factor per precipitation")
+    self%degday_max        =   var_dp(grid=l1, name="degday_max",        units="mm TS-1 degC-1",    long_name="Maximum degree-day factor")
+    self%degday_dry        =   var_dp(grid=l1, name="degday_dry",        units="mm TS-1 degC-1",    long_name="Degree-day factor for no precipitation")
+    self%thresh_temp       =   var_dp(grid=l1, name="thresh_temp",       units="degC",              long_name="Threshold temperature for phase transition snow and rain")
     ! soil moisture
-    self%f_sealed          =   var_dp(grid=l1, name="f_sealed",          units="1", long_name="Fraction of sealed area")
-    self%f_roots           = var2d_dp(grid=l1, name="f_roots",           units="1", long_name="Fraction of roots in soil horizons")
-    self%sm_saturation     = var2d_dp(grid=l1, name="sm_saturation",     units="mm", long_name="Saturation soil moisture")
-    self%sm_exponent       = var2d_dp(grid=l1, name="sm_exponent",       units="1", long_name="Exponential parameter controlling non-linearity of soil water retention")
-    self%sm_field_capacity = var2d_dp(grid=l1, name="sm_field_capacity", units="mm", long_name="Field capacity - soil moisture below which actual ET is reduced")
-    self%wilting_point     = var2d_dp(grid=l1, name="wilting_point",     units="mm", long_name="permanent wilting point")
-    self%thresh_jarvis     =   var_dp(grid=l1, name="thresh_jarvis",     units="1", static=.true., long_name="Jarvis critical value (C1) for normalized soil water content")
+    self%f_sealed          =   var_dp(grid=l1, name="f_sealed",          units="1",                 long_name="Fraction of sealed area")
+    self%f_roots           = var2d_dp(grid=l1, name="f_roots",           units="1",                 long_name="Fraction of roots in soil horizons")
+    self%sm_saturation     = var2d_dp(grid=l1, name="sm_saturation",     units="mm",                long_name="Saturation soil moisture")
+    self%sm_exponent       = var2d_dp(grid=l1, name="sm_exponent",       units="1",                 long_name="Exponential parameter controlling non-linearity of soil water retention")
+    self%sm_field_capacity = var2d_dp(grid=l1, name="sm_field_capacity", units="mm",                long_name="Field capacity - soil moisture below which actual ET is reduced")
+    self%wilting_point     = var2d_dp(grid=l1, name="wilting_point",     units="mm",                long_name="permanent wilting point")
+    self%thresh_jarvis     =   var_dp(grid=l1, name="thresh_jarvis",     units="1",  static=.true., long_name="Jarvis critical value (C1) for normalized soil water content")
     ! runoff
-    self%alpha             =   var_dp(grid=l1, name="alpha",             units="1", long_name="Exponent for the upper reservoir")
-    self%k_fastflow        =   var_dp(grid=l1, name="k_fastflow",        units="TS-1", long_name="Fast interflow recession coefficient")
-    self%k_slowflow        =   var_dp(grid=l1, name="k_slowflow",        units="TS-1", long_name="Slow interflow recession coefficient")
-    self%k_baseflow        =   var_dp(grid=l1, name="k_baseflow",        units="TS-1", long_name="Baseflow recession coefficient")
-    self%k_percolation     =   var_dp(grid=l1, name="k_percolation",     units="TS-1", long_name="Percolation coefficient")
-    self%f_karst_loss      =   var_dp(grid=l1, name="f_karst_loss",      units="1", static=.true., long_name="Fraction of karstic percolation loss")
+    self%alpha             =   var_dp(grid=l1, name="alpha",             units="1",                 long_name="Exponent for the upper reservoir")
+    self%k_fastflow        =   var_dp(grid=l1, name="k_fastflow",        units="TS-1",              long_name="Fast interflow recession coefficient")
+    self%k_slowflow        =   var_dp(grid=l1, name="k_slowflow",        units="TS-1",              long_name="Slow interflow recession coefficient")
+    self%k_baseflow        =   var_dp(grid=l1, name="k_baseflow",        units="TS-1",              long_name="Baseflow recession coefficient")
+    self%k_percolation     =   var_dp(grid=l1, name="k_percolation",     units="TS-1",              long_name="Percolation coefficient")
+    self%f_karst_loss      =   var_dp(grid=l1, name="f_karst_loss",      units="1",  static=.true., long_name="Fraction of karstic percolation loss")
     self%thresh_unsat      =   var_dp(grid=l1, name="thresh_unsat",      units="mm", static=.true., long_name="Threshold water depth for fast interflow")
     self%thresh_sealed     =   var_dp(grid=l1, name="thresh_sealed",     units="mm", static=.true., long_name="Threshold water depth for runoff on sealed surfaces")
     ! neutrons
     self%desilets_n0       =   var_dp(grid=l1, name="desilets_n0",       units="count h-1", static=.true., long_name="neutron count rate under dry reference conditions (N_0 in Desilets eq.)")
-    self%bulk_density      = var2d_dp(grid=l1, name="bulk_density",      units="g cm-3", long_name="bulk density")
-    self%lattice_water     = var2d_dp(grid=l1, name="lattice_water",     units="g g-1", long_name="Ratio of structurally bound water")
-    self%cosmic_l3         = var2d_dp(grid=l1, name="cosmic_l3",         units="g cm-2", long_name="cosmic L3 parameter")
+    self%bulk_density      = var2d_dp(grid=l1, name="bulk_density",      units="g cm-3",            long_name="bulk density")
+    self%lattice_water     = var2d_dp(grid=l1, name="lattice_water",     units="g g-1",             long_name="Ratio of structurally bound water")
+    self%cosmic_l3         = var2d_dp(grid=l1, name="cosmic_l3",         units="g cm-2",            long_name="cosmic L3 parameter")
 
     ! routing (level11)
-    self%q_out      = var_dp(grid=l11, name="q_out",      units="m3 s-1", long_name="accumulated runoff")
-    self%q_mod      = var_dp(grid=l11, name="q_mod",      units="m3 s-1", long_name="modelled discharge")
-    self%e_out      = var_dp(grid=l11, name="e_out",      units="W",      long_name="accumulated source energy")
-    self%e_mod      = var_dp(grid=l11, name="e_mod",      units="W",      long_name="modelled routed energy")
-    self%river_temp = var_dp(grid=l11, name="river_temp", units="degC",   long_name="simulated river temperature")
+    self%q_out             =   var_dp(grid=l11, name="q_out",            units="m3 s-1",            long_name="accumulated runoff")
+    self%q_mod             =   var_dp(grid=l11, name="q_mod",            units="m3 s-1",            long_name="modelled discharge")
+    self%e_out             =   var_dp(grid=l11, name="e_out",            units="W",                 long_name="accumulated source energy")
+    self%e_mod             =   var_dp(grid=l11, name="e_mod",            units="W",                 long_name="modelled routed energy")
+    self%river_temp        =   var_dp(grid=l11, name="river_temp",       units="degC",              long_name="simulated river temperature")
 
     ! groundwater (level0)
-    self%riverhead  = var_dp(grid=l0,  name="riverhead",  units="m",      long_name="simulated riverhead")
+    self%riverhead         =   var_dp(grid=l0,  name="riverhead",        units="m",                 long_name="simulated riverhead")
   end subroutine exchange_init
 
   !> \brief get the grid specifications for the selected level
