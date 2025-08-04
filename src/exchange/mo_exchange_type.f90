@@ -30,11 +30,11 @@ module mo_exchange_type
   !> \name Level Selectors
   !> \brief Constants to specify the grid for levels in mHM: L0, L1, L2 and L11.
   !!@{
-  integer(i4), public, parameter :: nogrid = 0_i4 !< no grid (yet) defined
-  integer(i4), public, parameter :: l0 = 1_i4     !< level0 - morphology
-  integer(i4), public, parameter :: l1 = 2_i4     !< level1 - hydrology
-  integer(i4), public, parameter :: l2 = 3_i4     !< level2 - meteorology
-  integer(i4), public, parameter :: l11 = 4_i4    !< level11 - routing
+  integer(i4), public, parameter :: nogrid = -1_i4 !< no grid (yet) defined
+  integer(i4), public, parameter :: l0 = 0_i4      !< level0 - morphology
+  integer(i4), public, parameter :: l1 = 1_i4      !< level1 - hydrology
+  integer(i4), public, parameter :: l2 = 2_i4      !< level2 - meteorology
+  integer(i4), public, parameter :: l11 = 3_i4     !< level11 - routing
   !!@}
 
   !> \class   variable_abc
@@ -204,6 +204,7 @@ module mo_exchange_type
   contains
     procedure, public  :: init => exchange_init
     procedure, public  :: get_grid => exchange_get_grid
+    procedure, public  :: has_grid => exchange_has_grid
   end type exchange_t
 
 contains
@@ -321,11 +322,11 @@ contains
   subroutine exchange_get_grid(self, selector, grid)
     use mo_message, only: error_message
     class(exchange_t), intent(in) :: self
-    integer(i4), intent(in) :: selector !< level selector (0: nogrid, 1: l0, 2: l1, 3: l2, 4: l11)
+    integer(i4), intent(in) :: selector !< level selector (0: l0, 1: l1, 2: l2, 3: l11, -1: nogrid)
     type(grid_t), pointer, intent(inout) :: grid !< resulting pointer to the selected grid
     select case(selector)
       case(nogrid)
-        grid => null()
+        grid => null() ! exchangable
       case(l0)
         grid => self%level0
       case(l1)
@@ -338,4 +339,23 @@ contains
         call error_message("exchange%get_grid: unknown grid selector '", n2s(selector), "'.")
     end select
   end subroutine exchange_get_grid
+
+  !> \brief get the grid specifications for the selected level
+  logical function exchange_has_grid(self, selector)
+    use mo_message, only: error_message
+    class(exchange_t), intent(in) :: self
+    integer(i4), intent(in) :: selector !< level selector (0: l0, 1: l1, 2: l2, 3: l11, -1: nogrid)
+    select case(selector)
+      case(l0)
+        exchange_has_grid = associated(self%level0)
+      case(l1)
+        exchange_has_grid = associated(self%level1)
+      case(l2)
+        exchange_has_grid = associated(self%level2)
+      case(l11)
+        exchange_has_grid = associated(self%level11)
+      case default
+        exchange_has_grid = .false.
+    end select
+  end function exchange_has_grid
 end module mo_exchange_type

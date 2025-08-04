@@ -11,7 +11,7 @@ contains
 
   @test
   subroutine test_exchange_type()
-    use mo_exchange_type, only: exchange_t
+    use mo_exchange_type, only: exchange_t, l0, l1, l2, l11
     use mo_datetime, only: datetime
     use mo_kind, only: i4
     type(exchange_t) :: exchange
@@ -22,6 +22,10 @@ contains
 
     @assertTrue(exchange%current_time == start_date, message='exchange: check start date')
     @assertTrue(exchange%time_step == 0_i4, message='exchange: check time step')
+    @assertFalse(exchange%has_grid(l0), message='exchange: check no l0 grid yet defined')
+    @assertFalse(exchange%has_grid(l1), message='exchange: check no l1 grid yet defined')
+    @assertFalse(exchange%has_grid(l2), message='exchange: check no l2 grid yet defined')
+    @assertFalse(exchange%has_grid(l11), message='exchange: check no l11 grid yet defined')
   end subroutine test_exchange_type
 
 end module test_exchange
