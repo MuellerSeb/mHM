@@ -1,0 +1,80 @@
+!> \file    mo_domain.f90
+!> \brief   \copybrief mo_domain
+!> \details \copydetails mo_domain
+
+!> \brief   Module to provide the exchange type.
+!> \version 0.1
+!> \authors Sebastian Mueller
+!> \date    Mar 2025
+!> \copyright Copyright 2005-\today, the mHM Developers, Luis Samaniego, Sabine Attinger: All rights reserved.
+!! mHM is released under the LGPLv3+ license \license_note
+!> \ingroup f_exchange
+module mo_domain
+  use mo_list, only: list
+  use mo_kind, only: i4
+  use mo_message, only: error_message
+  use mo_exchange_type, only: exchange_t
+  use mo_string_utils, only: n2s=>num2str
+  use mo_datetime, only: datetime
+
+  !> \class   domain_t
+  !> \brief   Class for a single mHM domain.
+  type, public :: domain_t
+    type(exchange_t) :: exchange !< the exchange container with all exchanged variables for this domain
+  contains
+    procedure :: init => domain_init
+  end type domain_t
+
+  !> \class   domain_list
+  !> \brief   Class to hold a list of all domains as a linked list of pointers.
+  type, extends(list) :: domain_list
+    integer(i4) :: counter = 0_i4 !< internal counter for added domains
+  contains
+    procedure :: get_domain => domain_list_get
+    procedure :: add_domain => domain_list_add
+  end type
+
+contains
+
+  !> \brief Get pointer to desired domain from domain list.
+  subroutine domain_list_get(self, key, domain)
+    class(domain_list), intent(in) :: self
+    integer(i4), intent(in) :: key !< domain key
+    type(domain_t), pointer, intent(out) :: domain !< pointer to desired domain
+    class(*), pointer :: p
+    call self%get(key, p)
+    if (associated(p)) then
+      select type (p)
+        type is (domain_t)
+          domain => p
+        class default
+          call error_message("Domain '", n2s(key), "' not a domain type.")
+      end select
+    else
+      call error_message("Domain '", n2s(key), "' not present.")
+    end if
+  end subroutine domain_list_get
+
+  !> \brief Add a new domain to the domain list.
+  function domain_list_add(self, key) result(new_key)
+    class(domain_list), intent(inout) :: self
+    integer(i4), optional, intent(in) :: key !< domain key
+    integer(i4) :: new_key !< key of the added domain
+    type(domain_t) :: new_domain
+    self%counter = self%counter + 1_i4
+    if (present(key)) then
+      new_key = key
+    else
+      new_key = self%counter
+    end if
+    call self%add_clone(new_key, new_domain)
+  end function domain_list_add
+
+  !> \brief Initialize a new domain.
+  subroutine domain_init(self, start_time)
+    class(domain_t), intent(inout) :: self
+    type(datetime), intent(in) :: start_time !< start time of the simulation
+    call self%exchange%init(start_time)
+  end subroutine domain_init
+
+end module mo_domain

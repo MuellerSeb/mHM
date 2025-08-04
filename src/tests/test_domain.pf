@@ -1,0 +1,36 @@
+module test_domain
+  use funit
+
+  implicit none
+
+  private
+
+  public :: test_domain_type
+
+contains
+
+  @test
+  subroutine test_domain_type()
+    use mo_domain, only: domain_list, domain_t
+    use mo_datetime, only: datetime
+    use mo_kind, only: i4
+    type(datetime) :: start_date
+    type(domain_list) :: domains
+    type(domain_t), pointer :: domain => null()
+    integer(i4) :: keys(2)
+
+    keys(1) = domains%add_domain()
+    keys(2) = domains%add_domain()
+    start_date = datetime(2025, 8, 4, 0, 0)
+
+    call domains%get_domain(1_i4, domain)
+    call domain%init(start_date)
+
+    @assertTrue(domain%exchange%current_time == start_date, message='domain%exchange: check start date')
+    @assertTrue(domain%exchange%time_step == 0_i4, message='domain%exchange: check time step')
+    @assertTrue(domains%has(2_i4), message='domains: has domain 2')
+    @assertEqual(keys(1), 1_i4, message='domains: first key is 1')
+    @assertEqual(keys(2), 2_i4, message='domains: second key is 2')
+  end subroutine test_domain_type
+
+end module test_domain
