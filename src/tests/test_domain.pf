@@ -12,12 +12,19 @@ contains
   @test
   subroutine test_domain_type()
     use mo_domain, only: domain_list, domain_t
+    use mo_exchange_type, only: var_dp, var2d_dp
     use mo_datetime, only: datetime
-    use mo_kind, only: i4
+    use mo_kind, only: i4, dp
     type(datetime) :: start_date
+    type(domain_t) :: domain_single ! note: no target attribute but able to set pointers to components
     type(domain_list) :: domains
     type(domain_t), pointer :: domain => null()
-    integer(i4) :: keys(2)
+    ! type(var_dp), pointer :: pre => null()
+    ! type(var2d_dp), pointer :: sm => null()
+    real(dp), pointer :: dat(:) => null()
+    real(dp), target :: src_dat(5)
+    logical :: provided
+    integer(i4) :: keys(2), i
 
     keys(1) = domains%add_domain()
     keys(2) = domains%add_domain()
@@ -31,6 +38,27 @@ contains
     @assertTrue(domains%has(2_i4), message='domains: has domain 2')
     @assertEqual(keys(1), 1_i4, message='domains: first key is 1')
     @assertEqual(keys(2), 2_i4, message='domains: second key is 2')
+
+    call domain_single%init(start_date)
+    ! call domain_single%exchange%get_var("pre", pre)
+    ! call domain_single%exchange%get_var("soil_moisture", sm)
+    call domain_single%exchange%get_meta("pre", provided=provided)
+    @assertFalse(provided, message='pre%provided: check default value')
+    call domain_single%exchange%get_meta("soil_moisture", provided=provided)
+    @assertFalse(provided, message='sm%provided: check default value')
+
+    ! effectively: dat => src_dat
+    src_dat = [(real(i, dp),i=1,5)]
+    call domain%exchange%set_data("pre", src_dat)
+    call domain%exchange%get_data("pre", dat)
+    @assertEqual(src_dat, dat, message='domains%exchange: assert data pointer correct')
+
+    dat(2) = 10._dp
+    @assertEqual(src_dat, dat, message='domains%exchange: assert data pointer correct')
+
+    src_dat(1) = 20._dp
+    @assertEqual(src_dat, dat, message='domains%exchange: assert data pointer correct')
+
   end subroutine test_domain_type
 
 end module test_domain

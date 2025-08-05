@@ -52,37 +52,37 @@ module mo_exchange_type
 
   !> \class   var_dp
   !> \brief   Class for a double precision variable in the exchange type.
-  type, extends(variable_abc) :: var_dp
+  type, public, extends(variable_abc) :: var_dp
     real(dp), dimension(:), pointer :: data => null() !< 1D real pointer (n-cells)
   end type var_dp
 
   !> \class   var_i4
   !> \brief   Class for a 32bit integer variable in the exchange type.
-  type, extends(variable_abc) :: var_i4
+  type, public, extends(variable_abc) :: var_i4
     integer(i4), dimension(:), pointer :: data => null() !< 1D integer pointer (n-cells)
   end type var_i4
 
   !> \class   var_lg
   !> \brief   Class for a logical variable in the exchange type.
-  type, extends(variable_abc) :: var_lg
+  type, public, extends(variable_abc) :: var_lg
     logical, dimension(:), pointer :: data => null() !< 1D logical pointer (n-cells)
   end type var_lg
 
   !> \class   var2d_dp
   !> \brief   Class for a double precision variable for each horizon in the exchange type.
-  type, extends(variable_abc) :: var2d_dp
+  type, public, extends(variable_abc) :: var2d_dp
     real(dp), dimension(:,:), pointer :: data => null() !< 2D real pointer (n-cells, horizons)
   end type var2d_dp
 
   !> \class   var2d_i4
   !> \brief   Class for a 32bit integer variable for each horizon in the exchange type.
-  type, extends(variable_abc) :: var2d_i4
+  type, public, extends(variable_abc) :: var2d_i4
     integer(i4), dimension(:,:), pointer :: data => null() !< 2D integer pointer (n-cells, horizons)
   end type var2d_i4
 
   !> \class   var2d_lg
   !> \brief   Class for a logical variable for each horizon in the exchange type.
-  type, extends(variable_abc) :: var2d_lg
+  type, public, extends(variable_abc) :: var2d_lg
     logical, dimension(:,:), pointer :: data => null() !< 2D logical pointer (n-cells, horizons)
   end type var2d_lg
 
@@ -211,6 +211,18 @@ module mo_exchange_type
     procedure, public  :: init => exchange_init
     procedure, public  :: get_grid => exchange_get_grid
     procedure, public  :: has_grid => exchange_has_grid
+    procedure, public :: get_meta => exchange_get_var_meta
+    procedure, private :: get_var_class => exchange_get_var_class
+    procedure, private  :: get_data_1d_dp => exchange_get_data_1d_dp
+    procedure, private  :: get_data_1d_i4 => exchange_get_data_1d_i4
+    procedure, private  :: get_data_1d_lg => exchange_get_data_1d_lg
+    procedure, private  :: get_data_2d_dp => exchange_get_data_2d_dp
+    procedure, private  :: get_data_2d_i4 => exchange_get_data_2d_i4
+    procedure, private  :: get_data_2d_lg => exchange_get_data_2d_lg
+    generic, public :: get_data => get_data_1d_dp, get_data_1d_i4, get_data_1d_lg, get_data_2d_dp, get_data_2d_i4, get_data_2d_lg
+    procedure, private  :: set_data_1d => exchange_set_data_1d
+    procedure, private  :: set_data_2d => exchange_set_data_2d
+    generic, public :: set_data => set_data_1d, set_data_2d
   end type exchange_t
 
 contains
@@ -335,7 +347,7 @@ contains
     use mo_message, only: error_message
     class(exchange_t), intent(in) :: self
     integer(i4), intent(in) :: selector !< level selector (0: l0, 1: l1, 2: l2, 3: l11, -1: nogrid)
-    type(grid_t), pointer, intent(inout) :: grid !< resulting pointer to the selected grid
+    type(grid_t), pointer, intent(out) :: grid !< resulting pointer to the selected grid
     select case(selector)
       case(nogrid)
         grid => null() ! exchangable
@@ -370,4 +382,391 @@ contains
         exchange_has_grid = .false.
     end select
   end function exchange_has_grid
+
+  !> \brief get class pointer to a variable
+  subroutine exchange_get_var_class(self, var, var_pnt)
+    use mo_message, only: error_message
+    class(exchange_t), target, intent(in) :: self ! target attribute valid here since Fortran 2003
+    character(*), intent(in) :: var !< name of the variable (attribute name)
+    class(*), pointer, intent(out) :: var_pnt !< resulting pointer to the selected variable
+    select case(var)
+      case("raw_pre")
+        var_pnt => self%raw_pre
+      case("raw_temp")
+        var_pnt => self%raw_temp
+      case("raw_ssrd")
+        var_pnt => self%raw_ssrd
+      case("raw_strd")
+        var_pnt => self%raw_strd
+      case("raw_tann")
+        var_pnt => self%raw_tann
+      case("raw_tmin")
+        var_pnt => self%raw_tmin
+      case("raw_tmax")
+        var_pnt => self%raw_tmax
+      case("raw_netrad")
+        var_pnt => self%raw_netrad
+      case("raw_eabs")
+        var_pnt => self%raw_eabs
+      case("raw_wind")
+        var_pnt => self%raw_wind
+      ! processed meteorology (level1)
+      case("pre")
+        var_pnt => self%pre
+      case("temp")
+        var_pnt => self%temp
+      case("pet")
+        var_pnt => self%pet
+      case("ssrd")
+        var_pnt => self%ssrd
+      case("strd")
+        var_pnt => self%strd
+      case("tann")
+        var_pnt => self%tann
+      ! morphology (level0)
+      case("dem")
+        var_pnt => self%dem
+      case("slope")
+        var_pnt => self%slope
+      case("aspect")
+        var_pnt => self%aspect
+      ! hydrology (level1)
+      ! canopy
+      case("interception")
+        var_pnt => self%interception
+      case("throughfall")
+        var_pnt => self%throughfall
+      ! storage and SM
+      case("soil_moisture")
+        var_pnt => self%soil_moisture
+      case("sealed_storage")
+        var_pnt => self%sealed_storage
+      case("unsat_storage")
+        var_pnt => self%unsat_storage
+      case("sat_storage")
+        var_pnt => self%sat_storage
+      ! case("water_table_depth")
+      !   var => self%water_table_depth
+      ! AET
+      case("aet_canopy")
+        var_pnt => self%aet_canopy
+      case("aet_sealed")
+        var_pnt => self%aet_sealed
+      case("aet_soil")
+        var_pnt => self%aet_soil
+      ! rain/snow
+      case("snowpack")
+        var_pnt => self%snowpack
+      case("rain")
+        var_pnt => self%rain
+      case("snow")
+        var_pnt => self%snow
+      case("melt")
+        var_pnt => self%melt
+      case("pre_eff")
+        var_pnt => self%pre_eff
+      ! vertical soil water movement
+      case("infiltration")
+        var_pnt => self%infiltration
+      case("percolation")
+        var_pnt => self%percolation
+      ! case("loss")
+      !   var => self%loss
+      ! lateral water movement
+      case("runoff_total")
+        var_pnt => self%runoff_total
+      case("runoff_sealed")
+        var_pnt => self%runoff_sealed
+      case("interflow_fast")
+        var_pnt => self%interflow_fast
+      case("interflow_slow")
+        var_pnt => self%interflow_slow
+      case("baseflow")
+        var_pnt => self%baseflow
+      ! neutrons
+      case("neutrons")
+        var_pnt => self%neutrons
+      ! degday calculated by mHM from MPR degday_X variables
+      case("degday")
+        var_pnt => self%degday
+      ! MPR results (level1)
+      ! PET
+      case("pet_coeff_pt")
+        var_pnt => self%pet_coeff_pt
+      case("pet_coeff_hs")
+        var_pnt => self%pet_coeff_hs
+      case("pet_fac_aspect")
+        var_pnt => self%pet_fac_aspect
+      case("pet_fac_lai")
+        var_pnt => self%pet_fac_lai
+      case("resist_aero")
+        var_pnt => self%resist_aero
+      case("resist_surf")
+        var_pnt => self%resist_surf
+      ! canopy
+      case("max_interception")
+        var_pnt => self%max_interception
+      ! snow
+      case("degday_inc")
+        var_pnt => self%degday_inc
+      case("degday_max")
+        var_pnt => self%degday_max
+      case("degday_dry")
+        var_pnt => self%degday_dry
+      case("thresh_temp")
+        var_pnt => self%thresh_temp
+      ! soil moisture
+      case("f_sealed")
+        var_pnt => self%f_sealed
+      case("f_roots")
+        var_pnt => self%f_roots
+      case("sm_saturation")
+        var_pnt => self%sm_saturation
+      case("sm_exponent")
+        var_pnt => self%sm_exponent
+      case("sm_field_capacity")
+        var_pnt => self%sm_field_capacity
+      case("wilting_point")
+        var_pnt => self%wilting_point
+      case("thresh_jarvis")
+        var_pnt => self%thresh_jarvis
+      ! runoff
+      case("alpha")
+        var_pnt => self%alpha
+      case("k_fastflow")
+        var_pnt => self%k_fastflow
+      case("k_slowflow")
+        var_pnt => self%k_slowflow
+      case("k_baseflow")
+        var_pnt => self%k_baseflow
+      case("k_percolation")
+        var_pnt => self%k_percolation
+      case("f_karst_loss")
+        var_pnt => self%f_karst_loss
+      case("thresh_unsat")
+        var_pnt => self%thresh_unsat
+      case("thresh_sealed")
+        var_pnt => self%thresh_sealed
+      ! neutrons
+      case("desilets_n0")
+        var_pnt => self%desilets_n0
+      case("bulk_density")
+        var_pnt => self%bulk_density
+      case("lattice_water")
+        var_pnt => self%lattice_water
+      case("cosmic_l3")
+        var_pnt => self%cosmic_l3
+      ! routing (level11)
+      case("q_out")
+        var_pnt => self%q_out
+      case("q_mod")
+        var_pnt => self%q_mod
+      case("e_out")
+        var_pnt => self%e_out
+      case("e_mod")
+        var_pnt => self%e_mod
+      case("river_temp")
+        var_pnt => self%river_temp
+      ! groundwater (level0)
+      case("riverhead")
+        var_pnt => self%riverhead
+      case default
+        call error_message("exchange%get_var: variable '", var, "' not available.")
+    end select
+  end subroutine exchange_get_var_class
+
+  !> \brief get var_dp pointer to a variable
+  subroutine exchange_get_var_meta(self, var, name, units, long_name, standard_name, grid, static, provided, required)
+    use mo_message, only: error_message
+    class(exchange_t), target, intent(in) :: self ! target attribute valid here since Fortran 2003
+    character(*), intent(in) :: var                                   !< name of the variable (attribute name)
+    character(:), allocatable, intent(out), optional :: name          !< variable name
+    character(:), allocatable, intent(out), optional :: units         !< variable unit
+    character(:), allocatable, intent(out), optional :: long_name     !< long name of the variable
+    character(:), allocatable, intent(out), optional :: standard_name !< standard name of the variable
+    integer(i4), intent(out), optional :: grid                        !< ID of the grid the data is defined on
+    logical, intent(out), optional :: static                          !< flag to indicated static data
+    logical, intent(out), optional :: provided                        !< flag to indicate that data is provided by a component
+    logical, intent(out), optional :: required                        !< flag to indicate that data is required by a component
+    class(*), pointer :: tmp
+    call self%get_var_class(var, tmp)
+    select type (tmp)
+      class is (variable_abc)
+        if (present(name)          .and. allocated(tmp%name))          name          = tmp%name
+        if (present(units)         .and. allocated(tmp%units))         units         = tmp%units
+        if (present(long_name)     .and. allocated(tmp%long_name))     long_name     = tmp%long_name
+        if (present(standard_name) .and. allocated(tmp%standard_name)) standard_name = tmp%standard_name
+        if (present(grid))     grid     = tmp%grid
+        if (present(static))   static   = tmp%static
+        if (present(provided)) provided = tmp%provided
+        if (present(required)) required = tmp%required
+    end select
+  end subroutine exchange_get_var_meta
+
+  !> \brief get pointer to the 1D variable data
+  subroutine exchange_get_data_1d_dp(self, var, data)
+    use mo_message, only: error_message
+    class(exchange_t), target, intent(in) :: self ! target attribute valid here since Fortran 2003
+    character(*), intent(in) :: var !< name of the variable (attribute name)
+    real(dp), pointer, intent(out) :: data(:) !< resulting pointer to the selected variable data
+    class(*), pointer :: tmp
+    call self%get_var_class(var, tmp)
+    select type (tmp)
+      class is (var_dp)
+        data => tmp%data
+      class default
+        call error_message("exchange%get_var: variable data of '", var, "' not 1D real(dp).")
+    end select
+  end subroutine exchange_get_data_1d_dp
+
+  !> \brief get pointer to the 1D variable data
+  subroutine exchange_get_data_1d_i4(self, var, data)
+    use mo_message, only: error_message
+    class(exchange_t), target, intent(in) :: self ! target attribute valid here since Fortran 2003
+    character(*), intent(in) :: var !< name of the variable (attribute name)
+    integer(i4), pointer, intent(out) :: data(:) !< resulting pointer to the selected variable data
+    class(*), pointer :: tmp
+    call self%get_var_class(var, tmp)
+    select type (tmp)
+      class is (var_i4)
+        data => tmp%data
+      class default
+        call error_message("exchange%get_var: variable data of '", var, "' not 1D integer(i4).")
+    end select
+  end subroutine exchange_get_data_1d_i4
+
+  !> \brief get pointer to the 1D variable data
+  subroutine exchange_get_data_1d_lg(self, var, data)
+    use mo_message, only: error_message
+    class(exchange_t), target, intent(in) :: self ! target attribute valid here since Fortran 2003
+    character(*), intent(in) :: var !< name of the variable (attribute name)
+    logical, pointer, intent(out) :: data(:) !< resulting pointer to the selected variable data
+    class(*), pointer :: tmp
+    call self%get_var_class(var, tmp)
+    select type (tmp)
+      class is (var_lg)
+        data => tmp%data
+      class default
+        call error_message("exchange%get_var: variable data of '", var, "' not 1D logical.")
+    end select
+  end subroutine exchange_get_data_1d_lg
+
+  !> \brief get pointer to the 2D variable data
+  subroutine exchange_get_data_2d_dp(self, var, data)
+  use mo_message, only: error_message
+    class(exchange_t), target, intent(in) :: self ! target attribute valid here since Fortran 2003
+    character(*), intent(in) :: var !< name of the variable (attribute name)
+    real(dp), pointer, intent(out) :: data(:,:) !< resulting pointer to the selected variable data
+    class(*), pointer :: tmp
+    call self%get_var_class(var, tmp)
+    select type (tmp)
+      class is (var2d_dp)
+        data => tmp%data
+      class default
+        call error_message("exchange%get_var: variable data of '", var, "' not 2D real(dp).")
+    end select
+  end subroutine exchange_get_data_2d_dp
+
+  !> \brief get pointer to the 2D variable data
+  subroutine exchange_get_data_2d_i4(self, var, data)
+    use mo_message, only: error_message
+    class(exchange_t), target, intent(in) :: self ! target attribute valid here since Fortran 2003
+    character(*), intent(in) :: var !< name of the variable (attribute name)
+    integer(i4), pointer, intent(out) :: data(:,:) !< resulting pointer to the selected variable data
+    class(*), pointer :: tmp
+    call self%get_var_class(var, tmp)
+    select type (tmp)
+      class is (var2d_i4)
+        data => tmp%data
+      class default
+        call error_message("exchange%get_var: variable data of '", var, "' not 2D integer(i4).")
+    end select
+  end subroutine exchange_get_data_2d_i4
+
+  !> \brief get pointer to the 2D variable data
+  subroutine exchange_get_data_2d_lg(self, var, data)
+    use mo_message, only: error_message
+    class(exchange_t), target, intent(in) :: self ! target attribute valid here since Fortran 2003
+    character(*), intent(in) :: var !< name of the variable (attribute name)
+    logical, pointer, intent(out) :: data(:,:) !< resulting pointer to the selected variable data
+    class(*), pointer :: tmp
+    call self%get_var_class(var, tmp)
+    select type (tmp)
+      class is (var2d_lg)
+        data => tmp%data
+      class default
+        call error_message("exchange%get_var: variable data of '", var, "' not 2D logical.")
+    end select
+  end subroutine exchange_get_data_2d_lg
+
+  !> \brief set pointer to the 1D variable data
+  subroutine exchange_set_data_1d(self, var, data)
+    use mo_message, only: error_message
+    class(exchange_t), target, intent(inout) :: self ! target attribute valid here since Fortran 2003
+    character(*), intent(in) :: var !< name of the variable (attribute name)
+    class(*), target, intent(in) :: data(:) !< target data
+    class(*), pointer :: tmp
+    call self%get_var_class(var, tmp)
+    select type (tmp)
+      class is (var_dp)
+        select type (data)
+          type is (real(dp))
+            tmp%data => data
+          class default
+            call error_message("exchange%get_var: variable data of '", var, "' is of type real(dp).")
+        end select
+      class is (var_i4)
+        select type (data)
+          type is (integer(i4))
+            tmp%data => data
+          class default
+            call error_message("exchange%get_var: variable data of '", var, "' is of type integer(i4).")
+        end select
+      class is (var_lg)
+        select type (data)
+          type is (logical)
+            tmp%data => data
+          class default
+            call error_message("exchange%get_var: variable data of '", var, "' is of type logical.")
+        end select
+      class default
+        call error_message("exchange%get_var: variable data of '", var, "' not one dimensional.")
+    end select
+  end subroutine exchange_set_data_1d
+
+  !> \brief set target for variable data 2D
+  subroutine exchange_set_data_2d(self, var, data)
+    use mo_message, only: error_message
+    class(exchange_t), target, intent(inout) :: self ! target attribute valid here since Fortran 2003
+    character(*), intent(in) :: var !< name of the variable (attribute name)
+    class(*), target, intent(in) :: data(:,:) !< target data
+    class(*), pointer :: tmp
+    call self%get_var_class(var, tmp)
+    select type (tmp)
+      class is (var2d_dp)
+        select type (data)
+          type is (real(dp))
+            tmp%data => data
+          class default
+            call error_message("exchange%get_var: variable data of '", var, "' is of type real(dp).")
+        end select
+      class is (var2d_i4)
+        select type (data)
+          type is (integer(i4))
+            tmp%data => data
+          class default
+            call error_message("exchange%get_var: variable data of '", var, "' is of type integer(i4).")
+        end select
+      class is (var2d_lg)
+        select type (data)
+          type is (logical)
+            tmp%data => data
+          class default
+            call error_message("exchange%get_var: variable data of '", var, "' is of type logical.")
+        end select
+      class default
+        call error_message("exchange%get_var: variable data of '", var, "' not two dimensional.")
+    end select
+  end subroutine exchange_set_data_2d
+
 end module mo_exchange_type
