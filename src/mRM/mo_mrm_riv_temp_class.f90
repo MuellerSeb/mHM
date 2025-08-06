@@ -158,14 +158,11 @@ contains
   subroutine config( &
     self, &
     file_namelist, &
-    unamelist, &
-    file_namelist_param, &
-    unamelist_param &
+    file_namelist_param &
   )
 
     use mo_common_constants, only : maxNoDomains, nodata_i4
     use mo_common_variables, only : domainMeta
-    use mo_nml, only : close_nml, open_nml, position_nml
     use mo_check, only : check_dir
     USE mo_string_utils, ONLY : num2str
     use mo_namelists, only : nml_config_riv_temp
@@ -175,15 +172,13 @@ contains
     class(riv_temp_type), intent(inout) :: self
     character(*), intent(in) :: file_namelist !< mhm namelist file
     character(*), intent(in) :: file_namelist_param !< mhm parameter namelist file
-    integer, intent(in) :: unamelist
-    integer, intent(in) :: unamelist_param
 
     integer(i4) :: iDomain, domainID
 
     ! allocate the directory arrays
     allocate(self%dir_riv_widths(domainMeta%nDomains))
 
-    call nml_config_riv_temp%read(file_namelist, unamelist)
+    call nml_config_riv_temp%read(file_namelist)
     self%albedo_water = nml_config_riv_temp%albedo_water
     self%pt_a_water = nml_config_riv_temp%pt_a_water
     self%emissivity_water = nml_config_riv_temp%emissivity_water

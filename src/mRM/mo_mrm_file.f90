@@ -21,12 +21,8 @@ MODULE mo_mrm_file
   CHARACTER(len = *), PARAMETER :: file_main = 'mrm_driver.f90'              ! Driver
   !> Namelist file name
   CHARACTER(len = *), PARAMETER :: file_namelist_mrm = 'mrm.nml'                     ! Namelist
-  !> Unit for namelist
-  INTEGER, PARAMETER :: unamelist_mrm = 40                            ! set different from mhm
   !> Parameter namelists file name
   CHARACTER(len = *), PARAMETER :: file_namelist_param_mrm = 'mrm_parameter.nml'           ! Parameter namelists
-  !> Unit for namelist
-  INTEGER, PARAMETER :: unamelist_param_mrm = 41                            ! set different from mhm
 
   CHARACTER(len = *), PARAMETER :: file_facc = 'facc.asc'                    ! flow accumulation
   !> Unit for  flow accumulation input data file
@@ -50,8 +46,6 @@ MODULE mo_mrm_file
 
   !> file defining mRM's outputs
   character(:), allocatable :: file_defOutput ! = 'mrm_outputs.nml'             ! output states and fluxes
-  !> Unit for file defining mRM's outputs
-  INTEGER, PARAMETER :: udefOutput = 67                            !
 
   !> file defining mHM's outputs
   CHARACTER(len = *), PARAMETER :: file_config = 'ConfigFile.log'              ! configuration

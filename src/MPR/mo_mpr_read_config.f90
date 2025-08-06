@@ -42,9 +42,7 @@ contains
 
   !    INTENT(IN)
   !>       \param[in] "character(*) :: file_namelist"
-  !>       \param[in] "integer :: unamelist"
   !>       \param[in] "character(*) :: file_namelist_param"
-  !>       \param[in] "integer :: unamelist_param"
 
   !    HISTORY
   !>       \authors Stephan Thober
@@ -57,7 +55,7 @@ contains
   ! Robert Schweppe Dec 2017 - adapted for MPR
   !  Rohini Kumar   Oct 2021 - Added Neutron count module to mHM integrate into develop branch (5.11.2)
 
-  subroutine mpr_read_config(file_namelist, unamelist, file_namelist_param, unamelist_param)
+  subroutine mpr_read_config(file_namelist, file_namelist_param)
 
     use mo_namelists, only : &
       nml_directories_mpr, &
@@ -99,11 +97,7 @@ contains
 
     character(*), intent(in) :: file_namelist
 
-    integer, intent(in) :: unamelist
-
     character(*), intent(in) :: file_namelist_param
-
-    integer, intent(in) :: unamelist_param
 
     integer(i4) :: ii
 
@@ -219,13 +213,13 @@ contains
     !===============================================================
     !  Read namelist for LCover
     !===============================================================
-    call nml_lcover_mpr%read(file_namelist, unamelist)
+    call nml_lcover_mpr%read(file_namelist)
     fracSealed_cityArea = nml_lcover_mpr%fracSealed_cityArea
 
     !===============================================================
     ! Read soil layering information
     !===============================================================
-    call nml_soildata%read(file_namelist, unamelist)
+    call nml_soildata%read(file_namelist)
     iFlag_soilDB = nml_soildata%iFlag_soilDB
     tillageDepth = nml_soildata%tillageDepth
     nSoilHorizons_mHM = nml_soildata%nSoilHorizons_mHM
@@ -259,7 +253,7 @@ contains
     !===============================================================
     ! Read LAI related information
     !===============================================================
-    call nml_lai_data_information%read(file_namelist, unamelist)
+    call nml_lai_data_information%read(file_namelist)
     inputFormat_gridded_LAI = nml_lai_data_information%inputFormat_gridded_LAI
     timeStep_LAI_input = nml_lai_data_information%timeStep_LAI_input
 
@@ -267,7 +261,7 @@ contains
       !===============================================================
       !  Read namelist for main directories
       !===============================================================
-      call nml_directories_mpr%read(file_namelist, unamelist)
+      call nml_directories_mpr%read(file_namelist)
       dir_gridded_LAI = nml_directories_mpr%dir_gridded_LAI
 
       allocate(dirgridded_LAI(domainMeta%nDomains))
@@ -289,7 +283,7 @@ contains
     select case (processMatrix(1, 1))
       ! 1 - maximum Interception
     case(1)
-      call nml_interception1%read(file_namelist_param, unamelist_param)
+      call nml_interception1%read(file_namelist_param)
       canopyInterceptionFactor = nml_interception1%canopyInterceptionFactor
 
       processMatrix(1, 2) = 1_i4
@@ -312,7 +306,7 @@ contains
     select case (processMatrix(2, 1))
       ! 1 - degree-day approach
     case(1)
-      call nml_snow1%read(file_namelist_param, unamelist_param)
+      call nml_snow1%read(file_namelist_param)
       snowTreshholdTemperature = nml_snow1%snowTreshholdTemperature
       degreeDayFactor_forest = nml_snow1%degreeDayFactor_forest
       degreeDayFactor_impervious = nml_snow1%degreeDayFactor_impervious
@@ -356,7 +350,7 @@ contains
 
       ! 1 - Feddes equation for PET reduction, bucket approach, Brooks-Corey like
     case(1)
-      call nml_soilmoisture1%read(file_namelist_param, unamelist_param)
+      call nml_soilmoisture1%read(file_namelist_param)
       orgMatterContent_forest = nml_soilmoisture1%orgMatterContent_forest
       orgMatterContent_impervious = nml_soilmoisture1%orgMatterContent_impervious
       orgMatterContent_pervious = nml_soilmoisture1%orgMatterContent_pervious
@@ -420,7 +414,7 @@ contains
 
       ! 2- Jarvis equation for PET reduction, bucket approach, Brooks-Corey like
     case(2)
-      call nml_soilmoisture2%read(file_namelist_param, unamelist_param)
+      call nml_soilmoisture2%read(file_namelist_param)
       orgMatterContent_forest = nml_soilmoisture2%orgMatterContent_forest
       orgMatterContent_impervious = nml_soilmoisture2%orgMatterContent_impervious
       orgMatterContent_pervious = nml_soilmoisture2%orgMatterContent_pervious
@@ -487,7 +481,7 @@ contains
 
       ! 3- Jarvis equation for ET reduction and FC dependency on root fraction coefficient
     case(3)
-      call nml_soilmoisture3%read(file_namelist_param, unamelist_param)
+      call nml_soilmoisture3%read(file_namelist_param)
       orgMatterContent_forest = nml_soilmoisture3%orgMatterContent_forest
       orgMatterContent_impervious = nml_soilmoisture3%orgMatterContent_impervious
       orgMatterContent_pervious = nml_soilmoisture3%orgMatterContent_pervious
@@ -566,7 +560,7 @@ contains
 
       ! 4- Feddes equation for ET reduction and FC dependency on root fraction coefficient
     case(4)
-      call nml_soilmoisture4%read(file_namelist_param, unamelist_param)
+      call nml_soilmoisture4%read(file_namelist_param)
       orgMatterContent_forest = nml_soilmoisture4%orgMatterContent_forest
       orgMatterContent_impervious = nml_soilmoisture4%orgMatterContent_impervious
       orgMatterContent_pervious = nml_soilmoisture4%orgMatterContent_pervious
@@ -649,7 +643,7 @@ contains
     select case (processMatrix(4, 1))
       ! 1 - bucket exceedance approach
     case(1)
-      call nml_directrunoff1%read(file_namelist_param, unamelist_param)
+      call nml_directrunoff1%read(file_namelist_param)
       imperviousStorageCapacity = nml_directrunoff1%imperviousStorageCapacity
 
       processMatrix(4, 2) = 1_i4
@@ -670,7 +664,7 @@ contains
     ! Process 5 - potential evapotranspiration (PET)
     select case (processMatrix(5, 1))
     case(-1) ! 0 - PET is input, correct PET by LAI
-      call nml_petminus1%read(file_namelist_param, unamelist_param)
+      call nml_petminus1%read(file_namelist_param)
       PET_a_forest = nml_petminus1%PET_a_forest
       PET_a_impervious = nml_petminus1%PET_a_impervious
       PET_a_pervious = nml_petminus1%PET_a_pervious
@@ -697,7 +691,7 @@ contains
         call error_message('***ERROR: parameter in namelist "PETminus1" out of bound  n ', trim(adjustl(file_namelist_param)))
 
     case(0) ! 0 - PET is input, correct PET by aspect
-      call nml_pet0%read(file_namelist_param, unamelist_param)
+      call nml_pet0%read(file_namelist_param)
       minCorrectionFactorPET = nml_pet0%minCorrectionFactorPET
       maxCorrectionFactorPET = nml_pet0%maxCorrectionFactorPET
       aspectTresholdPET = nml_pet0%aspectTresholdPET
@@ -718,7 +712,7 @@ contains
         call error_message('***ERROR: parameter in namelist "PET0" out of bound in ', trim(adjustl(file_namelist_param)))
 
     case(1) ! 1 - Hargreaves-Samani method (HarSam) - additional input needed: Tmin, Tmax
-      call nml_pet1%read(file_namelist_param, unamelist_param)
+      call nml_pet1%read(file_namelist_param)
       minCorrectionFactorPET = nml_pet1%minCorrectionFactorPET
       maxCorrectionFactorPET = nml_pet1%maxCorrectionFactorPET
       aspectTresholdPET = nml_pet1%aspectTresholdPET
@@ -741,7 +735,7 @@ contains
         call error_message('***ERROR: parameter in namelist "PET1" out of bound in ', trim(adjustl(file_namelist_param)))
 
     case(2) ! 2 - Priestley-Taylor method (PrieTay) - additional input needed: net_rad
-      call nml_pet2%read(file_namelist_param, unamelist_param)
+      call nml_pet2%read(file_namelist_param)
       PriestleyTaylorCoeff = nml_pet2%PriestleyTaylorCoeff
       PriestleyTaylorLAIcorr = nml_pet2%PriestleyTaylorLAIcorr
 
@@ -758,7 +752,7 @@ contains
         call error_message('***ERROR: parameter in namelist "PET2" out of bound in ', trim(adjustl(file_namelist_param)))
 
     case(3) ! 3 - Penman-Monteith method - additional input needed: net_rad, abs. vapour pressue, windspeed
-      call nml_pet3%read(file_namelist_param, unamelist_param)
+      call nml_pet3%read(file_namelist_param)
       canopyheigth_forest = nml_pet3%canopyheigth_forest
       canopyheigth_impervious = nml_pet3%canopyheigth_impervious
       canopyheigth_pervious = nml_pet3%canopyheigth_pervious
@@ -801,7 +795,7 @@ contains
     select case (processMatrix(6, 1))
       ! 1 - parallel soil reservoir approach
     case(1)
-      call nml_interflow1%read(file_namelist_param, unamelist_param)
+      call nml_interflow1%read(file_namelist_param)
       interflowStorageCapacityFactor = nml_interflow1%interflowStorageCapacityFactor
       interflowRecession_slope = nml_interflow1%interflowRecession_slope
       fastInterflowRecession_forest = nml_interflow1%fastInterflowRecession_forest
@@ -836,7 +830,7 @@ contains
     select case (processMatrix(7, 1))
       ! 1 - GW layer is assumed as bucket
     case(1)
-      call nml_percolation1%read(file_namelist_param, unamelist_param)
+      call nml_percolation1%read(file_namelist_param)
       rechargeCoefficient = nml_percolation1%rechargeCoefficient
       rechargeFactor_karstic = nml_percolation1%rechargeFactor_karstic
       gain_loss_GWreservoir_karstic = nml_percolation1%gain_loss_GWreservoir_karstic
@@ -900,7 +894,7 @@ contains
     select case (processMatrix(9, 1))
     case(1)
       ! read in global parameters (NOT REGIONALIZED, i.e. these are <beta> and not <gamma>) for each geological formation used
-      call nml_geoparameter%read(file_namelist_param, unamelist_param)
+      call nml_geoparameter%read(file_namelist_param)
       GeoParam = nml_geoparameter%GeoParam
 
       ! search number of geological parameters
@@ -947,7 +941,7 @@ contains
 
     case(1)
       ! 1 - inverse N0 based on Desilets et al. 2010
-      call nml_neutrons1%read(file_namelist_param, unamelist_param)
+      call nml_neutrons1%read(file_namelist_param)
       Desilets_N0 = nml_neutrons1%Desilets_N0
       Desilets_LW0 = nml_neutrons1%Desilets_LW0
       Desilets_LW1 = nml_neutrons1%Desilets_LW1
@@ -969,7 +963,7 @@ contains
 
     case(2)
       ! 2 - COSMIC version
-      call nml_neutrons2%read(file_namelist_param, unamelist_param)
+      call nml_neutrons2%read(file_namelist_param)
       COSMIC_N0 = nml_neutrons2%COSMIC_N0
       COSMIC_N1 = nml_neutrons2%COSMIC_N1
       COSMIC_N2 = nml_neutrons2%COSMIC_N2

@@ -44,7 +44,6 @@ CONTAINS
 
   !    INTENT(IN)
   !>       \param[in] "character(*) :: file_namelist"
-  !>       \param[in] "integer :: unamelist"
 
   !    HISTORY
   !>       \authors Matthias Zink
@@ -86,7 +85,7 @@ CONTAINS
   ! Robert Schweppe              Dec  2017 - switched from fractional julian day to integer
   ! Robert Schweppe              Jun  2018 - refactoring and reformatting
 
-  subroutine mhm_read_config(file_namelist, unamelist)
+  subroutine mhm_read_config(file_namelist)
 
     use mo_namelists, only : &
       nml_optional_data, &
@@ -97,7 +96,7 @@ CONTAINS
     use mo_common_mHM_mRM_read_config, only : common_check_resolution
     use mo_common_mhm_mrm_variables, only : opti_function, optimize
     use mo_common_variables, only : domainMeta, processMatrix
-    use mo_file, only : file_defOutput, udefOutput
+    use mo_file, only : file_defOutput
     use mo_global_variables, only : &
       L1_twsaObs, L1_etObs, L1_smObs, L1_neutronsObs, &
       evap_coeff, &
@@ -112,8 +111,6 @@ CONTAINS
     implicit none
 
     character(*), intent(in) :: file_namelist
-
-    integer, intent(in) :: unamelist
 
     integer(i4) :: iDomain, domainID
 
@@ -150,7 +147,7 @@ CONTAINS
       ! read nml
       select case (opti_function)
         case(10 : 13, 15, 17, 27 : 30, 33)
-          call nml_optional_data%read(file_namelist, unamelist)
+          call nml_optional_data%read(file_namelist)
           nSoilHorizons_sm_input = nml_optional_data%nSoilHorizons_sm_input
           dir_soil_moisture = nml_optional_data%dir_soil_moisture
           dir_neutrons = nml_optional_data%dir_neutrons
@@ -161,7 +158,7 @@ CONTAINS
           timeStep_et_input = nml_optional_data%timeStep_et_input
           timeStep_tws_input = nml_optional_data%timeStep_tws_input
         case(34)
-          call nml_baseflow_config%read(file_namelist, unamelist)
+          call nml_baseflow_config%read(file_namelist)
           BFI_calc = nml_baseflow_config%BFI_calc
           BFI_obs = nml_baseflow_config%BFI_obs(1:size(BFI_obs))
       end select
@@ -227,7 +224,7 @@ CONTAINS
     ! Read pan evaporation
     !===============================================================
     ! Evap. coef. for free-water surfaces
-    call nml_panEvapo%read(file_namelist, unamelist)
+    call nml_panEvapo%read(file_namelist)
     evap_coeff = nml_panEvapo%evap_coeff
 
     call common_check_resolution(.true., .false.)
@@ -235,7 +232,7 @@ CONTAINS
     !===============================================================
     ! Read output specifications for mHM
     !===============================================================
-    call nml_NLoutputResults%read(file_defOutput, udefOutput)
+    call nml_NLoutputResults%read(file_defOutput)
     output_deflate_level = nml_NLoutputResults%output_deflate_level
     output_double_precision = nml_NLoutputResults%output_double_precision
     timeStep_model_outputs = nml_NLoutputResults%timeStep_model_outputs

@@ -34,9 +34,7 @@ contains
 
   !    INTENT(IN)
   !>       \param[in] "character(*) :: file_namelist, file_namelist_param"
-  !>       \param[in] "integer :: unamelist, unamelist_param"
   !>       \param[in] "character(*) :: file_namelist, file_namelist_param"
-  !>       \param[in] "integer :: unamelist, unamelist_param"
   !>       \param[in] "logical :: do_message"                              - flag for writing mHM standard messages
 
   !    HISTORY
@@ -49,13 +47,13 @@ contains
   ! Stephan Thober  Oct 2015 - added NLoutputResults namelist, fileLatLon to directories_general namelist, and readLatLon flag
   ! Robert Schweppe Jun 2018 - refactoring and reformatting
 
-  subroutine mrm_read_config(file_namelist, unamelist, file_namelist_param, unamelist_param, do_message)
+  subroutine mrm_read_config(file_namelist, file_namelist_param, do_message)
 
     use mo_common_constants, only : maxNoDomains, nodata_i4
     use mo_common_mHM_mRM_read_config, only : common_check_resolution
     use mo_common_variables, only : ALMA_convention, domainMeta, processMatrix
     use mo_mrm_constants, only : maxNoGauges
-    use mo_mrm_file, only : file_defOutput, udefOutput
+    use mo_mrm_file, only : file_defOutput
     use mo_mrm_global_variables, only : InflowGauge, domainInfo_mRM, domain_mrm, &
                                         dirGauges, dirTotalRunoff, filenameTotalRunoff, dirBankfullRunoff, gauge, is_start, &
                                         nGaugesTotal, nGaugesLocal, nInflowGaugesTotal, outputFlxState_mrm, &
@@ -74,8 +72,6 @@ contains
     implicit none
 
     character(*), intent(in) :: file_namelist, file_namelist_param
-
-    integer, intent(in) :: unamelist, unamelist_param
 
     ! - flag for writing mHM standard messages
     logical, intent(in) :: do_message
@@ -111,7 +107,7 @@ contains
     !===============================================================
     !  Read namelist for mainconfig for mRM
     !===============================================================
-    call nml_mainconfig_mrm%read(file_namelist, unamelist)
+    call nml_mainconfig_mrm%read(file_namelist)
     ALMA_convention = nml_mainconfig_mrm%ALMA_convention
     filenameTotalRunoff = nml_mainconfig_mrm%filenameTotalRunoff
     varnameTotalRunoff = nml_mainconfig_mrm%varnameTotalRunoff
@@ -120,7 +116,7 @@ contains
     !===============================================================
     !  Read namelist for mainpaths
     !===============================================================
-    call nml_directories_mrm%read(file_namelist, unamelist)
+    call nml_directories_mrm%read(file_namelist)
     dir_Gauges = nml_directories_mrm%dir_Gauges
     dir_Total_Runoff = nml_directories_mrm%dir_Total_Runoff
     dir_Bankfull_Runoff = nml_directories_mrm%dir_Bankfull_Runoff
@@ -136,7 +132,7 @@ contains
     !===============================================================
     ! READ EVALUATION GAUGES
     !===============================================================
-    call nml_evaluation_gauges%read(file_namelist, unamelist)
+    call nml_evaluation_gauges%read(file_namelist)
     nGaugesTotal = nml_evaluation_gauges%nGaugesTotal
     NoGauges_domain = nml_evaluation_gauges%NoGauges_domain
     Gauge_id = nml_evaluation_gauges%Gauge_id
@@ -220,7 +216,7 @@ contains
     ! Read inflow gauge information
     !===============================================================
 
-    call nml_inflow_gauges%read(file_namelist, unamelist)
+    call nml_inflow_gauges%read(file_namelist)
     nInflowGaugesTotal = nml_inflow_gauges%nInflowGaugesTotal
     NoInflowGauges_domain = nml_inflow_gauges%NoInflowGauges_domain
     InflowGauge_id = nml_inflow_gauges%InflowGauge_id
@@ -300,12 +296,12 @@ contains
     !===============================================================
     ! Read namelist global parameters
     !===============================================================
-    call read_mrm_routing_params(processMatrix(8, 1), file_namelist_param, unamelist_param)
+    call read_mrm_routing_params(processMatrix(8, 1), file_namelist_param)
 
     !===============================================================
     ! Read Output specifications for mRM
     !===============================================================
-    call nml_mrm_outputs%read(file_defOutput, udefOutput)
+    call nml_mrm_outputs%read(file_defOutput)
     output_deflate_level_mrm = nml_mrm_outputs%output_deflate_level_mrm
     output_double_precision_mrm = nml_mrm_outputs%output_double_precision_mrm
     output_time_reference_mrm = nml_mrm_outputs%output_time_reference_mrm
@@ -363,7 +359,6 @@ contains
   !    INTENT(IN)
   !>       \param[in] "integer(i4) :: processCase"          it is the default case, should be one
   !>       \param[in] "character(*) :: file_namelist_param" file name containing parameter namelist
-  !>       \param[in] "integer(i4) :: unamelist_param"      file name id containing parameter namelist
 
   !    HISTORY
   !>       \authors Robert Schweppe
@@ -372,7 +367,7 @@ contains
 
   ! Modifications:
 
-  subroutine read_mrm_routing_params(processCase, file_namelist_param, unamelist_param)
+  subroutine read_mrm_routing_params(processCase, file_namelist_param)
 
     use mo_common_constants, only : nColPars
     use mo_common_functions, only : in_bound
@@ -391,9 +386,6 @@ contains
     ! file name containing parameter namelist
     character(*), intent(in) :: file_namelist_param
 
-    ! file name id containing parameter namelist
-    integer(i4), intent(in) :: unamelist_param
-
     ! equals sum of previous parameters
     integer(i4) :: start_index
 
@@ -407,17 +399,17 @@ contains
     real(dp), dimension(nColPars) :: slope_factor
 
     if (processCase .eq. 1_i4) then
-      call nml_routing1%read(file_namelist_param, unamelist_param)
+      call nml_routing1%read(file_namelist_param)
       muskingumTravelTime_constant = nml_routing1%muskingumTravelTime_constant
       muskingumTravelTime_riverLength = nml_routing1%muskingumTravelTime_riverLength
       muskingumTravelTime_riverSlope = nml_routing1%muskingumTravelTime_riverSlope
       muskingumTravelTime_impervious = nml_routing1%muskingumTravelTime_impervious
       muskingumAttenuation_riverSlope = nml_routing1%muskingumAttenuation_riverSlope
     else if (processCase .eq. 2_i4) then
-      call nml_routing2%read(file_namelist_param, unamelist_param)
+      call nml_routing2%read(file_namelist_param)
       streamflow_celerity = nml_routing2%streamflow_celerity
     else if (processCase .eq. 3_i4) then
-      call nml_routing3%read(file_namelist_param, unamelist_param)
+      call nml_routing3%read(file_namelist_param)
       slope_factor = nml_routing3%slope_factor
     end if
 

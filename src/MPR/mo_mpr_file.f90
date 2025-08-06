@@ -21,12 +21,8 @@ MODULE mo_mpr_file
   CHARACTER(len = *), PARAMETER :: file_main = 'mpr_driver.f90'              ! Driver
   !> Namelist file name
   CHARACTER(len = *), PARAMETER :: file_namelist_mpr = 'mpr.nml'                     ! Namelist
-  !> Unit for namelist
-  INTEGER, PARAMETER :: unamelist_mpr = 80                            ! set different from mhm
   !> Parameter namelists file name
   CHARACTER(len = *), PARAMETER :: file_namelist_mpr_param = 'mpr_parameter.nml'           ! Parameter namelists
-  !> Unit for namelist
-  INTEGER, PARAMETER :: unamelist_mpr_param = 31                            !
 
 
   !> Soil database file (iFlag_soilDB = 0) = classical mHM format

@@ -240,7 +240,7 @@ contains
   end subroutine clean_up
 
   !> \brief configure the \ref meteo_handler_type class from the mhm namelist
-  subroutine config(self, file_namelist, unamelist, optimize, domainMeta, processMatrix, timeStep, couple_cfg)
+  subroutine config(self, file_namelist, optimize, domainMeta, processMatrix, timeStep, couple_cfg)
 
     use mo_common_constants, only : maxNoDomains, nodata_i4
     use mo_common_types, only : domain_meta
@@ -251,7 +251,6 @@ contains
 
     class(meteo_handler_type), intent(inout) :: self
     character(*), intent(in) :: file_namelist !< mhm namelist file
-    integer, intent(in) :: unamelist !< unit to open namelist file
     logical, intent(in) :: optimize !< Optimization flag
     type(domain_meta), intent(in) :: domainMeta !< domain general description
     integer(i4), dimension(nProcesses, 3), intent(in) :: processMatrix !< Info about which process runs in which option
@@ -311,7 +310,7 @@ contains
     !  Read namelist main directories
     !===============================================================
 
-    call nml_directories_mHM%read(file_namelist, unamelist)
+    call nml_directories_mHM%read(file_namelist)
     self%bound_error = nml_directories_mhm%bound_error
     self%inputFormat_meteo_forcings = nml_directories_mhm%inputFormat_meteo_forcings
     dir_meteo_header = nml_directories_mhm%dir_meteo_header
@@ -360,7 +359,7 @@ contains
     ! Read night-day ratios and pan evaporation
     !===============================================================
 
-    call nml_nightDayRatio%read(file_namelist, unamelist)
+    call nml_nightDayRatio%read(file_namelist)
     self%read_meteo_weights = nml_nightDayRatio%read_meteo_weights
     self%fnight_prec = nml_nightDayRatio%fnight_prec
     self%fnight_pet = nml_nightDayRatio%fnight_pet

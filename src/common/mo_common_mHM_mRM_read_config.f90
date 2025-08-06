@@ -31,7 +31,7 @@ CONTAINS
   !!   - added nTStepForcingDay
   !> \authors Matthias Zink
   !> \date Dec 2012
-  subroutine common_mHM_mRM_read_config(file_namelist, unamelist)
+  subroutine common_mHM_mRM_read_config(file_namelist)
 
     use mo_namelists, only : &
       nml_mainconfig_mhm_mrm, &
@@ -55,7 +55,6 @@ CONTAINS
     implicit none
 
     character(*), intent(in) :: file_namelist !< namelist file name
-    integer, intent(in) :: unamelist !< unit to open namelist file
 
     integer(i4) :: jday
 
@@ -73,7 +72,7 @@ CONTAINS
     !===============================================================
     !  Read namelist specifying the model configuration
     !===============================================================
-    call nml_mainconfig_mhm_mrm%read(file_namelist, unamelist)
+    call nml_mainconfig_mhm_mrm%read(file_namelist)
     timestep = nml_mainconfig_mhm_mrm%timestep
     resolution_Routing = nml_mainconfig_mhm_mrm%resolution_Routing
     optimize = nml_mainconfig_mhm_mrm%optimize
@@ -137,7 +136,7 @@ CONTAINS
     !===============================================================
     !  read simulation time periods incl. warming days
     !===============================================================
-    call nml_time_periods%read(file_namelist, unamelist)
+    call nml_time_periods%read(file_namelist)
     warming_Days = nml_time_periods%warming_Days
     eval_Per = nml_time_periods%eval_Per
 
@@ -187,7 +186,7 @@ CONTAINS
     !===============================================================
     ! Settings for Optimization
     !===============================================================
-    call nml_Optimization%read(file_namelist, unamelist)
+    call nml_Optimization%read(file_namelist)
     nIterations = nml_Optimization%nIterations
     seed = nml_Optimization%seed
     dds_r = nml_Optimization%dds_r

@@ -29,7 +29,7 @@ MODULE mo_mrm_init
 CONTAINS
 
   !> \brief read mRM configuration from namelists
-  subroutine mrm_configuration(file_namelist, unamelist, file_namelist_param, unamelist_param)
+  subroutine mrm_configuration(file_namelist, file_namelist_param)
     use mo_common_mHM_mRM_variables, only : mrm_coupling_mode
     use mo_common_variables, only : processMatrix
     use mo_mrm_read_config, only : mrm_read_config
@@ -40,13 +40,11 @@ CONTAINS
     implicit none
 
     character(*), intent(in) :: file_namelist !< namelist file name
-    integer, intent(in) :: unamelist !< unit to open namelist
     character(*), intent(in) :: file_namelist_param !< parameter namelist file name
-    integer, intent(in) :: unamelist_param !< unit to open parameter namelist
 
     if (mrm_coupling_mode .eq. 0_i4) then
-      call common_read_config(file_namelist, unamelist)
-      call common_mHM_mRM_read_config(file_namelist, unamelist)
+      call common_read_config(file_namelist)
+      call common_mHM_mRM_read_config(file_namelist)
       !-----------------------------------------------------------
       ! PRINT STARTUP MESSAGE
       !-----------------------------------------------------------
@@ -60,12 +58,12 @@ CONTAINS
         riv_temp_pcs%case = processMatrix(11, 1)
         call message('')
         call message('    Read config: river temperature routing')
-        call riv_temp_pcs%config(file_namelist, unamelist, file_namelist_param, unamelist_param)
+        call riv_temp_pcs%config(file_namelist, file_namelist_param)
       end if
     end if
 
     ! read config for mrm, readlatlon is set here depending on whether output is needed
-    call mrm_read_config(file_namelist, unamelist, file_namelist_param, unamelist_param, (mrm_coupling_mode .eq. 0_i4))
+    call mrm_read_config(file_namelist, file_namelist_param, (mrm_coupling_mode .eq. 0_i4))
 
     ! this was moved here, because it depends on global_parameters that are only set in mrm_read_config
     if (mrm_coupling_mode .eq. 0_i4) then
@@ -98,7 +96,7 @@ CONTAINS
   !!   - added init of level0 in case of read restart
   !> \authors Stephan Thober
   !> \date Aug 2015
-  subroutine mrm_init(file_namelist, unamelist, file_namelist_param, unamelist_param)
+  subroutine mrm_init(file_namelist, file_namelist_param)
 
     use mo_common_constants, only : nodata_dp, nodata_i4
     use mo_common_mHM_mRM_variables, only : mrmFileRestartIn, mrm_coupling_mode, mrm_read_river_network, &
@@ -127,9 +125,7 @@ CONTAINS
     implicit none
 
     character(*), intent(in) :: file_namelist !< namelist file name
-    integer, intent(in) :: unamelist !< unit to open namelist
     character(*), intent(in) :: file_namelist_param !< parameter namelist file name
-    integer, intent(in) :: unamelist_param !< unit to open parameter namelist
 
     ! start and end index for routing parameters
     integer(i4) :: iStart, iEnd

@@ -8,7 +8,7 @@
 module mo_namelists
 
   use mo_kind, only : i4, i8, dp
-  use mo_nml, only : open_nml, close_nml, position_nml
+  use mo_nml, only : position_nml
   use mo_constants, only : YearMonths
   use mo_mhm_constants, only : nOutFlxState
   use mo_common_constants, only : maxNLcovers, maxNoDomains, nColPars, nodata_dp, nodata_i4
@@ -380,7 +380,7 @@ module mo_namelists
   !> \class   nml_baseflow_config_t
   !> \brief   'baseflow_config' namelist content
   type, public :: nml_baseflow_config_t
-    character(10) :: name = "baseflow_config" !< namelist name
+    character(15) :: name = "baseflow_config" !< namelist name
     logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
     logical :: BFI_calc !< calculate observed BFI from gauges with Eckhardt filter
     real(dp), dimension(maxNoDomains) :: BFI_obs !< given base-flow index per domain
@@ -1204,15 +1204,77 @@ contains
   !> 'config_riv_temp' namelist content
   type(nml_config_riv_temp_t), public :: nml_config_riv_temp
 
+  !######## mo_coupling_type
+  ! namelist /coupling/ &
+  !   case, &
+  !   meteo_timestep, &
+  !   meteo_time_ref_endpoint, &
+  !   meteo_expect_pre, &
+  !   meteo_expect_temp, &
+  !   meteo_expect_pet, &
+  !   meteo_expect_tmin, &
+  !   meteo_expect_tmax, &
+  !   meteo_expect_netrad, &
+  !   meteo_expect_absvappress, &
+  !   meteo_expect_windspeed, &
+  !   meteo_expect_ssrd, &
+  !   meteo_expect_strd, &
+  !   meteo_expect_tann
+  !
+  !> \class   nml_coupling_t
+  !> \brief   'coupling' namelist content
+  type, public :: nml_coupling_t
+    character(8) :: name = "coupling" !< namelist name
+    logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
+    integer(i4) :: case !< coupling case
+    integer(i4) :: meteo_timestep !< timestep for meteo-data from coupling
+    logical :: meteo_time_ref_endpoint !< expect meteo has time reference point at end of associated time interval
+    logical :: meteo_expect_pre !< expect meteo from coupling: [mm]      Precipitation
+    logical :: meteo_expect_temp !< expect meteo from coupling: [degC]    Air temperature
+    logical :: meteo_expect_pet !< expect meteo from coupling: [mm TS-1] Potential evapotranspiration
+    logical :: meteo_expect_tmin !< expect meteo from coupling: [degC]    minimum daily air temperature
+    logical :: meteo_expect_tmax !< expect meteo from coupling: [degC]    maximum daily air temperature
+    logical :: meteo_expect_netrad !< expect meteo from coupling: [W m2]    net radiation
+    logical :: meteo_expect_absvappress !< expect meteo from coupling: [Pa]      absolute vapour pressure
+    logical :: meteo_expect_windspeed !< expect meteo from coupling: [m s-1]   windspeed
+    logical :: meteo_expect_ssrd !< expect meteo from coupling: [W m2]    short wave radiation
+    logical :: meteo_expect_strd !< expect meteo from coupling: [W m2]    long wave radiation
+    logical :: meteo_expect_tann !< expect meteo from coupling: [degC]    annual mean air temperature
+  contains
+    !> \copydoc mo_namelists::read_coupling
+    procedure, public :: read => read_coupling !< \see mo_namelists::read_coupling
+  end type nml_coupling_t
+  !> 'coupling' namelist content
+  type(nml_coupling_t), public :: nml_coupling
+
 contains
 
+  !> \brief Open namelist file and generate a new unit.
+  subroutine open_new_nml(file, unit)
+    use mo_message, only: error_message
+    character(len = *), intent(in) :: file
+    integer, intent(out) :: unit
+    integer :: stat
+    open(newunit=unit, file=file, iostat=stat, status='old', action='read', delim='apostrophe')
+    if (stat .ne. 0) call error_message('open_new_nml: could not open namelist file ', trim(file))
+  end subroutine open_new_nml
+
+  !> \brief Close namelist file.
+  subroutine close_nml(unit)
+    use mo_message, only: error_message
+    integer, intent(in) :: unit
+    integer :: stat
+    close(unit, iostat=stat)
+    if (stat .ne. 0) call error_message('close_nml: could not close namelist file.')
+  end subroutine close_nml
+
   !> \brief Read 'project_description' namelist content.
-  subroutine read_project_description(self, file, unit)
+  subroutine read_project_description(self, file)
     implicit none
     class(nml_project_description_t), intent(inout) :: self
     character(*), intent(in) :: file !< file containing the namelist
-    integer, intent(in) :: unit !< file unit to open the given file
 
+    integer :: unit !< file unit to open the given file
     character(1024) :: project_details !< project including funding instituion., PI, etc.
     character(1024) :: setup_description !< any specific description of simulation
     character(1024) :: simulation_type !< e.g. seasonal forecast, climate projection, ...
@@ -1231,7 +1293,7 @@ contains
       history
 
     if ( self%read_from_file ) then
-      call open_nml(file, unit, quiet=.true.)
+      call open_new_nml(file, unit)
       call position_nml(self%name, unit)
       read(unit, nml=project_description)
       call close_nml(unit)
@@ -1247,12 +1309,12 @@ contains
   end subroutine read_project_description
 
   !> \brief Read 'directories_general' namelist content.
-  subroutine read_directories_general(self, file, unit)
+  subroutine read_directories_general(self, file)
     implicit none
     class(nml_directories_general_t), intent(inout) :: self
     character(*), intent(in) :: file !< file containing the namelist
-    integer, intent(in) :: unit !< file unit to open the given file
 
+    integer :: unit !< file unit to open the given file
     character(256) :: dirConfigOut !< directory for config file output
     character(256) :: dirCommonFiles !< directory where common input files should be located
     character(256), dimension(maxNoDomains) :: mhm_file_RestartOut !< Directory where mhm output of restart is written
@@ -1273,7 +1335,7 @@ contains
       file_LatLon
 
     if ( self%read_from_file ) then
-      call open_nml(file, unit, quiet=.true.)
+      call open_new_nml(file, unit)
       call position_nml(self%name, unit)
       read(unit, nml=directories_general)
       call close_nml(unit)
@@ -1290,12 +1352,12 @@ contains
   end subroutine read_directories_general
 
   !> \brief Read 'mainconfig' namelist content.
-  subroutine read_mainconfig(self, file, unit)
+  subroutine read_mainconfig(self, file)
     implicit none
     class(nml_mainconfig_t), intent(inout) :: self
     character(*), intent(in) :: file !< file containing the namelist
-    integer, intent(in) :: unit !< file unit to open the given file
 
+    integer :: unit !< file unit to open the given file
     integer(i4) :: iFlag_cordinate_sys !< options model for the run cordinate system
     real(dp), dimension(maxNoDomains) :: resolution_Hydrology !< [m or degree] resolution of hydrology - Level 1
     integer(i4) :: nDomains !< number of domains
@@ -1312,7 +1374,7 @@ contains
       read_opt_domain_data
 
     if ( self%read_from_file ) then
-      call open_nml(file, unit, quiet=.true.)
+      call open_new_nml(file, unit)
       call position_nml(self%name, unit)
       read(unit, nml=mainconfig)
       call close_nml(unit)
@@ -1327,12 +1389,12 @@ contains
   end subroutine read_mainconfig
 
   !> \brief Read 'processSelection' namelist content.
-  subroutine read_processSelection(self, file, unit)
+  subroutine read_processSelection(self, file)
     implicit none
     class(nml_processSelection_t), intent(inout) :: self
     character(*), intent(in) :: file !< file containing the namelist
-    integer, intent(in) :: unit !< file unit to open the given file
 
+    integer :: unit !< file unit to open the given file
     integer(i4), dimension(nProcesses) :: processCase !< ! Choosen process description number
 
     namelist /processSelection/ &
@@ -1342,7 +1404,7 @@ contains
       ! init the processCase matrix to 0 to be backward compatible
       ! if cases were added later (then there would be no values if not init here)
       processCase = 0_i4
-      call open_nml(file, unit, quiet=.true.)
+      call open_new_nml(file, unit)
       call position_nml(self%name, unit)
       read(unit, nml=processSelection)
       call close_nml(unit)
@@ -1352,12 +1414,12 @@ contains
   end subroutine read_processSelection
 
   !> \brief Read 'LCover' namelist content.
-  subroutine read_LCover(self, file, unit)
+  subroutine read_LCover(self, file)
     implicit none
     class(nml_LCover_t), intent(inout) :: self
     character(*), intent(in) :: file !< file containing the namelist
-    integer, intent(in) :: unit !< file unit to open the given file
 
+    integer :: unit !< file unit to open the given file
     integer(i4) :: nLCoverScene !< Number of land cover scene (lcs)
     integer(i4), dimension(maxNLCovers) :: LCoverYearStart !< starting year LCover
     integer(i4), dimension(maxNLCovers) :: LCoverYearEnd !< ending year LCover
@@ -1370,7 +1432,7 @@ contains
       LCoverfName
 
     if ( self%read_from_file ) then
-      call open_nml(file, unit, quiet=.true.)
+      call open_new_nml(file, unit)
       call position_nml(self%name, unit)
       read(unit, nml=LCover)
       call close_nml(unit)
@@ -1383,12 +1445,12 @@ contains
   end subroutine read_LCover
 
   !> \brief Read 'mainconfig_mhm_mrm' namelist content.
-  subroutine read_mainconfig_mhm_mrm(self, file, unit)
+  subroutine read_mainconfig_mhm_mrm(self, file)
     implicit none
     class(nml_mainconfig_mhm_mrm_t), intent(inout) :: self
     character(*), intent(in) :: file !< file containing the namelist
-    integer, intent(in) :: unit !< file unit to open the given file
 
+    integer :: unit !< file unit to open the given file
     integer(i4) :: timeStep !< [h] simulation time step (= TS) in [h] either 1, 2, 3, 4, 6, 12 or 24
     real(dp), dimension(maxNoDomains) :: resolution_Routing !< resolution of Level-11 discharge routing [m or degree] per domain
     logical :: optimize !< Optimization (.true.) or Evaluation run (.false.)
@@ -1421,7 +1483,7 @@ contains
       mrm_read_river_network = .false.
       read_old_style_restart_bounds = .false.
       restart_reset_fluxes_states = .false.
-      call open_nml(file, unit, quiet=.true.)
+      call open_new_nml(file, unit)
       call position_nml(self%name, unit)
       read(unit, nml=mainconfig_mhm_mrm)
       call close_nml(unit)
@@ -1442,12 +1504,12 @@ contains
   end subroutine read_mainconfig_mhm_mrm
 
   !> \brief Read 'optimization' namelist content.
-  subroutine read_optimization(self, file, unit)
+  subroutine read_optimization(self, file)
     implicit none
     class(nml_optimization_t), intent(inout) :: self
     character(*), intent(in) :: file !< file containing the namelist
-    integer, intent(in) :: unit !< file unit to open the given file
 
+    integer :: unit !< file unit to open the given file
     integer(i4) :: nIterations !< number of iterations for optimization
     integer(i8) :: seed !< seed used for optimization, default: -9 --> system time
     real(dp) :: dds_r !< DDS: perturbation rate, default: 0.2
@@ -1470,7 +1532,7 @@ contains
       mcmc_error_params
 
     if ( self%read_from_file ) then
-      call open_nml(file, unit, quiet=.true.)
+      call open_new_nml(file, unit)
       call position_nml(self%name, unit)
       read(unit, nml=optimization)
       call close_nml(unit)
@@ -1488,12 +1550,12 @@ contains
   end subroutine read_optimization
 
   !> \brief Read 'time_periods' namelist content.
-  subroutine read_time_periods(self, file, unit)
+  subroutine read_time_periods(self, file)
     implicit none
     class(nml_time_periods_t), intent(inout) :: self
     character(*), intent(in) :: file !< file containing the namelist
-    integer, intent(in) :: unit !< file unit to open the given file
 
+    integer :: unit !< file unit to open the given file
     integer(i4), dimension(maxNoDomains) :: warming_Days !< number of days for warm up period
     type(period), dimension(maxNoDomains) :: eval_Per !< time period for model evaluation
 
@@ -1502,7 +1564,7 @@ contains
       eval_Per
 
       if ( self%read_from_file ) then
-      call open_nml(file, unit, quiet=.true.)
+      call open_new_nml(file, unit)
       call position_nml(self%name, unit)
       read(unit, nml=time_periods)
       call close_nml(unit)
@@ -1513,12 +1575,12 @@ contains
   end subroutine read_time_periods
 
   !> \brief Read 'directories_mhm' namelist content.
-  subroutine read_directories_mhm(self, file, unit)
+  subroutine read_directories_mhm(self, file)
     implicit none
     class(nml_directories_mhm_t), intent(inout) :: self
     character(*), intent(in) :: file !< file containing the namelist
-    integer, intent(in) :: unit !< file unit to open the given file
 
+    integer :: unit !< file unit to open the given file
     character(256) :: inputFormat_meteo_forcings !< format of meteo input data (nc)
     !> .FALSE. to only warn about bound (lower, upper) violations in meteo files, default = .TRUE. - raise an error
     logical :: bound_error
@@ -1553,7 +1615,7 @@ contains
       call set_sentinel(dir_meteo_header) ! set sentinal to check reading
       inputFormat_meteo_forcings = "nc"
       bound_error = .TRUE.
-      call open_nml(file, unit, quiet=.true.)
+      call open_new_nml(file, unit)
       call position_nml(self%name, unit)
       read(unit, nml=directories_mhm)
       call close_nml(unit)
@@ -1575,12 +1637,12 @@ contains
   end subroutine read_directories_mhm
 
   !> \brief Read 'optional_data' namelist content.
-  subroutine read_optional_data(self, file, unit)
+  subroutine read_optional_data(self, file)
     implicit none
     class(nml_optional_data_t), intent(inout) :: self
     character(*), intent(in) :: file !< file containing the namelist
-    integer, intent(in) :: unit !< file unit to open the given file
 
+    integer :: unit !< file unit to open the given file
     integer(i4) :: nSoilHorizons_sm_input !< No. of mhm soil horizons equivalent to sm input
     character(256), dimension(maxNoDomains) :: dir_soil_moisture !< soil moisture input
     character(256), dimension(maxNoDomains) :: dir_neutrons !< ground albedo neutron input
@@ -1603,7 +1665,7 @@ contains
       timeStep_tws_input
 
     if ( self%read_from_file ) then
-      call open_nml(file, unit, quiet=.true.)
+      call open_new_nml(file, unit)
       call position_nml(self%name, unit)
       read(unit, nml=optional_data)
       call close_nml(unit)
@@ -1621,19 +1683,19 @@ contains
   end subroutine read_optional_data
 
   !> \brief Read 'panevapo' namelist content.
-  subroutine read_panevapo(self, file, unit)
+  subroutine read_panevapo(self, file)
     implicit none
     class(nml_panevapo_t), intent(inout) :: self
     character(*), intent(in) :: file !< file containing the namelist
-    integer, intent(in) :: unit !< file unit to open the given file
 
+    integer :: unit !< file unit to open the given file
     real(dp), dimension(int(YearMonths, i4)) :: evap_coeff !< [-] Evap. coef. for free-water surfaces
 
     namelist /panevapo/ &
       evap_coeff
 
     if ( self%read_from_file ) then
-      call open_nml(file, unit, quiet=.true.)
+      call open_new_nml(file, unit)
       call position_nml(self%name, unit)
       read(unit, nml=panevapo)
       call close_nml(unit)
@@ -1643,12 +1705,12 @@ contains
   end subroutine read_panevapo
 
   !> \brief Read 'nightdayratio' namelist content.
-  subroutine read_nightdayratio(self, file, unit)
+  subroutine read_nightdayratio(self, file)
     implicit none
     class(nml_nightdayratio_t), intent(inout) :: self
     character(*), intent(in) :: file !< file containing the namelist
-    integer, intent(in) :: unit !< file unit to open the given file
 
+    integer :: unit !< file unit to open the given file
     logical :: read_meteo_weights !< read weights for meteo data
     real(dp), dimension(int(YearMonths, i4)) :: fnight_prec !< [-] Night ratio precipitation < 1
     real(dp), dimension(int(YearMonths, i4)) :: fnight_pet !< [-] Night ratio PET  < 1
@@ -1668,7 +1730,7 @@ contains
       ! default values for long/shortwave rad.
       fnight_ssrd = 0.0_dp
       fnight_strd = 0.45_dp
-      call open_nml(file, unit, quiet=.true.)
+      call open_new_nml(file, unit)
       call position_nml(self%name, unit)
       read(unit, nml=nightdayratio)
       call close_nml(unit)
@@ -1683,12 +1745,12 @@ contains
   end subroutine read_nightdayratio
 
   !> \brief Read 'nloutputresults' namelist content.
-  subroutine read_nloutputresults(self, file, unit)
+  subroutine read_nloutputresults(self, file)
     implicit none
     class(nml_nloutputresults_t), intent(inout) :: self
     character(*), intent(in) :: file !< file containing the namelist
-    integer, intent(in) :: unit !< file unit to open the given file
 
+    integer :: unit !< file unit to open the given file
     integer(i4) :: output_deflate_level !< deflate level in nc files
     logical :: output_double_precision !< output precision in nc files
     integer(i4) :: output_time_reference !< time reference point location in output nc files
@@ -1708,7 +1770,7 @@ contains
       output_double_precision = .true.
       output_time_reference = 0
       outputFlxState = .FALSE.
-      call open_nml(file, unit, quiet=.true.)
+      call open_new_nml(file, unit)
       call position_nml(self%name, unit)
       read(unit, nml=nloutputresults)
       call close_nml(unit)
@@ -1722,12 +1784,12 @@ contains
   end subroutine read_nloutputresults
 
   !> \brief Read 'baseflow_config' namelist content.
-  subroutine read_baseflow_config(self, file, unit)
+  subroutine read_baseflow_config(self, file)
     implicit none
     class(nml_baseflow_config_t), intent(inout) :: self
     character(*), intent(in) :: file !< file containing the namelist
-    integer, intent(in) :: unit !< file unit to open the given file
 
+    integer :: unit !< file unit to open the given file
     logical :: BFI_calc !< calculate observed BFI from gauges with Eckhardt filter
     real(dp), dimension(maxNoDomains) :: BFI_obs !< given base-flow index per domain
 
@@ -1738,7 +1800,7 @@ contains
     if ( self%read_from_file ) then
       BFI_calc = .false. ! default value
       BFI_obs = -1.0_dp  ! negative value to flag missing values
-      call open_nml(file, unit, quiet=.true.)
+      call open_new_nml(file, unit)
       call position_nml(self%name, unit)
       read(unit, nml=baseflow_config)
       call close_nml(unit)
@@ -1749,19 +1811,19 @@ contains
   end subroutine read_baseflow_config
 
   !> \brief Read 'directories_mpr' namelist content.
-  subroutine read_directories_mpr(self, file, unit)
+  subroutine read_directories_mpr(self, file)
     implicit none
     class(nml_directories_mpr_t), intent(inout) :: self
     character(*), intent(in) :: file !< file containing the namelist
-    integer, intent(in) :: unit !< file unit to open the given file
 
+    integer :: unit !< file unit to open the given file
     character(256), dimension(maxNoDomains) :: dir_gridded_LAI !< directory of gridded LAI data, used when timeStep_LAI_input<0
 
     namelist /directories_mpr/ &
       dir_gridded_LAI
 
     if ( self%read_from_file ) then
-      call open_nml(file, unit, quiet=.true.)
+      call open_new_nml(file, unit)
       call position_nml(self%name, unit)
       read(unit, nml=directories_mpr)
       call close_nml(unit)
@@ -1771,12 +1833,12 @@ contains
   end subroutine read_directories_mpr
 
   !> \brief Read 'soildata' namelist content.
-  subroutine read_soildata(self, file, unit)
+  subroutine read_soildata(self, file)
     implicit none
     class(nml_soildata_t), intent(inout) :: self
     character(*), intent(in) :: file !< file containing the namelist
-    integer, intent(in) :: unit !< file unit to open the given file
 
+    integer :: unit !< file unit to open the given file
     integer(i4) :: iFlag_soilDB !< options to handle different soil databases
     real(dp) :: tillageDepth !< [mm] Soil depth down to which organic
     integer(i4) :: nSoilHorizons_mHM !< Number of horizons to model
@@ -1790,7 +1852,7 @@ contains
 
     if ( self%read_from_file ) then
       soil_Depth = 0.0_dp ! default soil depth
-      call open_nml(file, unit, quiet=.true.)
+      call open_new_nml(file, unit)
       call position_nml(self%name, unit)
       read(unit, nml=soildata)
       call close_nml(unit)
@@ -1803,12 +1865,12 @@ contains
   end subroutine read_soildata
 
   !> \brief Read 'lai_data_information' namelist content.
-  subroutine read_lai_data_information(self, file, unit)
+  subroutine read_lai_data_information(self, file)
     implicit none
     class(nml_lai_data_information_t), intent(inout) :: self
     character(*), intent(in) :: file !< file containing the namelist
-    integer, intent(in) :: unit !< file unit to open the given file
 
+    integer :: unit !< file unit to open the given file
     character(256) :: inputFormat_gridded_LAI !< format of gridded LAI data (nc only)
     integer(i4) :: timeStep_LAI_input !< time step of gridded LAI input
 
@@ -1817,7 +1879,7 @@ contains
       timeStep_LAI_input
 
     if ( self%read_from_file ) then
-      call open_nml(file, unit, quiet=.true.)
+      call open_new_nml(file, unit)
       call position_nml(self%name, unit)
       read(unit, nml=lai_data_information)
       call close_nml(unit)
@@ -1828,19 +1890,19 @@ contains
   end subroutine read_lai_data_information
 
   !> \brief Read 'lcover_mpr' namelist content.
-  subroutine read_lcover_mpr(self, file, unit)
+  subroutine read_lcover_mpr(self, file)
     implicit none
     class(nml_lcover_mpr_t), intent(inout) :: self
     character(*), intent(in) :: file !< file containing the namelist
-    integer, intent(in) :: unit !< file unit to open the given file
 
+    integer :: unit !< file unit to open the given file
     real(dp) :: fracSealed_cityArea !< fraction of area within city assumed to be perfectly sealed [0-1]
 
     namelist /lcover_mpr/ &
       fracSealed_cityArea
 
     if ( self%read_from_file ) then
-      call open_nml(file, unit, quiet=.true.)
+      call open_new_nml(file, unit)
       call position_nml(self%name, unit)
       read(unit, nml=lcover_mpr)
       call close_nml(unit)
@@ -1850,19 +1912,19 @@ contains
   end subroutine read_lcover_mpr
 
   !> \brief Read 'interception1' namelist content.
-  subroutine read_interception1(self, file, unit)
+  subroutine read_interception1(self, file)
     implicit none
     class(nml_interception1_t), intent(inout) :: self
     character(*), intent(in) :: file !< file containing the namelist
-    integer, intent(in) :: unit !< file unit to open the given file
 
+    integer :: unit !< file unit to open the given file
     real(dp), dimension(nColPars) :: canopyInterceptionFactor !< multiplier to relate LAI to interception storage [-]
 
     namelist /interception1/ &
       canopyInterceptionFactor
 
     if ( self%read_from_file ) then
-      call open_nml(file, unit, quiet=.true.)
+      call open_new_nml(file, unit)
       call position_nml(self%name, unit)
       read(unit, nml=interception1)
       call close_nml(unit)
@@ -1872,12 +1934,12 @@ contains
   end subroutine read_interception1
 
   !> \brief Read 'snow1' namelist content.
-  subroutine read_snow1(self, file, unit)
+  subroutine read_snow1(self, file)
     implicit none
     class(nml_snow1_t), intent(inout) :: self
     character(*), intent(in) :: file !< file containing the namelist
-    integer, intent(in) :: unit !< file unit to open the given file
 
+    integer :: unit !< file unit to open the given file
     real(dp), dimension(nColPars) :: snowTreshholdTemperature !< Threshold for rain/snow partitioning [degC]
     real(dp), dimension(nColPars) :: degreeDayFactor_forest !< forest: deg day factors to determine melting flux [m degC-1]
     real(dp), dimension(nColPars) :: degreeDayFactor_impervious !< impervious: deg day factors to determine melting flux [m degC-1]
@@ -1898,7 +1960,7 @@ contains
       maxDegreeDayFactor_pervious
 
     if ( self%read_from_file ) then
-      call open_nml(file, unit, quiet=.true.)
+      call open_new_nml(file, unit)
       call position_nml(self%name, unit)
       read(unit, nml=snow1)
       call close_nml(unit)
@@ -1915,12 +1977,12 @@ contains
   end subroutine read_snow1
 
   !> \brief Read 'soilmoisture1' namelist content.
-  subroutine read_soilmoisture1(self, file, unit)
+  subroutine read_soilmoisture1(self, file)
     implicit none
     class(nml_soilmoisture1_t), intent(inout) :: self
     character(*), intent(in) :: file !< file containing the namelist
-    integer, intent(in) :: unit !< file unit to open the given file
 
+    integer :: unit !< file unit to open the given file
     real(dp), dimension(nColPars) :: orgMatterContent_forest !< organic matter content [%] for forest
     real(dp), dimension(nColPars) :: orgMatterContent_impervious !< organic matter content [%] for impervious
     real(dp), dimension(nColPars) :: orgMatterContent_pervious !< organic matter content [%] for pervious
@@ -1966,7 +2028,7 @@ contains
       infiltrationShapeFactor
 
     if ( self%read_from_file ) then
-      call open_nml(file, unit, quiet=.true.)
+      call open_new_nml(file, unit)
       call position_nml(self%name, unit)
       read(unit, nml=soilmoisture1)
       call close_nml(unit)
@@ -1992,12 +2054,12 @@ contains
   end subroutine read_soilmoisture1
 
   !> \brief Read 'soilmoisture2' namelist content.
-  subroutine read_soilmoisture2(self, file, unit)
+  subroutine read_soilmoisture2(self, file)
     implicit none
     class(nml_soilmoisture2_t), intent(inout) :: self
     character(*), intent(in) :: file !< file containing the namelist
-    integer, intent(in) :: unit !< file unit to open the given file
 
+    integer :: unit !< file unit to open the given file
     real(dp), dimension(nColPars) :: orgMatterContent_forest !< organic matter content [%] for forest
     real(dp), dimension(nColPars) :: orgMatterContent_impervious !< organic matter content [%] for impervious
     real(dp), dimension(nColPars) :: orgMatterContent_pervious !< organic matter content [%] for pervious
@@ -2045,7 +2107,7 @@ contains
       jarvis_sm_threshold_c1
 
     if ( self%read_from_file ) then
-      call open_nml(file, unit, quiet=.true.)
+      call open_new_nml(file, unit)
       call position_nml(self%name, unit)
       read(unit, nml=soilmoisture2)
       call close_nml(unit)
@@ -2072,12 +2134,12 @@ contains
   end subroutine read_soilmoisture2
 
   !> \brief Read 'soilmoisture3' namelist content.
-  subroutine read_soilmoisture3(self, file, unit)
+  subroutine read_soilmoisture3(self, file)
     implicit none
     class(nml_soilmoisture3_t), intent(inout) :: self
     character(*), intent(in) :: file !< file containing the namelist
-    integer, intent(in) :: unit !< file unit to open the given file
 
+    integer :: unit !< file unit to open the given file
     real(dp), dimension(nColPars) :: orgMatterContent_forest !< organic matter content [%] for forest
     real(dp), dimension(nColPars) :: orgMatterContent_impervious !< organic matter content [%] for impervious
     real(dp), dimension(nColPars) :: orgMatterContent_pervious !< organic matter content [%] for pervious
@@ -2133,7 +2195,7 @@ contains
       jarvis_sm_threshold_c1
 
     if ( self%read_from_file ) then
-      call open_nml(file, unit, quiet=.true.)
+      call open_new_nml(file, unit)
       call position_nml(self%name, unit)
       read(unit, nml=soilmoisture3)
       call close_nml(unit)
@@ -2164,12 +2226,12 @@ contains
   end subroutine read_soilmoisture3
 
   !> \brief Read 'soilmoisture4' namelist content.
-  subroutine read_soilmoisture4(self, file, unit)
+  subroutine read_soilmoisture4(self, file)
     implicit none
     class(nml_soilmoisture4_t), intent(inout) :: self
     character(*), intent(in) :: file !< file containing the namelist
-    integer, intent(in) :: unit !< file unit to open the given file
 
+    integer :: unit !< file unit to open the given file
     real(dp), dimension(nColPars) :: orgMatterContent_forest !< organic matter content [%] for forest
     real(dp), dimension(nColPars) :: orgMatterContent_impervious !< organic matter content [%] for impervious
     real(dp), dimension(nColPars) :: orgMatterContent_pervious !< organic matter content [%] for pervious
@@ -2223,7 +2285,7 @@ contains
       FCdelta_glob
 
     if ( self%read_from_file ) then
-      call open_nml(file, unit, quiet=.true.)
+      call open_new_nml(file, unit)
       call position_nml(self%name, unit)
       read(unit, nml=soilmoisture4)
       call close_nml(unit)
@@ -2253,19 +2315,19 @@ contains
   end subroutine read_soilmoisture4
 
   !> \brief Read 'directrunoff1' namelist content.
-  subroutine read_directrunoff1(self, file, unit)
+  subroutine read_directrunoff1(self, file)
     implicit none
     class(nml_directrunoff1_t), intent(inout) :: self
     character(*), intent(in) :: file !< file containing the namelist
-    integer, intent(in) :: unit !< file unit to open the given file
 
+    integer :: unit !< file unit to open the given file
     real(dp), dimension(nColPars) :: imperviousStorageCapacity !< direct Runoff: Sealed Area storage capacity
 
     namelist /directrunoff1/ &
       imperviousStorageCapacity
 
     if ( self%read_from_file ) then
-      call open_nml(file, unit, quiet=.true.)
+      call open_new_nml(file, unit)
       call position_nml(self%name, unit)
       read(unit, nml=directrunoff1)
       call close_nml(unit)
@@ -2275,12 +2337,12 @@ contains
   end subroutine read_directrunoff1
 
   !> \brief Read 'petminus1' namelist content.
-  subroutine read_petminus1(self, file, unit)
+  subroutine read_petminus1(self, file)
     implicit none
     class(nml_petminus1_t), intent(inout) :: self
     character(*), intent(in) :: file !< file containing the namelist
-    integer, intent(in) :: unit !< file unit to open the given file
 
+    integer :: unit !< file unit to open the given file
     real(dp), dimension(nColPars) :: PET_a_forest !< DSF=PET_a+PET_b*(1-exp(PET_c*LAI)) to correct PET as PET=DSF*PET
     real(dp), dimension(nColPars) :: PET_a_impervious !< DSF=PET_a+PET_b*(1-exp(PET_c*LAI)) to correct PET as PET=DSF*PET
     real(dp), dimension(nColPars) :: PET_a_pervious !< DSF=PET_a+PET_b*(1-exp(PET_c*LAI)) to correct PET as PET=DSF*PET
@@ -2295,7 +2357,7 @@ contains
       PET_c
 
     if ( self%read_from_file ) then
-      call open_nml(file, unit, quiet=.true.)
+      call open_new_nml(file, unit)
       call position_nml(self%name, unit)
       read(unit, nml=petminus1)
       call close_nml(unit)
@@ -2309,12 +2371,12 @@ contains
   end subroutine read_petminus1
 
   !> \brief Read 'pet0' namelist content.
-  subroutine read_pet0(self, file, unit)
+  subroutine read_pet0(self, file)
     implicit none
     class(nml_pet0_t), intent(inout) :: self
     character(*), intent(in) :: file !< file containing the namelist
-    integer, intent(in) :: unit !< file unit to open the given file
 
+    integer :: unit !< file unit to open the given file
     real(dp), dimension(nColPars) :: minCorrectionFactorPET !< minimum factor for PET correction with aspect
     real(dp), dimension(nColPars) :: maxCorrectionFactorPET !< maximum factor for PET correction with aspect
     real(dp), dimension(nColPars) :: aspectTresholdPET !< aspect threshold for PET correction with aspect
@@ -2325,7 +2387,7 @@ contains
       aspectTresholdPET
 
     if ( self%read_from_file ) then
-      call open_nml(file, unit, quiet=.true.)
+      call open_new_nml(file, unit)
       call position_nml(self%name, unit)
       read(unit, nml=pet0)
       call close_nml(unit)
@@ -2337,12 +2399,12 @@ contains
   end subroutine read_pet0
 
   !> \brief Read 'pet1' namelist content.
-  subroutine read_pet1(self, file, unit)
+  subroutine read_pet1(self, file)
     implicit none
     class(nml_pet1_t), intent(inout) :: self
     character(*), intent(in) :: file !< file containing the namelist
-    integer, intent(in) :: unit !< file unit to open the given file
 
+    integer :: unit !< file unit to open the given file
     real(dp), dimension(nColPars) :: minCorrectionFactorPET !< minimum factor for PET correction with aspect
     real(dp), dimension(nColPars) :: maxCorrectionFactorPET !< maximum factor for PET correction with aspect
     real(dp), dimension(nColPars) :: aspectTresholdPET !< aspect threshold for PET correction with aspect
@@ -2355,7 +2417,7 @@ contains
     HargreavesSamaniCoeff
 
     if ( self%read_from_file ) then
-      call open_nml(file, unit, quiet=.true.)
+      call open_new_nml(file, unit)
       call position_nml(self%name, unit)
       read(unit, nml=pet1)
       call close_nml(unit)
@@ -2368,12 +2430,12 @@ contains
   end subroutine read_pet1
 
   !> \brief Read 'pet2' namelist content.
-  subroutine read_pet2(self, file, unit)
+  subroutine read_pet2(self, file)
     implicit none
     class(nml_pet2_t), intent(inout) :: self
     character(*), intent(in) :: file !< file containing the namelist
-    integer, intent(in) :: unit !< file unit to open the given file
 
+    integer :: unit !< file unit to open the given file
     real(dp), dimension(nColPars) :: PriestleyTaylorCoeff !< Priestley-Taylor coefficient
     real(dp), dimension(nColPars) :: PriestleyTaylorLAIcorr !< Priestley-Taylor LAI correction factor
 
@@ -2382,7 +2444,7 @@ contains
       PriestleyTaylorLAIcorr
 
     if ( self%read_from_file ) then
-      call open_nml(file, unit, quiet=.true.)
+      call open_new_nml(file, unit)
       call position_nml(self%name, unit)
       read(unit, nml=pet2)
       call close_nml(unit)
@@ -2393,12 +2455,12 @@ contains
   end subroutine read_pet2
 
   !> \brief Read 'pet3' namelist content.
-  subroutine read_pet3(self, file, unit)
+  subroutine read_pet3(self, file)
     implicit none
     class(nml_pet3_t), intent(inout) :: self
     character(*), intent(in) :: file !< file containing the namelist
-    integer, intent(in) :: unit !< file unit to open the given file
 
+    integer :: unit !< file unit to open the given file
     real(dp), dimension(nColPars) :: canopyheigth_forest !< canopy height for foreset
     real(dp), dimension(nColPars) :: canopyheigth_impervious !< canopy height for impervious
     real(dp), dimension(nColPars) :: canopyheigth_pervious !< canopy height for pervious
@@ -2417,7 +2479,7 @@ contains
       stomatal_resistance
 
     if ( self%read_from_file ) then
-      call open_nml(file, unit, quiet=.true.)
+      call open_new_nml(file, unit)
       call position_nml(self%name, unit)
       read(unit, nml=pet3)
       call close_nml(unit)
@@ -2433,12 +2495,12 @@ contains
   end subroutine read_pet3
 
   !> \brief Read 'interflow1' namelist content.
-  subroutine read_interflow1(self, file, unit)
+  subroutine read_interflow1(self, file)
     implicit none
     class(nml_interflow1_t), intent(inout) :: self
     character(*), intent(in) :: file !< file containing the namelist
-    integer, intent(in) :: unit !< file unit to open the given file
 
+    integer :: unit !< file unit to open the given file
     real(dp), dimension(nColPars) :: interflowStorageCapacityFactor !< interflow storage capacity factor
     real(dp), dimension(nColPars) :: interflowRecession_slope !< multiplier for slope to derive interflow recession constant
     !> multiplier to derive fast interflow recession constant for forest
@@ -2456,7 +2518,7 @@ contains
       exponentSlowInterflow
 
     if ( self%read_from_file ) then
-      call open_nml(file, unit, quiet=.true.)
+      call open_new_nml(file, unit)
       call position_nml(self%name, unit)
       read(unit, nml=interflow1)
       call close_nml(unit)
@@ -2470,12 +2532,12 @@ contains
   end subroutine read_interflow1
 
   !> \brief Read 'percolation1' namelist content.
-  subroutine read_percolation1(self, file, unit)
+  subroutine read_percolation1(self, file)
     implicit none
     class(nml_percolation1_t), intent(inout) :: self
     character(*), intent(in) :: file !< file containing the namelist
-    integer, intent(in) :: unit !< file unit to open the given file
 
+    integer :: unit !< file unit to open the given file
     real(dp), dimension(nColPars) :: rechargeCoefficient !< recharge coefficient
     real(dp), dimension(nColPars) :: rechargeFactor_karstic !< recharge factor for karstic percolation
     real(dp), dimension(nColPars) :: gain_loss_GWreservoir_karstic !< gain loss in ground water reservoir for karstic
@@ -2486,7 +2548,7 @@ contains
       gain_loss_GWreservoir_karstic
 
     if ( self%read_from_file ) then
-      call open_nml(file, unit, quiet=.true.)
+      call open_new_nml(file, unit)
       call position_nml(self%name, unit)
       read(unit, nml=percolation1)
       call close_nml(unit)
@@ -2498,12 +2560,12 @@ contains
   end subroutine read_percolation1
 
   !> \brief Read 'neutrons1' namelist content.
-  subroutine read_neutrons1(self, file, unit)
+  subroutine read_neutrons1(self, file)
     implicit none
     class(nml_neutrons1_t), intent(inout) :: self
     character(*), intent(in) :: file !< file containing the namelist
-    integer, intent(in) :: unit !< file unit to open the given file
 
+    integer :: unit !< file unit to open the given file
     real(dp), dimension(nColPars) :: Desilets_N0 !< Desilets N0 parameter
     real(dp), dimension(nColPars) :: Desilets_LW0 !< Desilets LW0 parameter
     real(dp), dimension(nColPars) :: Desilets_LW1 !< Desilets LW1 parameter
@@ -2514,7 +2576,7 @@ contains
       Desilets_LW1
 
     if ( self%read_from_file ) then
-      call open_nml(file, unit, quiet=.true.)
+      call open_new_nml(file, unit)
       call position_nml(self%name, unit)
       read(unit, nml=neutrons1)
       call close_nml(unit)
@@ -2526,12 +2588,12 @@ contains
   end subroutine read_neutrons1
 
   !> \brief Read 'neutrons2' namelist content.
-  subroutine read_neutrons2(self, file, unit)
+  subroutine read_neutrons2(self, file)
     implicit none
     class(nml_neutrons2_t), intent(inout) :: self
     character(*), intent(in) :: file !< file containing the namelist
-    integer, intent(in) :: unit !< file unit to open the given file
 
+    integer :: unit !< file unit to open the given file
     real(dp), dimension(nColPars) :: COSMIC_N0 !< cosmic N0 parameter
     real(dp), dimension(nColPars) :: COSMIC_N1 !< cosmic N1 parameter
     real(dp), dimension(nColPars) :: COSMIC_N2 !< cosmic N2 parameter
@@ -2554,7 +2616,7 @@ contains
       COSMIC_LW1
 
     if ( self%read_from_file ) then
-      call open_nml(file, unit, quiet=.true.)
+      call open_new_nml(file, unit)
       call position_nml(self%name, unit)
       read(unit, nml=neutrons2)
       call close_nml(unit)
@@ -2572,12 +2634,12 @@ contains
   end subroutine read_neutrons2
 
   !> \brief Read 'geoparameter' namelist content.
-  subroutine read_geoparameter(self, file, unit)
+  subroutine read_geoparameter(self, file)
     implicit none
     class(nml_geoparameter_t), intent(inout) :: self
     character(*), intent(in) :: file !< file containing the namelist
-    integer, intent(in) :: unit !< file unit to open the given file
 
+    integer :: unit !< file unit to open the given file
     !> geological parameters (ordering according to file 'geology_classdefinition.txt')
     real(dp), dimension(maxGeoUnit, nColPars) :: GeoParam
 
@@ -2586,7 +2648,7 @@ contains
 
     if ( self%read_from_file ) then
       GeoParam = nodata_dp
-      call open_nml(file, unit, quiet=.true.)
+      call open_new_nml(file, unit)
       call position_nml(self%name, unit)
       read(unit, nml=geoparameter)
       call close_nml(unit)
@@ -2596,12 +2658,12 @@ contains
   end subroutine read_geoparameter
 
   !> \brief Read 'mainconfig_mrm' namelist content.
-  subroutine read_mainconfig_mrm(self, file, unit)
+  subroutine read_mainconfig_mrm(self, file)
     implicit none
     class(nml_mainconfig_mrm_t), intent(inout) :: self
     character(*), intent(in) :: file !< file containing the namelist
-    integer, intent(in) :: unit !< file unit to open the given file
 
+    integer :: unit !< file unit to open the given file
     logical :: ALMA_convention !< flag for ALMA convention (see http://www.lmd.jussieu.fr/~polcher/ALMA/convention_3.html)
     character(256) :: filenameTotalRunoff !< Filename of simulated total runoff file
     character(256) :: varnameTotalRunoff !< variable name of total runoff
@@ -2618,7 +2680,7 @@ contains
       filenameTotalRunoff = 'total_runoff'
       varnameTotalRunoff = 'total_runoff'
       gw_coupling = .false.
-      call open_nml(file, unit, quiet=.true.)
+      call open_new_nml(file, unit)
       call position_nml(self%name, unit)
       read(unit, nml=mainconfig_mrm)
       call close_nml(unit)
@@ -2631,12 +2693,12 @@ contains
   end subroutine read_mainconfig_mrm
 
   !> \brief Read 'directories_mrm' namelist content.
-  subroutine read_directories_mrm(self, file, unit)
+  subroutine read_directories_mrm(self, file)
     implicit none
     class(nml_directories_mrm_t), intent(inout) :: self
     character(*), intent(in) :: file !< file containing the namelist
-    integer, intent(in) :: unit !< file unit to open the given file
 
+    integer :: unit !< file unit to open the given file
     character(256), dimension(maxNoDomains) :: dir_Gauges !< directory containing gauge time series
     character(256), dimension(maxNoDomains) :: dir_Total_Runoff !< directory where simulated runoff can be found
     character(256), dimension(maxNoDomains) :: dir_Bankfull_Runoff !< directory where runoff at bankfull conditions can be found
@@ -2647,7 +2709,7 @@ contains
       dir_Bankfull_Runoff
 
     if ( self%read_from_file ) then
-      call open_nml(file, unit, quiet=.true.)
+      call open_new_nml(file, unit)
       call position_nml(self%name, unit)
       read(unit, nml=directories_mrm)
       call close_nml(unit)
@@ -2659,12 +2721,12 @@ contains
   end subroutine read_directories_mrm
 
   !> \brief Read 'evaluation_gauges' namelist content.
-  subroutine read_evaluation_gauges(self, file, unit)
+  subroutine read_evaluation_gauges(self, file)
     implicit none
     class(nml_evaluation_gauges_t), intent(inout) :: self
     character(*), intent(in) :: file !< file containing the namelist
-    integer, intent(in) :: unit !< file unit to open the given file
 
+    integer :: unit !< file unit to open the given file
     integer(i4) :: nGaugesTotal !< Number of evaluation gauges for all domains
     integer(i4), dimension(maxNoDomains) :: NoGauges_domain !< number of gauges per domain
     integer(i4), dimension(maxNoDomains, maxNoGauges) :: Gauge_id !< gauge ID for each gauge
@@ -2681,7 +2743,7 @@ contains
       NoGauges_domain = nodata_i4
       Gauge_id = nodata_i4
       gauge_filename = num2str(nodata_i4)
-      call open_nml(file, unit, quiet=.true.)
+      call open_new_nml(file, unit)
       call position_nml(self%name, unit)
       read(unit, nml=evaluation_gauges)
       call close_nml(unit)
@@ -2694,12 +2756,12 @@ contains
   end subroutine read_evaluation_gauges
 
   !> \brief Read 'inflow_gauges' namelist content.
-  subroutine read_inflow_gauges(self, file, unit)
+  subroutine read_inflow_gauges(self, file)
     implicit none
     class(nml_inflow_gauges_t), intent(inout) :: self
     character(*), intent(in) :: file !< file containing the namelist
-    integer, intent(in) :: unit !< file unit to open the given file
 
+    integer :: unit !< file unit to open the given file
     integer(i4) :: nInflowGaugesTotal !< Number of evaluation gauges for all domains
     integer(i4), dimension(maxNoDomains) :: NoInflowGauges_domain !< number of gauges for subdomain (1)
     integer(i4), dimension(maxNoDomains, maxNoGauges) :: InflowGauge_id !< id of inflow gauge(1) for subdomain(1) --> (1,1)
@@ -2720,7 +2782,7 @@ contains
       NoInflowGauges_domain = 0
       InflowGauge_id = nodata_i4
       InflowGauge_filename = num2str(nodata_i4)
-      call open_nml(file, unit, quiet=.true.)
+      call open_new_nml(file, unit)
       call position_nml(self%name, unit)
       read(unit, nml=inflow_gauges)
       call close_nml(unit)
@@ -2734,13 +2796,13 @@ contains
   end subroutine read_inflow_gauges
 
   !> \brief Read 'mrm_outputs' namelist content.
-  subroutine read_mrm_outputs(self, file, unit)
+  subroutine read_mrm_outputs(self, file)
     use mo_message, only : message
     implicit none
     class(nml_mrm_outputs_t), intent(inout) :: self
     character(*), intent(in) :: file !< file containing the namelist
-    integer, intent(in) :: unit !< file unit to open the given file
 
+    integer :: unit !< file unit to open the given file
     integer(i4) :: output_deflate_level_mrm !< netcdf deflate level
     logical :: output_double_precision_mrm !< switch to enable double precision in netcdf
     integer(i4) :: output_time_reference_mrm !< time reference point location in output nc files
@@ -2764,7 +2826,7 @@ contains
       timeStep_model_outputs_mrm = -2
       inquire(file = file, exist = file_exists)
       if (file_exists) then
-        call open_nml(file, unit, quiet=.true.)
+        call open_new_nml(file, unit)
         call position_nml(self%name, unit)
         read(unit, nml=nloutputresults)
         call close_nml(unit)
@@ -2781,12 +2843,12 @@ contains
   end subroutine read_mrm_outputs
 
   !> \brief Read 'routing1' namelist content.
-  subroutine read_routing1(self, file, unit)
+  subroutine read_routing1(self, file)
     implicit none
     class(nml_routing1_t), intent(inout) :: self
     character(*), intent(in) :: file !< file containing the namelist
-    integer, intent(in) :: unit !< file unit to open the given file
 
+    integer :: unit !< file unit to open the given file
     real(dp), dimension(nColPars) :: muskingumTravelTime_constant !< muskingum parameter constant
     real(dp), dimension(nColPars) :: muskingumTravelTime_riverLength !< muskingum parameter river length
     real(dp), dimension(nColPars) :: muskingumTravelTime_riverSlope !< muskingum parameter river slope
@@ -2801,7 +2863,7 @@ contains
       muskingumAttenuation_riverSlope
 
     if ( self%read_from_file ) then
-      call open_nml(file, unit, quiet=.true.)
+      call open_new_nml(file, unit)
       call position_nml(self%name, unit)
       read(unit, nml=routing1)
       call close_nml(unit)
@@ -2815,18 +2877,18 @@ contains
   end subroutine read_routing1
 
   !> \brief Read 'routing2' namelist content.
-  subroutine read_routing2(self, file, unit)
+  subroutine read_routing2(self, file)
     implicit none
     class(nml_routing2_t), intent(inout) :: self
     character(*), intent(in) :: file !< file containing the namelist
-    integer, intent(in) :: unit !< file unit to open the given file
 
+    integer :: unit !< file unit to open the given file
     real(dp), dimension(nColPars) :: streamflow_celerity !< streamflow celerity
 
     namelist /routing2/ &
       streamflow_celerity
     if ( self%read_from_file ) then
-      call open_nml(file, unit, quiet=.true.)
+      call open_new_nml(file, unit)
       call position_nml(self%name, unit)
       read(unit, nml=routing2)
       call close_nml(unit)
@@ -2836,19 +2898,19 @@ contains
   end subroutine read_routing2
 
   !> \brief Read 'routing3' namelist content.
-  subroutine read_routing3(self, file, unit)
+  subroutine read_routing3(self, file)
     implicit none
     class(nml_routing3_t), intent(inout) :: self
     character(*), intent(in) :: file !< file containing the namelist
-    integer, intent(in) :: unit !< file unit to open the given file
 
+    integer :: unit !< file unit to open the given file
     real(dp), dimension(nColPars) :: slope_factor !< slope factor
 
     namelist /routing3/ &
       slope_factor
 
     if ( self%read_from_file ) then
-      call open_nml(file, unit, quiet=.true.)
+      call open_new_nml(file, unit)
       call position_nml(self%name, unit)
       read(unit, nml=routing3)
       call close_nml(unit)
@@ -2858,12 +2920,12 @@ contains
   end subroutine read_routing3
 
   !> \brief Read 'config_riv_temp' namelist content.
-  subroutine read_config_riv_temp(self, file, unit)
+  subroutine read_config_riv_temp(self, file)
     implicit none
     class(nml_config_riv_temp_t), intent(inout) :: self
     character(*), intent(in) :: file !< file containing the namelist
-    integer, intent(in) :: unit !< file unit to open the given file
 
+    integer :: unit !< file unit to open the given file
     real(dp) :: albedo_water !< albedo of open water
     real(dp) :: pt_a_water !< priestley taylor alpha parameter for PET on open water
     real(dp) :: emissivity_water !< emissivity of water
@@ -2895,7 +2957,7 @@ contains
       max_iter = 20_i4
       delta_iter = 1.0e-02_dp
       step_iter = 5.0_dp
-      call open_nml(file, unit, quiet=.true.)
+      call open_new_nml(file, unit)
       call position_nml(self%name, unit)
       read(unit, nml=config_riv_temp)
       call close_nml(unit)
@@ -2912,5 +2974,79 @@ contains
       self%read_from_file = .false.
     end if
   end subroutine read_config_riv_temp
+
+  !> \brief Read 'coupling' namelist content.
+  subroutine read_coupling(self, file)
+    implicit none
+    class(nml_coupling_t), intent(inout) :: self
+    character(*), intent(in) :: file !< file containing the namelist
+
+    integer :: unit, status
+    integer(i4) :: case !< coupling case
+    integer(i4) :: meteo_timestep !< timestep for meteo-data from coupling
+    logical :: meteo_time_ref_endpoint !< expect meteo has time reference point at end of associated time interval
+    logical :: meteo_expect_pre !< expect meteo from coupling: [mm]      Precipitation
+    logical :: meteo_expect_temp !< expect meteo from coupling: [degC]    Air temperature
+    logical :: meteo_expect_pet !< expect meteo from coupling: [mm TS-1] Potential evapotranspiration
+    logical :: meteo_expect_tmin !< expect meteo from coupling: [degC]    minimum daily air temperature
+    logical :: meteo_expect_tmax !< expect meteo from coupling: [degC]    maximum daily air temperature
+    logical :: meteo_expect_netrad !< expect meteo from coupling: [W m2]    net radiation
+    logical :: meteo_expect_absvappress !< expect meteo from coupling: [Pa]      absolute vapour pressure
+    logical :: meteo_expect_windspeed !< expect meteo from coupling: [m s-1]   windspeed
+    logical :: meteo_expect_ssrd !< expect meteo from coupling: [W m2]    short wave radiation
+    logical :: meteo_expect_strd !< expect meteo from coupling: [W m2]    long wave radiation
+    logical :: meteo_expect_tann !< expect meteo from coupling: [degC]    annual mean air temperature
+
+    namelist /coupling/ &
+      case, &
+      meteo_timestep, &
+      meteo_time_ref_endpoint, &
+      meteo_expect_pre, &
+      meteo_expect_temp, &
+      meteo_expect_pet, &
+      meteo_expect_tmin, &
+      meteo_expect_tmax, &
+      meteo_expect_netrad, &
+      meteo_expect_absvappress, &
+      meteo_expect_windspeed, &
+      meteo_expect_ssrd, &
+      meteo_expect_strd, &
+      meteo_expect_tann
+
+    if ( self%read_from_file ) then
+      case = 0_i4 ! no coupling by default
+      meteo_timestep = 0_i4 ! only valid if no meteo expected
+      meteo_time_ref_endpoint = .false. ! meteo data usually given at begin of time interval (i.e. 00:00 for current day)
+      meteo_expect_pre = .false.
+      meteo_expect_temp = .false.
+      meteo_expect_pet = .false.
+      meteo_expect_tmin = .false.
+      meteo_expect_tmax = .false.
+      meteo_expect_netrad = .false.
+      meteo_expect_absvappress = .false.
+      meteo_expect_windspeed = .false.
+      meteo_expect_ssrd = .false.
+      meteo_expect_strd = .false.
+      meteo_expect_tann = .false.
+      call open_new_nml(file, unit)
+      call position_nml(self%name, unit, status=status)
+      if (status == 0) read(unit, nml=coupling)
+      call close_nml(unit)
+      self%case = case
+      self%meteo_timestep = meteo_timestep
+      self%meteo_time_ref_endpoint = meteo_time_ref_endpoint
+      self%meteo_expect_pre = meteo_expect_pre
+      self%meteo_expect_temp = meteo_expect_temp
+      self%meteo_expect_pet = meteo_expect_pet
+      self%meteo_expect_tmin = meteo_expect_tmin
+      self%meteo_expect_tmax = meteo_expect_tmax
+      self%meteo_expect_netrad = meteo_expect_netrad
+      self%meteo_expect_absvappress = meteo_expect_absvappress
+      self%meteo_expect_windspeed = meteo_expect_windspeed
+      self%meteo_expect_ssrd = meteo_expect_ssrd
+      self%meteo_expect_strd = meteo_expect_strd
+      self%meteo_expect_tann = meteo_expect_tann
+    end if
+  end subroutine read_coupling
 
 end module mo_namelists

@@ -35,7 +35,7 @@ CONTAINS
   !!   - added check_L0Domain
   !> \authors Matthias Zink
   !> \date Dec 2012
-  subroutine common_read_config(file_namelist, unamelist)
+  subroutine common_read_config(file_namelist)
 
     use mo_namelists, only : &
       nml_project_description, &
@@ -57,9 +57,6 @@ CONTAINS
 
     !> name of file
     character(*), intent(in) :: file_namelist
-
-    !> id of file
-    integer, intent(in) :: unamelist
 
     ! Choosen process description number
     integer(i4), dimension(nProcesses) :: processCase
@@ -99,7 +96,7 @@ CONTAINS
     !===============================================================
     !  Read namelist specifying the project description
     !===============================================================
-    call nml_project_description%read(file_namelist, unamelist)
+    call nml_project_description%read(file_namelist)
     project_details = nml_project_description%project_details
     setup_description = nml_project_description%setup_description
     simulation_type = nml_project_description%simulation_type
@@ -111,7 +108,7 @@ CONTAINS
     !===============================================================
     !  Read namelist specifying the model configuration
     !===============================================================
-    call nml_mainconfig%read(file_namelist, unamelist)
+    call nml_mainconfig%read(file_namelist)
     iFlag_cordinate_sys = nml_mainconfig%iFlag_cordinate_sys
     resolution_Hydrology = nml_mainconfig%resolution_Hydrology
     nDomains = nml_mainconfig%nDomains
@@ -166,7 +163,7 @@ CONTAINS
     !===============================================================
     ! Read land cover
     !===============================================================
-    call nml_lcover%read(file_namelist, unamelist)
+    call nml_lcover%read(file_namelist)
     nLcoverScene = nml_lcover%nLcoverScene
     LCoverYearStart = nml_lcover%LCoverYearStart
     LCoverYearEnd = nml_lcover%LCoverYearEnd
@@ -184,7 +181,7 @@ CONTAINS
     !===============================================================
     ! Read namelist for mainpaths
     !===============================================================
-    call nml_directories_general%read(file_namelist, unamelist)
+    call nml_directories_general%read(file_namelist)
     dirConfigOut = nml_directories_general%dirConfigOut
     dirCommonFiles = nml_directories_general%dirCommonFiles
     dir_Morpho = nml_directories_general%dir_Morpho
@@ -212,7 +209,7 @@ CONTAINS
     !===============================================================
     ! Read process selection list
     !===============================================================
-    call nml_processselection%read(file_namelist, unamelist)
+    call nml_processselection%read(file_namelist)
     processCase = nml_processselection%processCase
 
     processMatrix = 0_i4

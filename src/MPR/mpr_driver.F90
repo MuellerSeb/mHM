@@ -69,8 +69,8 @@ program mpr_driver
   use mo_mpr_startup, only : mpr_initialize
   use mo_mpr_restart, only : write_mpr_restart_files
   use mo_mpr_file, only : &
-          file_namelist_mpr_param, unamelist_mpr_param, &      ! filename of namelist: mhm model parameter
-          file_namelist_mpr, unamelist_mpr ! file containing main configurations
+          file_namelist_mpr_param, &      ! filename of namelist: mhm model parameter
+          file_namelist_mpr ! file containing main configurations
   use mo_kind, only: dp
 
   implicit none
@@ -78,8 +78,8 @@ program mpr_driver
   ! --------------------------------------------------------------------------
   ! INITIALIZE
   ! --------------------------------------------------------------------------
-  call common_read_config(file_namelist_mpr, unamelist_mpr)
-  call mpr_read_config(file_namelist_mpr, unamelist_mpr, file_namelist_mpr_param, unamelist_mpr_param)
+  call common_read_config(file_namelist_mpr)
+  call mpr_read_config(file_namelist_mpr, file_namelist_mpr_param)
 
   ! Start timings
   call timers_init
