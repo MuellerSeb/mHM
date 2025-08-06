@@ -30,7 +30,7 @@ contains
   !> \brief Initialize the Input container.
   subroutine input_init(self, config)
     class(input_t), intent(inout) :: self
-    type(input_config_t), intent(inout) :: config !< initialization config for Input
+    type(input_config_t), intent(in) :: config !< initialization config for Input
     self%active = config%active
   end subroutine input_init
 

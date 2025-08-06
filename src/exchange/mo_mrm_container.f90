@@ -30,7 +30,7 @@ contains
   !> \brief Initialize the mRM process container.
   subroutine mrm_init(self, config)
     class(mrm_t), intent(inout) :: self
-    type(mrm_config_t), intent(inout) :: config !< initialization config for mRM
+    type(mrm_config_t), intent(in) :: config !< initialization config for mRM
     self%active = config%active
   end subroutine mrm_init
 

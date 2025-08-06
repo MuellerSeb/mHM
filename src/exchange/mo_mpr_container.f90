@@ -30,7 +30,7 @@ contains
   !> \brief Initialize the MPR process container.
   subroutine mpr_init(self, config)
     class(mpr_t), intent(inout) :: self
-    type(mpr_config_t), intent(inout) :: config !< initialization config for MPR
+    type(mpr_config_t), intent(in) :: config !< initialization config for MPR
     self%active = config%active
   end subroutine mpr_init
 

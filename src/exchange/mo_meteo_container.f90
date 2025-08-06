@@ -30,7 +30,7 @@ contains
   !> \brief Initialize the Meteorology process container.
   subroutine meteo_init(self, config)
     class(meteo_t), intent(inout) :: self
-    type(meteo_config_t), intent(inout) :: config !< initialization config for Meteorology
+    type(meteo_config_t), intent(in) :: config !< initialization config for Meteorology
     self%active = config%active
   end subroutine meteo_init
 

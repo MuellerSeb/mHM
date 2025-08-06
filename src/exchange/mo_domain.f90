@@ -82,10 +82,20 @@ contains
   end function domain_list_add
 
   !> \brief Initialize a new domain.
-  subroutine domain_init(self, start_time)
+  subroutine domain_init(self, start_time, input_cfg, meteo_cfg, mpr_cfg, mhm_cfg, mrm_cfg)
     class(domain_t), intent(inout) :: self
     type(datetime), intent(in) :: start_time !< start time of the simulation
+    type(input_config_t), intent(in), optional :: input_cfg !< configuration for the input container
+    type(meteo_config_t), intent(in), optional :: meteo_cfg !< configuration for the meteo container
+    type(mpr_config_t), intent(in), optional :: mpr_cfg !< configuration for the mpr container
+    type(mhm_config_t), intent(in), optional :: mhm_cfg !< configuration for the mhm container
+    type(mrm_config_t), intent(in), optional :: mrm_cfg !< configuration for the mrm container
     call self%exchange%init(start_time)
+    if (present(input_cfg)) call self%input%init(input_cfg)
+    if (present(meteo_cfg)) call self%meteo%init(meteo_cfg)
+    if (present(mpr_cfg)) call self%mpr%init(mpr_cfg)
+    if (present(mhm_cfg)) call self%mhm%init(mhm_cfg)
+    if (present(mrm_cfg)) call self%mrm%init(mrm_cfg)
   end subroutine domain_init
 
 end module mo_domain

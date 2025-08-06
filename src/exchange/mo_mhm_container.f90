@@ -30,7 +30,7 @@ contains
   !> \brief Initialize the mHM process container.
   subroutine mhm_init(self, config)
     class(mhm_t), intent(inout) :: self
-    type(mhm_config_t), intent(inout) :: config !< initialization config for mHM
+    type(mhm_config_t), intent(in) :: config !< initialization config for mHM
     self%active = config%active
   end subroutine mhm_init
 
