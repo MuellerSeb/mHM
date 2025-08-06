@@ -75,7 +75,7 @@ ${SUCMD}make install
 cd ..
 
 # remove temporary directory
-cd .. && rm -rf _tmp_mhm_deps
+cd .. && ${SUCMD}rm -rf _tmp_mhm_deps
 
 # call ldconfig if needed
 if [ "${CONFIG}" = "YES" ]; then

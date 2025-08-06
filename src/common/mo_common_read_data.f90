@@ -46,7 +46,7 @@ CONTAINS
     use mo_common_types, only: Grid
     use mo_common_variables, only : L0_elev, dirMorpho, level0, domainMeta, &
                                     resolutionHydrology
-    use mo_grid, only : set_domain_indices
+    use mo_common_grid, only : set_domain_indices
     use mo_read_spatial_data, only : read_header_ascii, read_spatial_data_ascii
     use mo_string_utils, only : num2str
 

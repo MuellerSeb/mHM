@@ -45,6 +45,7 @@ jobs:
       matrix:
         cfg:
         - { os: ubuntu-24.04, arch: x86_64 }
+        - { os: ubuntu-24.04-arm, arch: aarch64 }
         - { os: macos-13, arch: x86_64 }
         - { os: macos-14, arch: arm64 }
 
@@ -54,7 +55,7 @@ jobs:
           fetch-depth: '0'
 
       - name: Build wheels
-        uses: pypa/cibuildwheel@v2.22.0
+        uses: pypa/cibuildwheel@v3.0.1
         env:
           CIBW_ARCHS: ${{ matrix.cfg.arch }}
         with:
