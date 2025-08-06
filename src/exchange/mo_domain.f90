@@ -16,11 +16,21 @@ module mo_domain
   use mo_exchange_type, only: exchange_t
   use mo_string_utils, only: n2s=>num2str
   use mo_datetime, only: datetime
+  ! containers
+  use mo_input_container, only: input_t, input_config_t
+  use mo_meteo_container, only: meteo_t, meteo_config_t
+  use mo_mpr_container, only: mpr_t, mpr_config_t
+  use mo_mhm_container, only: mhm_t, mhm_config_t
+  use mo_mrm_container, only: mrm_t, mrm_config_t
 
   !> \class   domain_t
   !> \brief   Class for a single mHM domain.
   type, public :: domain_t
     type(exchange_t) :: exchange !< the exchange container with all exchanged variables for this domain
+    type(input_t) :: input !< the input container providing inputs from file or couplers
+    type(mpr_t) :: mpr !< the MPR container providing parameter fields for the process containers
+    type(mhm_t) :: mhm !< the mHM process container calculating vertical hydrological processes
+    type(mrm_t) :: mrm !< the mRM process container for routing related processes
   contains
     procedure :: init => domain_init
   end type domain_t
