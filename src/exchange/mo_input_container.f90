@@ -2,7 +2,7 @@
 !> \brief   \copybrief mo_input_container
 !> \details \copydetails mo_input_container
 
-!> \brief   Module for a mHM process container.
+!> \brief   Module for an input container.
 !> \version 0.1
 !> \authors Sebastian Mueller
 !> \date    Aug 2025
@@ -12,22 +12,22 @@
 module mo_input_container
 
   !> \class   input_t
-  !> \brief   Class for a single Input process container.
+  !> \brief   Class for a single Input container.
   type, public :: input_t
-    logical :: active = .false. !< flag to activate the Input process container
+    logical :: active = .false. !< flag to activate the Input container
   contains
     procedure :: init => input_init
   end type input_t
 
   !> \class   input_config_t
-  !> \brief   Class for a single Input process container.
+  !> \brief   Class for a single Input container.
   type, public :: input_config_t
-    logical :: active = .false. !< flag to activate the Input process container
+    logical :: active = .false. !< flag to activate the Input container
   end type input_config_t
 
 contains
 
-  !> \brief Initialize the Input process container.
+  !> \brief Initialize the Input container.
   subroutine input_init(self, config)
     class(input_t), intent(inout) :: self
     type(input_config_t), intent(inout) :: config !< initialization config for Input

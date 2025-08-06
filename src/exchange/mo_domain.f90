@@ -28,6 +28,7 @@ module mo_domain
   type, public :: domain_t
     type(exchange_t) :: exchange !< the exchange container with all exchanged variables for this domain
     type(input_t) :: input !< the input container providing inputs from file or couplers
+    type(meteo_t) :: meteo !< the meteorology container providing processed meteorological data
     type(mpr_t) :: mpr !< the MPR container providing parameter fields for the process containers
     type(mhm_t) :: mhm !< the mHM process container calculating vertical hydrological processes
     type(mrm_t) :: mrm !< the mRM process container for routing related processes
