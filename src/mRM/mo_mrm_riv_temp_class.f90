@@ -158,86 +158,37 @@ contains
   subroutine config( &
     self, &
     file_namelist, &
-    unamelist, &
-    file_namelist_param, &
-    unamelist_param &
+    file_namelist_param &
   )
 
     use mo_common_constants, only : maxNoDomains, nodata_i4
     use mo_common_variables, only : domainMeta
-    use mo_nml, only : close_nml, open_nml, position_nml
     use mo_check, only : check_dir
     USE mo_string_utils, ONLY : num2str
+    use mo_namelists, only : nml_config_riv_temp
 
     implicit none
 
     class(riv_temp_type), intent(inout) :: self
     character(*), intent(in) :: file_namelist !< mhm namelist file
     character(*), intent(in) :: file_namelist_param !< mhm parameter namelist file
-    integer, intent(in) :: unamelist
-    integer, intent(in) :: unamelist_param
-
-    ! parameter to read in
-    real(dp) :: albedo_water ! albedo of open water
-    real(dp) :: pt_a_water ! priestley taylor alpha parameter for PET on open water
-    real(dp) :: emissivity_water ! emissivity of water
-    real(dp) :: turb_heat_ex_coeff ! lateral heat exchange coefficient water <-> air
-    ! controlling variables for iterative solver
-    integer(i4) :: max_iter
-    real(dp) :: delta_iter
-    real(dp) :: step_iter
-    ! files for river widths
-    character(256), dimension(maxNoDomains) :: dir_riv_widths
-    character(256) :: riv_widths_file ! file name for river widths
-    character(256) :: riv_widths_name ! variable name for river widths
 
     integer(i4) :: iDomain, domainID
-
-    ! namelist for river temperature configuration
-    namelist /config_riv_temp/ &
-      albedo_water, &
-      pt_a_water, &
-      emissivity_water, &
-      turb_heat_ex_coeff, &
-      max_iter, &
-      delta_iter, &
-      step_iter, &
-      riv_widths_file, &
-      riv_widths_name, &
-      dir_riv_widths
 
     ! allocate the directory arrays
     allocate(self%dir_riv_widths(domainMeta%nDomains))
 
-    ! default values
-    albedo_water = 0.15_dp
-    pt_a_water = 1.26_dp
-    emissivity_water = 0.96_dp
-    turb_heat_ex_coeff = 20.0_dp
-    max_iter = 20_i4
-    delta_iter = 1.0e-02_dp
-    step_iter = 5.0_dp
-
-    ! open the namelist file
-    call open_nml(file_namelist, unamelist, quiet=.true.)
-    ! find the river-temp config namelist
-    call position_nml(self%nml_name, unamelist)
-    ! read the river-temp config namelist
-    read(unamelist, nml=config_riv_temp)
-
-    self%albedo_water = albedo_water
-    self%pt_a_water = pt_a_water
-    self%emissivity_water = emissivity_water
-    self%turb_heat_ex_coeff = turb_heat_ex_coeff
-    self%delta_iter = delta_iter
-    self%max_iter = max_iter
-    self%step_iter = step_iter
-    self%riv_widths_file = riv_widths_file
-    self%riv_widths_name = riv_widths_name
-    self%dir_riv_widths = dir_riv_widths
-
-    ! closing the namelist file
-    call close_nml(unamelist)
+    call nml_config_riv_temp%read(file_namelist)
+    self%albedo_water = nml_config_riv_temp%albedo_water
+    self%pt_a_water = nml_config_riv_temp%pt_a_water
+    self%emissivity_water = nml_config_riv_temp%emissivity_water
+    self%turb_heat_ex_coeff = nml_config_riv_temp%turb_heat_ex_coeff
+    self%delta_iter = nml_config_riv_temp%delta_iter
+    self%max_iter = nml_config_riv_temp%max_iter
+    self%step_iter = nml_config_riv_temp%step_iter
+    self%riv_widths_file = nml_config_riv_temp%riv_widths_file
+    self%riv_widths_name = nml_config_riv_temp%riv_widths_name
+    self%dir_riv_widths = nml_config_riv_temp%dir_riv_widths(1:domainMeta%nDomains)
 
     do iDomain = 1, domainMeta%nDomains
       domainID = domainMeta%indices(iDomain)

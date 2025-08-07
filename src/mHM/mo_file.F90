@@ -43,16 +43,10 @@ MODULE mo_file
   CHARACTER(len = *), PARAMETER :: file_main = 'mhm_driver.f90'
   !> Namelist file name
   character(:), allocatable :: file_namelist_mhm ! = 'mhm.nml'
-  !> Unit for namelist
-  INTEGER, PARAMETER :: unamelist_mhm = 30
   !> Parameter namelists file name
   character(:), allocatable :: file_namelist_mhm_param ! = 'mhm_parameter.nml'
-  !> Unit for namelist
-  INTEGER, PARAMETER :: unamelist_mhm_param = 31
   !> file defining mHM's outputs
   character(:), allocatable :: file_defOutput ! = 'mhm_outputs.nml'
-  !> Unit for file defining mHM's outputs
-  INTEGER, PARAMETER :: udefOutput = 67
   !> file containing mhm output
   character(len = *), PARAMETER :: file_mhm_output = 'mHM_Fluxes_States.nc'
 
