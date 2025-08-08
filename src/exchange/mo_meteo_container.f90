@@ -11,19 +11,19 @@
 !> \ingroup f_exchange
 module mo_meteo_container
 
-  !> \class   meteo_t
-  !> \brief   Class for a single Meteorology process container.
-  type, public :: meteo_t
-    logical :: active = .false. !< flag to activate the Meteorology process container
-  contains
-    procedure :: init => meteo_init
-  end type meteo_t
-
   !> \class   meteo_config_t
   !> \brief   Class for a single Meteorology process container.
   type, public :: meteo_config_t
     logical :: active = .false. !< flag to activate the Meteorology process container
   end type meteo_config_t
+
+  !> \class   meteo_t
+  !> \brief   Class for a single Meteorology process container.
+  type, public :: meteo_t
+    type(meteo_config_t) :: config !< configuration of the Meteorology process container
+  contains
+    procedure :: init => meteo_init
+  end type meteo_t
 
 contains
 
@@ -31,7 +31,7 @@ contains
   subroutine meteo_init(self, config)
     class(meteo_t), intent(inout) :: self
     type(meteo_config_t), intent(in) :: config !< initialization config for Meteorology
-    self%active = config%active
+    self%config = config
   end subroutine meteo_init
 
 end module mo_meteo_container

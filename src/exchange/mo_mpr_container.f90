@@ -11,19 +11,19 @@
 !> \ingroup f_exchange
 module mo_mpr_container
 
-  !> \class   mpr_t
-  !> \brief   Class for a single MPR process container.
-  type, public :: mpr_t
-    logical :: active = .false. !< flag to activate the MPR process container
-  contains
-    procedure :: init => mpr_init
-  end type mpr_t
-
   !> \class   mpr_config_t
-  !> \brief   Class for a single MPR process container.
+  !> \brief   Configuration for a single MPR process container.
   type, public :: mpr_config_t
     logical :: active = .false. !< flag to activate the MPR process container
   end type mpr_config_t
+
+  !> \class   mpr_t
+  !> \brief   Class for a single MPR process container.
+  type, public :: mpr_t
+    type(mpr_config_t) :: config !< configuration of the MPR process container
+  contains
+    procedure :: init => mpr_init
+  end type mpr_t
 
 contains
 
@@ -31,7 +31,7 @@ contains
   subroutine mpr_init(self, config)
     class(mpr_t), intent(inout) :: self
     type(mpr_config_t), intent(in) :: config !< initialization config for MPR
-    self%active = config%active
+    self%config = config
   end subroutine mpr_init
 
 end module mo_mpr_container

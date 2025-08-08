@@ -11,19 +11,19 @@
 !> \ingroup f_exchange
 module mo_mrm_container
 
-  !> \class   mrm_t
-  !> \brief   Class for a single mRM process container.
-  type, public :: mrm_t
-    logical :: active = .false. !< flag to activate the mRM process container
-  contains
-    procedure :: init => mrm_init
-  end type mrm_t
-
   !> \class   mrm_config_t
-  !> \brief   Class for a single mRM process container.
+  !> \brief   Configuration for a single mRM process container.
   type, public :: mrm_config_t
     logical :: active = .false. !< flag to activate the mRM process container
   end type mrm_config_t
+
+  !> \class   mrm_t
+  !> \brief   Class for a single mRM process container.
+  type, public :: mrm_t
+    type(mrm_config_t) :: config !< configuration of the mRM process container
+  contains
+    procedure :: init => mrm_init
+  end type mrm_t
 
 contains
 
@@ -31,7 +31,7 @@ contains
   subroutine mrm_init(self, config)
     class(mrm_t), intent(inout) :: self
     type(mrm_config_t), intent(in) :: config !< initialization config for mRM
-    self%active = config%active
+    self%config = config
   end subroutine mrm_init
 
 end module mo_mrm_container

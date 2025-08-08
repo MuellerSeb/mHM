@@ -11,19 +11,19 @@
 !> \ingroup f_exchange
 module mo_input_container
 
-  !> \class   input_t
-  !> \brief   Class for a single Input container.
-  type, public :: input_t
-    logical :: active = .false. !< flag to activate the Input container
-  contains
-    procedure :: init => input_init
-  end type input_t
-
   !> \class   input_config_t
   !> \brief   Class for a single Input container.
   type, public :: input_config_t
     logical :: active = .false. !< flag to activate the Input container
   end type input_config_t
+
+  !> \class   input_t
+  !> \brief   Class for a single Input container.
+  type, public :: input_t
+    type(input_config_t) :: config !< configuration of the Input container
+  contains
+    procedure :: init => input_init
+  end type input_t
 
 contains
 
@@ -31,7 +31,7 @@ contains
   subroutine input_init(self, config)
     class(input_t), intent(inout) :: self
     type(input_config_t), intent(in) :: config !< initialization config for Input
-    self%active = config%active
+    self%config = config
   end subroutine input_init
 
 end module mo_input_container
