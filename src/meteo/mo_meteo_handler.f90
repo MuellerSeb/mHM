@@ -30,7 +30,7 @@ module mo_meteo_handler
   use mo_common_types, only: Grid, period
   use mo_message, only : message, error_message
   use mo_coupling_type, only : couple_cfg_type
-  use mo_sentinel, only : set_sentinel, check_sentinel
+  use mo_sentinel, only : check_sentinel
   use mo_datetime, only : datetime, timedelta, zero_delta, one_hour, one_day
 
   implicit none
