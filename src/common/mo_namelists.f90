@@ -12,12 +12,11 @@ module mo_namelists
 
   use mo_kind, only : i4, i8, dp
   use mo_nml, only : position_nml
-  use mo_constants, only : YearMonths, nodata_dp, nodata_i4
-  use mo_mhm_constants, only : nOutFlxState
-  use mo_common_constants, only : maxNLcovers, maxNoDomains, nColPars, nProcesses
   use mo_common_types, only : period
-  use mo_common_mHM_mRM_variables, only : nerror_model
+  use mo_constants, only : YearMonths, nodata_dp, nodata_i4
+  use mo_common_constants, only : maxNLcovers, maxNoDomains, nColPars, nProcesses, nerror_model
   use mo_mpr_constants, only : maxGeoUnit, maxNoSoilHorizons
+  use mo_mhm_constants, only : nOutFlxState
   use mo_mrm_constants, only : maxNoGauges, mrm_nOutFlxState => nOutFlxState
   use mo_string_utils, only : num2str
   use mo_sentinel, only : set_sentinel

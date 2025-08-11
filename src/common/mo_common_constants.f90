@@ -20,6 +20,8 @@ MODULE mo_common_constants
 
   PRIVATE
 
+  integer(i4), public, parameter :: nerror_model = 2    !< # possible parameters in error model
+
   ! PROCESSES description
   integer(i4), parameter, public :: nProcesses = 11 !< Number of possible processes to consider
 
