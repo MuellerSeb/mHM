@@ -43,12 +43,12 @@ CONTAINS
       nml_mainconfig, &
       nml_processselection, &
       nml_lcover
-    use mo_common_constants, only : maxNLcovers, maxNoDomains
+    use mo_common_constants, only : maxNLcovers, maxNoDomains, nProcesses
     use mo_common_variables, only : Conventions, LC_year_end, LC_year_start, LCfilename, contact, &
                                     dirCommonFiles, dirConfigOut, dirLCover, dirMorpho, dirOut, &
                                     mhmFileRestartOut, mrmFileRestartOut, &
                                     fileLatLon, history, iFlag_cordinate_sys, mHM_details, domainMeta, nLcoverScene, &
-                                    nProcesses, nuniqueL0Domains, processMatrix, project_details, resolutionHydrology, &
+                                    nuniqueL0Domains, processMatrix, project_details, resolutionHydrology, &
                                     setup_description, simulation_type, write_restart
     use mo_message, only : message
     use mo_string_utils, only : num2str

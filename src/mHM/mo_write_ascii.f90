@@ -515,7 +515,8 @@ CONTAINS
   subroutine write_optinamelist(processMatrix, parameters, maskpara, parameters_name)
 
     use mo_common_mhm_mrm_file, only : file_opti_nml, uopti_nml
-    use mo_common_variables, only : dirConfigOut, nProcesses
+    use mo_common_variables, only : dirConfigOut
+    use mo_common_constants, only : nProcesses
     use mo_string_utils, only : num2str
     use mo_os, only : check_path_isdir
 
