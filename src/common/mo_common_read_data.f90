@@ -42,7 +42,7 @@ CONTAINS
   subroutine read_dem
 
     use mo_append, only : append
-    use mo_common_constants, only : nodata_dp
+    use mo_constants, only : nodata_dp
     use mo_common_file, only : file_dem, udem
     use mo_common_types, only: Grid
     use mo_common_variables, only : L0_elev, dirMorpho, level0, domainMeta, &
@@ -142,7 +142,7 @@ CONTAINS
   subroutine read_lcover
 
     use mo_append, only : append, paste
-    use mo_common_constants, only : nodata_i4
+    use mo_constants, only : nodata_i4
     use mo_common_file, only : ulcoverclass
     use mo_common_types, only: Grid
     use mo_common_variables, only : L0_LCover, LCfilename, dirLCover, level0, domainMeta, nLCoverScene

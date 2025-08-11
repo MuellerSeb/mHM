@@ -13,7 +13,7 @@
 MODULE mo_mpr_startup
 
   USE mo_kind, ONLY : i4, dp
-  use mo_common_constants, only : nodata_i4, nodata_dp   ! global nodata values (i4, dp)
+  use mo_constants, only : nodata_i4, nodata_dp   ! global nodata values (i4, dp)
 
   IMPLICIT NONE
 
@@ -125,7 +125,7 @@ CONTAINS
   !> \date Jan 2013
   subroutine L0_check_input(iDomain)
 
-    use mo_common_constants, only : eps_dp
+    use mo_constants, only : eps_dp
     use mo_common_variables, only : L0_LCover, L0_elev, level0, nLCoverScene
     use mo_message, only : error_message
     use mo_mpr_global_variables, only : L0_asp, L0_geoUnit, L0_gridded_LAI, &

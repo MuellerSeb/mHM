@@ -76,8 +76,7 @@ CONTAINS
 
   SUBROUTINE L11_runoff_acc(qAll, efecArea, L1_L11_Id, L11_areaCell, L11_L1_Id, TS, map_flag, qAcc)
 
-    use mo_constants, only : HourSecs
-    use mo_common_constants, only : nodata_dp
+    use mo_constants, only : HourSecs, nodata_dp
 
     implicit none
 
@@ -254,8 +253,7 @@ CONTAINS
 
   SUBROUTINE L11_E_acc(qAll, efecArea, L1_L11_Id, L11_areaCell, L11_L1_Id, TS, map_flag, qAcc)
 
-    use mo_constants, only : HourSecs
-    use mo_common_constants, only : nodata_dp
+    use mo_constants, only : HourSecs, nodata_dp
 
     implicit none
 
@@ -421,7 +419,7 @@ CONTAINS
 
   SUBROUTINE L11_meteo_acc(meteo_all, efecArea, L1_L11_Id, L11_areaCell, L11_L1_Id, map_flag, meteo_acc)
 
-    use mo_common_constants, only : nodata_dp
+    use mo_constants, only : nodata_dp
 
     implicit none
 

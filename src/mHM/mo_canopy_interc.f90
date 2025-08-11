@@ -15,8 +15,7 @@
 MODULE mo_canopy_interc
 
   USE mo_kind, ONLY : dp
-  USE mo_common_constants, ONLY : eps_dp
-  USE mo_constants, ONLY : twothird_dp
+  USE mo_constants, ONLY : eps_dp, twothird_dp
 
   IMPLICIT NONE
 

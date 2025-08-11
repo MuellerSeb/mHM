@@ -152,7 +152,7 @@ contains
   function L0_fractionalCover_in_Lx(dataIn0, classId, mask0, L0upBound_inLx, L0downBound_inLx, L0leftBound_inLx, &
                                    L0rightBound_inLx, nTCells0_inLx) result(frac_cover_Lx)
 
-    use mo_common_constants, only : nodata_i4
+    use mo_constants, only : nodata_i4
 
     implicit none
 

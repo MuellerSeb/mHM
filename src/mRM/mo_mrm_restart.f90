@@ -55,7 +55,7 @@ contains
 
   subroutine mrm_write_restart(iDomain, domainID, OutFile)
 
-    use mo_common_constants, only : nodata_dp, nodata_i4
+    use mo_constants, only : nodata_dp, nodata_i4
     use mo_common_restart, only : write_grid_info
     use mo_common_variables, only : level0, level1, nLCoverScene, processMatrix, domainMeta, &
             LC_year_start, LC_year_end
@@ -602,7 +602,7 @@ contains
   subroutine mrm_read_restart_config(iDomain, domainID, InFile)
 
     use mo_append, only : append
-    use mo_common_constants, only : nodata_dp
+    use mo_constants, only : nodata_dp
     use mo_common_variables, only : level0, level1, domainMeta, processMatrix, domainMeta
     use mo_kind, only : dp, i4
     use mo_mpr_global_variables, only : L0_slope

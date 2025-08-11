@@ -12,7 +12,7 @@
 MODULE mo_multi_param_reg
 
   use mo_kind, only : i4, dp
-  use mo_common_constants, only : nodata_dp, nodata_i4
+  use mo_constants, only : nodata_dp, nodata_i4
   use mo_message, only : message, error_message
 
   implicit none
@@ -1203,7 +1203,7 @@ subroutine mpr(mask0, geoUnit0, soilId0, Asp0, gridded_LAI0, LCover0, slope_emp0
   subroutine aerodynamical_resistance(LAI0, LCover0, param, mask0, Id0, n_subcells1, upper_bound1, lower_bound1, &
        left_bound1, right_bound1, aerodyn_resistance1)
 
-    use mo_common_constants, only : eps_dp
+    use mo_constants, only : eps_dp
     use mo_mpr_constants, only : WindMeasHeight, karman
     use mo_upscaling_operators, only : upscale_arithmetic_mean
 

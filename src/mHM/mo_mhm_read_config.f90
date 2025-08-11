@@ -92,7 +92,8 @@ CONTAINS
       nml_panEvapo, &
       nml_NLoutputResults, &
       nml_baseflow_config
-    use mo_common_constants, only : maxNoDomains, nodata_i4
+    use mo_common_constants, only : maxNoDomains
+    use mo_constants, only : nodata_i4
     use mo_common_mHM_mRM_read_config, only : common_check_resolution
     use mo_common_mhm_mrm_variables, only : opti_function, optimize
     use mo_common_variables, only : domainMeta, processMatrix

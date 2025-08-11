@@ -25,7 +25,7 @@ module mo_nc_output
   use mo_common_variables, only : project_details, setup_description, simulation_type, &
           Conventions, contact, mHM_details, history, dirOut, iFlag_cordinate_sys
   use mo_file, only : version
-  use mo_common_constants, only : nodata_dp
+  use mo_constants, only : nodata_dp
   use mo_netcdf, only : NcDataset, NcDimension, NcVariable
   use mo_common_mHM_mRM_variables, only: timeStep
 

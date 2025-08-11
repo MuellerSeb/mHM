@@ -98,7 +98,7 @@ CONTAINS
   !> \date Aug 2015
   subroutine mrm_init(file_namelist, file_namelist_param)
 
-    use mo_common_constants, only : nodata_dp, nodata_i4
+    use mo_constants, only : nodata_dp, nodata_i4
     use mo_common_mHM_mRM_variables, only : mrmFileRestartIn, mrm_coupling_mode, mrm_read_river_network, &
                                             resolutionRouting
     use mo_common_restart, only : read_grid_info
@@ -495,7 +495,7 @@ CONTAINS
   !> \date Jun 2018
   subroutine L0_check_input_routing(L0Domain_iDomain)
 
-    use mo_common_constants, only : nodata_i4
+    use mo_constants, only : nodata_i4
     use mo_common_variables, only : level0
     use mo_kind, only : i4
     use mo_mrm_global_variables, only : L0_fAcc, L0_fDir

@@ -12,7 +12,7 @@
 MODULE mo_runoff
 
   USE mo_kind, ONLY : dp
-  USE mo_common_constants, ONLY : eps_dp
+  USE mo_constants, ONLY : eps_dp
 
   IMPLICIT NONE
 

@@ -13,7 +13,7 @@
 MODULE mo_read_wrapper
 
   USE mo_kind, ONLY : i4, dp
-  use mo_common_constants, only : nodata_dp, nodata_i4
+  use mo_constants, only : nodata_dp, nodata_i4
   use mo_message, only: message, error_message
 
   IMPLICIT NONE

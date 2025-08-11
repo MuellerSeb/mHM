@@ -12,7 +12,7 @@
 module mo_mpr_SMhorizons
 
   use mo_kind, only : i4, dp
-  use mo_common_constants, only : nodata_dp
+  use mo_constants, only : nodata_dp
 
   implicit none
 

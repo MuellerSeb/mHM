@@ -30,7 +30,7 @@ MODULE mo_read_spatial_data
   PUBLIC :: read_spatial_data_nc          ! Reads netcdf files
   PUBLIC :: read_spatial_data_ascii       ! Reads ASCII files
 
-  
+
   ! ------------------------------------------------------------------
 
   !    NAME
@@ -93,7 +93,7 @@ MODULE mo_read_spatial_data
     MODULE PROCEDURE read_spatial_data_ascii_i4, read_spatial_data_ascii_dp
   END INTERFACE read_spatial_data_ascii
 
-  
+
 
   ! ------------------------------------------------------------------
 
@@ -416,7 +416,7 @@ CONTAINS
 
   subroutine read_header_ascii(filename, fileunit, header_ncols, header_nrows, header_xllcorner, header_yllcorner, &
                               header_cellsize, header_nodata)
-    use mo_common_constants, only : nodata_dp
+    use mo_constants, only : nodata_dp
     implicit none
 
     ! Name of file and its location
@@ -659,9 +659,9 @@ CONTAINS
     integer(i4), intent(out) :: nx !< size of the x coordinate
     integer(i4), intent(out) :: ny !< size of the y coordinate
     real(dp), intent(out) :: xll !< x lower left corner
-    real(dp), intent(out) :: yll !< y lower left corner 
-    real(dp), intent(out) :: cellsize !< cellsize 
-    logical, optional, allocatable, dimension(:,:), intent(out) :: mask !< mask 
+    real(dp), intent(out) :: yll !< y lower left corner
+    real(dp), intent(out) :: cellsize !< cellsize
+    logical, optional, allocatable, dimension(:,:), intent(out) :: mask !< mask
     ! integer(i4), intent(in), optional :: y_direction !< y-axis direction (-1 (default) as present, 0 for top-down, 1 for bottom-up)
 
     type(NcVariable) :: ncvar, xvar, yvar
@@ -674,7 +674,7 @@ CONTAINS
     real(dp), allocatable, dimension(:,:) :: dummy
     logical :: y_inc, x_sph, y_sph, x_cart, y_cart, flip_y
     integer(i4) :: keep_y
-    keep_y = -1_i4 
+    keep_y = -1_i4
     y_dir = keep_y
     ! if (present(y_direction)) y_dir = y_direction
 
@@ -807,8 +807,8 @@ CONTAINS
 
     call nc%close()
   end subroutine read_spatial_data_nc_i4
-  
-  
+
+
   !    NAME
   !        read_spatial_data_nc_dp
 
@@ -930,15 +930,15 @@ CONTAINS
     ! header read in cellsize
     real(dp), optional, intent(out) :: out_cellsize
 
-    ! 
+    !
     real(dp), optional, intent(out) :: out_nodata_value
 
     ! netcdf file
     type(NcDataset) :: nc
     ! variables for data from netcdf
     type(NcVariable) :: var
-    
-    ! file exists 
+
+    ! file exists
     real(dp) :: nodata_value
     integer(i4) :: nrows, ncols
     real(dp) :: xllcorner, yllcorner, cellsize
@@ -960,7 +960,7 @@ CONTAINS
         yllcorner = header_yllcorner
         xllcorner = header_xllcorner
         cellsize = header_cellsize
-      else 
+      else
         call read_header_ascii(filepath, fileunit, &
               ncols, nrows, xllcorner, &
               yllcorner, cellsize, nodata_value)
@@ -969,19 +969,19 @@ CONTAINS
       ! print *, "run ascii dp reading with ", filepath
       call read_spatial_data_ascii(filepath, fileunit, ncols, nrows, xllcorner, &
                                     yllcorner, cellsize, data, maskout)
-    end if 
+    end if
     !  if header information is needed as output it is saved to the output variables
-    if (present(out_nCols)) & 
+    if (present(out_nCols)) &
       out_nCols = ncols
-    if (present(out_nRows)) & 
+    if (present(out_nRows)) &
       out_nRows = nrows
-    if (present(out_xllcorner)) & 
+    if (present(out_xllcorner)) &
       out_xllcorner = xllcorner
-    if (present(out_yllcorner)) & 
+    if (present(out_yllcorner)) &
       out_yllcorner = yllcorner
-    if (present(out_cellsize)) & 
+    if (present(out_cellsize)) &
       out_cellsize = cellsize
-    if (present(out_nodata_value)) & 
+    if (present(out_nodata_value)) &
       out_nodata_value = nodata_value
 
   end subroutine read_spatial_data_nc_or_ascii_dp
@@ -1047,15 +1047,15 @@ CONTAINS
 
     ! header read in cellsize
     real(dp), optional, intent(out) :: out_cellsize
-    
+
     real(dp), optional, intent(out) :: out_nodata_value
 
     ! netcdf file
     type(NcDataset) :: nc
     ! variables for data from netcdf
     type(NcVariable) :: var
-    
-    ! file exists 
+
+    ! file exists
     real(dp) :: nodata_value
     integer(i4) :: nrows, ncols
     real(dp) :: xllcorner, yllcorner, cellsize
@@ -1077,7 +1077,7 @@ CONTAINS
         yllcorner = header_yllcorner
         xllcorner = header_xllcorner
         cellsize = header_cellsize
-      else 
+      else
         call read_header_ascii(filepath, fileunit, &
               ncols, nrows, xllcorner, &
               yllcorner, cellsize, nodata_value)
@@ -1086,19 +1086,19 @@ CONTAINS
       ! print *, "run ascii i4 reading with ", filepath, " as ", ncname, " does not exists"
       call read_spatial_data_ascii(filepath, fileunit, ncols, nrows, xllcorner, &
                                     yllcorner, cellsize, data, maskout)
-    end if 
+    end if
     !  if header information is needed as output it is saved to the output variables
-    if (present(out_nCols)) & 
+    if (present(out_nCols)) &
       out_nCols = ncols
-    if (present(out_nRows)) & 
+    if (present(out_nRows)) &
       out_nRows = nrows
-    if (present(out_xllcorner)) & 
+    if (present(out_xllcorner)) &
       out_xllcorner = xllcorner
-    if (present(out_yllcorner)) & 
+    if (present(out_yllcorner)) &
       out_yllcorner = yllcorner
-    if (present(out_cellsize)) & 
+    if (present(out_cellsize)) &
       out_cellsize = cellsize
-    if (present(out_nodata_value)) & 
+    if (present(out_nodata_value)) &
       out_nodata_value = nodata_value
   end subroutine read_spatial_data_nc_or_ascii_i4
 

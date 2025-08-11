@@ -93,7 +93,7 @@ CONTAINS
 
   subroutine spatial_aggregation_3d(data2, cellsize2, cellsize1, mask1, mask2, data1)
 
-    use mo_common_constants, only : nodata_dp
+    use mo_constants, only : nodata_dp
 
     implicit none
 
@@ -201,7 +201,7 @@ CONTAINS
 
   subroutine spatial_aggregation_4d(data2, cellsize2, cellsize1, mask1, mask2, data1)
 
-    use mo_common_constants, only : nodata_dp
+    use mo_constants, only : nodata_dp
 
     implicit none
 
@@ -312,7 +312,7 @@ CONTAINS
 
   subroutine spatial_disaggregation_3d(data2, cellsize2, cellsize1, mask1, mask2, data1)
 
-    use mo_common_constants, only : nodata_dp
+    use mo_constants, only : nodata_dp
 
     implicit none
 
@@ -378,7 +378,7 @@ CONTAINS
 
   subroutine spatial_disaggregation_4d(data2, cellsize2, cellsize1, mask1, mask2, data1)
 
-    use mo_common_constants, only : nodata_dp
+    use mo_constants, only : nodata_dp
 
     implicit none
 

@@ -242,7 +242,8 @@ contains
   !> \brief configure the \ref meteo_handler_type class from the mhm namelist
   subroutine config(self, file_namelist, optimize, domainMeta, processMatrix, timeStep, couple_cfg)
 
-    use mo_common_constants, only : maxNoDomains, nodata_i4
+    use mo_common_constants, only : maxNoDomains
+    use mo_constants, only : nodata_i4
     use mo_common_types, only : domain_meta
     use mo_common_variables, only : nProcesses
     use mo_namelists, only : nml_directories_mhm, nml_nightdayratio

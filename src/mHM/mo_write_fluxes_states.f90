@@ -19,7 +19,7 @@ module mo_write_fluxes_states
   use mo_nc_output, only: OutputDataset, OutputVariable, set_attributes, data_dims, data_dtype
   use mo_kind, only : i4, dp
   use mo_string_utils, only : num2str
-  use mo_common_constants, only : nodata_dp
+  use mo_constants, only : nodata_dp
   use mo_netcdf, only : NcDataset
   use mo_global_variables, only : &
     output_deflate_level, output_double_precision, output_time_reference, timeStep_model_outputs, outputFlxState

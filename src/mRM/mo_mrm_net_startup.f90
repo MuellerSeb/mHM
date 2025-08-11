@@ -61,7 +61,7 @@ contains
   subroutine L11_L1_mapping(iDomain)
 
     use mo_append, only : append
-    use mo_common_constants, only : nodata_i4
+    use mo_constants, only : nodata_i4
     use mo_common_variables, only : level1
     use mo_mrm_global_variables, only : L11_L1_ID, L1_L11_ID, level11
 
@@ -227,7 +227,7 @@ contains
   subroutine L11_flow_direction(iDomain)
 
     use mo_append, only : append
-    use mo_common_constants, only : nodata_i4
+    use mo_constants, only : nodata_i4
     use mo_common_types, only: Grid
     use mo_common_variables, only : domainMeta, level0
     use mo_mrm_global_variables, only : L0_draSC, L0_fAcc, L0_fDir, L0_l11_remap, L11_colOut, L11_fDir, &
@@ -630,7 +630,7 @@ contains
   subroutine L11_set_network_topology(iDomain)
 
     use mo_append, only : append
-    use mo_common_constants, only : nodata_i4
+    use mo_constants, only : nodata_i4
     use mo_mrm_global_variables, only : L11_fDir, L11_fromN, L11_toN, level11
 
     implicit none
@@ -728,7 +728,7 @@ contains
   subroutine L11_routing_order(iDomain)
 
     use mo_append, only : append
-    use mo_common_constants, only : nodata_i4
+    use mo_constants, only : nodata_i4
     use mo_mrm_global_variables, only : L11_fDir, L11_fromN, L11_label, L11_nOutlets, L11_netPerm, L11_rOrder, L11_sink, L11_toN, &
                                         level11
 
@@ -887,7 +887,7 @@ contains
   subroutine L11_link_location(iDomain)
 
     use mo_append, only : append
-    use mo_common_constants, only : nodata_i4
+    use mo_constants, only : nodata_i4
     use mo_common_types, only: Grid
     use mo_common_variables, only : domainMeta, level0
     use mo_mrm_global_variables, only : L0_draSC, L0_fDir, L11_colOut, L11_fCol, L11_fRow, L11_fromN, &
@@ -1088,7 +1088,7 @@ contains
   subroutine L11_set_drain_outlet_gauges(iDomain)
 
     use mo_append, only : append
-    use mo_common_constants, only : nodata_i4
+    use mo_constants, only : nodata_i4
     use mo_common_types, only: Grid
     use mo_common_variables, only : domainMeta, level0
     use mo_mrm_global_variables, only : L0_InflowgaugeLoc, L0_draCell, L0_draSC, L0_fDir, L0_gaugeLoc, domain_mrm, &
@@ -1233,7 +1233,7 @@ contains
   subroutine L11_stream_features(iDomain)
 
     use mo_append, only : append
-    use mo_common_constants, only : nodata_dp, nodata_i4
+    use mo_constants, only : nodata_dp, nodata_i4
     use mo_common_types, only: Grid
     use mo_common_variables, only : domainMeta, L0_elev, iFlag_cordinate_sys, level0, processMatrix
     use mo_mrm_global_variables, only : L0_fDir, &
@@ -1510,7 +1510,7 @@ contains
   subroutine L11_fraction_sealed_floodplain(LCClassImp, do_init)
 
     use mo_append, only : append
-    use mo_common_constants, only : nodata_dp
+    use mo_constants, only : nodata_dp
     use mo_common_types, only: Grid
     use mo_common_variables, only : domainMeta, L0_LCover, level0, domainMeta, nLCoverScene
     use mo_mrm_global_variables, only : L0_floodPlain, L11_aFloodPlain, &
@@ -2025,7 +2025,7 @@ contains
         L11_fDir,          & !  IN: flow direction at L11 (standard notation)
         L11_fAcc             ! OUT: flow accumulation at L11 [km^2]
     use mo_mrm_global_variables, only : level11
-    use mo_common_constants, only : nodata_i4, nodata_dp
+    use mo_constants, only : nodata_i4, nodata_dp
     use mo_append, only : append
 
     implicit none
@@ -2210,7 +2210,7 @@ contains
   ! ------------------------------------------------------------------
 
   subroutine L11_calc_celerity(iDomain, param)
-    use mo_common_constants, only: nodata_i4, nodata_dp
+    use mo_constants, only: nodata_i4, nodata_dp
     use mo_mad, only: mad
     use mo_append, only: append
     use mo_mpr_global_variables, only: &

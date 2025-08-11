@@ -95,7 +95,7 @@ CONTAINS
                           soil_moist_FC, wilting_point, soil_moist_exponen, jarvis_thresh_c1, aet_canopy, prec_effec, &
                           runoff_sealed, storage_sealed, infiltration, soil_moist, aet, aet_sealed)
 
-    use mo_common_constants, only : eps_dp
+    use mo_constants, only : eps_dp
 
     implicit none
 

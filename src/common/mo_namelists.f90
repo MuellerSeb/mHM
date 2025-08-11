@@ -14,7 +14,8 @@ module mo_namelists
   use mo_nml, only : position_nml
   use mo_constants, only : YearMonths
   use mo_mhm_constants, only : nOutFlxState
-  use mo_common_constants, only : maxNLcovers, maxNoDomains, nColPars, nodata_dp, nodata_i4
+  use mo_common_constants, only : maxNLcovers, maxNoDomains, nColPars
+  use mo_constants, only : nodata_dp, nodata_i4
   use mo_common_variables, only : nProcesses
   use mo_common_types, only : period
   use mo_common_mHM_mRM_variables, only : nerror_model

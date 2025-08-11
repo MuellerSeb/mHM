@@ -37,7 +37,8 @@ CONTAINS
       nml_mainconfig_mhm_mrm, &
       nml_Optimization, &
       nml_time_periods
-    use mo_common_constants, only : maxNoDomains, nodata_i4
+    use mo_common_constants, only : maxNoDomains
+    use mo_constants, only : nodata_i4
     use mo_common_mHM_mRM_variables, only : LCyearId, dds_r, mhmFileRestartIn, mrmFileRestartIn, evalPer,&
                                             mcmc_error_params, mcmc_opti, nIterations, &
                                             nTStepDay, opti_function, opti_method, optimize, optimize_restart, &

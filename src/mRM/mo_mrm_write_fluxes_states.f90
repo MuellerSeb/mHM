@@ -20,7 +20,7 @@ module mo_mrm_write_fluxes_states
 
   use mo_nc_output, only: OutputDataset, OutputVariable, set_attributes, data_dims, data_dtype
   use mo_kind, only : i4, dp
-  use mo_common_constants, only : nodata_dp
+  use mo_constants, only : nodata_dp
   use mo_netcdf, only : NcDataset, NcVariable
   use mo_mrm_global_variables, only : output_deflate_level_mrm, output_double_precision_mrm, &
     output_time_reference_mrm, timeStep_model_outputs_mrm, outputFlxState_mrm, riv_temp_pcs, level11

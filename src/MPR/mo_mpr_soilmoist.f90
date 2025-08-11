@@ -100,7 +100,7 @@ contains
   subroutine mpr_sm(param, processMatrix, is_present, nHorizons, nTillHorizons, sand, clay, DbM, ID0, soilId0, LCover0, &
                    thetaS_till, thetaFC_till, thetaPW_till, thetaS, thetaFC, thetaPW, Ks, Db, KsVar_H0, KsVar_V0, SMs_FC0)
 
-    use mo_common_constants, only : nodata_dp, nodata_i4
+    use mo_constants, only : nodata_dp, nodata_i4
     use mo_mpr_constants, only : BulkDens_OrgMatter
     use mo_mpr_global_variables, only : iFlag_soilDB
     !$ use omp_lib

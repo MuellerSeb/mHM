@@ -57,7 +57,7 @@ contains
 
   subroutine init_lowres_level(highres, target_resolution, lowres, highres_lowres_remap)
 
-    use mo_common_constants, only : nodata_dp, nodata_i4
+    use mo_constants, only : nodata_dp, nodata_i4
     use mo_common_types, only : Grid, GridRemapper
 
     implicit none

@@ -51,7 +51,7 @@ CONTAINS
     iDomain, dataPath, inputFormat, dataOut1, readPer, nTstepForcingDay, level1, level2, lower, upper, ncvarName, bound_error)
 
     use mo_append, only : append
-    use mo_common_constants, only : nodata_dp
+    use mo_constants, only : nodata_dp
     use mo_common_types, only : period, grid
     use mo_read_nc, only : read_nc
     use mo_meteo_spatial_tools, only : spatial_aggregation, spatial_disaggregation
@@ -175,7 +175,7 @@ CONTAINS
   subroutine meteo_weights_wrapper(iDomain, read_meteo_weights, dataPath, dataOut1, level1, level2, lower, upper, ncvarName)
 
     use mo_append, only : append
-    use mo_common_constants, only : nodata_dp
+    use mo_constants, only : nodata_dp
     use mo_common_types, only : grid
     use mo_read_nc, only : read_weights_nc
     use mo_meteo_spatial_tools, only : spatial_aggregation, spatial_disaggregation
@@ -282,7 +282,7 @@ CONTAINS
   !> \date Jun 2014
   subroutine chunk_config(iDomain, tt, nTstepDay, simPer, timestep, timeStep_model_inputs, read_flag, readPer)
 
-    use mo_common_constants, only : nodata_dp
+    use mo_constants, only : nodata_dp
     use mo_common_types, only: period
 
     implicit none

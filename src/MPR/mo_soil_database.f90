@@ -59,7 +59,7 @@ CONTAINS
 
   subroutine read_soil_LUT(filename)
 
-    use mo_common_constants, only : eps_dp, nodata_dp, nodata_i4
+    use mo_constants, only : eps_dp, nodata_dp, nodata_i4
     use mo_mpr_constants, only : nLCover_class
     use mo_mpr_file, only : usoil_database
     use mo_mpr_global_variables, only : HorizonDepth_mHM, iFlag_soilDB, nSoilHorizons_mHM, nSoilTypes, soilDB, &
@@ -386,7 +386,7 @@ CONTAINS
 
   subroutine generate_soil_database
 
-    use mo_common_constants, only : nodata_dp, nodata_i4
+    use mo_constants, only : nodata_dp, nodata_i4
     use mo_mpr_global_variables, only : HorizonDepth_mHM, iFlag_soilDB, nSoilHorizons_mHM, nSoilTypes, soilDB
 
     implicit none

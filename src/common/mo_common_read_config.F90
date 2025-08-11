@@ -231,7 +231,7 @@ CONTAINS
   !> \date Dec 2012
   subroutine set_land_cover_scenes_id(sim_Per, LCyear_Id)
 
-    use mo_common_constants, only : nodata_i4
+    use mo_constants, only : nodata_i4
     use mo_common_types, only: period
     use mo_common_variables, only : LC_year_end, LC_year_start, domainMeta, nLcoverScene
     use mo_string_utils, only : num2str

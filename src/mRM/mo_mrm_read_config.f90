@@ -49,7 +49,8 @@ contains
 
   subroutine mrm_read_config(file_namelist, file_namelist_param, do_message)
 
-    use mo_common_constants, only : maxNoDomains, nodata_i4
+    use mo_common_constants, only : maxNoDomains
+    use mo_constants, only : nodata_i4
     use mo_common_mHM_mRM_read_config, only : common_check_resolution
     use mo_common_variables, only : ALMA_convention, domainMeta, processMatrix
     use mo_mrm_constants, only : maxNoGauges

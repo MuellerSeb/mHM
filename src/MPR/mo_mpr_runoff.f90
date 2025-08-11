@@ -74,7 +74,7 @@ contains
   subroutine mpr_runoff(LCOVER0, mask0, SMs_FC0, slope_emp0, KsVar_H0, param, cell_id0, upp_row_L1, low_row_L1, &
                        lef_col_L1, rig_col_L1, nL0_in_L1, L1_HL1, L1_K0, L1_K1, L1_alpha)
 
-    use mo_common_constants, only : nodata_dp, nodata_i4
+    use mo_constants, only : nodata_dp, nodata_i4
     use mo_upscaling_operators, only : upscale_arithmetic_mean
 
     implicit none
