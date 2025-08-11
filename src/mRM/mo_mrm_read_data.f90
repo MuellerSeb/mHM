@@ -60,7 +60,7 @@ contains
                             file_gaugeloc, ufacc, ufdir, ugaugeloc
     use mo_mrm_global_variables, only : L0_InflowGaugeLoc, L0_fAcc, L0_fDir, L0_gaugeLoc, domain_mrm
     use mo_read_latlon, only : read_latlon
-    use mo_read_spatial_data, only : read_spatial_data_ascii
+    use mo_read_spatial_data, only : read_spatial_data_nc_or_ascii
     use mo_string_utils, only : num2str
 
     implicit none
@@ -152,7 +152,7 @@ contains
        if (iVar .le. 2) then
           !
           ! reading and transposing
-          call read_spatial_data_ascii(trim(fName), nunit, &
+          call read_spatial_data_nc_or_ascii(trim(fName), nunit, &
                level0_iDomain%nrows, level0_iDomain%ncols, level0_iDomain%xllcorner, &
                level0_iDomain%yllcorner, level0_iDomain%cellsize, data_i4_2d, mask_2d)
 
@@ -164,7 +164,7 @@ contains
           if (domain_mrm(iDomain)%nGauges .ge. 1_i4) then
              !
              ! reading and transposing
-             call read_spatial_data_ascii(trim(fName), nunit, &
+             call read_spatial_data_nc_or_ascii(trim(fName), nunit, &
                   level0_iDomain%nrows, level0_iDomain%ncols, level0_iDomain%xllcorner, &
                   level0_iDomain%yllcorner, level0_iDomain%cellsize, data_i4_2d, mask_2d)
 

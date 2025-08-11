@@ -12,6 +12,7 @@
 module mo_common_read_data
   USE mo_kind, ONLY : i4, dp
   use mo_message, only: message, error_message
+  use mo_read_spatial_data, only : read_spatial_data_nc_or_ascii
 
   IMPLICIT NONE
 
@@ -104,7 +105,7 @@ CONTAINS
 
       ! DEM + overall mask creation
       fName = trim(adjustl(dirMorpho(iDomain))) // trim(adjustl(file_dem))
-      call read_spatial_data_ascii(trim(fName), udem, &
+      call read_spatial_data_nc_or_ascii(trim(fName), udem, &
               level0_iDomain%nrows, level0_iDomain%ncols, level0_iDomain%xllcorner, &
               level0_iDomain%yllcorner, level0_iDomain%cellsize, data_dp_2d, level0_iDomain%mask)
 
@@ -186,7 +187,7 @@ CONTAINS
       ! LCover read in is realized seperated because of unknown number of scenes
       do iVar = 1, nLCoverScene
         fName = trim(adjustl(dirLCover(iDomain))) // trim(adjustl(LCfilename(iVar)))
-        call read_spatial_data_ascii(trim(fName), ulcoverclass, &
+        call read_spatial_data_nc_or_ascii(trim(fName), ulcoverclass, &
                 level0_iDomain%nrows, level0_iDomain%ncols, level0_iDomain%xllcorner, &
                 level0_iDomain%yllcorner, level0_iDomain%cellsize, data_i4_2d, mask_2d)
         ! put global nodata value into array (probably not all grid cells have values)
