@@ -79,7 +79,7 @@ CONTAINS
     use mo_prepare_gridded_lai, only : prepare_gridded_daily_LAI_data, prepare_gridded_mean_monthly_LAI_data
     use mo_read_latlon, only : read_latlon
     use mo_read_lut, only : read_geoformation_lut, read_lai_lut
-    use mo_read_spatial_data, only : read_spatial_data_ascii
+    use mo_read_spatial_data, only : read_spatial_data_nc_or_ascii
     use mo_soil_database, only : read_soil_LUT
     use mo_string_utils, only : num2str
     use mo_timer, only : timer_get, timer_start, &
@@ -183,7 +183,7 @@ CONTAINS
         end select
 
         ! reading
-        call read_spatial_data_ascii(trim(fName), nunit, &
+        call read_spatial_data_nc_or_ascii(trim(fName), nunit, &
                 level0_iDomain%nrows, level0_iDomain%ncols, level0_iDomain%xllcorner, &
                 level0_iDomain%yllcorner, level0_iDomain%cellsize, data_dp_2d, mask_2d)
         ! put global nodata value into array (probably not all grid cells have values)
@@ -220,7 +220,7 @@ CONTAINS
           172             format('soil_class_horizon_', i2.2, '.asc')
           fName = trim(adjustl(dirMorpho(iDomain))) // trim(adjustl(fName))
         end if
-        call read_spatial_data_ascii(trim(fName), usoilclass, &
+        call read_spatial_data_nc_or_ascii(trim(fName), usoilclass, &
                 level0_iDomain%nrows, level0_iDomain%ncols, level0_iDomain%xllcorner, &
                 level0_iDomain%yllcorner, level0_iDomain%cellsize, data_i4_2d, mask_2d)
         ! put global nodata value into array (probably not all grid cells have values)
@@ -234,7 +234,7 @@ CONTAINS
       ! read geoUnit
       fName = trim(adjustl(dirMorpho(iDomain))) // trim(adjustl(file_hydrogeoclass))
       ! reading and transposing
-      call read_spatial_data_ascii(trim(fName), uhydrogeoclass, &
+      call read_spatial_data_nc_or_ascii(trim(fName), uhydrogeoclass, &
               level0_iDomain%nrows, level0_iDomain%ncols, level0_iDomain%xllcorner, &
               level0_iDomain%yllcorner, level0_iDomain%cellsize, data_i4_2d, mask_2d)
       ! put global nodata value into array (probably not all grid cells have values)
@@ -258,7 +258,7 @@ CONTAINS
 
         fName = trim(adjustl(dirMorpho(iDomain))) // trim(adjustl(file_laiclass))
         ! reading and transposing
-        call read_spatial_data_ascii(trim(fName), ulaiclass, &
+        call read_spatial_data_nc_or_ascii(trim(fName), ulaiclass, &
                 level0_iDomain%nrows, level0_iDomain%ncols, level0_iDomain%xllcorner, &
                 level0_iDomain%yllcorner, level0_iDomain%cellsize, data_i4_2d, mask_2d)
         ! put global nodata value into array (probably not all grid cells have values)
