@@ -123,7 +123,7 @@ contains
     call meteo_handler%config(file_namelist_mhm, optimize, domainMeta, processMatrix, timestep, couple_cfg)
     mrm_coupling_mode = 2_i4 ! TODO: this shouldn't be needed
     call mrm_configuration(file_namelist_mhm, file_namelist_mhm_param)
-    call check_optimization_settings()
+    if (optimize) call check_optimization_settings()
 
     ! Message about input directories
     call domain_dir_check_message()

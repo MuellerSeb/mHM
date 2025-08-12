@@ -30,7 +30,7 @@ CONTAINS
 
   !> \brief read mRM configuration from namelists
   subroutine mrm_configuration(file_namelist, file_namelist_param)
-    use mo_common_mHM_mRM_variables, only : mrm_coupling_mode
+    use mo_common_mHM_mRM_variables, only : mrm_coupling_mode, optimize
     use mo_common_variables, only : processMatrix
     use mo_mrm_read_config, only : mrm_read_config
     use mo_mrm_global_variables, only: riv_temp_pcs
@@ -67,7 +67,7 @@ CONTAINS
 
     ! this was moved here, because it depends on global_parameters that are only set in mrm_read_config
     if (mrm_coupling_mode .eq. 0_i4) then
-      call check_optimization_settings()
+      if (optimize) call check_optimization_settings()
       !-----------------------------------------------------------
       ! CONFIG OUTPUT
       !-----------------------------------------------------------

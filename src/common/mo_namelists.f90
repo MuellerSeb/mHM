@@ -1509,7 +1509,7 @@ contains
     class(nml_optimization_t), intent(inout) :: self
     character(*), intent(in) :: file !< file containing the namelist
 
-    integer :: unit !< file unit to open the given file
+    integer :: unit, status
     integer(i4) :: nIterations !< number of iterations for optimization
     integer(i8) :: seed !< seed used for optimization, default: -9 --> system time
     real(dp) :: dds_r !< DDS: perturbation rate, default: 0.2
@@ -1532,9 +1532,18 @@ contains
       mcmc_error_params
 
     if ( self%read_from_file ) then
+      nIterations = 0_i4
+      seed = -9_i8
+      dds_r = 0.2_dp
+      sa_temp = -9.0_dp
+      sce_ngs = 2_i4
+      sce_npg = -9_i4
+      sce_nps = -9_i4
+      mcmc_opti = .true.
+      ! mcmc_error_params -> no defaults
       call open_new_nml(file, unit)
-      call position_nml(self%name, unit)
-      read(unit, nml=optimization)
+      call position_nml(self%name, unit, status=status)
+      if (status == 0) read(unit, nml=optimization)
       call close_nml(unit)
       self%nIterations = nIterations
       self%seed = seed
