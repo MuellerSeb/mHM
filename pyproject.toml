@@ -137,8 +137,8 @@ build-verbosity = 1
 skip = ["cp38*", "*-musllinux_*"]
 # check command
 test-extras = "test"
-test-command = "mhm -h && python -m pytest pybind/tests/"
-test-sources = ["pybind/tests/", "pyproject.toml"]
+test-command = "mhm -h && mhm test_domain/ && python -m pytest -v pybind/tests/"
+test-sources = ["test_domain/", "pybind/tests/", "pyproject.toml"]
 # force binary numpy dep
 environment.PIP_ONLY_BINARY = "numpy"
 environment.PIP_PREFER_BINARY = "1"
