@@ -47,8 +47,7 @@ module mo_namelists
     character(1024) :: mHM_details !< developing institution, specific mHM revision
     character(1024) :: history !< details on version/creation date
   contains
-    !> \copydoc mo_namelists::read_project_description
-    procedure, public :: read => read_project_description !< \see mo_namelists::read_project_description
+    procedure, public :: read => read_project_description
   end type nml_project_description_t
   !> 'project_description' namelist content
   type(nml_project_description_t), public :: nml_project_description
@@ -77,8 +76,7 @@ module mo_namelists
     character(256), dimension(maxNoDomains) :: dir_Out !< Directory where output is written to
     character(256), dimension(maxNoDomains) :: file_LatLon !< Directory where the Lat Lon Files are located
   contains
-    !> \copydoc mo_namelists::read_directories_general
-    procedure, public :: read => read_directories_general !< \see mo_namelists::read_directories_general
+    procedure, public :: read => read_directories_general
   end type nml_directories_general_t
   !> 'directories_general' namelist content
   type(nml_directories_general_t), public :: nml_directories_general
@@ -103,8 +101,7 @@ module mo_namelists
     logical :: write_restart !< flag to write restart
     integer(i4), dimension(maxNoDomains) :: read_opt_domain_data !< read domain specific optional data
     contains
-    !> \copydoc mo_namelists::read_mainconfig
-    procedure, public :: read => read_mainconfig !< \see mo_namelists::read_mainconfig
+    procedure, public :: read => read_mainconfig
   end type nml_mainconfig_t
   !> 'mainconfig' namelist content
   type(nml_mainconfig_t), public :: nml_mainconfig
@@ -119,8 +116,7 @@ module mo_namelists
     logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
     integer(i4), dimension(nProcesses) :: processCase !< ! Choosen process description number
   contains
-    !> \copydoc mo_namelists::read_processselection
-    procedure, public :: read => read_processselection !< \see mo_namelists::read_processselection
+    procedure, public :: read => read_processselection
   end type nml_processselection_t
   !> 'processSelection' namelist content
   type(nml_processselection_t), public :: nml_processselection
@@ -141,8 +137,7 @@ module mo_namelists
     integer(i4), dimension(maxNLCovers) :: LCoverYearEnd !< ending year LCover
     character(256), dimension(maxNLCovers) :: LCoverfName !< filename of Lcover file
   contains
-    !> \copydoc mo_namelists::read_lcover
-    procedure, public :: read => read_lcover !< \see mo_namelists::read_lcover
+    procedure, public :: read => read_lcover
   end type nml_lcover_t
   !> 'LCover' namelist content
   type(nml_lcover_t), public :: nml_lcover
@@ -180,8 +175,7 @@ module mo_namelists
     character(256), dimension(maxNoDomains) :: mhm_file_RestartIn !< mhm restart file paths
     character(256), dimension(maxNoDomains) :: mrm_file_RestartIn !< mrm restart file paths
   contains
-    !> \copydoc mo_namelists::read_mainconfig_mhm_mrm
-    procedure, public :: read => read_mainconfig_mhm_mrm !< \see mo_namelists::read_mainconfig_mhm_mrm
+    procedure, public :: read => read_mainconfig_mhm_mrm
   end type nml_mainconfig_mhm_mrm_t
   !> 'mainconfig_mhm_mrm' namelist content
   type(nml_mainconfig_mhm_mrm_t), public :: nml_mainconfig_mhm_mrm
@@ -212,8 +206,7 @@ module mo_namelists
     logical :: mcmc_opti !< MCMC: optimization (.true.) or only parameter uncertainty (.false.)
     real(dp), dimension(nerror_model) :: mcmc_error_params !< error model para (mcmc_opti=.false.) e.g. for opti_function=8: .01, .3
   contains
-    !> \copydoc mo_namelists::read_optimization
-    procedure, public :: read => read_optimization !< \see mo_namelists::read_optimization
+    procedure, public :: read => read_optimization
   end type nml_optimization_t
   !> 'optimization' namelist content
   type(nml_optimization_t), public :: nml_optimization
@@ -230,8 +223,7 @@ module mo_namelists
     integer(i4), dimension(maxNoDomains) :: warming_Days !< number of days for warm up period
     type(period), dimension(maxNoDomains) :: eval_Per !< time period for model evaluation
   contains
-    !> \copydoc mo_namelists::read_time_periods
-    procedure, public :: read => read_time_periods !< \see mo_namelists::read_time_periods
+    procedure, public :: read => read_time_periods
   end type nml_time_periods_t
   !> 'time_periods' namelist content
   type(nml_time_periods_t), public :: nml_time_periods
@@ -271,8 +263,7 @@ module mo_namelists
     character(256), dimension(maxNoDomains) :: dir_Radiation !< riv-temp related: directory of (long/short-wave)radiation
     integer(i4), dimension(maxNoDomains) :: time_step_model_inputs !< frequency for reading meteo input
   contains
-    !> \copydoc mo_namelists::read_directories_mhm
-    procedure, public :: read => read_directories_mhm !< \see mo_namelists::read_directories_mhm
+    procedure, public :: read => read_directories_mhm
   end type nml_directories_mhm_t
   !> 'directories_mhm' namelist content
   type(nml_directories_mhm_t), public :: nml_directories_mhm
@@ -303,8 +294,7 @@ module mo_namelists
     integer(i4) :: timeStep_et_input !< time step of optional data: et
     integer(i4) :: timeStep_tws_input !< time step of optional data: tws
   contains
-    !> \copydoc mo_namelists::read_optional_data
-    procedure, public :: read => read_optional_data !< \see mo_namelists::read_optional_data
+    procedure, public :: read => read_optional_data
   end type nml_optional_data_t
   !> 'optional_data' namelist content
   type(nml_optional_data_t), public :: nml_optional_data
@@ -319,8 +309,7 @@ module mo_namelists
     logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
     real(dp), dimension(int(YearMonths, i4)) :: evap_coeff !< [-] Evap. coef. for free-water surfaces
   contains
-    !> \copydoc mo_namelists::read_panevapo
-    procedure, public :: read => read_panevapo !< \see mo_namelists::read_panevapo
+    procedure, public :: read => read_panevapo
   end type nml_panevapo_t
   !> 'panevapo' namelist content
   type(nml_panevapo_t), public :: nml_panevapo
@@ -345,8 +334,7 @@ module mo_namelists
     real(dp), dimension(int(YearMonths, i4)) :: fnight_ssrd !< [-] Night factor short-wave rad.
     real(dp), dimension(int(YearMonths, i4)) :: fnight_strd !< [-] Night factor long-wave rad.
   contains
-    !> \copydoc mo_namelists::read_nightdayratio
-    procedure, public :: read => read_nightdayratio !< \see mo_namelists::read_nightdayratio
+    procedure, public :: read => read_nightdayratio
   end type nml_nightdayratio_t
   !> 'nightdayratio' namelist content
   type(nml_nightdayratio_t), public :: nml_nightdayratio
@@ -368,8 +356,7 @@ module mo_namelists
     integer(i4) :: output_time_reference !< time reference point location in output nc files
     logical, dimension(nOutFlxState) :: outputFlxState !< Define model outputs see "mhm_outputs.nml"
   contains
-    !> \copydoc mo_namelists::read_nloutputresults
-    procedure, public :: read => read_nloutputresults !< \see mo_namelists::read_nloutputresults
+    procedure, public :: read => read_nloutputresults
   end type nml_nloutputresults_t
   !> 'nloutputresults' namelist content
   type(nml_nloutputresults_t), public :: nml_nloutputresults
@@ -386,8 +373,7 @@ module mo_namelists
     logical :: BFI_calc !< calculate observed BFI from gauges with Eckhardt filter
     real(dp), dimension(maxNoDomains) :: BFI_obs !< given base-flow index per domain
 contains
-    !> \copydoc mo_namelists::read_baseflow_config
-    procedure, public :: read => read_baseflow_config !< \see mo_namelists::read_baseflow_config
+    procedure, public :: read => read_baseflow_config
   end type nml_baseflow_config_t
   !> 'baseflow_config' namelist content
   type(nml_baseflow_config_t), public :: nml_baseflow_config
@@ -403,8 +389,7 @@ contains
     logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
     character(256), dimension(maxNoDomains) :: dir_gridded_LAI !< directory of gridded LAI data, used when timeStep_LAI_input<0
   contains
-    !> \copydoc mo_namelists::read_directories_mpr
-    procedure, public :: read => read_directories_mpr !< \see mo_namelists::read_directories_mpr
+    procedure, public :: read => read_directories_mpr
   end type nml_directories_mpr_t
   !> 'directories_mpr' namelist content
   type(nml_directories_mpr_t), public :: nml_directories_mpr
@@ -425,8 +410,7 @@ contains
     integer(i4) :: nSoilHorizons_mHM !< Number of horizons to model
     real(dp), dimension(maxNoSoilHorizons) :: soil_Depth !< depth of the single horizons
   contains
-    !> \copydoc mo_namelists::read_soildata
-    procedure, public :: read => read_soildata !< \see mo_namelists::read_soildata
+    procedure, public :: read => read_soildata
   end type nml_soildata_t
   !> 'soildata' namelist content
   type(nml_soildata_t), public :: nml_soildata
@@ -443,8 +427,7 @@ contains
     character(256) :: inputFormat_gridded_LAI !< format of gridded LAI data (nc only)
     integer(i4) :: timeStep_LAI_input !< time step of gridded LAI input
   contains
-    !> \copydoc mo_namelists::read_lai_data_information
-    procedure, public :: read => read_lai_data_information !< \see mo_namelists::read_lai_data_information
+    procedure, public :: read => read_lai_data_information
   end type nml_lai_data_information_t
   !> 'lai_data_information' namelist content
   type(nml_lai_data_information_t), public :: nml_lai_data_information
@@ -459,8 +442,7 @@ contains
     logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
     real(dp) :: fracSealed_cityArea !< fraction of area within city assumed to be perfectly sealed [0-1]
   contains
-    !> \copydoc mo_namelists::read_lcover_mpr
-    procedure, public :: read => read_lcover_mpr !< \see mo_namelists::read_lcover_mpr
+    procedure, public :: read => read_lcover_mpr
   end type nml_lcover_mpr_t
   !> 'lcover_mpr' namelist content
   type(nml_lcover_mpr_t), public :: nml_lcover_mpr
@@ -475,8 +457,7 @@ contains
     logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
     real(dp), dimension(nColPars) :: canopyInterceptionFactor !< multiplier to relate LAI to interception storage [-]
   contains
-    !> \copydoc mo_namelists::read_interception1
-    procedure, public :: read => read_interception1 !< \see mo_namelists::read_interception1
+    procedure, public :: read => read_interception1
   end type nml_interception1_t
   !> 'interception1' namelist content
   type(nml_interception1_t), public :: nml_interception1
@@ -505,8 +486,7 @@ contains
     real(dp), dimension(nColPars) :: maxDegreeDayFactor_impervious !< impervious: maximum values for degree day factor [m degC-1]
     real(dp), dimension(nColPars) :: maxDegreeDayFactor_pervious !< pervious: maximum values for degree day factor [m degC-1]
   contains
-    !> \copydoc mo_namelists::read_snow1
-    procedure, public :: read => read_snow1 !< \see mo_namelists::read_snow1
+    procedure, public :: read => read_snow1
   end type nml_snow1_t
   !> 'snow1' namelist content
   type(nml_snow1_t), public :: nml_snow1
@@ -560,8 +540,7 @@ contains
     !> shape factor for partitioning effective precipitation into runoff and infiltration based on soil wetness [-]
     real(dp), dimension(nColPars) :: infiltrationShapeFactor
   contains
-    !> \copydoc mo_namelists::read_soilmoisture1
-    procedure, public :: read => read_soilmoisture1 !< \see mo_namelists::read_soilmoisture1
+    procedure, public :: read => read_soilmoisture1
   end type nml_soilmoisture1_t
   !> 'soilmoisture1' namelist content
   type(nml_soilmoisture1_t), public :: nml_soilmoisture1
@@ -617,8 +596,7 @@ contains
     real(dp), dimension(nColPars) :: infiltrationShapeFactor
     real(dp), dimension(nColPars) :: jarvis_sm_threshold_c1 !< soil moisture threshod for jarvis model
   contains
-    !> \copydoc mo_namelists::read_soilmoisture2
-    procedure, public :: read => read_soilmoisture2 !< \see mo_namelists::read_soilmoisture2
+    procedure, public :: read => read_soilmoisture2
   end type nml_soilmoisture2_t
   !> 'soilmoisture2' namelist content
   type(nml_soilmoisture2_t), public :: nml_soilmoisture2
@@ -682,8 +660,7 @@ contains
     real(dp), dimension(nColPars) :: rootFractionCoefficient_clay !< threshold for actual ET reduction for clay
     real(dp), dimension(nColPars) :: jarvis_sm_threshold_c1 !< soil moisture threshod for jarvis model
   contains
-    !> \copydoc mo_namelists::read_soilmoisture3
-    procedure, public :: read => read_soilmoisture3 !< \see mo_namelists::read_soilmoisture3
+    procedure, public :: read => read_soilmoisture3
   end type nml_soilmoisture3_t
   !> 'soilmoisture3' namelist content
   type(nml_soilmoisture3_t), public :: nml_soilmoisture3
@@ -745,8 +722,7 @@ contains
     real(dp), dimension(nColPars) :: rootFractionCoefficient_sand !< threshold for actual ET reduction for sand
     real(dp), dimension(nColPars) :: rootFractionCoefficient_clay !< threshold for actual ET reduction for clay
   contains
-    !> \copydoc mo_namelists::read_soilmoisture4
-    procedure, public :: read => read_soilmoisture4 !< \see mo_namelists::read_soilmoisture4
+    procedure, public :: read => read_soilmoisture4
   end type nml_soilmoisture4_t
   !> 'soilmoisture4' namelist content
   type(nml_soilmoisture4_t), public :: nml_soilmoisture4
@@ -761,8 +737,7 @@ contains
     logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
     real(dp), dimension(nColPars) :: imperviousStorageCapacity !< direct Runoff: Sealed Area storage capacity
   contains
-    !> \copydoc mo_namelists::read_directrunoff1
-    procedure, public :: read => read_directrunoff1 !< \see mo_namelists::read_directrunoff1
+    procedure, public :: read => read_directrunoff1
   end type nml_directrunoff1_t
   !> 'directrunoff1' namelist content
   type(nml_directrunoff1_t), public :: nml_directrunoff1
@@ -786,8 +761,7 @@ contains
     real(dp), dimension(nColPars) :: PET_b !< DSF=PET_a+PET_b*(1-exp(PET_c*LAI)) to correct PET as PET=DSF*PET
     real(dp), dimension(nColPars) :: PET_c !< DSF=PET_a+PET_b*(1-exp(PET_c*LAI)) to correct PET as PET=DSF*PET
   contains
-    !> \copydoc mo_namelists::read_petminus1
-    procedure, public :: read => read_petminus1 !< \see mo_namelists::read_petminus1
+    procedure, public :: read => read_petminus1
   end type nml_petminus1_t
   !> 'petminus1' namelist content
   type(nml_petminus1_t), public :: nml_petminus1
@@ -807,8 +781,7 @@ contains
     real(dp), dimension(nColPars) :: maxCorrectionFactorPET !< maximum factor for PET correction with aspect
     real(dp), dimension(nColPars) :: aspectTresholdPET !< aspect threshold for PET correction with aspect
   contains
-    !> \copydoc mo_namelists::read_pet0
-    procedure, public :: read => read_pet0 !< \see mo_namelists::read_pet0
+    procedure, public :: read => read_pet0
   end type nml_pet0_t
   !> 'pet0' namelist content
   type(nml_pet0_t), public :: nml_pet0
@@ -830,8 +803,7 @@ contains
     real(dp), dimension(nColPars) :: aspectTresholdPET !< aspect threshold for PET correction with aspect
     real(dp), dimension(nColPars) :: HargreavesSamaniCoeff !< coefficient for Hargreaves Samani
   contains
-    !> \copydoc mo_namelists::read_pet1
-    procedure, public :: read => read_pet1 !< \see mo_namelists::read_pet1
+    procedure, public :: read => read_pet1
   end type nml_pet1_t
   !> 'pet1' namelist content
   type(nml_pet1_t), public :: nml_pet1
@@ -849,8 +821,7 @@ contains
     real(dp), dimension(nColPars) :: PriestleyTaylorCoeff !< Priestley-Taylor coefficient
     real(dp), dimension(nColPars) :: PriestleyTaylorLAIcorr !< Priestley-Taylor LAI correction factor
   contains
-    !> \copydoc mo_namelists::read_pet2
-    procedure, public :: read => read_pet2 !< \see mo_namelists::read_pet2
+    procedure, public :: read => read_pet2
   end type nml_pet2_t
   !> 'pet2' namelist content
   type(nml_pet2_t), public :: nml_pet2
@@ -878,8 +849,7 @@ contains
     real(dp), dimension(nColPars) :: roughnesslength_heat_coeff !< roughness length heat coefficient
     real(dp), dimension(nColPars) :: stomatal_resistance !< stomatal resistance
   contains
-    !> \copydoc mo_namelists::read_pet3
-    procedure, public :: read => read_pet3 !< \see mo_namelists::read_pet3
+    procedure, public :: read => read_pet3
   end type nml_pet3_t
   !> 'pet3' namelist content
   type(nml_pet3_t), public :: nml_pet3
@@ -905,8 +875,7 @@ contains
     !> multiplier for variability of saturated hydraulic conductivity to derive slow interflow exponent
     real(dp), dimension(nColPars) :: exponentSlowInterflow
   contains
-    !> \copydoc mo_namelists::read_interflow1
-    procedure, public :: read => read_interflow1 !< \see mo_namelists::read_interflow1
+    procedure, public :: read => read_interflow1
   end type nml_interflow1_t
   !> 'interflow1' namelist content
   type(nml_interflow1_t), public :: nml_interflow1
@@ -925,8 +894,7 @@ contains
     real(dp), dimension(nColPars) :: rechargeFactor_karstic !< recharge factor for karstic percolation
     real(dp), dimension(nColPars) :: gain_loss_GWreservoir_karstic !< gain loss in ground water reservoir for karstic
   contains
-    !> \copydoc mo_namelists::read_percolation1
-    procedure, public :: read => read_percolation1 !< \see mo_namelists::read_percolation1
+    procedure, public :: read => read_percolation1
   end type nml_percolation1_t
   !> 'percolation1' namelist content
   type(nml_percolation1_t), public :: nml_percolation1
@@ -945,8 +913,7 @@ contains
     real(dp), dimension(nColPars) :: Desilets_LW0 !< Desilets LW0 parameter
     real(dp), dimension(nColPars) :: Desilets_LW1 !< Desilets LW1 parameter
   contains
-    !> \copydoc mo_namelists::read_neutrons1
-    procedure, public :: read => read_neutrons1 !< \see mo_namelists::read_neutrons1
+    procedure, public :: read => read_neutrons1
   end type nml_neutrons1_t
   !> 'neutrons1' namelist content
   type(nml_neutrons1_t), public :: nml_neutrons1
@@ -977,8 +944,7 @@ contains
     real(dp), dimension(nColPars) :: COSMIC_LW0 !< cosmic LW0 parameter
     real(dp), dimension(nColPars) :: COSMIC_LW1 !< cosmic LW1 parameter
   contains
-    !> \copydoc mo_namelists::read_neutrons2
-    procedure, public :: read => read_neutrons2 !< \see mo_namelists::read_neutrons2
+    procedure, public :: read => read_neutrons2
   end type nml_neutrons2_t
   !> 'neutrons2' namelist content
   type(nml_neutrons2_t), public :: nml_neutrons2
@@ -994,8 +960,7 @@ contains
     !> geological parameters (ordering according to file 'geology_classdefinition.txt')
     real(dp), dimension(maxGeoUnit, nColPars) :: GeoParam
   contains
-    !> \copydoc mo_namelists::read_geoparameter
-    procedure, public :: read => read_geoparameter !< \see mo_namelists::read_geoparameter
+    procedure, public :: read => read_geoparameter
   end type nml_geoparameter_t
   !> 'geoparameter' namelist content
   type(nml_geoparameter_t), public :: nml_geoparameter
@@ -1017,8 +982,7 @@ contains
     character(256) :: varnameTotalRunoff !< variable name of total runoff
     logical :: gw_coupling !< switch to enable ground water coupling
   contains
-    !> \copydoc mo_namelists::read_mainconfig_mrm
-    procedure, public :: read => read_mainconfig_mrm !< \see mo_namelists::read_mainconfig_mrm
+    procedure, public :: read => read_mainconfig_mrm
   end type nml_mainconfig_mrm_t
   !> 'mainconfig_mrm' namelist content
   type(nml_mainconfig_mrm_t), public :: nml_mainconfig_mrm
@@ -1037,8 +1001,7 @@ contains
     character(256), dimension(maxNoDomains) :: dir_Total_Runoff !< directory where simulated runoff can be found
     character(256), dimension(maxNoDomains) :: dir_Bankfull_Runoff !< directory where runoff at bankfull conditions can be found
   contains
-    !> \copydoc mo_namelists::read_directories_mrm
-    procedure, public :: read => read_directories_mrm !< \see mo_namelists::read_directories_mrm
+    procedure, public :: read => read_directories_mrm
   end type nml_directories_mrm_t
   !> 'directories_mrm' namelist content
   type(nml_directories_mrm_t), public :: nml_directories_mrm
@@ -1059,8 +1022,7 @@ contains
     integer(i4), dimension(maxNoDomains, maxNoGauges) :: Gauge_id !< gauge ID for each gauge
     character(256), dimension(maxNoDomains, maxNoGauges) :: Gauge_filename !< filename for each gauge time series
   contains
-    !> \copydoc mo_namelists::read_evaluation_gauges
-    procedure, public :: read => read_evaluation_gauges !< \see mo_namelists::read_evaluation_gauges
+    procedure, public :: read => read_evaluation_gauges
   end type nml_evaluation_gauges_t
   !> 'evaluation_gauges' namelist content
   type(nml_evaluation_gauges_t), public :: nml_evaluation_gauges
@@ -1085,8 +1047,7 @@ contains
     !> consider flows from upstream/headwater cells of inflow gauge(1) for subdomain(1) --> (1,1)
     logical, dimension(maxNoDomains, maxNoGauges) :: InflowGauge_Headwater
   contains
-    !> \copydoc mo_namelists::read_inflow_gauges
-    procedure, public :: read => read_inflow_gauges !< \see mo_namelists::read_inflow_gauges
+    procedure, public :: read => read_inflow_gauges
   end type nml_inflow_gauges_t
   !> 'inflow_gauges' namelist content
   type(nml_inflow_gauges_t), public :: nml_inflow_gauges
@@ -1108,8 +1069,7 @@ contains
     integer(i4) :: timeStep_model_outputs_mrm !< timestep for writing model outputs
     logical, dimension(mrm_nOutFlxState) :: outputFlxState_mrm !< Define model outputs see "mhm_outputs.nml"
   contains
-    !> \copydoc mo_namelists::read_mrm_outputs
-    procedure, public :: read => read_mrm_outputs !< \see mo_namelists::read_mrm_outputs
+    procedure, public :: read => read_mrm_outputs
   end type nml_mrm_outputs_t
   !> 'mrm_outputs' namelist content
   type(nml_mrm_outputs_t), public :: nml_mrm_outputs
@@ -1132,8 +1092,7 @@ contains
     real(dp), dimension(nColPars) :: muskingumTravelTime_impervious !< muskingum parameter impervious
     real(dp), dimension(nColPars) :: muskingumAttenuation_riverSlope !< muskingum parameter attenuation river slope
   contains
-    !> \copydoc mo_namelists::read_routing1
-    procedure, public :: read => read_routing1 !< \see mo_namelists::read_routing1
+    procedure, public :: read => read_routing1
   end type nml_routing1_t
   !> 'routing1' namelist content
   type(nml_routing1_t), public :: nml_routing1
@@ -1148,8 +1107,7 @@ contains
     logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
     real(dp), dimension(nColPars) :: streamflow_celerity !< streamflow celerity
   contains
-    !> \copydoc mo_namelists::read_routing2
-    procedure, public :: read => read_routing2 !< \see mo_namelists::read_routing2
+    procedure, public :: read => read_routing2
   end type nml_routing2_t
   !> 'routing2' namelist content
   type(nml_routing2_t), public :: nml_routing2
@@ -1164,8 +1122,7 @@ contains
     logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
     real(dp), dimension(nColPars) :: slope_factor !< slope factor
   contains
-    !> \copydoc mo_namelists::read_routing3
-    procedure, public :: read => read_routing3 !< \see mo_namelists::read_routing3
+    procedure, public :: read => read_routing3
   end type nml_routing3_t
   !> 'routing3' namelist content
   type(nml_routing3_t), public :: nml_routing3
@@ -1199,8 +1156,7 @@ contains
     character(256) :: riv_widths_name !< variable name for river widths
     character(256), dimension(maxNoDomains) :: dir_riv_widths !< files for river widths
   contains
-    !> \copydoc mo_namelists::read_config_riv_temp
-    procedure, public :: read => read_config_riv_temp !< \see mo_namelists::read_config_riv_temp
+    procedure, public :: read => read_config_riv_temp
   end type nml_config_riv_temp_t
   !> 'config_riv_temp' namelist content
   type(nml_config_riv_temp_t), public :: nml_config_riv_temp
@@ -1242,8 +1198,7 @@ contains
     logical :: meteo_expect_strd !< expect meteo from coupling: [W m2]    long wave radiation
     logical :: meteo_expect_tann !< expect meteo from coupling: [degC]    annual mean air temperature
   contains
-    !> \copydoc mo_namelists::read_coupling
-    procedure, public :: read => read_coupling !< \see mo_namelists::read_coupling
+    procedure, public :: read => read_coupling
   end type nml_coupling_t
   !> 'coupling' namelist content
   type(nml_coupling_t), public :: nml_coupling
@@ -1510,7 +1465,7 @@ contains
     class(nml_optimization_t), intent(inout) :: self
     character(*), intent(in) :: file !< file containing the namelist
 
-    integer :: unit !< file unit to open the given file
+    integer :: unit, status
     integer(i4) :: nIterations !< number of iterations for optimization
     integer(i8) :: seed !< seed used for optimization, default: -9 --> system time
     real(dp) :: dds_r !< DDS: perturbation rate, default: 0.2
@@ -1533,9 +1488,18 @@ contains
       mcmc_error_params
 
     if ( self%read_from_file ) then
+      nIterations = 0_i4
+      seed = -9_i8
+      dds_r = 0.2_dp
+      sa_temp = -9.0_dp
+      sce_ngs = 2_i4
+      sce_npg = -9_i4
+      sce_nps = -9_i4
+      mcmc_opti = .true.
+      ! mcmc_error_params -> no defaults
       call open_new_nml(file, unit)
-      call position_nml(self%name, unit)
-      read(unit, nml=optimization)
+      call position_nml(self%name, unit, status=status)
+      if (status == 0) read(unit, nml=optimization)
       call close_nml(unit)
       self%nIterations = nIterations
       self%seed = seed
