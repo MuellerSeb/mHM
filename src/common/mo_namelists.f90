@@ -1532,6 +1532,14 @@ contains
       mcmc_error_params
 
     if ( self%read_from_file ) then
+      ! defaults
+      nIterations = 0_i4
+      seed = -9_i8
+      dds_r = 0.2_dp
+      sa_temp = -9.0_dp
+      sce_ngs = 2_i4
+      sce_npg = -9_i4
+      sce_nps = -9_i4
       call open_new_nml(file, unit)
       call position_nml(self%name, unit)
       read(unit, nml=optimization)
