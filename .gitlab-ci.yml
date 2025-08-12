@@ -145,6 +145,7 @@ pybindings:
   stage: build
   variables:
     GIT_DEPTH: 0  # to have all tags
+    CMAKE_BUILD_PARALLEL_LEVEL: 4  # at most 4 cores
   script:
     - module load Mamba
     - mamba create -p ./mhm_env -y python=3.11 pip netcdf-fortran fortran-compiler c-compiler cxx-compiler fypp python-build black isort pytest-cov xarray netCDF4
