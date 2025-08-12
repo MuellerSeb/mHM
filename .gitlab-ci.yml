@@ -118,7 +118,7 @@ show-env-vars:
     - source hpc-module-loads/eve.$COMPILER
     # run cmake with testing support, build mhm and run pfunit tests
     - cmake -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTING=ON -B build
-    - cmake --build build --parallel
+    - cmake --build build --parallel 4
     - cmake --build build --target test
 
 .valgrind_template: &valgrind_template
@@ -337,7 +337,7 @@ coverage:
     - source hpc-module-loads/eve.chs-conda02
     # run cmake with coverage support and run tests
     - cmake -DCMAKE_BUILD_TYPE=Debug -DCMAKE_WITH_COVERAGE=ON -B build
-    - cmake --build build --parallel
+    - cmake --build build --parallel 4
     - cmake --build build --target mhm_coverage_CI
     # copy the output to a top-level folder
     - mkdir coverage

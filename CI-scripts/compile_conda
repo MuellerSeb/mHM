@@ -4,5 +4,5 @@ conda config --add channels conda-forge
 conda config --set channel_priority strict
 conda install -y cmake make fortran-compiler netcdf-fortran fypp
 cmake -DCMAKE_BUILD_TYPE=Release -B build
-cmake --build build --parallel
+cmake --build build --parallel 4
 cmake --install build --prefix $CONDA_PREFIX
