@@ -118,7 +118,7 @@ show-env-vars:
     - source hpc-module-loads/eve.$COMPILER
     # run cmake with testing support, build mhm and run pfunit tests
     - cmake -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTING=ON -B build
-    - cmake --build build --parallel 4
+    - cmake --build build --parallel 16  # intel fails with too few (pfunit issue)
     - cmake --build build --target test
 
 .valgrind_template: &valgrind_template
