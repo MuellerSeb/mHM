@@ -76,7 +76,6 @@ jobs:
 
       - uses: mamba-org/setup-micromamba@v2
         with:
-          generate-run-shell: true
           environment-name: mhm-env
           create-args: >-
             python=3.12
@@ -90,7 +89,6 @@ jobs:
       - run: |
           pip install -v .
           pytest pybind/tests/
-        shell: micromamba-shell {0}
 
   upload_to_pypi:
     needs: [build_wheels, build_sdist]
