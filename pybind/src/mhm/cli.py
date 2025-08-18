@@ -7,7 +7,17 @@ Module to provide a script to execute mHM.
 
 import argparse
 
-from . import __version__, f_version, model
+from .wrapper import model
+
+try:
+    from ._version import __version__
+except ModuleNotFoundError:  # pragma: no cover
+    # package is not installed
+    __version__ = "0.0.0.dev0"
+
+
+def f_version():
+    return model.version().decode("utf-8").strip()
 
 
 def mhm():  # pragma: no cover
@@ -20,7 +30,7 @@ def mhm():  # pragma: no cover
         "-V",
         "--version",
         action="version",
-        version=f_version,
+        version=f_version(),
         help="show mHM version and exit",
     )
     parser.add_argument(

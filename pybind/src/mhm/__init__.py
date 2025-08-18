@@ -33,18 +33,13 @@ from .tools import (
     set_meteo,
 )
 from .wrapper import get, model, run, set
-
-try:
-    from ._version import __version__
-except ModuleNotFoundError:  # pragma: no cover
-    # package is not installed
-    __version__ = "0.0.0.dev0"
+from .cli import __version__
 
 
 def __getattr__(name):
     """Magic method to provide 'f_version' in Python."""
     if name == "f_version":
-        return model.version().decode("utf-8").strip()
+        return cli.f_verison()
     raise AttributeError(f"module {__name__} has no attribute {name}")
 
 
