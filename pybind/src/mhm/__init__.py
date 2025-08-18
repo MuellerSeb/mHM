@@ -39,7 +39,7 @@ from .cli import __version__
 def __getattr__(name):
     """Magic method to provide 'f_version' in Python."""
     if name == "f_version":
-        return cli.f_verison()
+        return cli.f_version()
     raise AttributeError(f"module {__name__} has no attribute {name}")
 
 
