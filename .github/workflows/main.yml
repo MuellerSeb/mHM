@@ -82,6 +82,7 @@ jobs:
             numpy
             gfortran_win-64
             netcdf-fortran
+            pkg-config
             pytest-cov
             xarray
             netcdf4
