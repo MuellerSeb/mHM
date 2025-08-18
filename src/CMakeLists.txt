@@ -8,11 +8,9 @@ file(GLOB sources_meteo meteo/*mo_*.*90)
 file(GLOB sources_coupling coupling/*mo_*.*90)
 list(APPEND sources ${sources_mpr} ${sources_mhm} ${sources_mrm} ${sources_common} ${sources_meteo} ${sources_coupling})
 option(BUILD_MHM_LIB_SHARED "Build mhm library as shared." OFF)
-if(BUILD_MHM_LIB_SHARED)
-  add_library(${LIB_NAME} SHARED ${sources})
-else()
-  add_library(${LIB_NAME} STATIC ${sources})
-endif()
+
+add_library(${LIB_NAME} STATIC ${sources})
+
 target_include_directories(${LIB_NAME} PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
 
 # add FORCES
@@ -37,6 +35,7 @@ set(CPM_forces_VERSION "${ver_forces}" CACHE STRING "FORCES version to download 
 CPMAddPackage("https://git.ufz.de/chs/forces.git#${CPM_forces_VERSION}")
 if(BUILD_MHM_LIB_SHARED)
   set_property(TARGET forces PROPERTY POSITION_INDEPENDENT_CODE ON)
+  set_property(TARGET ${LIB_NAME} PROPERTY POSITION_INDEPENDENT_CODE ON)
 endif()
 target_link_libraries(${LIB_NAME} PUBLIC forces)
 

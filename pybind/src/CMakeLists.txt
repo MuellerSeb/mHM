@@ -8,32 +8,6 @@ else()
   set(mhm_install_dir "mhm")
 endif()
 
-install(TARGETS mhm_lib
-  RUNTIME DESTINATION "${mhm_install_dir}"  # Windows: .dll
-  LIBRARY DESTINATION "${mhm_install_dir}"  # Linux/macOS: .so/.dylib
-  ARCHIVE DESTINATION "${mhm_install_dir}"  # Windows: .lib (static/import), Unix: .a
-)
-if(BUILD_MHM_DRIVER)
-  # link to mhm-lib next to executable
-  if (APPLE)
-    set_target_properties(mhm
-      PROPERTIES
-      LINK_FLAGS  "-Wl,-undefined,dynamic_lookup"
-      INSTALL_RPATH "@loader_path"
-      BUILD_RPATH "@loader_path"
-    )
-  elseif(UNIX)
-    set_target_properties(mhm
-      PROPERTIES
-      LINK_FLAGS  "-Wl,--allow-shlib-undefined"
-      BUILD_RPATH_USE_ORIGIN ON
-      INSTALL_RPATH "$ORIGIN"
-      BUILD_RPATH "$ORIGIN"
-    )
-  endif()
-  install(TARGETS mhm RUNTIME DESTINATION "${mhm_install_dir}")
-endif()
-
 # Grab the variables from a local Python installation F2PY headers
 execute_process(
   COMMAND "${PYTHON_EXECUTABLE}"
@@ -73,24 +47,6 @@ python_add_library(${f2py_module_name}
 # link mhm to wrapper
 target_include_directories(${f2py_module_name} PUBLIC ${F2PY_INCLUDE_DIR})
 target_link_libraries(${f2py_module_name} PUBLIC mhm_lib Python::NumPy)
-
-# linker flags (rpath)
-if (APPLE)
-  set_target_properties(${f2py_module_name}
-    PROPERTIES
-    LINK_FLAGS  "-Wl,-dylib,-undefined,dynamic_lookup"
-    INSTALL_RPATH "@loader_path"
-    BUILD_RPATH "@loader_path"
-  )
-elseif(UNIX)
-  set_target_properties(${f2py_module_name}
-    PROPERTIES
-    LINK_FLAGS  "-Wl,--allow-shlib-undefined"
-    BUILD_RPATH_USE_ORIGIN ON
-    INSTALL_RPATH "$ORIGIN"
-    BUILD_RPATH "$ORIGIN"
-  )
-endif()
 add_dependencies(${f2py_module_name} genpyf)
 
 # install
