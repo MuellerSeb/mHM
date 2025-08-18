@@ -76,6 +76,7 @@ jobs:
 
       - uses: mamba-org/setup-micromamba@v2
         with:
+          init-shell: cmd.exe
           environment-name: mhm-env
           create-args: >-
             python=3.12
@@ -90,6 +91,7 @@ jobs:
       - run: |
           pip install -v .
           pytest pybind/tests/
+        shell: cmd /C CALL {0}
 
   upload_to_pypi:
     needs: [build_wheels, build_sdist]
