@@ -6,6 +6,7 @@ Module to provide a script to execute mHM.
 """
 
 import os
+import platform
 import subprocess
 import sys
 
@@ -13,6 +14,8 @@ import sys
 def mhm():  # pragma: no cover
     """Execute mhm as a command line program."""
     exe = os.path.join(os.path.dirname(__file__), "mhm")
+    if platform.system() == "Windows":
+        exe += ".exe"
     if not os.path.exists(exe):
         raise RuntimeError("mhm: python bindings were installed without driver.")
     raise SystemExit(subprocess.call([exe] + sys.argv[1:]))

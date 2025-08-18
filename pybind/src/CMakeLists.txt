@@ -8,7 +8,11 @@ else()
   set(mhm_install_dir "mhm")
 endif()
 
-install(TARGETS mhm_lib LIBRARY DESTINATION "${mhm_install_dir}")
+install(TARGETS mhm_lib
+  RUNTIME DESTINATION "${mhm_install_dir}"  # Windows: .dll
+  LIBRARY DESTINATION "${mhm_install_dir}"  # Linux/macOS: .so/.dylib
+  ARCHIVE DESTINATION "${mhm_install_dir}"  # Windows: .lib (static/import), Unix: .a
+)
 if(BUILD_MHM_DRIVER)
   # link to mhm-lib next to executable
   if (APPLE)
@@ -33,7 +37,7 @@ endif()
 # Grab the variables from a local Python installation F2PY headers
 execute_process(
   COMMAND "${PYTHON_EXECUTABLE}"
-  -c "import numpy.f2py; print(numpy.f2py.get_include())"
+  -c "import numpy.f2py as f, pathlib as p; print(p.Path(f.get_include()).as_posix())"
   OUTPUT_VARIABLE F2PY_INCLUDE_DIR
   OUTPUT_STRIP_TRAILING_WHITESPACE
 )
