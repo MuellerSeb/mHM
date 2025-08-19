@@ -87,8 +87,12 @@ jobs:
             pytest-cov
             xarray
             netcdf4
+            libgomp
 
-      - run: |
+      - name: build wheel on win
+        env:
+          MHM_BUILD_PARALLEL: 1
+        run: |
           pip install -v .
           mhm -h
           mhm -V
