@@ -13,9 +13,13 @@ project(mhm
 
 option(BUILD_MHM_DRIVER "Build mHM with executable driver." ON)
 option(BUILD_MHM_PYBIND "Build mHM python bindings." OFF)
+option(BUILD_MHM_LIB_SHARED "Build mhm library as shared." OFF)
+option(BUILD_MHM_LIB_PIC "Build mhm library as position independent." OFF)
 
 if(BUILD_MHM_PYBIND)
-  set(BUILD_MHM_LIB_SHARED ON)
+  set(BUILD_MHM_LIB_SHARED OFF)
+  set(BUILD_MHM_LIB_PIC ON)
+  set(BUILD_MHM_DRIVER OFF)
 endif()
 
 add_subdirectory(src)
@@ -23,10 +27,7 @@ add_subdirectory(src)
 if(BUILD_MHM_DRIVER)
   add_executable(mhm src/mHM/mhm_driver.f90)
   target_link_libraries(mhm PRIVATE mhm_lib)
-  # add install option
-  if(NOT BUILD_MHM_PYBIND)
-    install(TARGETS mhm DESTINATION bin)
-  endif()
+  install(TARGETS mhm DESTINATION bin)
 endif()
 
 if(BUILD_MHM_PYBIND)
