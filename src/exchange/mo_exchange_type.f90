@@ -45,6 +45,7 @@ module mo_exchange_type
     character(:), allocatable :: long_name     !< long name of the variable
     character(:), allocatable :: standard_name !< standard name of the variable
     integer(i4) :: grid = nogrid               !< ID of the grid the data is defined on
+    integer(i4) :: stepping = 0_i4             !< time-step size of this variable in hours (0 - static)
     logical :: static = .false.                !< flag to indicated static data (.false. by default)
     logical :: provided = .false.              !< flag to indicate that data is provided by a component (.false. by default)
     logical :: required = .false.              !< flag to indicate that data is required by a component (.false. by default)
@@ -89,8 +90,8 @@ module mo_exchange_type
   !> \class   exchange_t
   !> \brief   Class for dynamically exchanging variables in mHM.
   type, public :: exchange_t
-    integer(i4) :: time_step       !< current time step
-    type(datetime) :: current_time !< time-stamp for the current time step
+    integer(i4) :: time_step !< current time step
+    type(datetime) :: time   !< time-stamp for the current time step
 
     ! grids
     type(grid_t), pointer :: level0  => null() !< level0 grid of the morphology
@@ -234,7 +235,7 @@ contains
 
     ! time
     self%time_step = 0_i4
-    self%current_time = start_time
+    self%time = start_time
 
     ! variables
     ! raw meteorology (level2)
