@@ -13,7 +13,7 @@ module mo_river_upscaler
   use mo_kind, only: i4, i8, dp
   use mo_constants, only: nodata_i4
   use mo_dag, only: traversal_visit
-  use mo_river, only: river_t, dir_E, dir_S, dir_W, dir_N, dir_SE, dir_SW, dir_NW, dir_NE
+  use mo_river, only: river_t, d8_E, d8_S, d8_W, d8_N, d8_SE, d8_SW, d8_NW, d8_NE
   use mo_grid, only: grid_t, bottom_up
   use mo_grid_scaler, only: regridder, up_scaling
   use mo_message, only: error_message
@@ -206,38 +206,38 @@ contains
       ! searching on side E
       do iy = yl + 1_i4, yu - 1_i4
         if (.not.this%fine_river%grid%mask(xu,iy)) cycle
-        if (any(this%fine_river%fdir(cells(xu,iy))==[dir_NE, dir_E, dir_SE])) this%leaving_cells(cells(xu,iy)) = .true.
+        if (any(this%fine_river%fdir(cells(xu,iy))==[d8_NE, d8_E, d8_SE])) this%leaving_cells(cells(xu,iy)) = .true.
       end do
       ! searching on side S
       do ix = xl + 1_i4, xu - 1_i4
         if (.not.this%fine_river%grid%mask(ix,ys)) cycle
-        if (any(this%fine_river%fdir(cells(ix,ys))==[dir_SE, dir_S, dir_SW])) this%leaving_cells(cells(ix,ys)) = .true.
+        if (any(this%fine_river%fdir(cells(ix,ys))==[d8_SE, d8_S, d8_SW])) this%leaving_cells(cells(ix,ys)) = .true.
       end do
       ! searching on side W
       do iy = yl + 1_i4, yu - 1_i4
         if (.not.this%fine_river%grid%mask(xl,iy)) cycle
-        if (any(this%fine_river%fdir(cells(xl,iy))==[dir_NW, dir_W, dir_SW])) this%leaving_cells(cells(xl,iy)) = .true.
+        if (any(this%fine_river%fdir(cells(xl,iy))==[d8_NW, d8_W, d8_SW])) this%leaving_cells(cells(xl,iy)) = .true.
       end do
       ! searching on side N
       do ix = xl + 1_i4, xu - 1_i4
         if (.not.this%fine_river%grid%mask(ix,yn)) cycle
-        if (any(this%fine_river%fdir(cells(ix,yn))==[dir_NE, dir_N, dir_NW])) this%leaving_cells(cells(ix,yn)) = .true.
+        if (any(this%fine_river%fdir(cells(ix,yn))==[d8_NE, d8_N, d8_NW])) this%leaving_cells(cells(ix,yn)) = .true.
       end do
       ! searching on corner SE
       if (this%fine_river%grid%mask(xu,ys)) then
-        if (any(this%fine_river%fdir(cells(xu,ys))==[dir_NE,dir_E,dir_SE,dir_S,dir_SW])) this%leaving_cells(cells(xu,ys)) = .true.
+        if (any(this%fine_river%fdir(cells(xu,ys))==[d8_NE,d8_E,d8_SE,d8_S,d8_SW])) this%leaving_cells(cells(xu,ys)) = .true.
       end if
       ! searching on corner SW
       if (this%fine_river%grid%mask(xl,ys)) then
-        if (any(this%fine_river%fdir(cells(xl,ys))==[dir_NW,dir_W,dir_SW,dir_S,dir_SE])) this%leaving_cells(cells(xl,ys)) = .true.
+        if (any(this%fine_river%fdir(cells(xl,ys))==[d8_NW,d8_W,d8_SW,d8_S,d8_SE])) this%leaving_cells(cells(xl,ys)) = .true.
       end if
       ! searching on corner NE
       if (this%fine_river%grid%mask(xu,yn)) then
-        if (any(this%fine_river%fdir(cells(xu,yn))==[dir_NW,dir_N,dir_NE,dir_E,dir_SE])) this%leaving_cells(cells(xu,yn)) = .true.
+        if (any(this%fine_river%fdir(cells(xu,yn))==[d8_NW,d8_N,d8_NE,d8_E,d8_SE])) this%leaving_cells(cells(xu,yn)) = .true.
       end if
       ! searching on corner NW
       if (this%fine_river%grid%mask(xl,yn)) then
-        if (any(this%fine_river%fdir(cells(xl,yn))==[dir_SW,dir_W,dir_NW,dir_N,dir_NE])) this%leaving_cells(cells(xl,yn)) = .true.
+        if (any(this%fine_river%fdir(cells(xl,yn))==[d8_SW,d8_W,d8_NW,d8_N,d8_NE])) this%leaving_cells(cells(xl,yn)) = .true.
       end if
 
       ! count number of scc nodes
@@ -447,48 +447,48 @@ contains
       dir = this%fine_river%fdir(this%link_start(i))
       if (ix==xu.and.iy==yn) then ! NE
         select case(dir)
-          case(dir_NW, dir_N)
-            fdir(i) = dir_N
-          case(dir_NE)
-            fdir(i) = dir_NE
-          case(dir_E, dir_SE)
-            fdir(i) = dir_E
+          case(d8_NW, d8_N)
+            fdir(i) = d8_N
+          case(d8_NE)
+            fdir(i) = d8_NE
+          case(d8_E, d8_SE)
+            fdir(i) = d8_E
         end select
       else if (ix==xu.and.iy==ys) then ! SE
         select case(dir)
-          case(dir_NE, dir_E)
-            fdir(i) = dir_E
-          case(dir_SE)
-            fdir(i) = dir_SE
-          case(dir_S, dir_SW)
-            fdir(i) = dir_S
+          case(d8_NE, d8_E)
+            fdir(i) = d8_E
+          case(d8_SE)
+            fdir(i) = d8_SE
+          case(d8_S, d8_SW)
+            fdir(i) = d8_S
         end select
       else if (ix==xl.and.iy==ys) then ! SW
         select case(dir)
-          case(dir_SE, dir_S)
-            fdir(i) = dir_S
-          case(dir_SW)
-            fdir(i) = dir_SW
-          case(dir_W, dir_NW)
-            fdir(i) = dir_W
+          case(d8_SE, d8_S)
+            fdir(i) = d8_S
+          case(d8_SW)
+            fdir(i) = d8_SW
+          case(d8_W, d8_NW)
+            fdir(i) = d8_W
         end select
       else if (ix==xl.and.iy==yn) then ! NW
         select case(dir)
-          case(dir_SW, dir_W)
-            fdir(i) = dir_W
-          case(dir_NW)
-            fdir(i) = dir_NW
-          case(dir_N, dir_NE)
-            fdir(i) = dir_N
+          case(d8_SW, d8_W)
+            fdir(i) = d8_W
+          case(d8_NW)
+            fdir(i) = d8_NW
+          case(d8_N, d8_NE)
+            fdir(i) = d8_N
         end select
       else if (ix==xu) then ! E
-        fdir(i) = dir_E
+        fdir(i) = d8_E
       else if (ix==xl) then ! W
-        fdir(i) = dir_W
+        fdir(i) = d8_W
       else if (iy==yn) then ! N
-        fdir(i) = dir_N
+        fdir(i) = d8_N
       else if (iy==ys) then ! S
-        fdir(i) = dir_S
+        fdir(i) = d8_S
       end if
     end do
     !$omp end parallel do
