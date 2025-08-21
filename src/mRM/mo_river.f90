@@ -10,7 +10,7 @@
 !! This code is released under the LGPLv3+ license \license_note
 module mo_river
 
-  use mo_kind,   only: i2, i4, i8, dp
+  use mo_kind,   only: i1, i2, i4, i8, sp, dp
   use mo_dag, only: dag, order_t, traversal_visit
   use mo_grid, only: grid_t, bottom_up, cartesian, dist_latlon
   use mo_grid_io, only: var, output_dataset
@@ -23,19 +23,65 @@ module mo_river
   !> \brief Constants describing the D8 routing direction of a cell.
   !!@{
   integer(i4), public, parameter :: sink = 0_i4 !< sink
-  integer(i4), public, parameter :: dir_E = 1_i4 !< east
-  integer(i4), public, parameter :: dir_SE = 2_i4 !< south-east
-  integer(i4), public, parameter :: dir_S = 4_i4 !< south
-  integer(i4), public, parameter :: dir_SW = 8_i4 !< south-west
-  integer(i4), public, parameter :: dir_W = 16_i4 !< west
-  integer(i4), public, parameter :: dir_NW = 32_i4 !< north-west
-  integer(i4), public, parameter :: dir_N = 64_i4 !< north
-  integer(i4), public, parameter :: dir_NE = 128_i4 !< north-east
+  integer(i4), public, parameter :: d8_E = 1_i4 !< east
+  integer(i4), public, parameter :: d8_SE = 2_i4 !< south-east
+  integer(i4), public, parameter :: d8_S = 4_i4 !< south
+  integer(i4), public, parameter :: d8_SW = 8_i4 !< south-west
+  integer(i4), public, parameter :: d8_W = 16_i4 !< west
+  integer(i4), public, parameter :: d8_NW = 32_i4 !< north-west
+  integer(i4), public, parameter :: d8_N = 64_i4 !< north
+  integer(i4), public, parameter :: d8_NE = 128_i4 !< north-east
   !> all directions as array
-  integer(i4), public, dimension(8), parameter :: dirs = [dir_E, dir_SE, dir_S, dir_SW, dir_W, dir_NW, dir_N, dir_NE]
+  integer(i4), public, dimension(8), parameter :: d8_all = [d8_E, d8_SE, d8_S, d8_SW, d8_W, d8_NW, d8_N, d8_NE]
   !> matching back pointing directions as array
-  integer(i4), public, dimension(8), parameter :: back = [dir_W, dir_NW, dir_N, dir_NE, dir_E, dir_SE, dir_S, dir_SW]
+  integer(i4), public, dimension(8), parameter :: d8_back = [d8_W, d8_NW, d8_N, d8_NE, d8_E, d8_SE, d8_S, d8_SW]
   !!@}
+
+  !> \name ldd direction values
+  !> \brief Constants describing the Local drain direction (lld) routing direction of a cell.
+  !!@{
+  integer(i1), public, parameter :: o = 0_i1 !< no-data shortcut
+  integer(i1), public, parameter :: ldd_sink = 5_i1 !< sink
+  integer(i1), public, parameter :: ldd_E = 6_i1 !< east
+  integer(i1), public, parameter :: ldd_SE = 3_i1 !< south-east
+  integer(i1), public, parameter :: ldd_S = 2_i1 !< south
+  integer(i1), public, parameter :: ldd_SW = 1_i1 !< south-west
+  integer(i1), public, parameter :: ldd_W = 4_i1 !< west
+  integer(i1), public, parameter :: ldd_NW = 7_i1 !< north-west
+  integer(i1), public, parameter :: ldd_N = 8_i1 !< north
+  integer(i1), public, parameter :: ldd_NE = 9_i1 !< north-east
+  !> all directions as array
+  integer(i1), public, dimension(8), parameter :: ldd_all = [ldd_E, ldd_SE, ldd_S, ldd_SW, ldd_W, ldd_NW, ldd_N, ldd_NE]
+  !> matching back pointing directions as array
+  integer(i1), public, dimension(8), parameter :: ldd_back = [ldd_W, ldd_NW, ldd_N, ldd_NE, ldd_E, ldd_SE, ldd_S, ldd_SW]
+  !> x direction change for given ldd flow direction
+  integer(i4), public, dimension(9), parameter :: ldd_dx = [-1_i4, 0_i4, 1_i4, -1_i4, 0_i4, 1_i4, -1_i4, 0_i4, 1_i4]
+  !> y direction change for given ldd flow direction (bottom-up)
+  integer(i4), public, dimension(9), parameter :: ldd_dy = [-1_i4, -1_i4, -1_i4, 0_i4, 0_i4, 0_i4, 1_i4, 1_i4, 1_i4]
+  !> ldd to d8 conversion
+  integer(i4), public, dimension(9), parameter :: ldd_to_d8 = [d8_SW, d8_S, d8_SE, d8_W, sink, d8_E, d8_NW, d8_N, d8_NE]
+  !> d8 to ldd conversion (array mostly empty)
+  integer(i1), public, dimension(128), parameter :: d8_to_ldd = [ &
+    ldd_E, &
+    ldd_SE, o, &
+    ldd_S,  o,o,o, &
+    ldd_SW, o,o,o,o,o,o,o, &
+    ldd_W,  o,o,o,o,o,o,o,o,o,o,o,o,o,o,o, &
+    ldd_NW, o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o, &
+    ldd_N,  o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o, &
+            o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o, &
+    ldd_NE]
+  !!@}
+
+  type, public :: simple_river_t
+    integer(i1) :: nodata = 0_i1 !< no-data value to determine mask
+    integer(i1), allocatable :: fdir(:,:) !< LDD flow direction
+    integer(i4), allocatable :: facc(:,:) !< flow accumulation
+    real(sp), allocatable :: width(:,:) !< river width
+    real(dp) :: xllcorner    !< x coordinate of the lowerleft corner
+    real(dp) :: yllcorner    !< y coordinate of the lowerleft corner
+    real(dp) :: cellsize     !< cellsize x = cellsize y
+  end type simple_river_t
 
   !> \class river_t
   !> \brief River network representation
@@ -50,6 +96,8 @@ module mo_river
     real(dp), allocatable :: link_length(:) !< length of link starting at node (0 if node is sink) size(n_nodes)
     real(dp), allocatable :: link_slope(:) !< slope of link starting at node (in [0,1]) size(n_nodes)
     real(dp), allocatable :: celerity(:) !< celerity of link starting at node derived form slope size(n_nodes)
+    real(dp), allocatable :: dem(:) !< cell elevation [m] size(ncells)
+    real(dp), allocatable :: slope(:) !< cell slope [%] size(ncells)
     type(order_t) :: order !< level based order of the network
     ! scc related attributes
     logical :: scc = .false. !< indicate that this river is a SCC-river (not D8)
@@ -84,14 +132,14 @@ contains
     ! upstream
     n_up = 0_i4
     do k = 1_i4, 8_i4
-      call next(dirs(k), dy, i, j, ni, nj) ! check all directions
+      call next(d8_all(k), dy, i, j, ni, nj) ! check all directions
       if (periodic) then ! sinks still indicated by nj=0
         if (ni < 1_i4) ni = imax
         if (imax < ni) ni = 1_i4
       end if
       if (ni < 1_i4 .or. imax < ni .or. nj < 1_i4 .or. jmax < nj ) cycle ! outside matrix / sink
       if (.not.mask(ni,nj)) cycle ! outside mask
-      if (fdir(cells(ni,nj)) /= back(k)) cycle ! check if this next cell is pointing back
+      if (fdir(cells(ni,nj)) /= d8_back(k)) cycle ! check if this next cell is pointing back
       n_up = n_up + 1_i4 ! found an inflow
       up(n_up) = cells(ni,nj) ! add the upstream neighbor to the list
     end do
@@ -116,28 +164,28 @@ contains
     integer(i4), intent(out) :: ni !< i index of next cell (on x-axis)
     integer(i4), intent(out) :: nj !< j index of next cell (on y-axis)
     select case(fdir)
-      case(dir_E) ! E
+      case(d8_E) ! E
         ni = i+1_i4
         nj = j
-      case(dir_SE) ! SE
+      case(d8_SE) ! SE
         ni = i+1_i4
         nj = j-dy
-      case(dir_S) ! S
+      case(d8_S) ! S
         ni = i
         nj = j-dy
-      case(dir_SW) ! SW
+      case(d8_SW) ! SW
         ni = i-1_i4
         nj = j-dy
-      case(dir_W) ! W
+      case(d8_W) ! W
         ni = i-1_i4
         nj = j
-      case(dir_NW) ! NW
+      case(d8_NW) ! NW
         ni = i-1_i4
         nj = j+dy
-      case(dir_N) ! N
+      case(d8_N) ! N
         ni = i
         nj = j+dy
-      case(dir_NE) ! NE
+      case(d8_NE) ! NE
         ni = i+1_i4
         nj = j+dy
       case default ! sink/outlet
@@ -152,31 +200,33 @@ contains
     integer(i4), intent(in) :: to(2) !< to-cell indices
     integer(i4), intent(in) :: dy !< direction of north in the grid matrix (1/-1)
     if (to(1)==(from(1)+1_i4) .and. to(2)==from(2)) then
-      get_fdir = dir_E
+      get_fdir = d8_E
     else if (to(1)==(from(1)+1_i4) .and. to(2)==(from(2)-dy)) then
-      get_fdir = dir_SE
+      get_fdir = d8_SE
     else if (to(1)==from(1) .and. to(2)==(from(2)-dy)) then
-      get_fdir = dir_S
+      get_fdir = d8_S
     else if (to(1)==(from(1)-1_i4) .and. to(2)==(from(2)-dy)) then
-      get_fdir = dir_SW
+      get_fdir = d8_SW
     else if (to(1)==(from(1)-1_i4) .and. to(2)==from(2)) then
-      get_fdir = dir_W
+      get_fdir = d8_W
     else if (to(1)==(from(1)-1_i4) .and. to(2)==(from(2)+dy)) then
-      get_fdir = dir_NW
+      get_fdir = d8_NW
     else if (to(1)==from(1) .and. to(2)==(from(2)+dy)) then
-      get_fdir = dir_N
+      get_fdir = d8_N
     else if (to(1)==(from(1)+1_i4) .and. to(2)==(from(2)+dy)) then
-      get_fdir = dir_NE
+      get_fdir = d8_NE
     else
       get_fdir = sink
     end if
   end function get_fdir
 
   !> \brief Initialize river network from flow direction.
-  subroutine river_from_fdir(this, fdir, grid)
+  subroutine river_from_fdir(this, fdir, grid, dem, slope)
     class(river_t), intent(inout) :: this
-    integer(i4), dimension(:) :: fdir !< D8 flow direction
+    integer(i4), dimension(:), intent(in) :: fdir !< D8 flow direction
     type(grid_t), pointer, intent(in), optional :: grid !< grid the river network is defined on
+    real(dp), dimension(:), intent(in), optional :: dem !< elevation [m]
+    real(dp), dimension(:), intent(in), optional :: slope !< slope [%]
     integer(i8), allocatable :: cells(:,:)
     integer(i4) :: dy ! direction of north in the grid matrix (1/-1)
     integer(i4) :: n_up ! number of upstream neighbor cells
@@ -185,6 +235,8 @@ contains
     integer(i8) :: i, j
     logical :: periodic ! periodic latlon grid
     if (present(grid)) this%grid => grid
+    if (present(dem)) allocate(this%dem(this%grid%ncells), source=dem)
+    if (present(slope)) allocate(this%slope(this%grid%ncells), source=slope)
     if (.not.associated(this%grid)) call error_message("river%from_fdir: grid not associated")
     call this%init(this%grid%ncells)
     this%fdir = fdir
@@ -223,6 +275,9 @@ contains
       j = j + 1_i8
       this%sinks(j) = i
     end do
+
+    ! calculate d8 reach length
+    call this%calc_length()
 
   end subroutine river_from_fdir
 
@@ -303,9 +358,9 @@ contains
       do i = 1_i8, this%grid%ncells
         if (this%down(i) == 0_i8) cycle ! sinks ain't links
         select case (this%fdir(i))
-          case(dir_E, dir_S, dir_W, dir_N)
+          case(d8_E, d8_S, d8_W, d8_N)
             this%link_length(i) = this%grid%cellsize
-          case(dir_SE, dir_SW, dir_NW, dir_NE)
+          case(d8_SE, d8_SW, d8_NW, d8_NE)
             this%link_length(i) = SQRT2_dp * this%grid%cellsize
         end select
       end do
