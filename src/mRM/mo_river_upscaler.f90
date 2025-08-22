@@ -27,8 +27,8 @@ module mo_river_upscaler
   !! Nodes are ordered in reverse sub-catchment order: first the nodes of the base catchment are added,
   !! then the nodes of the sub-catchment flowing into the base catchment and so on.
   type, public :: river_upscaler_t
-    type(river_t), pointer :: fine_river !< river definition at fine grid
-    type(river_t), pointer :: coarse_river !< river definition at coarse grid
+    type(river_t), pointer :: fine_river => null() !< river definition at fine grid
+    type(river_t), pointer :: coarse_river => null() !< river definition at coarse grid
     type(regridder) :: upscaler !< upscaler from fine to coarse grid
     ! coarse attributes derived from fine grid
     logical, allocatable :: leaving_cells(:) !< mask marking fine cells leaving a coarse cell size(fine\%ncells)
@@ -60,6 +60,7 @@ module mo_river_upscaler
     procedure, public :: upscale_scc => river_upscaler_scc
     procedure, public :: upscale_fdir => river_upscaler_fdir
     procedure, public :: calc_stream => river_upscaler_stream
+    procedure, public :: calc_celerity => river_upscaler_celerity
     procedure, public :: node_from_cell_sub => river_upscaler_cell_sub
   end type river_upscaler_t
 
@@ -555,6 +556,64 @@ contains
     where(this%stream_mask) this%stream_sub = this%scc_map
 
   end subroutine river_upscaler_stream
+
+  !> \brief calculate the celerity c_i from slope s_i (i - cell index)
+  subroutine river_upscaler_celerity(this, gamma, constant_celerity, slope)
+    use mo_mad, only: mad
+    use mo_utils, only: locate
+    implicit none
+    class(river_upscaler_t), intent(inout) :: this
+    real(dp), intent(in) :: gamma !< model parameter: c_i = gamma * sqrt(s_i) or c = gamma
+    logical, optional, intent(in) :: constant_celerity !< whether celerity is assumed constant: c = gamma (default: .false.)
+    real(dp), optional, intent(in) :: slope(this%fine_river%n_nodes) !< [%] river slope on fine grid: size(fine\%ncells)
+    real(dp), allocatable :: smooth_slope(:)
+    integer(i8) :: i, cell
+    real(dp) :: n
+
+    logical :: constant = .false.
+    if (present(constant_celerity)) constant = constant_celerity
+
+    if (constant) then
+      allocate(this%fine_river%celerity(this%fine_river%n_nodes), source=gamma)
+      allocate(this%coarse_river%celerity(this%coarse_river%n_nodes), source=gamma)
+      return
+    end if
+
+    if (.not.present(slope)) call error_message("river_upscaler%calc_celerity: need slope on fine grid.")
+    allocate(smooth_slope(this%fine_river%n_nodes), source=slope)
+    ! set min val for river slope to enable h-mean
+    where ( smooth_slope < 0.1_dp ) smooth_slope = 0.1_dp
+    ! smooth river slope if there is more than one cell
+    if( count(this%stream_mask) > 1) smooth_slope = mad(arr=smooth_slope, z=2.25_dp, mask=this%stream_mask, tout="u", mval=0.1_dp)
+
+    allocate(this%fine_river%celerity(this%fine_river%n_nodes), source=(gamma * sqrt(smooth_slope / 100.0_dp)))
+    allocate(this%coarse_river%celerity(this%coarse_river%n_nodes), source=1.0_dp)
+
+    !$omp parallel do default(shared) private(i, cell, n)
+    do i = 1_i8, this%coarse_river%n_nodes
+      if (this%coarse_river%is_sink(i)) cycle ! this also catches one-cell setups
+      ! TODO: link_from could be simply link_start
+      cell = this%link_from(i)
+      this%coarse_river%celerity(i) = 0.0_dp
+      n = 0.0_dp
+      ! one pass algorithm for harmonic mean:
+      ! 0. M  = 0               -> 0 as initial value for the [M]ean of inverses
+      ! 1. M += (1/v - M) / n   -> updating the mean with the weighted deviation of new value (n as counter)
+      ! 2. H  = 1 / M           -> [H]armonic mean is then the inverse of M
+      do ! go down the river
+        n = n + 1.0_dp
+        this%coarse_river%celerity(i) = this%coarse_river%celerity(i) &
+          + ( 1.0_dp / this%fine_river%celerity(cell) - this%coarse_river%celerity(i) ) / n
+        ! exit at end of link
+        if (this%link_to(i) == cell) exit
+        cell = this%fine_river%down(cell)
+      end do
+      ! finalize harmonic mean for celerity
+      this%coarse_river%celerity(i) = 1.0_dp / this%coarse_river%celerity(i)
+    end do
+    !$omp end parallel do
+
+  end subroutine river_upscaler_celerity
 
   !> \brief determine node ID from coarse cell and sub-catchment id
   !> \details Nodes are ordered by sub-catchments:
