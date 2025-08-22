@@ -95,9 +95,7 @@ module mo_river
     integer(i8), allocatable :: sinks(:) !< node ids of sinks
     real(dp), allocatable :: link_length(:) !< length of link starting at node (0 if node is sink) size(n_nodes)
     real(dp), allocatable :: link_slope(:) !< slope of link starting at node (in [0,1]) size(n_nodes)
-    real(dp), allocatable :: celerity(:) !< celerity of link starting at node derived form slope size(n_nodes)
-    real(dp), allocatable :: dem(:) !< cell elevation [m] size(ncells)
-    real(dp), allocatable :: slope(:) !< cell slope [%] size(ncells)
+    real(dp), allocatable :: celerity(:) !< celerity of link starting at node set by upscaler size(n_nodes)
     type(order_t) :: order !< level based order of the network
     ! scc related attributes
     logical :: scc = .false. !< indicate that this river is a SCC-river (not D8)
@@ -109,6 +107,7 @@ module mo_river
     procedure, public :: calc_fdir => river_fdir
     procedure, public :: calc_facc => river_facc
     procedure, public :: calc_length => river_length
+    procedure, public :: calc_slope => river_slope
     procedure, public :: export => river_export
   end type river_t
 
@@ -221,12 +220,10 @@ contains
   end function get_fdir
 
   !> \brief Initialize river network from flow direction.
-  subroutine river_from_fdir(this, fdir, grid, dem, slope)
+  subroutine river_from_fdir(this, fdir, grid)
     class(river_t), intent(inout) :: this
     integer(i4), dimension(:), intent(in) :: fdir !< D8 flow direction
     type(grid_t), pointer, intent(in), optional :: grid !< grid the river network is defined on
-    real(dp), dimension(:), intent(in), optional :: dem !< elevation [m]
-    real(dp), dimension(:), intent(in), optional :: slope !< slope [%]
     integer(i8), allocatable :: cells(:,:)
     integer(i4) :: dy ! direction of north in the grid matrix (1/-1)
     integer(i4) :: n_up ! number of upstream neighbor cells
@@ -235,8 +232,6 @@ contains
     integer(i8) :: i, j
     logical :: periodic ! periodic latlon grid
     if (present(grid)) this%grid => grid
-    if (present(dem)) allocate(this%dem(this%grid%ncells), source=dem)
-    if (present(slope)) allocate(this%slope(this%grid%ncells), source=slope)
     if (.not.associated(this%grid)) call error_message("river%from_fdir: grid not associated")
     call this%init(this%grid%ncells)
     this%fdir = fdir
@@ -254,13 +249,8 @@ contains
     !$omp parallel do default(shared) private(i, n_up, up, down)
     do i = 1_i8, this%grid%ncells
       call get_links(this%grid%mask, cells, this%fdir, this%grid%cell_ij(i,1), this%grid%cell_ij(i,2), dy, periodic, n_up, up, down)
-      ! implicit (re-)allocation of LHS not working with intel-llvm + openmp
-      allocate(this%nodes(i)%edges(n_up))
-      this%nodes(i)%edges(:) = up(1_i4:n_up)
-      if (down > 0_i8) then
-        allocate(this%nodes(i)%dependents(1))
-        this%nodes(i)%dependents(1) = down
-      end if
+      allocate(this%nodes(i)%edges(n_up), source=up(1_i4:n_up))
+      if (down > 0_i8) allocate(this%nodes(i)%dependents(1), source=down)
       this%down(i) = down
     end do
     !$omp end parallel do
@@ -382,6 +372,30 @@ contains
     end if
   end subroutine river_length
 
+  !> \brief Calculate link slopes
+  subroutine river_slope(this, dem)
+    class(river_t), intent(inout) :: this
+    real(dp), dimension(this%grid%ncells), intent(in) :: dem !< elevation [m]
+    integer(i8) :: i, j, k
+    if (this%scc) call error_message("river%calc_slope: can't calculate slope from DEM for a SCC river.")
+    if (.not.allocated(this%link_length)) call error_message("river%calc_slope: can't calculate slope without link length.")
+    if (allocated(this%link_slope)) deallocate(this%link_slope)
+    allocate(this%link_slope(this%grid%ncells), source=0.0_dp)
+    k = 0_i8
+    !$omp parallel do default(shared) private(i,j)
+    do i = 1_i8, this%grid%ncells
+      j = this%down(i)
+      if (j == 0_i8) cycle ! sinks ain't links
+      if (dem(i) < dem(j)) then
+        k = k + 1_i8
+        ! print*, "link is going upwards: ", i, j, dem(i), dem(j)
+      end if
+      this%link_slope(i) = max(( dem(i) - dem(j) ) / this%link_length(i), 0.0_dp)
+    end do
+    !$omp end parallel do
+    ! print*, "upward links: ", k, this%grid%ncells
+  end subroutine river_slope
+
   !> \brief Export river arrays to netcdf
   subroutine river_export(this, path, sub_map, leaving, stream_mask, stream_sub, highlight, factor)
     class(river_t), intent(in) :: this
@@ -416,6 +430,8 @@ contains
     if (allocated(this%facc)) vars = [vars, var("facc", "flow accumulation", dtype="i32", kind="i8", static=.true.)]
     if (allocated(this%order%id)) vars = [vars, var("level", "order level", dtype="i32", static=.true.)]
     if (allocated(this%link_length)) vars = [vars, var("length", "link length", dtype="f64", static=.true.)]
+    if (allocated(this%link_slope)) vars = [vars, var("slope", "link slope", dtype="f64", static=.true.)]
+    if (allocated(this%celerity)) vars = [vars, var("celerity", "celerity", dtype="f64", static=.true.)]
     if (present(sub_map)) vars = [vars, var("scc", "scc catchment id", dtype="i32", static=.true.)]
     if (present(leaving)) vars = [vars, var("leaving", "leaving", dtype="i32", static=.true.)]
     if (present(stream_mask)) vars = [vars, var("stream", "stream mask", dtype="i32", static=.true.)]
@@ -433,6 +449,8 @@ contains
       call ds%update("level", level)
     end if
     if (allocated(this%link_length)) call ds%update("length", this%link_length)
+    if (allocated(this%link_slope)) call ds%update("slope", this%link_slope)
+    if (allocated(this%celerity)) call ds%update("celerity", this%celerity)
     if (present(sub_map)) call ds%update("scc", sub_map)
     if (present(leaving)) then
       allocate(tmp(this%n_nodes), source=0_i4)
