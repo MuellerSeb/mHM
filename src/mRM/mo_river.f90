@@ -73,6 +73,8 @@ module mo_river
     ldd_NE]
   !!@}
 
+  !> \class simple_river_t
+  !> \brief Simple LDD river network representation
   type, public :: simple_river_t
     integer(i1) :: nodata = 0_i1 !< no-data value to determine mask
     integer(i1), allocatable :: fdir(:,:) !< LDD flow direction
