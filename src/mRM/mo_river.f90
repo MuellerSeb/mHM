@@ -222,10 +222,11 @@ contains
   end function get_fdir
 
   !> \brief Initialize river network from flow direction.
-  subroutine river_from_fdir(this, fdir, grid)
+  subroutine river_from_fdir(this, fdir, grid, calculate_length)
     class(river_t), intent(inout) :: this
     integer(i4), dimension(:), intent(in) :: fdir !< D8 flow direction
     type(grid_t), pointer, intent(in), optional :: grid !< grid the river network is defined on
+    logical, intent(in), optional :: calculate_length !< whether to calculate the link length from fdir (default: .true.)
     integer(i8), allocatable :: cells(:,:)
     integer(i4) :: dy ! direction of north in the grid matrix (1/-1)
     integer(i4) :: n_up ! number of upstream neighbor cells
@@ -233,6 +234,8 @@ contains
     integer(i8) :: down ! the downstream cell
     integer(i8) :: i, j
     logical :: periodic ! periodic latlon grid
+    logical :: calc_length = .true.
+    if (present(calculate_length)) calc_length = calculate_length
     if (present(grid)) this%grid => grid
     if (.not.associated(this%grid)) call error_message("river%from_fdir: grid not associated")
     call this%init(this%grid%ncells)
@@ -269,7 +272,7 @@ contains
     end do
 
     ! calculate d8 reach length
-    call this%calc_length()
+    if (calc_length) call this%calc_length()
 
   end subroutine river_from_fdir
 
