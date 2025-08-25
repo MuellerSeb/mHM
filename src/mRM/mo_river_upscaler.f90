@@ -408,7 +408,7 @@ contains
 
     ! find outlets of of coarse grid
     allocate(fdir(this%coarse_river%grid%ncells), source=-1_i4) ! sinks to be determined
-    allocate(this%sink_map(this%coarse_river%n_nodes), source=0_i8)
+    allocate(this%sink_map(this%coarse_river%grid%ncells), source=0_i8)
     !$omp parallel do default(shared) private(j, i, k, yl, yu, xl, xu)
     do j = 1_i4, size(this%fine_river%sinks)
       k = this%fine_river%sinks(j)
@@ -495,8 +495,8 @@ contains
     !$omp end parallel do
     deallocate(cells, facc, leaving)
 
-    ! init coarse river from upscaled fdir
-    call this%coarse_river%from_fdir(fdir)
+    ! init coarse river from upscaled fdir (length will be set later)
+    call this%coarse_river%from_fdir(fdir, calculate_length=.false.)
 
     ! cleanup
     deallocate(fdir)
