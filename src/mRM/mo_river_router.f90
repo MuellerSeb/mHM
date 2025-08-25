@@ -163,6 +163,7 @@ contains
     if (this%input_count < this%accumulations) return ! not yet ready to route
     ! average runoff flux over input time step accumulations
     if (this%accumulations > 1_i4) this%runoff = this%runoff / real(this%accumulations, dp)
+    ! TODO: distribute runoff in case of SCC
     ! reset input counter
     this%input_count = 0_i4
     ! prepare discharge
