@@ -129,7 +129,7 @@ contains
     allocate(gauge_facc(n))
     this%nsub = n + 1_i4
     if (this%fine_river%scc) call error_message("river_upscaler%init_scc: need a D8 river to initialize SCC")
-    if (.not.allocated(this%fine_river%facc)) call error_message("river_upscaler%init_scc: facc not initialized")
+    if (.not.allocated(this%fine_river%facc)) call error_message("river_upscaler%init_scc: facc not available")
     allocate(this%scc_gauges(n))
     ! find gauge cell ids
     do i = 1_i4, n
@@ -395,7 +395,7 @@ contains
     integer(i4) :: yn, ys ! north and south y-bound depending on grid y-direction
 
     if (this%coarse_river%scc) call error_message("river_upscaler%upscale_fdir: river is not a D8 river")
-    if (.not.allocated(this%fine_river%facc)) call error_message("river_upscaler%upscale_fdir: facc not initialized")
+    if (.not.allocated(this%fine_river%facc)) call error_message("river_upscaler%upscale_fdir: facc not available")
 
     ! sub-catchment attributes when scc is turned of
     allocate(this%sub_size(1), source=this%coarse_river%grid%ncells)
@@ -508,6 +508,8 @@ contains
     implicit none
     class(river_upscaler_t), intent(inout) :: this
     integer(i8) :: i, cell
+
+    if (.not.allocated(this%fine_river%link_length)) call error_message("river_upscaler%calc_stream: link length not available")
 
     ! create is_link_start array
     allocate(this%is_link_start(this%fine_river%n_nodes), source=.false.)
