@@ -124,6 +124,9 @@ contains
     allocate(this%nu1(this%river%n_nodes), source=0.0_dp)
     allocate(this%nu2(this%river%n_nodes), source=0.0_dp)
 
+    if (.not.allocated(this%river%link_length)) call error_message("river_router%setup_muskingum: link_length not available")
+    if (.not.allocated(this%river%celerity)) call error_message("river_router%setup_muskingum: celerity not available")
+
     ! wave travel time parameter [s]
     allocate(k(this%river%n_nodes), source=(this%river%link_length / this%river%celerity))
 
