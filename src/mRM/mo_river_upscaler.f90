@@ -15,7 +15,7 @@ module mo_river_upscaler
   use mo_dag, only: traversal_visit
   use mo_river, only: river_t, d8_E, d8_S, d8_W, d8_N, d8_SE, d8_SW, d8_NW, d8_NE
   use mo_grid, only: grid_t, bottom_up
-  use mo_grid_scaler, only: regridder, down_scaling
+  use mo_grid_scaler, only: scaler_t, down_scaling
   use mo_message, only: error_message
 
   implicit none
@@ -29,7 +29,7 @@ module mo_river_upscaler
   type, public :: river_upscaler_t
     type(river_t), pointer :: fine_river => null() !< river definition at fine grid
     type(river_t), pointer :: coarse_river => null() !< river definition at coarse grid
-    type(regridder) :: upscaler !< upscaler from fine to coarse grid
+    type(scaler_t) :: upscaler !< upscaler from fine to coarse grid
     ! coarse attributes derived from fine grid
     logical, allocatable :: leaving_cells(:) !< mask marking fine cells leaving a coarse cell size(fine\%ncells)
     logical, allocatable :: stream_mask(:) !< mask marking the upscaled stream at fine grid size(fine\%ncells)
