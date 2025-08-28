@@ -15,7 +15,7 @@ module mo_river_upscaler
   use mo_dag, only: traversal_visit
   use mo_river, only: river_t, d8_E, d8_S, d8_W, d8_N, d8_SE, d8_SW, d8_NW, d8_NE
   use mo_grid, only: grid_t, bottom_up
-  use mo_grid_scaler, only: regridder, up_scaling
+  use mo_grid_scaler, only: regridder, down_scaling
   use mo_message, only: error_message
 
   implicit none
@@ -55,11 +55,11 @@ module mo_river_upscaler
     integer(i8), allocatable :: sub_size(:) !< number of coarse river nodes in each sub catchment size(nsub)
   contains
     procedure, public :: init => river_upscaler_init
-    procedure, public :: init_scc => river_upscaler_init_scc
-    procedure, public :: find_leaving_cells => river_upscaler_leaving
-    procedure, public :: upscale_scc => river_upscaler_scc
-    procedure, public :: upscale_fdir => river_upscaler_fdir
-    procedure, public :: calc_stream => river_upscaler_stream
+    procedure, private :: init_scc => river_upscaler_init_scc
+    procedure, private :: find_leaving_cells => river_upscaler_leaving
+    procedure, private :: upscale_scc => river_upscaler_scc
+    procedure, private :: upscale_fdir => river_upscaler_fdir
+    procedure, private :: calc_stream => river_upscaler_stream
     procedure, public :: calc_celerity => river_upscaler_celerity
     procedure, public :: node_from_cell_sub => river_upscaler_cell_sub
   end type river_upscaler_t
@@ -80,7 +80,8 @@ contains
     this%coarse_river => coarse_river
     this%coarse_river%grid => coarse_grid
     call this%upscaler%init(this%fine_river%grid, this%coarse_river%grid, tol=tol)
-    if (this%upscaler%scaling_mode /= up_scaling) call error_message("river_upscaler: target grid needs to be coarser then input!")
+    if (this%upscaler%scaling_mode == down_scaling) call error_message("river_upscaler: target grid needs to be coarser then input")
+    ! TODO: shortcut for same resolution of fine and coarse river
 
     ! initialize scc related variables
     call this%init_scc(scc_gauges)
@@ -128,8 +129,8 @@ contains
     allocate(gauge_mask(n))
     allocate(gauge_facc(n))
     this%nsub = n + 1_i4
-    if (this%fine_river%scc) call error_message("init_scc: need a D8 river to initialize SCC")
-    if (.not.allocated(this%fine_river%facc)) call error_message("init_scc: facc not initialized")
+    if (this%fine_river%scc) call error_message("river_upscaler%init_scc: need a D8 river to initialize SCC")
+    if (.not.allocated(this%fine_river%facc)) call error_message("river_upscaler%init_scc: facc not initialized")
     allocate(this%scc_gauges(n))
     ! find gauge cell ids
     do i = 1_i4, n
@@ -180,10 +181,10 @@ contains
     !                        ys  SW--S--SE
     !------------------------------------------------------------------
     cells = this%fine_river%grid%id_matrix()
-    scc_map = this%fine_river%grid%unpack(this%scc_map)
     allocate(this%leaving_cells(this%fine_river%grid%ncells), source=.false.)
 
     if (this%coarse_river%scc) then
+      scc_map = this%fine_river%grid%unpack(this%scc_map)
       allocate(this%has_sub(this%coarse_river%grid%ncells, this%nsub), source=.false.)
     else
       allocate(this%has_sub(this%coarse_river%grid%ncells, this%nsub), source=.true.)
@@ -262,7 +263,7 @@ contains
     integer(i4) :: j, sub
     integer(i4) :: yl, yu, xl, xu ! lower and upper bounds for x and y
 
-    if (.not.this%coarse_river%scc) call error_message("river_upscaler%scc: river is not a SCC river")
+    if (.not.this%coarse_river%scc) call error_message("river_upscaler%upscale_scc: river is not a SCC river")
 
     ! coarse river attributes
     this%coarse_river%n_nodes = count(this%has_sub, kind=i8)
@@ -394,7 +395,8 @@ contains
     integer(i4) :: dir, loc(2), j, ix, iy, yl, yu, xl, xu ! lower and upper bounds for x and y
     integer(i4) :: yn, ys ! north and south y-bound depending on grid y-direction
 
-    if (this%coarse_river%scc) call error_message("river_upscaler%d8: river is not a D8 river")
+    if (this%coarse_river%scc) call error_message("river_upscaler%upscale_fdir: river is not a D8 river")
+    if (.not.allocated(this%fine_river%facc)) call error_message("river_upscaler%upscale_fdir: facc not initialized")
 
     ! sub-catchment attributes when scc is turned of
     allocate(this%sub_size(1), source=this%coarse_river%grid%ncells)
