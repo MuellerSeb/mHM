@@ -106,7 +106,6 @@ contains
 
   !> \brief Initialize SCC related variables
   subroutine river_upscaler_init_scc(this, scc_gauges)
-    use mo_message, only: error_message
     class(river_upscaler_t), intent(inout) :: this
     integer(i4), dimension(:,:), intent(in), optional :: scc_gauges !< gauge locations at fine river dim 1: x/y, dim 2: gauge id
     ! sub-catchment related attributes
