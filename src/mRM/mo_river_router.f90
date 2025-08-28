@@ -16,7 +16,7 @@ module mo_river_router
   use mo_string_utils, only: n2s => num2str
   use mo_river, only: river_t
   use mo_grid, only: grid_t, bottom_up
-  use mo_grid_scaler, only: regridder, up_sum, down_nearest, up_scaling
+  use mo_grid_scaler, only: scaler_t, up_sum, down_nearest, up_scaling
   use mo_message, only: error_message
   use mo_datetime, only: HOUR_SECONDS
 
@@ -56,7 +56,7 @@ module mo_river_router
   type, public :: river_router_t
     type(river_t), pointer :: river => null() !< river definition to route on
     type(grid_t), pointer :: input_grid => null() !< grid the input (e.g. runoff) is defined on
-    type(regridder) :: scaler !< input rescaler
+    type(scaler_t) :: scaler !< input rescaler
     integer(i4) :: input_step !< [h] time step size of the input (either 1 or 24)
     integer(i4) :: input_count !< [-] number of accumulated inputs for longer output step
     integer(i4) :: output_step !< [h] time step size of the output (at least 1)
