@@ -152,7 +152,7 @@ contains
     real(dp), dimension(this%input_grid%ncells), intent(in) :: input_runoff
     real(dp), dimension(this%river%n_nodes), intent(out) :: discharge
     integer(i4) :: i
-    ! TODO: accumulate before rescaling
+    ! TODO: accumulate before rescaling (to only rescale once)
     ! accumulate input runoff
     this%input_count = this%input_count + 1_i4
     if (this%input_count == 1_i4) then
@@ -187,7 +187,7 @@ contains
     if (this%scaler%scaling_mode == up_scaling) then
       call this%scaler%execute(input_runoff * this%input_grid%cell_area, scaled_runoff_flux)
     else
-      call this%scaler%execute(input_runoff, scaled_runoff_flux)
+      call this%scaler%downscale_nearest(input_runoff, scaled_runoff_flux)
       scaled_runoff_flux = scaled_runoff_flux * this%river%grid%cell_area
     end if
     ! from [liter TS-1] to [m3 s-1]
