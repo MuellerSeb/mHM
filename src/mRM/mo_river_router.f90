@@ -16,7 +16,7 @@ module mo_river_router
   use mo_string_utils, only: n2s => num2str
   use mo_river, only: river_t
   use mo_grid, only: grid_t, bottom_up
-  use mo_grid_scaler, only: scaler_t, up_sum, down_nearest, up_scaling
+  use mo_grid_scaler, only: scaler_t, up_sum, down_nearest, down_scaling
   use mo_message, only: error_message
   use mo_datetime, only: HOUR_SECONDS
 
@@ -187,11 +187,11 @@ contains
     real(dp), dimension(this%river%grid%ncells) :: scaled_runoff_flux
     ! TODO: this could be optimized, since rescaler always unpacks the input
     ! rescaled result in [liter] = [mm m2]
-    if (this%scaler%scaling_mode == up_scaling) then
-      call this%scaler%execute(input_runoff * this%input_grid%cell_area, scaled_runoff_flux)
-    else
+    if (this%scaler%scaling_mode == down_scaling) then
       call this%scaler%downscale_nearest(input_runoff, scaled_runoff_flux)
       scaled_runoff_flux = scaled_runoff_flux * this%river%grid%cell_area
+    else
+      call this%scaler%execute(input_runoff * this%input_grid%cell_area, scaled_runoff_flux)
     end if
     ! from [liter TS-1] to [m3 s-1]
     scaled_runoff_flux = scaled_runoff_flux * (liter_to_m3 / (this%input_step * HOUR_SECONDS))
