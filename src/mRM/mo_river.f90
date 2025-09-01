@@ -457,7 +457,7 @@ contains
     vars = [vars, var("fdir", "flow direction", dtype="i32", static=.true.)]
     if (allocated(this%facc)) vars = [vars, var("facc", "flow accumulation", dtype="i32", kind="i8", static=.true.)]
     if (allocated(this%order%id)) vars = [vars, var("level", "order level", dtype="i32", static=.true.)]
-    if (allocated(this%upstream_area)) vars = [vars, var("upstream_area", "upstream area", units="m2" dtype="f64", static=.true.)]
+    if (allocated(this%upstream_area)) vars = [vars, var("upstream_area", "upstream area", units="m2", dtype="f64", static=.true.)]
     if (allocated(this%link_length)) vars = [vars, var("length", "link length", dtype="f64", static=.true.)]
     if (allocated(this%link_slope)) vars = [vars, var("slope", "link slope", dtype="f64", static=.true.)]
     if (allocated(this%celerity)) vars = [vars, var("celerity", "celerity", dtype="f64", static=.true.)]
