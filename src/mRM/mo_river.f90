@@ -95,6 +95,7 @@ module mo_river
     integer(i8), allocatable :: down(:) !< downstream cell by id size(n_nodes)
     logical, allocatable :: is_sink(:) !< flag to indicate sinks size(n_nodes)
     integer(i8), allocatable :: sinks(:) !< node ids of sinks
+    real(dp), allocatable :: upstream_area(:) !< upstream area of node size(n_nodes)
     real(dp), allocatable :: link_length(:) !< length of link starting at node (0 if node is sink) size(n_nodes)
     real(dp), allocatable :: link_slope(:) !< slope of link starting at node (in [0,1]) size(n_nodes)
     real(dp), allocatable :: celerity(:) !< celerity of link starting at node set by upscaler size(n_nodes)
@@ -108,6 +109,7 @@ module mo_river
     procedure, public :: calc_order => river_order
     procedure, public :: calc_fdir => river_fdir
     procedure, public :: calc_facc => river_facc
+    procedure, public :: calc_upstream_area => river_upstream_area
     procedure, public :: calc_length => river_length
     procedure, public :: calc_slope => river_slope
     procedure, public :: export => river_export
@@ -308,6 +310,27 @@ contains
     end do
   end subroutine river_facc
 
+  !> \brief Calculate upstream area for each node (inclusive).
+  subroutine river_upstream_area(this)
+    use mo_message, only: error_message
+    class(river_t), intent(inout) :: this
+    integer(i8) :: i, j, n, m
+    if (allocated(this%upstream_area)) deallocate(this%upstream_area)
+    allocate(this%upstream_area(this%n_nodes))
+    if (.not.allocated(this%order%id)) call error_message("river%calc_upstream_area: order not initialized")
+    do i = 1_i8, size(this%order%level_start, kind=i8)
+      !$omp parallel do default(shared) private(j, n, m)
+      do j = this%order%level_start(i), this%order%level_end(i)
+        n = this%order%id(j)
+        this%upstream_area(n) = this%grid%cell_area(this%node_cell(n)) * this%area_fraction(n)
+        do m = 1, this%nodes(n)%nedges()
+          this%upstream_area(n) = this%upstream_area(n) + this%upstream_area(this%nodes(n)%edges(m))
+        end do
+      end do
+      !$omp end parallel do
+    end do
+  end subroutine river_upstream_area
+
   !> \brief Calculate D8 flow direction from network
   subroutine river_fdir(this)
     use mo_message, only: error_message
@@ -434,6 +457,7 @@ contains
     vars = [vars, var("fdir", "flow direction", dtype="i32", static=.true.)]
     if (allocated(this%facc)) vars = [vars, var("facc", "flow accumulation", dtype="i32", kind="i8", static=.true.)]
     if (allocated(this%order%id)) vars = [vars, var("level", "order level", dtype="i32", static=.true.)]
+    if (allocated(this%upstream_area)) vars = [vars, var("upstream_area", "upstream area", dtype="f64", static=.true.)]
     if (allocated(this%link_length)) vars = [vars, var("length", "link length", dtype="f64", static=.true.)]
     if (allocated(this%link_slope)) vars = [vars, var("slope", "link slope", dtype="f64", static=.true.)]
     if (allocated(this%celerity)) vars = [vars, var("celerity", "celerity", dtype="f64", static=.true.)]
@@ -453,6 +477,7 @@ contains
       end do
       call ds%update("level", level)
     end if
+    if (allocated(this%upstream_area)) call ds%update("upstream_area", this%upstream_area)
     if (allocated(this%link_length)) call ds%update("length", this%link_length)
     if (allocated(this%link_slope)) call ds%update("slope", this%link_slope)
     if (allocated(this%celerity)) call ds%update("celerity", this%celerity)
