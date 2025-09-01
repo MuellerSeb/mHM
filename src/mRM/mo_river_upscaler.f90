@@ -67,14 +67,17 @@ module mo_river_upscaler
 contains
 
   !> \brief Setup river upscaler from fine river and coarse target grid.
-  subroutine river_upscaler_init(this, fine_river, coarse_river, coarse_grid, scc_gauges, tol)
+  subroutine river_upscaler_init(this, fine_river, coarse_river, coarse_grid, scc_gauges, calc_stream, tol)
     implicit none
     class(river_upscaler_t), intent(inout) :: this
     type(river_t), pointer, intent(in) :: fine_river !< river definition at fine grid
     type(river_t), pointer, intent(in) :: coarse_river !< pointer to coarse river definition to be determined
     type(grid_t), pointer, intent(in) :: coarse_grid !< coarse grid for the upscaled river network
     integer(i4), dimension(:,:), intent(in), optional :: scc_gauges !< gauge locations at fine river dim 1: x/y, dim 2: gauge id
+    logical, optional, intent(in) :: calc_stream !< Whether to calculate stream features (default: .true.)
     real(dp), optional, intent(in) :: tol !< tolerance for cell factor comparison (default: 1.e-7)
+    logical :: stream = .true.
+    if (present(calc_stream)) stream = calc_stream
 
     this%fine_river => fine_river
     this%coarse_river => coarse_river
@@ -100,7 +103,7 @@ contains
     call this%coarse_river%calc_order()
 
     ! calculate stream features (stream mask, link lengths)
-    call this%calc_stream()
+    if (stream) call this%calc_stream()
 
   end subroutine river_upscaler_init
 
@@ -197,11 +200,11 @@ contains
       xu = this%upscaler%x_ub(i) ! upper x-bound
       ! determine north and south bound depending on y-direction
       if (this%fine_river%grid%y_direction == bottom_up) then
-        yn = yu ! north y-bound is up
-        ys = yl ! south y-bound is down
+        yn = yu ! north y-bound is upper bound
+        ys = yl ! south y-bound is lower bound
       else ! top_down
-        yn = yl ! north y-bound is down
-        ys = yu ! south y-bound is up
+        yn = yl ! north y-bound is lower bound
+        ys = yu ! south y-bound is upper bound
       end if
 
       ! searching on side E
