@@ -11,11 +11,14 @@
 module mo_river_output
 
   use mo_kind,   only: i1, i2, i4, i8, sp, dp
+  use mo_constants, only : nodata_dp, nodata_sp, nodata_i4, nodata_i8
   use mo_river, only: river_t
-  use mo_grid_io, only: var, var_index
-  use mo_message, only: error_message
-  use mo_netcdf, only : NcDataset, NcDimension, NcVariable
+  use mo_grid, only: cartesian
+  use mo_grid_io, only: var, var_index, end_timestamp
+  use mo_message, only: error_message, warn_message
+  use mo_netcdf, only : NcDataset, NcDimension, NcVariable, NcGroup, check
   use mo_datetime, only : datetime, timedelta, delta_from_string, decode_cf_time_units, one_day, one_hour
+  use netcdf, only: nf90_def_dim
 
   implicit none
   private
@@ -265,7 +268,7 @@ contains
     character(:), allocatable :: units, units_dt
     type(NcDimension) :: t_dim, b_dim, node_dim, dims(2)
     type(NcVariable) :: x_var, y_var, t_var
-    integer(i4) :: i
+    integer(i4) :: i, id
 
     self%path = trim(path)
     self%nc = NcDataset(self%path, "w")
@@ -288,11 +291,18 @@ contains
     end do
 
     b_dim = self%nc%setDimension("bnds", 2_i4)
-    node_dim = self%nc%setDimension("node", self%river%n_nodes)
+    ! node dim creation by hand, since netcdf doesn't support i8 for dimension size
+    ! call check(nf90_def_dim(self%nc%id, "node", self%river%n_nodes, id), "Failed to create dimension: node")
+    ! node_dim%id = id
+    ! node_dim%parent = NcGroup(self%nc%id)
+    ! node_dim = self%nc%setDimension("node", self%river%n_nodes)
+    node_dim = self%nc%setDimension("node") ! use unlimited dimension to support i8 index
+
+    ! coordinates
     x_var = self%nc%setVariable("x", "f64", [node_dim])
     y_var = self%nc%setVariable("y", "f64", [node_dim])
 
-    if (this%river%grid%coordsys==cartesian) then
+    if (self%river%grid%coordsys==cartesian) then
       call x_var%setAttribute("long_name", "x coordinate of projection")
       call x_var%setAttribute("standard_name", "projection_x_coordinate")
       call x_var%setAttribute("units", "m") ! TODO: this should be configurable
@@ -307,8 +317,9 @@ contains
       call y_var%setAttribute("standard_name", "latitude")
       call y_var%setAttribute("units", "degrees_north")
     end if
-    call x_var%setData(this%river%node_x)
-    call y_var%setData(this%river%node_y)
+    ! this should set the node-dim size
+    call x_var%setData(self%river%node_x)
+    call y_var%setData(self%river%node_y)
 
     if (.not.self%static) then
       if (.not.present(start_time)) call error_message("output: if dataset is not static, a start_time is needed")
