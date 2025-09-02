@@ -57,18 +57,22 @@ module mo_river_router
     type(river_t), pointer :: river => null() !< river definition to route on
     type(grid_t), pointer :: input_grid => null() !< grid the input (e.g. runoff) is defined on
     type(scaler_t) :: scaler !< input rescaler
-    integer(i4) :: input_step !< [h] time step size of the input (either 1 or 24)
+    integer(i4) :: input_step !< [h] time step size of the input in hours
     integer(i4) :: input_count !< [-] number of accumulated inputs for longer output step
-    integer(i4) :: output_step !< [h] time step size of the output (at least 1)
+    integer(i4) :: output_step !< [h] time step size of the output in hours (at least 1)
     real(dp) :: step !< [s] time step size of the routing (for meeting the CFL condition)
     integer(i4) :: iterations !< number of routing iterations for each output step
     integer(i4) :: accumulations !< number of input accumulations for each output step
     type(inflow_t) :: inflow !< inflow handler
-    !> [m3 s-1] runoff flux to route for current node, size(river\%n_nodes)
+    !> [mm] accumulated runoff size(input_grid\%ncells)
+    real(dp), allocatable :: acc_runoff(:)
+    !> [m3 s-1] runoff flux for current cell as intermediate result for SCC, size(river\%grid\%ncells)
+    real(dp), allocatable :: scaled_runoff(:)
+    !> [m3 s-1] runoff flux to route for current river node, size(river\%n_nodes)
     real(dp), allocatable :: runoff(:)
-    !> [m3 s-1] inflow flux to link starting at current node (current and previous time step), size(river\%n_nodes)
+    !> [m3 s-1] inflow flux to link starting at current node (current and previous time step), size(river\%n_nodes, 2)
     real(dp), allocatable :: link_inflow(:, :)
-    !> [m3 s-1] routed flux from link starting at current node (current and previous time step), size(river\%n_nodes)
+    !> [m3 s-1] routed flux from link starting at current node (current and previous time step), size(river\%n_nodes, 2)
     real(dp), allocatable :: link_routed(:, :)
     real(dp), allocatable :: nu1(:) !< Muskingum parameter nu1, size(river\%n_nodes) -> C1 = nu2, C2 = nu1-nu2, C3=1-nu1
     real(dp), allocatable :: nu2(:) !< Muskingum parameter nu2, size(river\%n_nodes) -> C1 = nu2, C2 = nu1-nu2, C3=1-nu1
@@ -102,7 +106,10 @@ contains
     this%input_count = 0_i4
     this%input_step = 1_i4
     if (present(input_step)) this%input_step = input_step
+    ! only need scaled runoff as intermediate result in case of SCC
+    if (this%river%scc) allocate(this%scaled_runoff(this%river%grid%ncells), source=0.0_dp)
     allocate(this%runoff(this%river%n_nodes), source=0.0_dp)
+    allocate(this%acc_runoff(this%input_grid%ncells), source=0.0_dp)
     allocate(this%link_inflow(this%river%n_nodes, 2), source=0.0_dp)
     allocate(this%link_routed(this%river%n_nodes, 2), source=0.0_dp)
     ! setup muskingum parameters
@@ -116,7 +123,7 @@ contains
     class(river_router_t), intent(inout) :: this
     real(dp), optional, intent(in) :: max_route_step !< [s] maximum routing time step (default: 86400.0)
     real(dp), allocatable :: k(:)
-    real(dp) :: xi, max_step_
+    real(dp) :: xi
     integer(i4) :: step_id
 
     xi = routing_space_weight ! fixed for now
@@ -155,18 +162,28 @@ contains
     real(dp), dimension(this%input_grid%ncells), intent(in) :: input_runoff
     real(dp), dimension(this%river%n_nodes), intent(out) :: discharge
     integer(i4) :: i
-    ! TODO: accumulate before rescaling (to only rescale once)
+    integer(i8) :: n
     ! accumulate input runoff
     this%input_count = this%input_count + 1_i4
     if (this%input_count == 1_i4) then
-      this%runoff = this%scale_runoff(input_runoff) ! first accumulation as runoff reset
+      this%acc_runoff = input_runoff ! first accumulation as runoff reset
     else
-      this%runoff = this%runoff + this%scale_runoff(input_runoff) ! accumulate
+      this%acc_runoff = this%acc_runoff + input_runoff ! accumulate
     end if
     if (this%input_count < this%accumulations) return ! not yet ready to route
     ! average runoff flux over input time step accumulations
-    if (this%accumulations > 1_i4) this%runoff = this%runoff / real(this%accumulations, dp)
-    ! TODO: distribute runoff in case of SCC
+    if (this%accumulations > 1_i4) this%acc_runoff = this%acc_runoff / real(this%accumulations, dp)
+    ! distribute runoff in case of SCC
+    if (this%river%scc) then
+      this%scaled_runoff = this%scale_runoff(this%acc_runoff)
+      !$omp parallel do default(shared) private(n)
+      do n = 1_i8, this%river%n_nodes
+        this%runoff(n) = this%scaled_runoff(this%river%node_cell(n)) * this%river%area_fraction(n)
+      end do
+      !$omp end parallel do
+    else
+      this%runoff = this%scale_runoff(this%acc_runoff)
+    end if
     ! reset input counter
     this%input_count = 0_i4
     ! prepare discharge
@@ -185,7 +202,6 @@ contains
     class(river_router_t), intent(inout) :: this
     real(dp), dimension(this%input_grid%ncells), intent(in) :: input_runoff
     real(dp), dimension(this%river%grid%ncells) :: scaled_runoff_flux
-    ! TODO: this could be optimized, since rescaler always unpacks the input
     ! rescaled result in [liter] = [mm m2]
     if (this%scaler%scaling_mode == down_scaling) then
       call this%scaler%downscale_nearest(input_runoff, scaled_runoff_flux)
