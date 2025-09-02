@@ -270,9 +270,11 @@ contains
     integer(i4), intent(in), optional :: deflate_level !< deflate level for compression
 
     character(:), allocatable :: units, units_dt
-    type(NcDimension) :: t_dim, b_dim, node_dim, dims(2)
-    type(NcVariable) :: x_var, y_var, t_var, mesh_var
+    type(NcDimension) :: t_dim, b_dim, node_dim, link_dim, dims(2)
+    type(NcVariable) :: x_var, y_var, t_var, mesh_var, link_var
     integer(i4) :: i, id
+    integer(i8) :: n, k
+    integer(i8), allocatable :: links(:, :)
 
     self%path = trim(path)
     self%nc = NcDataset(self%path, "w")
@@ -290,8 +292,9 @@ contains
       self%static = self%static .and. vars(i)%static
     end do
 
-    b_dim = self%nc%setDimension("bnds", 2_i4)
+    b_dim = self%nc%setDimension("Two", 2_i4)
     node_dim = self%nc%setDimension("node") ! use unlimited dimension to support i8 index
+    link_dim = self%nc%setDimension("link") ! use unlimited dimension to support i8 index
 
     ! coordinates
     x_var = self%nc%setVariable("x", "f64", [node_dim])
@@ -316,12 +319,28 @@ contains
     call x_var%setData(self%river%node_x)
     call y_var%setData(self%river%node_y)
 
+    ! 1D network topology following UGRID conventions
     mesh_var = self%nc%setVariable("river", "i32", dims(:0)) ! mesh variable as scalar integer
     call mesh_var%setAttribute("cf_role", "mesh_topology")
     call mesh_var%setAttribute("long_name", "river network definition")
-    call mesh_var%setAttribute("topology_dimension", 0)  ! only nodes, 1 would need links
+    call mesh_var%setAttribute("topology_dimension", 1)  ! 0 - only nodes, 1 - with links
     call mesh_var%setAttribute("node_coordinates", "x y")
-    ! call mesh_var%setAttribute("edge_node_connectivity", "links")
+    call mesh_var%setAttribute("edge_node_connectivity", "links")
+
+    link_var = self%nc%setVariable("links", "i64", [b_dim, link_dim])
+    call link_var%setAttribute("cf_role", "edge_node_connectivity")
+    call link_var%setAttribute("long_name", "river links definition")
+    call link_var%setAttribute("start_index", 1)  ! fortran indices starting with 1
+    allocate(links(2, count(.not.self%river%is_sink)))
+    k = 0_i8
+    do n = 1_i8, self%river%n_nodes
+      if (self%river%is_sink(n)) cycle
+      k = k + 1_i8
+      links(1, k) = n
+      links(2, k) = self%river%down(n)
+    end do
+    call link_var%setData(links)
+    deallocate(links)
 
     if (.not.self%static) then
       if (.not.present(start_time)) call error_message("output: if dataset is not static, a start_time is needed")
