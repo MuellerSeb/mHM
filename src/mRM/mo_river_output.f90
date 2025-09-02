@@ -296,6 +296,14 @@ contains
     node_dim = self%nc%setDimension("node") ! use unlimited dimension to support i8 index
     link_dim = self%nc%setDimension("link") ! use unlimited dimension to support i8 index
 
+    ! 1D network topology following UGRID conventions
+    mesh_var = self%nc%setVariable("river", "i32", dims(:0)) ! mesh variable as scalar integer
+    call mesh_var%setAttribute("cf_role", "mesh_topology")
+    call mesh_var%setAttribute("long_name", "river network definition")
+    call mesh_var%setAttribute("topology_dimension", 1)  ! 0 - only nodes, 1 - with links
+    call mesh_var%setAttribute("node_coordinates", "x y")
+    call mesh_var%setAttribute("edge_node_connectivity", "links")
+
     ! coordinates
     x_var = self%nc%setVariable("x", "f64", [node_dim])
     y_var = self%nc%setVariable("y", "f64", [node_dim])
@@ -319,14 +327,7 @@ contains
     call x_var%setData(self%river%node_x)
     call y_var%setData(self%river%node_y)
 
-    ! 1D network topology following UGRID conventions
-    mesh_var = self%nc%setVariable("river", "i32", dims(:0)) ! mesh variable as scalar integer
-    call mesh_var%setAttribute("cf_role", "mesh_topology")
-    call mesh_var%setAttribute("long_name", "river network definition")
-    call mesh_var%setAttribute("topology_dimension", 1)  ! 0 - only nodes, 1 - with links
-    call mesh_var%setAttribute("node_coordinates", "x y")
-    call mesh_var%setAttribute("edge_node_connectivity", "links")
-
+    ! links
     link_var = self%nc%setVariable("links", "i64", [b_dim, link_dim])
     call link_var%setAttribute("cf_role", "edge_node_connectivity")
     call link_var%setAttribute("long_name", "river links definition")
