@@ -14,11 +14,10 @@ module mo_river_output
   use mo_constants, only : nodata_dp, nodata_sp, nodata_i4, nodata_i8
   use mo_river, only: river_t
   use mo_grid, only: cartesian
-  use mo_grid_io, only: var, var_index, end_timestamp
+  use mo_grid_io, only: var, var_index, end_timestamp, time_values
   use mo_message, only: error_message, warn_message
   use mo_netcdf, only : NcDataset, NcDimension, NcVariable, NcGroup, check
   use mo_datetime, only : datetime, timedelta, delta_from_string, decode_cf_time_units, one_day, one_hour
-  use netcdf, only: nf90_def_dim
 
   implicit none
   private
@@ -99,6 +98,9 @@ contains
     if (allocated(self%long_name)) call self%nc%setAttribute("long_name", self%long_name)
     if (allocated(self%standard_name)) call self%nc%setAttribute("standard_name", self%standard_name)
     if (allocated(self%units)) call self%nc%setAttribute("units", self%units)
+
+    ! set coordinates
+    call self%nc%setAttribute("coordinates", "x y")
 
     self%river => river
     ! input data is still either real(dp) or integer(i4)
@@ -280,10 +282,6 @@ contains
     self%timestamp = end_timestamp
     if (present(timestamp)) self%timestamp = timestamp
 
-    ! write river specification to file
-    call create_river(self%nc, self%river)
-    ! self%river%to_netcdf(self%nc, double_precision=river_double_precision)
-
     self%nvars = size(vars)
     self%static = .true.
     do i = 1_i4, self%nvars
@@ -291,11 +289,6 @@ contains
     end do
 
     b_dim = self%nc%setDimension("bnds", 2_i4)
-    ! node dim creation by hand, since netcdf doesn't support i8 for dimension size
-    ! call check(nf90_def_dim(self%nc%id, "node", self%river%n_nodes, id), "Failed to create dimension: node")
-    ! node_dim%id = id
-    ! node_dim%parent = NcGroup(self%nc%id)
-    ! node_dim = self%nc%setDimension("node", self%river%n_nodes)
     node_dim = self%nc%setDimension("node") ! use unlimited dimension to support i8 index
 
     ! coordinates
