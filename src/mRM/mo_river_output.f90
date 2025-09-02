@@ -101,6 +101,8 @@ contains
 
     ! set coordinates
     call self%nc%setAttribute("coordinates", "x y")
+    call self%nc%setAttribute("mesh", "river")
+    call self%nc%setAttribute("location", "node")
 
     self%river => river
     ! input data is still either real(dp) or integer(i4)
@@ -269,7 +271,7 @@ contains
 
     character(:), allocatable :: units, units_dt
     type(NcDimension) :: t_dim, b_dim, node_dim, dims(2)
-    type(NcVariable) :: x_var, y_var, t_var
+    type(NcVariable) :: x_var, y_var, t_var, mesh_var
     integer(i4) :: i, id
 
     self%path = trim(path)
@@ -313,6 +315,13 @@ contains
     ! this should set the node-dim size
     call x_var%setData(self%river%node_x)
     call y_var%setData(self%river%node_y)
+
+    mesh_var = self%nc%setVariable("river", "i32", dims(:0)) ! mesh variable as scalar integer
+    call mesh_var%setAttribute("cf_role", "mesh_topology")
+    call mesh_var%setAttribute("long_name", "river network definition")
+    call mesh_var%setAttribute("topology_dimension", 0)  ! only nodes, 1 would need links
+    call mesh_var%setAttribute("node_coordinates", "x y")
+    ! call mesh_var%setAttribute("edge_node_connectivity", "links")
 
     if (.not.self%static) then
       if (.not.present(start_time)) call error_message("output: if dataset is not static, a start_time is needed")
