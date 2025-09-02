@@ -499,8 +499,8 @@ contains
     !$omp end parallel do
     deallocate(cells, facc, leaving)
 
-    ! init coarse river from upscaled fdir (length will be set later)
-    call this%coarse_river%from_fdir(fdir, calculate_length=.false.)
+    ! init coarse river from upscaled fdir (length, node_x and node_y will be set later)
+    call this%coarse_river%from_fdir(fdir, calculate_length=.false., calculate_node_xy=.false.)
 
     ! cleanup
     deallocate(fdir)
@@ -513,11 +513,17 @@ contains
     integer(i8) :: i, cell
 
     if (.not.allocated(this%fine_river%link_length)) call error_message("river_upscaler%calc_stream: link length not available")
+    if (.not.allocated(this%fine_river%node_x)) call error_message("river_upscaler%calc_stream: node location not available")
+    if (.not.allocated(this%fine_river%node_y)) call error_message("river_upscaler%calc_stream: node location not available")
 
-    ! create is_link_start array
+    ! create is_link_start array and node locations
     allocate(this%is_link_start(this%fine_river%n_nodes), source=.false.)
+    allocate(this%coarse_river%node_x(this%coarse_river%n_nodes))
+    allocate(this%coarse_river%node_y(this%coarse_river%n_nodes))
     !$omp parallel do default(shared) private(i)
     do i = 1_i8, this%coarse_river%n_nodes
+      this%coarse_river%node_x(i) = this%fine_river%node_x(this%link_start(i))
+      this%coarse_river%node_y(i) = this%fine_river%node_y(this%link_start(i))
       if (this%coarse_river%is_sink(i)) cycle ! skip sinks
       this%is_link_start(this%link_start(i)) = .true.
     end do
