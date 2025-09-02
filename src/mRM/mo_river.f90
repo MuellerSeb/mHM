@@ -104,6 +104,8 @@ module mo_river
     logical :: scc = .false. !< indicate that this river is a SCC-river (not D8)
     integer(i8), allocatable :: node_cell(:) !< map node to grid cell id size(n_nodes)
     real(dp), allocatable :: area_fraction(:) !< area fraction for each node in cell size(n_nodes)
+    real(dp), allocatable :: node_x(:) !< x coordinate for each node size(n_nodes)
+    real(dp), allocatable :: node_y(:) !< x coordinate for each node size(n_nodes)
   contains
     procedure, public :: from_fdir => river_from_fdir
     procedure, public :: calc_order => river_order
@@ -224,11 +226,12 @@ contains
   end function get_fdir
 
   !> \brief Initialize river network from flow direction.
-  subroutine river_from_fdir(this, fdir, grid, calculate_length)
+  subroutine river_from_fdir(this, fdir, grid, calculate_length, calculate_node_xy)
     class(river_t), intent(inout) :: this
     integer(i4), dimension(:), intent(in) :: fdir !< D8 flow direction
     type(grid_t), pointer, intent(in), optional :: grid !< grid the river network is defined on
     logical, intent(in), optional :: calculate_length !< whether to calculate the link length from fdir (default: .true.)
+    logical, intent(in), optional :: calculate_node_xy !< whether to calculate node locations (default: .true.)
     integer(i8), allocatable :: cells(:,:)
     integer(i4) :: dy ! direction of north in the grid matrix (1/-1)
     integer(i4) :: n_up ! number of upstream neighbor cells
@@ -237,7 +240,11 @@ contains
     integer(i8) :: i, j
     logical :: periodic ! periodic latlon grid
     logical :: calc_length = .true.
+    logical :: calc_node_xy = .true.
+    real(dp), allocatable :: xax(:), yax(:)
+
     if (present(calculate_length)) calc_length = calculate_length
+    if (present(calculate_node_xy)) calc_node_xy = calculate_node_xy
     if (present(grid)) this%grid => grid
     if (.not.associated(this%grid)) call error_message("river%from_fdir: grid not associated")
     call this%init(this%grid%ncells)
@@ -276,6 +283,17 @@ contains
     ! calculate d8 reach length
     if (calc_length) call this%calc_length()
 
+    ! determine node locations
+    if (calc_node_xy) then
+      allocate(this%node_x(this%n_nodes))
+      allocate(this%node_y(this%n_nodes))
+      xax = this%grid%x_axis()
+      yax = this%grid%y_axis()
+      do i = 1_i8, this%grid%ncells
+        this%node_x(i) = xax(this%grid%cell_ij(i, 1))
+        this%node_y(i) = yax(this%grid%cell_ij(i, 2))
+      end do
+    end if
   end subroutine river_from_fdir
 
   !> \brief Get river node order by levels
