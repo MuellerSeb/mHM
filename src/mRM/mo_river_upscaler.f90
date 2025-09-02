@@ -10,7 +10,7 @@
 !! This code is released under the LGPLv3+ license \license_note
 module mo_river_upscaler
 
-  use mo_kind, only: i4, i8, dp
+  use mo_kind, only: i1, i4, i8, dp
   use mo_constants, only: nodata_i4
   use mo_dag, only: traversal_visit
   use mo_river, only: river_t, d8_E, d8_S, d8_W, d8_N, d8_SE, d8_SW, d8_NW, d8_NE
@@ -73,7 +73,7 @@ contains
     type(river_t), pointer, intent(in) :: fine_river !< river definition at fine grid
     type(river_t), pointer, intent(in) :: coarse_river !< pointer to coarse river definition to be determined
     type(grid_t), pointer, intent(in) :: coarse_grid !< coarse grid for the upscaled river network
-    integer(i4), dimension(:,:), intent(in), optional :: scc_gauges !< gauge locations at fine river dim 1: x/y, dim 2: gauge id
+    real(dp), dimension(:,:), intent(in), optional :: scc_gauges !< gauge locations on fine river dim 1: id, dim 2: (x,y)
     logical, optional, intent(in) :: calc_stream !< Whether to calculate stream features (default: .true.)
     real(dp), optional, intent(in) :: tol !< tolerance for cell factor comparison (default: 1.e-7)
     logical :: stream = .true.
@@ -110,12 +110,13 @@ contains
   !> \brief Initialize SCC related variables
   subroutine river_upscaler_init_scc(this, scc_gauges)
     class(river_upscaler_t), intent(inout) :: this
-    integer(i4), dimension(:,:), intent(in), optional :: scc_gauges !< gauge locations at fine river dim 1: x/y, dim 2: gauge id
+    real(dp), dimension(:,:), intent(in), optional :: scc_gauges !< gauge locations on fine river dim 1: id, dim 2: (x,y)
     ! sub-catchment related attributes
     logical, allocatable :: gauge_mask(:)
     integer(i8), allocatable :: gauge_facc(:)
     type(traversal_visit) :: handler
     integer(i4) :: i, j, n
+    real(dp) :: coords(2)
 
     if (.not.present(scc_gauges)) then
       this%coarse_river%scc = .false.
@@ -127,7 +128,7 @@ contains
       return
     end if
 
-    n = size(scc_gauges, dim=2)
+    n = size(scc_gauges, dim=1)
     allocate(gauge_mask(n))
     allocate(gauge_facc(n))
     this%nsub = n + 1_i4
@@ -136,7 +137,8 @@ contains
     allocate(this%scc_gauges(n))
     ! find gauge cell ids
     do i = 1_i4, n
-      this%scc_gauges(i) = this%fine_river%grid%cell_id(scc_gauges(:,i))
+      coords = scc_gauges(i,:)
+      this%scc_gauges(i) = this%fine_river%grid%closest_cell_id(coords)
       gauge_facc(i) = this%fine_river%facc(this%scc_gauges(i))
     end do
     ! calculate scc map
