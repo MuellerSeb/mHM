@@ -522,9 +522,13 @@ contains
     allocate(this%coarse_river%node_y(this%coarse_river%n_nodes))
     !$omp parallel do default(shared) private(i)
     do i = 1_i8, this%coarse_river%n_nodes
+      if (this%coarse_river%is_sink(i)) then
+        this%coarse_river%node_x(i) = this%fine_river%node_x(this%sink_map(i))
+        this%coarse_river%node_y(i) = this%fine_river%node_y(this%sink_map(i))
+        cycle ! skip sinks
+      end if
       this%coarse_river%node_x(i) = this%fine_river%node_x(this%link_start(i))
       this%coarse_river%node_y(i) = this%fine_river%node_y(this%link_start(i))
-      if (this%coarse_river%is_sink(i)) cycle ! skip sinks
       this%is_link_start(this%link_start(i)) = .true.
     end do
     !$omp end parallel do
