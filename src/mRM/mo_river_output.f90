@@ -272,7 +272,7 @@ contains
     character(:), allocatable :: units, units_dt
     type(NcDimension) :: t_dim, b_dim, node_dim, link_dim, dims(2)
     type(NcVariable) :: x_var, y_var, t_var, mesh_var, link_var
-    integer(i4) :: i, id
+    integer(i4) :: i
     integer(i8) :: n, k
     integer(i8), allocatable :: links(:, :)
 
