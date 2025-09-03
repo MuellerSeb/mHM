@@ -14,7 +14,7 @@ module mo_river_upscaler
   use mo_constants, only: nodata_i4
   use mo_dag, only: traversal_visit
   use mo_river, only: river_t, d8_E, d8_S, d8_W, d8_N, d8_SE, d8_SW, d8_NW, d8_NE
-  use mo_grid, only: grid_t, bottom_up
+  use mo_grid, only: grid_t, bottom_up, cartesian
   use mo_grid_scaler, only: scaler_t, down_scaling
   use mo_message, only: error_message
 
@@ -67,13 +67,14 @@ module mo_river_upscaler
 contains
 
   !> \brief Setup river upscaler from fine river and coarse target grid.
-  subroutine river_upscaler_init(this, fine_river, coarse_river, coarse_grid, scc_gauges, calc_stream, tol)
+  subroutine river_upscaler_init(this, fine_river, coarse_river, coarse_grid, scc_gauges, scc_latlon, calc_stream, tol)
     implicit none
     class(river_upscaler_t), intent(inout) :: this
     type(river_t), pointer, intent(in) :: fine_river !< river definition at fine grid
     type(river_t), pointer, intent(in) :: coarse_river !< pointer to coarse river definition to be determined
     type(grid_t), pointer, intent(in) :: coarse_grid !< coarse grid for the upscaled river network
     real(dp), dimension(:,:), intent(in), optional :: scc_gauges !< gauge locations on fine river dim 1: id, dim 2: (x,y)
+    logical, optional, intent(in) :: scc_latlon !< Whether the scc gauges coordinates are geographical (default: .true.)
     logical, optional, intent(in) :: calc_stream !< Whether to calculate stream features (default: .true.)
     real(dp), optional, intent(in) :: tol !< tolerance for cell factor comparison (default: 1.e-7)
     logical :: stream = .true.
@@ -87,7 +88,7 @@ contains
     ! TODO: shortcut for same resolution of fine and coarse river
 
     ! initialize scc related variables
-    call this%init_scc(scc_gauges)
+    call this%init_scc(scc_gauges, scc_latlon)
 
     ! find leaving fine cells in every coarse cell
     call this%find_leaving_cells()
@@ -108,15 +109,17 @@ contains
   end subroutine river_upscaler_init
 
   !> \brief Initialize SCC related variables
-  subroutine river_upscaler_init_scc(this, scc_gauges)
+  subroutine river_upscaler_init_scc(this, scc_gauges, scc_latlon)
     class(river_upscaler_t), intent(inout) :: this
     real(dp), dimension(:,:), intent(in), optional :: scc_gauges !< gauge locations on fine river dim 1: id, dim 2: (x,y)
+    logical, optional, intent(in) :: scc_latlon !< Whether the scc gauges coordinates are geographical (default: .true.)
     ! sub-catchment related attributes
     logical, allocatable :: gauge_mask(:)
     integer(i8), allocatable :: gauge_facc(:)
     type(traversal_visit) :: handler
     integer(i4) :: i, j, n
     real(dp) :: coords(2)
+    logical :: aux, latlon
 
     if (.not.present(scc_gauges)) then
       this%coarse_river%scc = .false.
@@ -128,6 +131,13 @@ contains
       return
     end if
 
+    latlon = .true.  ! assume geographical coordinates of stations by default
+    if (present(scc_latlon)) latlon = scc_latlon
+    if (latlon .and. (.not.this%fine_river%grid%has_aux_coords()) .and. this%fine_river%grid%coordsys == cartesian) then
+      call error_message("river_upscaler%init_scc: gauge coordinates are geographical but grid has no lat-lon coordinates.")
+    end if
+    aux = this%fine_river%grid%has_aux_coords() .and. latlon
+
     n = size(scc_gauges, dim=1)
     allocate(gauge_mask(n))
     allocate(gauge_facc(n))
@@ -135,12 +145,14 @@ contains
     if (this%fine_river%scc) call error_message("river_upscaler%init_scc: need a D8 river to initialize SCC")
     if (.not.allocated(this%fine_river%facc)) call error_message("river_upscaler%init_scc: facc not available")
     allocate(this%scc_gauges(n))
+
     ! find gauge cell ids
     do i = 1_i4, n
       coords = scc_gauges(i,:)
-      this%scc_gauges(i) = this%fine_river%grid%closest_cell_id(coords)
+      this%scc_gauges(i) = this%fine_river%grid%closest_cell_id(coords, use_aux=aux)
       gauge_facc(i) = this%fine_river%facc(this%scc_gauges(i))
     end do
+
     ! calculate scc map
     allocate(this%scc_map(this%fine_river%grid%ncells), source=n+1_i4) ! base catchment gets id n+1
     allocate(handler%visited(this%fine_river%grid%ncells))
