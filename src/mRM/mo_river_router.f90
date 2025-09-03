@@ -218,22 +218,25 @@ contains
     implicit none
     class(river_router_t), intent(inout) :: this
     real(dp), dimension(this%river%n_nodes), intent(inout) :: discharge
+    real(dp) :: inflow
     integer(i8) :: i, j, n, m
     if (.not.allocated(this%river%order%id)) call error_message("router%route: river order not initialized")
     ! parallel routing on levels
+    !$omp parallel default(shared) private(i,j,n,m,inflow)
     do i = 1_i8, size(this%river%order%level_start, kind=i8)
-      !$omp parallel do default(shared) private(j, n, m)
+      !$omp do schedule(dynamic)
       do j = this%river%order%level_start(i), this%river%order%level_end(i)
         n = this%river%order%id(j)
         ! add runoff to inflow
-        this%link_inflow(n, current) = this%runoff(n)
+        inflow = this%runoff(n)
         ! add upstream routed flux to inflow
         do m = 1, this%river%nodes(n)%nedges()
-          this%link_inflow(n, current) = this%link_inflow(n, current) + this%link_routed(this%river%nodes(n)%edges(m), current)
+          inflow = inflow + this%link_routed(this%river%nodes(n)%edges(m), current)
         end do
+        this%link_inflow(n, current) = inflow
         ! TODO: add/replace inflow with inflow handler at inflow gauges
         ! discharge is the accumulated inflow at current node
-        discharge(n) = discharge(n) + this%link_inflow(n, current)
+        discharge(n) = discharge(n) + inflow
         ! no routing at sinks
         if (this%river%is_sink(n)) cycle
         ! muskingum schema for routed flux
@@ -241,8 +244,9 @@ contains
                                      + this%nu1(n) * (this%link_inflow(n, previous) - this%link_routed(n, previous)) &
                                      + this%nu2(n) * (this%link_inflow(n, current)  - this%link_inflow(n, previous))
       end do
-      !$omp end parallel do
+      !$omp end do
     end do
+    !$omp end parallel
     ! move values from t -> t-1 for next iteration
     ! TODO: prevent copying by only swapping indices
     this%link_inflow(:, previous) = this%link_inflow(:, current)
