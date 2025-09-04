@@ -190,7 +190,7 @@ contains
     ! distribute runoff in case of SCC
     if (this%river%scc) then
       this%scaled_runoff = this%scale_runoff(this%acc_runoff)
-      !$omp parallel do simd default(none) schedule(static) shared(this) private(n,c)
+      !$omp parallel do simd default(none) schedule(static) shared(this) private(c)
       do n = 1_i8, this%river%n_nodes
         c = this%river%node_cell(n)
         this%runoff(n) = this%scaled_runoff(c) * this%river%area_fraction(n)
@@ -241,7 +241,7 @@ contains
     ! parallel routing on levels
     do i = 1_i8, size(this%river%order%level_start, kind=i8)
       if (this%river%order%level_size(i) >= this%openmp_level_thresh) then
-        !$omp parallel do simd default(shared) private(j)
+        !$omp parallel do simd default(shared)
         do j = this%river%order%level_start(i), this%river%order%level_end(i)
           call process_node(j)
         end do
