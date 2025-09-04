@@ -63,19 +63,24 @@ module mo_river_router
     real(dp) :: step !< [s] time step size of the routing (for meeting the CFL condition)
     integer(i4) :: iterations !< number of routing iterations for each output step
     integer(i4) :: accumulations !< number of input accumulations for each output step
-    type(inflow_t) :: inflow !< inflow handler
+    type(inflow_t) :: inflow_handler !< inflow handler
     !> [mm] accumulated runoff size(input_grid\%ncells)
     real(dp), allocatable :: acc_runoff(:)
     !> [m3 s-1] runoff flux for current cell as intermediate result for SCC, size(river\%grid\%ncells)
     real(dp), allocatable :: scaled_runoff(:)
     !> [m3 s-1] runoff flux to route for current river node, size(river\%n_nodes)
     real(dp), allocatable :: runoff(:)
-    !> [m3 s-1] inflow flux to link starting at current node (current and previous time step), size(river\%n_nodes, 2)
-    real(dp), allocatable :: link_inflow(:, :)
-    !> [m3 s-1] routed flux from link starting at current node (current and previous time step), size(river\%n_nodes, 2)
-    real(dp), allocatable :: link_routed(:, :)
+    !> [m3 s-1] inflow flux to link starting at current node from current time step, size(river\%n_nodes)
+    real(dp), allocatable :: discharge(:)
+    !> [m3 s-1] inflow flux to link starting at current node from previous time step, size(river\%n_nodes)
+    real(dp), allocatable :: previous_discharge(:)
+    !> [m3 s-1] routed flux from link starting at current node from current time step, size(river\%n_nodes)
+    real(dp), allocatable :: tributary(:)
+    !> [m3 s-1] routed flux from link starting at current node from previous time step, size(river\%n_nodes)
+    real(dp), allocatable :: previous_tributary(:)
     real(dp), allocatable :: nu1(:) !< Muskingum parameter nu1, size(river\%n_nodes) -> C1 = nu2, C2 = nu1-nu2, C3=1-nu1
     real(dp), allocatable :: nu2(:) !< Muskingum parameter nu2, size(river\%n_nodes) -> C1 = nu2, C2 = nu1-nu2, C3=1-nu1
+    integer(i8) :: openmp_level_thresh = 1_i8 !< minimum size of river-levels to route in parallel
   contains
     procedure, public :: init => river_router_init
     procedure, public :: update => river_router_update
@@ -87,22 +92,25 @@ module mo_river_router
 contains
 
   !> \brief Setup river upscaler from fine river and coarse target grid.
-  subroutine river_router_init(this, river, input_grid, input_step, inflow, max_route_step)
+  subroutine river_router_init(this, river, input_grid, input_step, inflow_handler, max_route_step, openmp_level_thresh)
+    !$ use omp_lib, only: omp_get_num_threads
     implicit none
     class(river_router_t), intent(inout) :: this
     type(river_t), pointer, intent(in) :: river !< river definition
     type(grid_t), pointer, intent(in) :: input_grid !< input grid
     integer(i4), intent(in), optional :: input_step !< [h] input time step size (1 by default)
-    type(inflow_t), intent(in), optional :: inflow !< inflow specifications
+    type(inflow_t), intent(in), optional :: inflow_handler !< inflow specifications
     real(dp), optional, intent(in) :: max_route_step !< [s] maximum routing time step (default: 86400.0)
+    integer(i8), optional, intent(in) :: openmp_level_thresh !< minimum size of river-levels to route in parallel (default: threads * 16)
     this%river => river
+    if (.not.allocated(this%river%order%id)) call this%river%calc_order()
     this%input_grid => input_grid
     call this%scaler%init( &
       source_grid=this%input_grid, &
       target_grid=this%river%grid, &
       upscaling_operator=up_sum, &       ! if L11 coarser than L1: sum runoff
       downscaling_operator=down_nearest) ! if L11 finer than L1: distribute same value on fine cells
-    if (present(inflow)) this%inflow = inflow
+    if (present(inflow_handler)) this%inflow_handler = inflow_handler
     this%input_count = 0_i4
     this%input_step = 1_i4
     if (present(input_step)) this%input_step = input_step
@@ -110,10 +118,16 @@ contains
     if (this%river%scc) allocate(this%scaled_runoff(this%river%grid%ncells), source=0.0_dp)
     allocate(this%runoff(this%river%n_nodes), source=0.0_dp)
     allocate(this%acc_runoff(this%input_grid%ncells), source=0.0_dp)
-    allocate(this%link_inflow(this%river%n_nodes, 2), source=0.0_dp)
-    allocate(this%link_routed(this%river%n_nodes, 2), source=0.0_dp)
+    allocate(this%discharge(this%river%n_nodes), source=0.0_dp)
+    allocate(this%previous_discharge(this%river%n_nodes), source=0.0_dp)
+    allocate(this%tributary(this%river%n_nodes), source=0.0_dp)
+    allocate(this%previous_tributary(this%river%n_nodes), source=0.0_dp)
     ! setup muskingum parameters
     call this%setup_muskingum(max_route_step)
+    !$omp parallel
+    !$ this%openmp_level_thresh = int(omp_get_num_threads() * 16, kind=i8)
+    !$ if (present(openmp_level_thresh)) this%openmp_level_thresh = openmp_level_thresh
+    !$omp end parallel
   end subroutine river_router_init
 
   !> \brief calculate the muskingum parameters nu1 and nu2
@@ -162,7 +176,7 @@ contains
     real(dp), dimension(this%input_grid%ncells), intent(in) :: input_runoff
     real(dp), dimension(this%river%n_nodes), intent(out) :: discharge
     integer(i4) :: i
-    integer(i8) :: n
+    integer(i8) :: n, c
     ! accumulate input runoff
     this%input_count = this%input_count + 1_i4
     if (this%input_count == 1_i4) then
@@ -176,11 +190,12 @@ contains
     ! distribute runoff in case of SCC
     if (this%river%scc) then
       this%scaled_runoff = this%scale_runoff(this%acc_runoff)
-      !$omp parallel do default(shared) private(n)
+      !$omp parallel do simd default(none) schedule(static) shared(this) private(n,c)
       do n = 1_i8, this%river%n_nodes
-        this%runoff(n) = this%scaled_runoff(this%river%node_cell(n)) * this%river%area_fraction(n)
+        c = this%river%node_cell(n)
+        this%runoff(n) = this%scaled_runoff(c) * this%river%area_fraction(n)
       end do
-      !$omp end parallel do
+      !$omp end parallel do simd
     else
       this%runoff = this%scale_runoff(this%acc_runoff)
     end if
@@ -190,7 +205,11 @@ contains
     discharge = 0.0_dp
     ! route
     do i = 1_i4, this%iterations
-      call this%route(discharge)
+      call this%route(this%discharge, this%tributary)
+      discharge = discharge + this%discharge
+      ! store discharge and tributary for next time-step
+      this%previous_discharge = this%discharge
+      this%previous_tributary = this%tributary
     end do
     ! average discharge flux over output time step iterations
     if (this%iterations > 1_i4) discharge = discharge / real(this%iterations, dp)
@@ -214,43 +233,56 @@ contains
   end function river_router_scale_runoff
 
   !> \brief Execute routing for a single routing time step.
-  subroutine river_router_route(this, discharge)
+  subroutine river_router_route(this, discharge, tributary)
     implicit none
-    class(river_router_t), intent(inout) :: this
-    real(dp), dimension(this%river%n_nodes), intent(inout) :: discharge
-    real(dp) :: inflow
-    integer(i8) :: i, j, n, m
-    if (.not.allocated(this%river%order%id)) call error_message("router%route: river order not initialized")
+    class(river_router_t), intent(in) :: this
+    real(dp), dimension(this%river%n_nodes), intent(out) :: discharge, tributary
+    integer(i8) :: i, j
     ! parallel routing on levels
-    !$omp parallel default(shared) private(i,j,n,m,inflow)
     do i = 1_i8, size(this%river%order%level_start, kind=i8)
-      !$omp do schedule(dynamic)
-      do j = this%river%order%level_start(i), this%river%order%level_end(i)
-        n = this%river%order%id(j)
-        ! add runoff to inflow
-        inflow = this%runoff(n)
-        ! add upstream routed flux to inflow
-        do m = 1, this%river%nodes(n)%nedges()
-          inflow = inflow + this%link_routed(this%river%nodes(n)%edges(m), current)
+      if (this%river%order%level_size(i) >= this%openmp_level_thresh) then
+        !$omp parallel do simd default(shared) private(j)
+        do j = this%river%order%level_start(i), this%river%order%level_end(i)
+          call process_node(j)
         end do
-        this%link_inflow(n, current) = inflow
-        ! TODO: add/replace inflow with inflow handler at inflow gauges
-        ! discharge is the accumulated inflow at current node
-        discharge(n) = discharge(n) + inflow
-        ! no routing at sinks
-        if (this%river%is_sink(n)) cycle
-        ! muskingum schema for routed flux
-        this%link_routed(n, current) = this%link_routed(n, previous) &
-                                     + this%nu1(n) * (this%link_inflow(n, previous) - this%link_routed(n, previous)) &
-                                     + this%nu2(n) * (this%link_inflow(n, current)  - this%link_inflow(n, previous))
-      end do
-      !$omp end do
+        !$omp end parallel do simd
+      else
+        ! small levels suffer from openmp overhead
+        do j = this%river%order%level_start(i), this%river%order%level_end(i)
+          call process_node(j)
+        end do
+      end if
     end do
-    !$omp end parallel
-    ! move values from t -> t-1 for next iteration
-    ! TODO: prevent copying by only swapping indices
-    this%link_inflow(:, previous) = this%link_inflow(:, current)
-    this%link_routed(:, previous) = this%link_routed(:, current)
+  contains
+    subroutine process_node(ni)
+      integer(i8), intent(in) :: ni
+      integer(i8) :: n
+      integer(i4) :: n_edges, m
+      integer(i8), pointer :: edges(:)
+      real(dp) :: inflow, prev_inflow, prev_routed
+      n = this%river%order%id(ni)
+      ! add runoff to inflow
+      inflow = this%runoff(n)
+      ! add upstream routed flux to inflow
+      edges => this%river%nodes(n)%edges
+      n_edges = size(edges)
+      !$omp simd reduction(+:inflow)
+      do m = 1_i4, n_edges
+        inflow = inflow + tributary(edges(m))
+      end do
+      ! TODO: add/replace inflow with inflow handler at inflow gauges
+      ! discharge is the accumulated inflow at current node
+      discharge(n) = inflow
+      if (this%river%is_sink(n)) then
+        ! no routing at sinks
+        tributary(n) = 0.0_dp
+      else
+        ! muskingum schema for routed flux
+        prev_routed = this%previous_tributary(n)
+        prev_inflow = this%previous_discharge(n)
+        tributary(n) = prev_routed + this%nu1(n) * (prev_inflow - prev_routed) + this%nu2(n) * (inflow - prev_inflow)
+      end if
+    end subroutine process_node
   end subroutine river_router_route
 
 end module mo_river_router
