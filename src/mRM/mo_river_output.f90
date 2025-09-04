@@ -293,8 +293,10 @@ contains
     end do
 
     b_dim = self%nc%setDimension("Two", 2_i4)
-    node_dim = self%nc%setDimension("node") ! use unlimited dimension to support i8 index
-    link_dim = self%nc%setDimension("link") ! use unlimited dimension to support i8 index
+    ! node_dim = self%nc%setDimension("node") ! use unlimited dimension to support i8 index
+    ! link_dim = self%nc%setDimension("link") ! use unlimited dimension to support i8 index
+    node_dim = self%nc%setDimension("node", int(self%river%n_nodes, i4))  ! only works if network is not to huge for i4
+    link_dim = self%nc%setDimension("link", int(self%river%n_nodes, i4) - size(self%river%sinks, kind=i4))
 
     ! 1D network topology following UGRID conventions
     mesh_var = self%nc%setVariable("river", "i32", dims(:0)) ! mesh variable as scalar integer
