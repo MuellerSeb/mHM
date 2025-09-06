@@ -100,9 +100,6 @@ contains
       call this%upscale_fdir()
     end if
 
-    ! order the coarse river
-    call this%coarse_river%calc_order()
-
     ! calculate stream features (stream mask, link lengths)
     if (stream) call this%calc_stream()
 
