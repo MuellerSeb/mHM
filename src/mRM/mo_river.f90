@@ -297,13 +297,14 @@ contains
   end subroutine river_from_fdir
 
   !> \brief Get river node order by levels
-  subroutine river_order(this)
+  subroutine river_order(this, root)
     class(river_t), intent(inout) :: this
+    logical, optional, intent(in) :: root !< level as distance from root (.true.) or max. distance from headwater (.false., default)
     integer(i8) :: istat
     if (allocated(this%order%id)) deallocate(this%order%id)
     if (allocated(this%order%level_start)) deallocate(this%order%level_start)
     if (allocated(this%order%level_end)) deallocate(this%order%level_end)
-    call this%levelsort(this%order, istat)
+    call this%levelsort(this%order, istat, root)
     if (istat /= 0_i8) call error_message("river%order: found cycle")
   end subroutine river_order
 
