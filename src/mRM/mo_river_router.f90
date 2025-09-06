@@ -92,7 +92,7 @@ module mo_river_router
 contains
 
   !> \brief Setup river upscaler from fine river and coarse target grid.
-  subroutine river_router_init(this, river, input_grid, input_step, inflow_handler, max_route_step, openmp_level_thresh)
+  subroutine river_router_init(this, river, input_grid, input_step, inflow_handler, max_route_step, openmp_level_thresh, root)
     !$ use omp_lib, only: omp_get_num_threads
     implicit none
     class(river_router_t), intent(inout) :: this
@@ -102,8 +102,9 @@ contains
     type(inflow_t), intent(in), optional :: inflow_handler !< inflow specifications
     real(dp), optional, intent(in) :: max_route_step !< [s] maximum routing time step (default: 86400.0)
     integer(i8), optional, intent(in) :: openmp_level_thresh !< minimum size of river-levels to route in parallel (default: threads * 16)
+    logical, intent(in), optional :: root !< order levels as distance from graph roots (default: .false.)
     this%river => river
-    if (.not.allocated(this%river%order%id)) call this%river%calc_order()
+    if (.not.allocated(this%river%order%id)) call this%river%calc_order(root)
     this%input_grid => input_grid
     call this%scaler%init( &
       source_grid=this%input_grid, &
