@@ -80,7 +80,7 @@ module mo_river_router
     real(dp), allocatable :: previous_tributary(:)
     real(dp), allocatable :: nu1(:) !< Muskingum parameter nu1, size(river\%n_nodes) -> C1 = nu2, C2 = nu1-nu2, C3=1-nu1
     real(dp), allocatable :: nu2(:) !< Muskingum parameter nu2, size(river\%n_nodes) -> C1 = nu2, C2 = nu1-nu2, C3=1-nu1
-    !> minimum size of river-levels to route in parallel (default: threads * 16, 0 to run all in serial)
+    !> minimum size of river-levels to route in parallel (default: threads * 8, 0 to run all in serial, 1 to run all in parallel)
     integer(i8) :: omp_level_thresh = 0_i8
     integer(i8) :: last_parallel_level = 0_i8 !< last level to run in parallel
   contains
@@ -104,7 +104,7 @@ contains
     type(inflow_t), intent(in), optional :: inflow_handler !< inflow specifications
     real(dp), optional, intent(in) :: max_route_step !< [s] maximum routing time step (default: 86400.0)
     logical, intent(in), optional :: root_levels !< order levels as distance from graph roots (default: .false.)
-    !> minimum size of river-levels to route in parallel (default: threads * 16, 0 to run all in serial, 1 to run all in parallel)
+    !> minimum size of river-levels to route in parallel (default: threads * 8, 0 to run all in serial, 1 to run all in parallel)
     integer(i8), optional, intent(in) :: omp_level_thresh
     integer(i8) :: i
     integer(i8), pointer :: level_size(:)
@@ -131,7 +131,7 @@ contains
     call this%setup_muskingum(max_route_step)
 
     !$omp parallel
-    !$ this%omp_level_thresh = int(omp_get_num_threads() * 16, kind=i8)
+    !$ this%omp_level_thresh = int(omp_get_num_threads() * 8, kind=i8)
     !$ if (present(omp_level_thresh)) this%omp_level_thresh = omp_level_thresh
     !$omp end parallel
 
@@ -262,22 +262,22 @@ contains
     implicit none
     class(river_router_t), intent(in) :: this
     real(dp), dimension(this%river%n_nodes), intent(out) :: discharge, tributary
-    integer(i8) :: i, j
-    type(node), pointer :: nodes(:)
-    logical, pointer :: is_sink(:)
-    integer(i8), pointer :: id(:), level_start(:), level_end(:), level_size(:)
+    integer(i8) :: i, j, n_levels
+    type(node), pointer, contiguous :: nodes(:)
+    logical, pointer, contiguous :: is_sink(:)
+    integer(i8), pointer, contiguous :: id(:), level_start(:), level_end(:)
 
     ! pointers for speeding up dereferencing attributes (river is a pointer, so this works)
     nodes => this%river%nodes
     id => this%river%order%id
     level_start => this%river%order%level_start
     level_end => this%river%order%level_end
-    level_size => this%river%order%level_size
     is_sink => this%river%is_sink
+    n_levels = this%river%order%n_levels
 
     ! parallel routing on levels with size above threshold
     if (this%last_parallel_level > 0_i8) then
-      !$omp parallel default(shared) private(i,j)
+      !$omp parallel default(shared) private(i)
       do i = 1_i8, this%last_parallel_level
         !$omp do simd schedule(static)
         do j = level_start(i), level_end(i)
@@ -289,8 +289,8 @@ contains
     end if
 
     ! serial routing of nodes from remaining levels
-    if (this%last_parallel_level == this%river%order%n_levels) return ! no node left
-    do j = level_start(this%last_parallel_level + 1_i8), this%river%n_nodes
+    if (this%last_parallel_level == n_levels) return ! no node left
+    do j = level_start(this%last_parallel_level + 1_i8), level_end(n_levels)
       call process_node(j)
     end do
 
@@ -299,7 +299,7 @@ contains
       integer(i8), intent(in) :: ni
       integer(i8) :: n
       integer(i4) :: n_edges, m
-      integer(i8), pointer :: edges(:)
+      integer(i8), pointer, contiguous :: edges(:)
       real(dp) :: inflow, prev_inflow, prev_routed
       n = id(ni)
       ! add runoff to inflow
