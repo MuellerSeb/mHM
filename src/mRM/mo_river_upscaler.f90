@@ -17,6 +17,7 @@ module mo_river_upscaler
   use mo_grid, only: grid_t, bottom_up, cartesian
   use mo_grid_scaler, only: scaler_t, down_scaling
   use mo_message, only: error_message
+  use mo_utils, only: optval
 
   implicit none
   private
@@ -77,8 +78,8 @@ contains
     logical, optional, intent(in) :: scc_latlon !< Whether the scc gauges coordinates are geographical (default: .true.)
     logical, optional, intent(in) :: calc_stream !< Whether to calculate stream features (default: .true.)
     real(dp), optional, intent(in) :: tol !< tolerance for cell factor comparison (default: 1.e-7)
-    logical :: stream = .true.
-    if (present(calc_stream)) stream = calc_stream
+    logical :: stream
+    stream = optval(calc_stream, .true.)
 
     this%fine_river => fine_river
     this%coarse_river => coarse_river
@@ -128,8 +129,7 @@ contains
       return
     end if
 
-    latlon = .true.  ! assume geographical coordinates of stations by default
-    if (present(scc_latlon)) latlon = scc_latlon
+    latlon = optval(scc_latlon, .true.)  ! assume geographical coordinates of stations by default
     if (latlon .and. (.not.this%fine_river%grid%has_aux_coords()) .and. this%fine_river%grid%coordsys == cartesian) then
       call error_message("river_upscaler%init_scc: gauge coordinates are geographical but grid has no lat-lon coordinates.")
     end if
@@ -596,10 +596,9 @@ contains
     real(dp), allocatable :: smooth_slope(:)
     integer(i8) :: i, cell
     real(dp) :: n
+    logical :: constant
 
-    logical :: constant = .false.
-    if (present(constant_celerity)) constant = constant_celerity
-
+    constant = optval(constant_celerity, .false.)
     if (constant) then
       allocate(this%fine_river%celerity(this%fine_river%n_nodes), source=gamma)
       allocate(this%coarse_river%celerity(this%coarse_river%n_nodes), source=gamma)
