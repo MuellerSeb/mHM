@@ -15,6 +15,7 @@ module mo_river
   use mo_grid, only: grid_t, bottom_up, cartesian, dist_latlon
   use mo_grid_io, only: var, output_dataset
   use mo_message, only: error_message
+  use mo_utils, only: optval
 
   implicit none
   private
@@ -239,12 +240,11 @@ contains
     integer(i8) :: down ! the downstream cell
     integer(i8) :: i, j
     logical :: periodic ! periodic latlon grid
-    logical :: calc_length = .true.
-    logical :: calc_node_xy = .true.
+    logical :: calc_length, calc_node_xy
     real(dp), allocatable :: xax(:), yax(:)
 
-    if (present(calculate_length)) calc_length = calculate_length
-    if (present(calculate_node_xy)) calc_node_xy = calculate_node_xy
+    calc_length = optval(calculate_length, .true.)
+    calc_node_xy = optval(calculate_node_xy, .true.)
     if (present(grid)) this%grid => grid
     if (.not.associated(this%grid)) call error_message("river%from_fdir: grid not associated")
     call this%init(this%grid%ncells)
