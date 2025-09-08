@@ -12,7 +12,7 @@ module mo_river_router
 
   use mo_kind, only: i4, i8, dp
   use mo_constants, only: nodata_i4
-  use mo_utils, only: equal
+  use mo_utils, only: equal, optval
   use mo_string_utils, only: n2s => num2str
   use mo_river, only: river_t
   use mo_grid, only: grid_t, bottom_up
@@ -80,7 +80,7 @@ module mo_river_router
     real(dp), allocatable :: previous_tributary(:)
     real(dp), allocatable :: nu1(:) !< Muskingum parameter nu1, size(river\%n_nodes) -> C1 = nu2, C2 = nu1-nu2, C3=1-nu1
     real(dp), allocatable :: nu2(:) !< Muskingum parameter nu2, size(river\%n_nodes) -> C1 = nu2, C2 = nu1-nu2, C3=1-nu1
-    integer(i8) :: openmp_level_thresh = 1_i8 !< minimum size of river-levels to route in parallel
+    integer(i8) :: omp_level_thresh = 1_i8 !< minimum size of river-levels to route in parallel
   contains
     procedure, public :: init => river_router_init
     procedure, public :: update => river_router_update
@@ -92,7 +92,7 @@ module mo_river_router
 contains
 
   !> \brief Setup river upscaler from fine river and coarse target grid.
-  subroutine river_router_init(this, river, input_grid, input_step, inflow_handler, max_route_step, openmp_level_thresh, root)
+  subroutine river_router_init(this, river, input_grid, input_step, inflow_handler, max_route_step, root_levels, omp_level_thresh)
     !$ use omp_lib, only: omp_get_num_threads
     implicit none
     class(river_router_t), intent(inout) :: this
@@ -101,10 +101,10 @@ contains
     integer(i4), intent(in), optional :: input_step !< [h] input time step size (1 by default)
     type(inflow_t), intent(in), optional :: inflow_handler !< inflow specifications
     real(dp), optional, intent(in) :: max_route_step !< [s] maximum routing time step (default: 86400.0)
-    integer(i8), optional, intent(in) :: openmp_level_thresh !< minimum size of river-levels to route in parallel (default: threads * 16)
-    logical, intent(in), optional :: root !< order levels as distance from graph roots (default: .false.)
+    logical, intent(in), optional :: root_levels !< order levels as distance from graph roots (default: .false.)
+    integer(i8), optional, intent(in) :: omp_level_thresh !< minimum size of river-levels to route in parallel (default: threads * 16)
     this%river => river
-    if (.not.allocated(this%river%order%id)) call this%river%calc_order(root)
+    if (.not.allocated(this%river%order%id)) call this%river%calc_order(root_levels)
     this%input_grid => input_grid
     call this%scaler%init( &
       source_grid=this%input_grid, &
@@ -113,8 +113,7 @@ contains
       downscaling_operator=down_nearest) ! if L11 finer than L1: distribute same value on fine cells
     if (present(inflow_handler)) this%inflow_handler = inflow_handler
     this%input_count = 0_i4
-    this%input_step = 1_i4
-    if (present(input_step)) this%input_step = input_step
+    this%input_step = optval(input_step, 1_i4)
     ! only need scaled runoff as intermediate result in case of SCC
     if (this%river%scc) allocate(this%scaled_runoff(this%river%grid%ncells), source=0.0_dp)
     allocate(this%runoff(this%river%n_nodes), source=0.0_dp)
@@ -126,8 +125,8 @@ contains
     ! setup muskingum parameters
     call this%setup_muskingum(max_route_step)
     !$omp parallel
-    !$ this%openmp_level_thresh = int(omp_get_num_threads() * 16, kind=i8)
-    !$ if (present(openmp_level_thresh)) this%openmp_level_thresh = openmp_level_thresh
+    !$ this%omp_level_thresh = int(omp_get_num_threads() * 16, kind=i8)
+    !$ if (present(omp_level_thresh)) this%omp_level_thresh = omp_level_thresh
     !$omp end parallel
   end subroutine river_router_init
 
@@ -241,7 +240,7 @@ contains
     integer(i8) :: i, j
     ! parallel routing on levels
     do i = 1_i8, size(this%river%order%level_start, kind=i8)
-      if (this%river%order%level_size(i) >= this%openmp_level_thresh) then
+      if (this%river%order%level_size(i) >= this%omp_level_thresh) then
         !$omp parallel do simd default(shared)
         do j = this%river%order%level_start(i), this%river%order%level_end(i)
           call process_node(j)
