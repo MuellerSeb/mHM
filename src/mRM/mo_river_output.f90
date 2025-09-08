@@ -16,8 +16,9 @@ module mo_river_output
   use mo_grid, only: cartesian
   use mo_grid_io, only: var, var_index, end_timestamp, time_values
   use mo_message, only: error_message, warn_message
-  use mo_netcdf, only : NcDataset, NcDimension, NcVariable, NcGroup, check
-  use mo_datetime, only : datetime, timedelta, delta_from_string, decode_cf_time_units, one_day, one_hour
+  use mo_netcdf, only: NcDataset, NcDimension, NcVariable, NcGroup, check
+  use mo_datetime, only: datetime, timedelta, delta_from_string, decode_cf_time_units, one_day, one_hour
+  use mo_utils, only: optval
 
   implicit none
   private
@@ -281,10 +282,8 @@ contains
     self%river => river
     self%counter = 0_i4
 
-    self%deflate_level = 6_i4
-    if (present(deflate_level)) self%deflate_level = deflate_level
-    self%timestamp = end_timestamp
-    if (present(timestamp)) self%timestamp = timestamp
+    self%deflate_level = optval(deflate_level, 6_i4)
+    self%timestamp = optval(timestamp, end_timestamp)
 
     self%nvars = size(vars)
     self%static = .true.
@@ -347,8 +346,7 @@ contains
 
     if (.not.self%static) then
       if (.not.present(start_time)) call error_message("output: if dataset is not static, a start_time is needed")
-      units_dt = "hours"
-      if (present(delta)) units_dt = trim(delta)
+      units_dt = trim(optval(delta, "hours"))
       self%previous_time = start_time
       self%start_time = start_time
       self%delta = delta_from_string(units_dt)
