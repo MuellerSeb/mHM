@@ -68,7 +68,8 @@ module mo_river_upscaler
 contains
 
   !> \brief Setup river upscaler from fine river and coarse target grid.
-  subroutine river_upscaler_init(this, fine_river, coarse_river, coarse_grid, scc_gauges, scc_latlon, calc_stream, tol)
+  subroutine river_upscaler_init(this, &
+    fine_river, coarse_river, coarse_grid, scc_gauges, scc_latlon, calc_stream, length_percentile, tol)
     implicit none
     class(river_upscaler_t), intent(inout) :: this
     type(river_t), pointer, intent(in) :: fine_river !< river definition at fine grid
@@ -77,6 +78,7 @@ contains
     real(dp), dimension(:,:), intent(in), optional :: scc_gauges !< gauge locations on fine river dim 1: id, dim 2: (x,y)
     logical, optional, intent(in) :: scc_latlon !< Whether the scc gauges coordinates are geographical (default: .true.)
     logical, optional, intent(in) :: calc_stream !< Whether to calculate stream features (default: .true.)
+    real(dp), optional, intent(in) :: length_percentile !< [%] percentile for lower cut-off of upscaled link-length (40 by default)
     real(dp), optional, intent(in) :: tol !< tolerance for cell factor comparison (default: 1.e-7)
     logical :: stream
     stream = optval(calc_stream, .true.)
@@ -102,7 +104,7 @@ contains
     end if
 
     ! calculate stream features (stream mask, link lengths)
-    if (stream) call this%calc_stream()
+    if (stream) call this%calc_stream(length_percentile)
 
   end subroutine river_upscaler_init
 
@@ -518,10 +520,23 @@ contains
   end subroutine river_upscaler_fdir
 
   !> \brief Setup stream features.
-  subroutine river_upscaler_stream(this)
+  !> \details This method sets the following attributes:
+  !!          - coarse_river%node_[x|y]: location of the coarse river nodes (link-start or sink location on fine river)
+  !!          - coarse_river%link_length: upscaled link length (with lower cut-off at given percentile)
+  !!          - is_link_start(fine_river%n_nodes): fine cell determining the leaving point of a link in the coarse cell
+  !!          - stream_mask(fine_river%n_nodes): mask marking the upscaled stream at fine grid
+  !!          - stream_sub(fine_river%n_nodes): sub-catchment ID for stream cell at fine grid
+  !!          - link_from(coarse_river%n_nodes): first fine cell after start for coarse river node
+  !!          - link_to(coarse_river%n_nodes): end cell at fine grid of coarse river node
+  subroutine river_upscaler_stream(this, length_percentile)
+    use mo_percentile, only: percentile
     implicit none
     class(river_upscaler_t), intent(inout) :: this
+    real(dp), optional, intent(in) :: length_percentile !< [%] percentile for lower cut-off of upscaled link-length (40 by default)
     integer(i8) :: i, cell
+    real(dp) :: length, len_percentile
+
+    len_percentile = optval(length_percentile, 40.0_dp)
 
     if (.not.allocated(this%fine_river%link_length)) call error_message("river_upscaler%calc_stream: link length not available")
     if (.not.allocated(this%fine_river%node_x)) call error_message("river_upscaler%calc_stream: node location not available")
@@ -579,6 +594,10 @@ contains
     end do
     !$omp end parallel do
 
+    ! cut off length at given percentile (40 by default) to neglect short paths
+    length = percentile(pack(this%coarse_river%link_length, mask=.not.this%coarse_river%is_sink), len_percentile)
+    this%coarse_river%link_length = merge(this%coarse_river%link_length, length, mask=(this%coarse_river%link_length > length))
+
     ! generate stream sub-catchment map from mask
     where(this%stream_mask) this%stream_sub = this%scc_map
 
@@ -598,21 +617,15 @@ contains
     real(dp) :: n
     logical :: constant
 
+    ! first calculate celerity on fine river
+    call this%fine_river%calc_celerity(gamma, constant_celerity, slope, this%stream_mask)
+
     constant = optval(constant_celerity, .false.)
     if (constant) then
-      allocate(this%fine_river%celerity(this%fine_river%n_nodes), source=gamma)
       allocate(this%coarse_river%celerity(this%coarse_river%n_nodes), source=gamma)
       return
     end if
 
-    if (.not.present(slope)) call error_message("river_upscaler%calc_celerity: need slope on fine grid.")
-    allocate(smooth_slope(this%fine_river%n_nodes), source=slope)
-    ! set min val for river slope to enable h-mean
-    where ( smooth_slope < 0.1_dp ) smooth_slope = 0.1_dp
-    ! smooth river slope if there is more than one cell
-    if( count(this%stream_mask) > 1) smooth_slope = mad(arr=smooth_slope, z=2.25_dp, mask=this%stream_mask, tout="u", mval=0.1_dp)
-
-    allocate(this%fine_river%celerity(this%fine_river%n_nodes), source=(gamma * sqrt(smooth_slope / 100.0_dp)))
     allocate(this%coarse_river%celerity(this%coarse_river%n_nodes), source=1.0_dp)
 
     !$omp parallel do default(shared) private(i, cell, n)
