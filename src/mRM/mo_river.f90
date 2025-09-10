@@ -458,8 +458,6 @@ contains
     real(dp), optional, intent(in) :: slope(this%n_nodes) !< [%] river slope
     logical, optional, intent(in) :: mask(this%n_nodes) !< mask for slope smoothing (may come from upscaled river network)
     real(dp), allocatable :: smooth_slope(:)
-    integer(i8) :: i, cell
-    real(dp) :: n
     logical :: constant, smoothing
 
     constant = optval(constant_celerity, .false.)
