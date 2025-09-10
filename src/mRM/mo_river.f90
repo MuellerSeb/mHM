@@ -115,6 +115,7 @@ module mo_river
     procedure, public :: calc_upstream_area => river_upstream_area
     procedure, public :: calc_length => river_length
     procedure, public :: calc_slope => river_slope
+    procedure, public :: calc_celerity => river_celerity
     procedure, public :: export => river_export
   end type river_t
 
@@ -442,6 +443,42 @@ contains
     !$omp end parallel do
     ! print*, "upward links: ", k, this%grid%ncells
   end subroutine river_slope
+
+  !> \brief Calculate the celerity
+  !> \author Stephan Thober
+  !> \author Matthias Kelbling
+  !> \author Sebastian Müller
+  subroutine river_celerity(this, gamma, constant_celerity, slope, mask)
+    use mo_mad, only: mad
+    use mo_utils, only: locate
+    implicit none
+    class(river_t), intent(inout) :: this
+    real(dp), intent(in) :: gamma !< model parameter: c_i = gamma * sqrt(s_i) or c = gamma
+    logical, optional, intent(in) :: constant_celerity !< whether celerity is assumed constant: c = gamma (default: .false.)
+    real(dp), optional, intent(in) :: slope(this%n_nodes) !< [%] river slope
+    logical, optional, intent(in) :: mask(this%n_nodes) !< mask for slope smoothing (may come from upscaled river network)
+    real(dp), allocatable :: smooth_slope(:)
+    integer(i8) :: i, cell
+    real(dp) :: n
+    logical :: constant, smoothing
+
+    constant = optval(constant_celerity, .false.)
+    if (constant) then
+      allocate(this%celerity(this%n_nodes), source=gamma)
+      return
+    end if
+    ! need slope for non constant celerity
+    if (.not.present(slope)) call error_message("river%calc_celerity: need slope to calculate celerity.")
+    allocate(smooth_slope(this%n_nodes), source=slope)
+    ! set min val for river slope to enable h-mean
+    where ( smooth_slope < 0.1_dp ) smooth_slope = 0.1_dp
+    ! smooth river slope if there is more than one cell
+    smoothing = this%n_nodes > 1_i8
+    if (present(mask)) smoothing = count(mask, kind=i8) > 1_i8
+    if(smoothing) smooth_slope = mad(arr=smooth_slope, z=2.25_dp, mask=mask, tout="u", mval=0.1_dp)
+    ! calculate celerity
+    allocate(this%celerity(this%n_nodes), source=(gamma * sqrt(smooth_slope / 100.0_dp)))
+  end subroutine river_celerity
 
   !> \brief Export river arrays to netcdf
   subroutine river_export(this, path, sub_map, leaving, stream_mask, stream_sub, highlight, factor)
