@@ -612,7 +612,6 @@ contains
     real(dp), intent(in) :: gamma !< model parameter: c_i = gamma * sqrt(s_i) or c = gamma
     logical, optional, intent(in) :: constant_celerity !< whether celerity is assumed constant: c = gamma (default: .false.)
     real(dp), optional, intent(in) :: slope(this%fine_river%n_nodes) !< [%] river slope on fine grid: size(fine\%ncells)
-    real(dp), allocatable :: smooth_slope(:)
     integer(i8) :: i, cell
     real(dp) :: n
     logical :: constant
