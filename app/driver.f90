@@ -102,14 +102,14 @@ program driver
 
   call message("CREATE domains: ", trim(n2s(n_domains)))
   do i = 1_i4, n_domains
-    selected_domains(i) = domains%add_domain()
+    selected_domains(i) = domains%add_domain() ! returns domain id
   end do
   print*, "selected_domains", selected_domains
 
   ! read configs
   do i = 1_i4, size(selected_domains)
     id = selected_domains(i)
-    call message("READ CONFIGS domain: ", trim(n2s(id)))
+    call message("READ CONFIGS domain: ", trim(adjustl(n2s(id))))
     ! global configs
     call time_cfg(id)%read(parser%option_value("nml"), id)
     call parameter_cfg(id)%read(parser%option_value("parameter"))
@@ -137,13 +137,13 @@ program driver
   do i = 1_i4, size(selected_domains)
     id = selected_domains(i)
     call domains%get_domain(id, domain)
-    call message("PREPARE domain: ", trim(n2s(id)))
+    call message("PREPARE domain: ", trim(adjustl(n2s(id))))
     call domain%prepare()
-    call message("RUN TIME LOOP domain: ", trim(n2s(id)))
+    call message("RUN TIME LOOP domain: ", trim(adjustl(n2s(id))))
     ! do while(domain%exchange%time < domain%exchange%end_time)
     call domain%update()
     ! end do
-    call message("FINALIZE domain: ", trim(n2s(id)))
+    call message("FINALIZE domain: ", trim(adjustl(n2s(id))))
     call domain%finalize()
   end do
 
