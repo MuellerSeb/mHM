@@ -67,6 +67,7 @@ endif()
 if(CMAKE_Fortran_COMPILER_ID MATCHES "GNU")
   target_compile_definitions(${LIB_NAME} PRIVATE GFORTRAN)
   target_compile_options(${LIB_NAME} PUBLIC
+    -ffree-line-length-none
     $<$<NOT:$<BOOL:${BUILD_MHM_PYBIND}>>:-ffree-form -ffixed-line-length-132>
     $<$<CONFIG:DEBUG>:-Og -g -Wall -Wextra -fimplicit-none -fbacktrace -fcheck=all -ffpe-trap=zero,overflow,underflow -finit-real=snan -pedantic>
     $<$<CONFIG:RELEASE>:-O3>
