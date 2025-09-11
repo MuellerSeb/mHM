@@ -14,7 +14,7 @@
 !> \ingroup f_common
 MODULE mo_common_constants
 
-  USE mo_kind, ONLY : i4, dp, sp
+  USE mo_kind, ONLY : i4, dp
 
   IMPLICIT NONE
 
