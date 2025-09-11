@@ -33,12 +33,12 @@ module mo_common_types
   !> \class   period
   !> \brief   period description
   type, public :: period
-    integer(i4) :: dStart = 1_i4      !< first day
-    integer(i4) :: mStart = 1_i4      !< first month
-    integer(i4) :: yStart = 0_i4      !< first year
-    integer(i4) :: dEnd = 1_i4        !< last  day
-    integer(i4) :: mEnd = 1_i4        !< last  month
-    integer(i4) :: yEnd = 0_i4        !< last  year
+    integer(i4) :: dStart      !< first day
+    integer(i4) :: mStart      !< first month
+    integer(i4) :: yStart      !< first year
+    integer(i4) :: dEnd        !< last  day
+    integer(i4) :: mEnd        !< last  month
+    integer(i4) :: yEnd        !< last  year
     integer(i4) :: julStart    !< first julian day
     integer(i4) :: julEnd      !< last  julian day
     integer(i4) :: nObs        !< total number of observations
