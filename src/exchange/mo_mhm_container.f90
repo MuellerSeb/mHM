@@ -27,6 +27,8 @@ module mo_mhm_container
   use mo_constants, only : yearmonths
   use mo_mhm_constants, only : noutflxstate
   use mo_optimization_types, only : optidata
+  use mo_exchange_type, only: exchange_t
+  use mo_message, only: message, error_message
 
   !> \class   mhm_config_t
   !> \brief   Configuration for a single mHM process container.
@@ -45,6 +47,8 @@ module mo_mhm_container
     type(nml_baseflow_config_t) :: baseflow_config !< baseflow_config configuration
     type(nml_panevapo_t) :: panevapo !< panevapo configuration
     type(nml_nloutputresults_t) :: nloutputresults !< nloutputresults configuration
+  contains
+    procedure :: read => mhm_config_read
   end type mhm_config_t
 
   !> \class   mhm_t
@@ -63,7 +67,7 @@ module mo_mhm_container
     ! neutrons
     real(dp), public, dimension(:, :), allocatable :: L1_neutronsdata !< [cph] ground albedo neutrons input
     logical, public, dimension(:, :), allocatable :: L1_neutronsdata_mask !< [cph] mask for valid data in L1_neutrons
-  ! soil moisture
+    ! soil moisture
     integer(i4) :: nSoilHorizons_sm_input ! No. of mhm soil horizons equivalent to sm input
 
     ! OPTIMIZATION STUFF
@@ -122,6 +126,9 @@ module mo_mhm_container
 
   contains
     procedure :: init => mhm_init
+    procedure :: connect => mhm_connect
+    procedure :: prepare => mhm_prepare
+    procedure :: update => mhm_update
   end type mhm_t
 
 contains
@@ -130,14 +137,17 @@ contains
   subroutine mhm_init(self, config)
     class(mhm_t), intent(inout) :: self
     type(mhm_config_t), intent(in) :: config !< initialization config for mHM
+    call message(" ... init mhm")
     self%config = config
   end subroutine mhm_init
 
   !> \brief Initialize the mHM process container.
-  subroutine mhm_config_read(self, file, domain)
+  subroutine mhm_config_read(self, file, output_file, domain)
     class(mhm_config_t), intent(inout) :: self
     character(*), intent(in) :: file !< file containing the namelists
+    character(*), intent(in) :: output_file !< file containing the output namelist
     integer(i4), intent(in) :: domain !< domain number to read correct configuration
+    call message(" ... config mHM: ", file, ", ", output_file)
     self%active = .true.
     self%domain = domain
     call self%project_description%read(file)
@@ -151,7 +161,26 @@ contains
     call self%optional_data%read(file)
     call self%baseflow_config%read(file)
     call self%panevapo%read(file)
-    call self%nloutputresults%read(file)
+    ! output defined in mhm_outputs.nml
+    call self%nloutputresults%read(output_file)
   end subroutine mhm_config_read
+
+  subroutine mhm_connect(this, exchange)
+    class(mhm_t), intent(inout) :: this
+    type(exchange_t), intent(inout) :: exchange
+    call message(" ... connecting mHM: ", exchange%time%str())
+  end subroutine mhm_connect
+
+  subroutine mhm_prepare(this, exchange)
+    class(mhm_t), intent(inout) :: this
+    type(exchange_t), intent(inout) :: exchange
+    call message(" ... preparing mHM: ", exchange%time%str())
+  end subroutine mhm_prepare
+
+  subroutine mhm_update(this, exchange)
+    class(mhm_t), intent(inout) :: this
+    type(exchange_t), intent(in) :: exchange
+    call message(" ... updating mHM: ", exchange%time%str())
+  end subroutine mhm_update
 
 end module mo_mhm_container
