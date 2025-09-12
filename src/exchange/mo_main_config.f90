@@ -188,27 +188,16 @@ contains
   subroutine parameters_create(self)
 
     use mo_append, only : append
-    use mo_common_constants, only : maxNoDomains, nColPars
+    use mo_common_constants, only : nColPars
     use mo_mpr_constants, only : maxGeoUnit
-    use mo_constants, only : eps_dp, nodata_dp
-    use mo_common_functions, only : in_bound
-    use mo_message, only : message, error_message
-    use mo_string_utils, only : num2str
+    use mo_constants, only : nodata_dp
     use mo_utils, only : EQ
 
     implicit none
     class(parameters_t), intent(inout) :: self
 
-    character(256) :: dummy
-
-    ! space holder for routing parameters
-    real(dp), dimension(5, nColPars) :: dummy_2d_dp
-
-    ! space holder for routing parameters
-    real(dp), dimension(1, nColPars) :: dummy_2d_dp_2
-
+    character(256) :: geo_name
     real(dp), dimension(maxGeoUnit, nColPars) :: GeoParam
-
     integer(i4) :: ii, shp(2)
 
     shp = [1_i4, ncolpars] ! shape of a parameter matrix slice
@@ -685,22 +674,44 @@ contains
         self%process_matrix(8, 2) = 0_i4
         self%process_matrix(8, 3) = sum(self%process_matrix(1 : 8, 2))
       case(1)
-        ! parameter values and names are set in mRM
         ! 1 - Muskingum approach
+        if (self%config%routing1%nml_status /= 0_i4) call error_message("'routing1' namelist not found.")
         self%process_matrix(8, 2) = 5_i4
         self%process_matrix(8, 3) = sum(self%process_matrix(1 : 8, 2))
-        call append(self%definition, dummy_2d_dp)
-        call append(self%names, ['dummy', 'dummy', 'dummy', 'dummy', 'dummy'])
+
+        call append(self%definition, reshape(self%config%routing1%muskingumTravelTime_constant, shp))
+        call append(self%definition, reshape(self%config%routing1%muskingumTravelTime_riverLength, shp))
+        call append(self%definition, reshape(self%config%routing1%muskingumTravelTime_riverSlope, shp))
+        call append(self%definition, reshape(self%config%routing1%muskingumTravelTime_impervious, shp))
+        call append(self%definition, reshape(self%config%routing1%muskingumAttenuation_riverSlope, shp))
+
+        call append(self%names, [&
+                'muskingumTravelTime_constant   ', &
+                'muskingumTravelTime_riverLength', &
+                'muskingumTravelTime_riverSlope ', &
+                'muskingumTravelTime_impervious ', &
+                'muskingumAttenuation_riverSlope'])
+        ! check if parameter are in range
+        if (.not. in_bound(self%definition)) &
+          call error_message('***ERROR: parameter in namelist "routing1" out of bound in ', self%config%file)
       case(2)
+        if (self%config%routing2%nml_status /= 0_i4) call error_message("'routing2' namelist not found.")
         self%process_matrix(8, 2) = 1_i4
         self%process_matrix(8, 3) = sum(self%process_matrix(1 : 8, 2))
-        call append(self%definition, dummy_2d_dp_2)
-        call append(self%names, ['dummy'])
+        call append(self%definition, reshape(self%config%routing2%streamflow_celerity, shp))
+        call append(self%names, ['streamflow_celerity'])
+        ! check if parameter are in range
+        if (.not. in_bound(self%definition)) &
+          call error_message('***ERROR: parameter in namelist "routing1" out of bound in ', self%config%file)
       case(3)
+        if (self%config%routing3%nml_status /= 0_i4) call error_message("'routing3' namelist not found.")
         self%process_matrix(8, 2) = 1_i4
         self%process_matrix(8, 3) = sum(self%process_matrix(1 : 8, 2))
-        call append(self%definition, dummy_2d_dp_2)
-        call append(self%names, ['dummy'])
+        call append(self%definition, reshape(self%config%routing3%slope_factor, shp))
+        call append(self%names, ['slope_factor'])
+        ! check if parameter are in range
+        if (.not. in_bound(self%definition)) &
+          call error_message('***ERROR: parameter in namelist "routing1" out of bound in ', self%config%file)
       case DEFAULT
         call error_message('***ERROR: Process description for process "routing" does not exist!')
     end select
@@ -708,8 +719,6 @@ contains
     !===============================================================
     ! Geological formations
     !===============================================================
-    dummy = dummy // ''   ! only to avoid warning
-
     ! Process 9 - geoparameter
     select case (self%process_matrix(9, 1))
       case(1)
@@ -733,8 +742,8 @@ contains
 
         ! create names
         do ii = 1, self%nGeoUnits
-          dummy = 'GeoParam(' // trim(adjustl(num2str(ii))) // ',:)'
-          call append(self%names, [ trim(dummy) ])
+          geo_name = 'GeoParam(' // trim(adjustl(n2s(ii))) // ',:)'
+          call append(self%names, [ trim(geo_name) ])
         end do
 
         ! check if parameter are in range
@@ -839,7 +848,7 @@ contains
         return
       end if
     end do
-    call error_message("parameters%get: paramter '", trim(name), "' not present.")
+    call error_message("parameters%get: parameter '", trim(name), "' not present.")
   end function parameters_get
 
   !> get parameter array for selected process
@@ -863,5 +872,11 @@ contains
       call message(self%names(i)(1:35), n2s(self%values(i)))
     end do
   end subroutine parameters_print
+
+  !> check if all parameters are within their defined bounds
+  logical function in_bound(params)
+    real(dp), dimension(:, :), intent(in) :: params
+    in_bound = .not.(any(params(:, 3) .lt. params(:, 1)) .or. any(params(:, 3) .gt. params(:, 2)))
+  end function in_bound
 
 end module mo_main_config
