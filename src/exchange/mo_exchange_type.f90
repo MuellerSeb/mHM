@@ -972,92 +972,11 @@ contains
     ! space holder for routing parameters
     real(dp), dimension(1, nColPars) :: dummy_2d_dp_2
 
-    real(dp), dimension(nColPars) :: canopyInterceptionFactor
-
-    real(dp), dimension(nColPars) :: snowTreshholdTemperature
-    real(dp), dimension(nColPars) :: degreeDayFactor_forest
-    real(dp), dimension(nColPars) :: degreeDayFactor_impervious
-    real(dp), dimension(nColPars) :: degreeDayFactor_pervious
-    real(dp), dimension(nColPars) :: increaseDegreeDayFactorByPrecip
-    real(dp), dimension(nColPars) :: maxDegreeDayFactor_forest
-    real(dp), dimension(nColPars) :: maxDegreeDayFactor_impervious
-    real(dp), dimension(nColPars) :: maxDegreeDayFactor_pervious
-
-    real(dp), dimension(nColPars) :: orgMatterContent_forest
-    real(dp), dimension(nColPars) :: orgMatterContent_impervious
-    real(dp), dimension(nColPars) :: orgMatterContent_pervious
-    real(dp), dimension(nColPars) :: PTF_lower66_5_constant
-    real(dp), dimension(nColPars) :: PTF_lower66_5_clay
-    real(dp), dimension(nColPars) :: PTF_lower66_5_Db
-    real(dp), dimension(nColPars) :: PTF_higher66_5_constant
-    real(dp), dimension(nColPars) :: PTF_higher66_5_clay
-    real(dp), dimension(nColPars) :: PTF_higher66_5_Db
-    real(dp), dimension(nColPars) :: PTF_Ks_constant
-    real(dp), dimension(nColPars) :: PTF_Ks_sand
-    real(dp), dimension(nColPars) :: PTF_Ks_clay
-    real(dp), dimension(nColPars) :: PTF_Ks_curveSlope
-    real(dp), dimension(nColPars) :: rootFractionCoefficient_forest
-    real(dp), dimension(nColPars) :: rootFractionCoefficient_impervious
-    real(dp), dimension(nColPars) :: rootFractionCoefficient_pervious
-    real(dp), dimension(nColPars) :: infiltrationShapeFactor
-    real(dp), dimension(nColPars) :: jarvis_sm_threshold_c1
-
-    real(dp), dimension(nColPars) :: FCmin_glob
-    real(dp), dimension(nColPars) :: FCdelta_glob
-    real(dp), dimension(nColPars) :: rootFractionCoefficient_sand
-    real(dp), dimension(nColPars) :: rootFractionCoefficient_clay
-
-    real(dp), dimension(nColPars) :: imperviousStorageCapacity
-
-    real(dp), dimension(nColPars) :: PET_a_forest
-    real(dp), dimension(nColPars) :: PET_a_impervious
-    real(dp), dimension(nColPars) :: PET_a_pervious
-    real(dp), dimension(nColPars) :: PET_b
-    real(dp), dimension(nColPars) :: PET_c
-
-    real(dp), dimension(nColPars) :: minCorrectionFactorPET
-    real(dp), dimension(nColPars) :: maxCorrectionFactorPET
-    real(dp), dimension(nColPars) :: aspectTresholdPET
-    real(dp), dimension(nColPars) :: HargreavesSamaniCoeff
-
-    real(dp), dimension(nColPars) :: PriestleyTaylorCoeff
-    real(dp), dimension(nColPars) :: PriestleyTaylorLAIcorr
-
-    real(dp), dimension(nColPars) :: canopyheigth_forest
-    real(dp), dimension(nColPars) :: canopyheigth_impervious
-    real(dp), dimension(nColPars) :: canopyheigth_pervious
-    real(dp), dimension(nColPars) :: displacementheight_coeff
-    real(dp), dimension(nColPars) :: roughnesslength_momentum_coeff
-    real(dp), dimension(nColPars) :: roughnesslength_heat_coeff
-    real(dp), dimension(nColPars) :: stomatal_resistance
-
-    real(dp), dimension(nColPars) :: interflowStorageCapacityFactor
-    real(dp), dimension(nColPars) :: interflowRecession_slope
-    real(dp), dimension(nColPars) :: fastInterflowRecession_forest
-    real(dp), dimension(nColPars) :: slowInterflowRecession_Ks
-    real(dp), dimension(nColPars) :: exponentSlowInterflow
-
-    real(dp), dimension(nColPars) :: rechargeCoefficient
-    real(dp), dimension(nColPars) :: rechargeFactor_karstic
-    real(dp), dimension(nColPars) :: gain_loss_GWreservoir_karstic
-
     real(dp), dimension(maxGeoUnit, nColPars) :: GeoParam
 
-    real(dp), dimension(nColPars) :: Desilets_N0
-    real(dp), dimension(nColPars) :: Desilets_LW0
-    real(dp), dimension(nColPars) :: Desilets_LW1
+    integer(i4) :: ii, shp(2)
 
-    real(dp), dimension(nColPars) :: COSMIC_N0
-    real(dp), dimension(nColPars) :: COSMIC_N1
-    real(dp), dimension(nColPars) :: COSMIC_N2
-    real(dp), dimension(nColPars) :: COSMIC_alpha0
-    real(dp), dimension(nColPars) :: COSMIC_alpha1
-    real(dp), dimension(nColPars) :: COSMIC_L30
-    real(dp), dimension(nColPars) :: COSMIC_L31
-    real(dp), dimension(nColPars) :: COSMIC_LW0
-    real(dp), dimension(nColPars) :: COSMIC_LW1
-
-    integer(i4) :: ii
+    shp = [1_i4, ncolpars] ! shape of a parameter matrix slice
 
     !===============================================================
     ! Read namelist global parameters
@@ -1073,11 +992,10 @@ contains
       ! 1 - maximum Interception
       case(1)
         if (self%parameter_config%interception1%nml_status /= 0_i4) call error_message("'interception1' namelist not found.")
-        canopyInterceptionFactor = self%parameter_config%interception1%canopyInterceptionFactor
 
         self%process_matrix(1, 2) = 1_i4
         self%process_matrix(1, 3) = 1_i4
-        call append(self%parameters_definition, reshape(canopyInterceptionFactor, [1, nColPars]))
+        call append(self%parameters_definition, reshape(self%parameter_config%interception1%canopyInterceptionFactor, shp))
 
         call append(self%parameters_name, [  &
                 'canopyInterceptionFactor'])
@@ -1096,25 +1014,17 @@ contains
       ! 1 - degree-day approach
       case(1)
         if (self%parameter_config%snow1%nml_status /= 0_i4) call error_message("'snow1' namelist not found.")
-        snowTreshholdTemperature = self%parameter_config%snow1%snowTreshholdTemperature
-        degreeDayFactor_forest = self%parameter_config%snow1%degreeDayFactor_forest
-        degreeDayFactor_impervious = self%parameter_config%snow1%degreeDayFactor_impervious
-        degreeDayFactor_pervious = self%parameter_config%snow1%degreeDayFactor_pervious
-        increaseDegreeDayFactorByPrecip = self%parameter_config%snow1%increaseDegreeDayFactorByPrecip
-        maxDegreeDayFactor_forest = self%parameter_config%snow1%maxDegreeDayFactor_forest
-        maxDegreeDayFactor_impervious = self%parameter_config%snow1%maxDegreeDayFactor_impervious
-        maxDegreeDayFactor_pervious = self%parameter_config%snow1%maxDegreeDayFactor_pervious
 
         self%process_matrix(2, 2) = 8_i4
         self%process_matrix(2, 3) = sum(self%process_matrix(1 : 2, 2))
-        call append(self%parameters_definition, reshape(snowTreshholdTemperature, [1, nColPars]))
-        call append(self%parameters_definition, reshape(degreeDayFactor_forest, [1, nColPars]))
-        call append(self%parameters_definition, reshape(degreeDayFactor_impervious, [1, nColPars]))
-        call append(self%parameters_definition, reshape(degreeDayFactor_pervious, [1, nColPars]))
-        call append(self%parameters_definition, reshape(increaseDegreeDayFactorByPrecip, [1, nColPars]))
-        call append(self%parameters_definition, reshape(maxDegreeDayFactor_forest, [1, nColPars]))
-        call append(self%parameters_definition, reshape(maxDegreeDayFactor_impervious, [1, nColPars]))
-        call append(self%parameters_definition, reshape(maxDegreeDayFactor_pervious, [1, nColPars]))
+        call append(self%parameters_definition, reshape(self%parameter_config%snow1%snowTreshholdTemperature, shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%snow1%degreeDayFactor_forest, shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%snow1%degreeDayFactor_impervious, shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%snow1%degreeDayFactor_pervious, shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%snow1%increaseDegreeDayFactorByPrecip, shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%snow1%maxDegreeDayFactor_forest, shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%snow1%maxDegreeDayFactor_impervious, shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%snow1%maxDegreeDayFactor_pervious, shp))
 
         call append(self%parameters_name, [  &
                 'snowTreshholdTemperature       ', &
@@ -1140,43 +1050,26 @@ contains
         ! 1 - Feddes equation for PET reduction, bucket approach, Brooks-Corey like
       case(1)
         if (self%parameter_config%soilmoisture1%nml_status /= 0_i4) call error_message("'soilmoisture1' namelist not found.")
-        orgMatterContent_forest = self%parameter_config%soilmoisture1%orgMatterContent_forest
-        orgMatterContent_impervious = self%parameter_config%soilmoisture1%orgMatterContent_impervious
-        orgMatterContent_pervious = self%parameter_config%soilmoisture1%orgMatterContent_pervious
-        PTF_lower66_5_constant = self%parameter_config%soilmoisture1%PTF_lower66_5_constant
-        PTF_lower66_5_clay = self%parameter_config%soilmoisture1%PTF_lower66_5_clay
-        PTF_lower66_5_Db = self%parameter_config%soilmoisture1%PTF_lower66_5_Db
-        PTF_higher66_5_constant = self%parameter_config%soilmoisture1%PTF_higher66_5_constant
-        PTF_higher66_5_clay = self%parameter_config%soilmoisture1%PTF_higher66_5_clay
-        PTF_higher66_5_Db = self%parameter_config%soilmoisture1%PTF_higher66_5_Db
-        PTF_Ks_constant = self%parameter_config%soilmoisture1%PTF_Ks_constant
-        PTF_Ks_sand = self%parameter_config%soilmoisture1%PTF_Ks_sand
-        PTF_Ks_clay = self%parameter_config%soilmoisture1%PTF_Ks_clay
-        PTF_Ks_curveSlope = self%parameter_config%soilmoisture1%PTF_Ks_curveSlope
-        rootFractionCoefficient_forest = self%parameter_config%soilmoisture1%rootFractionCoefficient_forest
-        rootFractionCoefficient_impervious = self%parameter_config%soilmoisture1%rootFractionCoefficient_impervious
-        rootFractionCoefficient_pervious = self%parameter_config%soilmoisture1%rootFractionCoefficient_pervious
-        infiltrationShapeFactor = self%parameter_config%soilmoisture1%infiltrationShapeFactor
 
         self%process_matrix(3, 2) = 17_i4
         self%process_matrix(3, 3) = sum(self%process_matrix(1 : 3, 2))
-        call append(self%parameters_definition, reshape(orgMatterContent_forest, [1, nColPars]))
-        call append(self%parameters_definition, reshape(orgMatterContent_impervious, [1, nColPars]))
-        call append(self%parameters_definition, reshape(orgMatterContent_pervious, [1, nColPars]))
-        call append(self%parameters_definition, reshape(PTF_lower66_5_constant, [1, nColPars]))
-        call append(self%parameters_definition, reshape(PTF_lower66_5_clay, [1, nColPars]))
-        call append(self%parameters_definition, reshape(PTF_lower66_5_Db, [1, nColPars]))
-        call append(self%parameters_definition, reshape(PTF_higher66_5_constant, [1, nColPars]))
-        call append(self%parameters_definition, reshape(PTF_higher66_5_clay, [1, nColPars]))
-        call append(self%parameters_definition, reshape(PTF_higher66_5_Db, [1, nColPars]))
-        call append(self%parameters_definition, reshape(PTF_Ks_constant, [1, nColPars]))
-        call append(self%parameters_definition, reshape(PTF_Ks_sand, [1, nColPars]))
-        call append(self%parameters_definition, reshape(PTF_Ks_clay, [1, nColPars]))
-        call append(self%parameters_definition, reshape(PTF_Ks_curveSlope, [1, nColPars]))
-        call append(self%parameters_definition, reshape(rootFractionCoefficient_forest, [1, nColPars]))
-        call append(self%parameters_definition, reshape(rootFractionCoefficient_impervious, [1, nColPars]))
-        call append(self%parameters_definition, reshape(rootFractionCoefficient_pervious, [1, nColPars]))
-        call append(self%parameters_definition, reshape(infiltrationShapeFactor, [1, nColPars]))
+        call append(self%parameters_definition, reshape(self%parameter_config%soilmoisture1%orgMatterContent_forest, shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%soilmoisture1%orgMatterContent_impervious, shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%soilmoisture1%orgMatterContent_pervious, shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%soilmoisture1%PTF_lower66_5_constant, shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%soilmoisture1%PTF_lower66_5_clay, shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%soilmoisture1%PTF_lower66_5_Db, shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%soilmoisture1%PTF_higher66_5_constant, shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%soilmoisture1%PTF_higher66_5_clay, shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%soilmoisture1%PTF_higher66_5_Db, shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%soilmoisture1%PTF_Ks_constant, shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%soilmoisture1%PTF_Ks_sand, shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%soilmoisture1%PTF_Ks_clay, shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%soilmoisture1%PTF_Ks_curveSlope, shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%soilmoisture1%rootFractionCoefficient_forest, shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%soilmoisture1%rootFractionCoefficient_impervious, shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%soilmoisture1%rootFractionCoefficient_pervious, shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%soilmoisture1%infiltrationShapeFactor, shp))
 
         call append(self%parameters_name, [     &
                 'orgMatterContent_forest           ', &
@@ -1204,45 +1097,27 @@ contains
         ! 2- Jarvis equation for PET reduction, bucket approach, Brooks-Corey like
       case(2)
         if (self%parameter_config%soilmoisture2%nml_status /= 0_i4) call error_message("'soilmoisture2' namelist not found.")
-        orgMatterContent_forest = self%parameter_config%soilmoisture2%orgMatterContent_forest
-        orgMatterContent_impervious = self%parameter_config%soilmoisture2%orgMatterContent_impervious
-        orgMatterContent_pervious = self%parameter_config%soilmoisture2%orgMatterContent_pervious
-        PTF_lower66_5_constant = self%parameter_config%soilmoisture2%PTF_lower66_5_constant
-        PTF_lower66_5_clay = self%parameter_config%soilmoisture2%PTF_lower66_5_clay
-        PTF_lower66_5_Db = self%parameter_config%soilmoisture2%PTF_lower66_5_Db
-        PTF_higher66_5_constant = self%parameter_config%soilmoisture2%PTF_higher66_5_constant
-        PTF_higher66_5_clay = self%parameter_config%soilmoisture2%PTF_higher66_5_clay
-        PTF_higher66_5_Db = self%parameter_config%soilmoisture2%PTF_higher66_5_Db
-        PTF_Ks_constant = self%parameter_config%soilmoisture2%PTF_Ks_constant
-        PTF_Ks_sand = self%parameter_config%soilmoisture2%PTF_Ks_sand
-        PTF_Ks_clay = self%parameter_config%soilmoisture2%PTF_Ks_clay
-        PTF_Ks_curveSlope = self%parameter_config%soilmoisture2%PTF_Ks_curveSlope
-        rootFractionCoefficient_forest = self%parameter_config%soilmoisture2%rootFractionCoefficient_forest
-        rootFractionCoefficient_impervious = self%parameter_config%soilmoisture2%rootFractionCoefficient_impervious
-        rootFractionCoefficient_pervious = self%parameter_config%soilmoisture2%rootFractionCoefficient_pervious
-        infiltrationShapeFactor = self%parameter_config%soilmoisture2%infiltrationShapeFactor
-        jarvis_sm_threshold_c1 = self%parameter_config%soilmoisture2%jarvis_sm_threshold_c1
 
         self%process_matrix(3, 2) = 18_i4
         self%process_matrix(3, 3) = sum(self%process_matrix(1 : 3, 2))
-        call append(self%parameters_definition, reshape(orgMatterContent_forest, [1, nColPars]))
-        call append(self%parameters_definition, reshape(orgMatterContent_impervious, [1, nColPars]))
-        call append(self%parameters_definition, reshape(orgMatterContent_pervious, [1, nColPars]))
-        call append(self%parameters_definition, reshape(PTF_lower66_5_constant, [1, nColPars]))
-        call append(self%parameters_definition, reshape(PTF_lower66_5_clay, [1, nColPars]))
-        call append(self%parameters_definition, reshape(PTF_lower66_5_Db, [1, nColPars]))
-        call append(self%parameters_definition, reshape(PTF_higher66_5_constant, [1, nColPars]))
-        call append(self%parameters_definition, reshape(PTF_higher66_5_clay, [1, nColPars]))
-        call append(self%parameters_definition, reshape(PTF_higher66_5_Db, [1, nColPars]))
-        call append(self%parameters_definition, reshape(PTF_Ks_constant, [1, nColPars]))
-        call append(self%parameters_definition, reshape(PTF_Ks_sand, [1, nColPars]))
-        call append(self%parameters_definition, reshape(PTF_Ks_clay, [1, nColPars]))
-        call append(self%parameters_definition, reshape(PTF_Ks_curveSlope, [1, nColPars]))
-        call append(self%parameters_definition, reshape(rootFractionCoefficient_forest, [1, nColPars]))
-        call append(self%parameters_definition, reshape(rootFractionCoefficient_impervious, [1, nColPars]))
-        call append(self%parameters_definition, reshape(rootFractionCoefficient_pervious, [1, nColPars]))
-        call append(self%parameters_definition, reshape(infiltrationShapeFactor, [1, nColPars]))
-        call append(self%parameters_definition, reshape(jarvis_sm_threshold_c1, [1, nColPars]))
+        call append(self%parameters_definition, reshape(self%parameter_config%soilmoisture2%orgMatterContent_forest, shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%soilmoisture2%orgMatterContent_impervious, shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%soilmoisture2%orgMatterContent_pervious, shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%soilmoisture2%PTF_lower66_5_constant, shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%soilmoisture2%PTF_lower66_5_clay, shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%soilmoisture2%PTF_lower66_5_Db, shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%soilmoisture2%PTF_higher66_5_constant, shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%soilmoisture2%PTF_higher66_5_clay, shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%soilmoisture2%PTF_higher66_5_Db, shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%soilmoisture2%PTF_Ks_constant, shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%soilmoisture2%PTF_Ks_sand, shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%soilmoisture2%PTF_Ks_clay, shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%soilmoisture2%PTF_Ks_curveSlope, shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%soilmoisture2%rootFractionCoefficient_forest, shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%soilmoisture2%rootFractionCoefficient_impervious, shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%soilmoisture2%rootFractionCoefficient_pervious, shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%soilmoisture2%infiltrationShapeFactor, shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%soilmoisture2%jarvis_sm_threshold_c1, shp))
 
         call append(self%parameters_name, [     &
                 'orgMatterContent_forest           ', &
@@ -1271,53 +1146,31 @@ contains
         ! 3- Jarvis equation for ET reduction and FC dependency on root fraction coefficient
       case(3)
         if (self%parameter_config%soilmoisture3%nml_status /= 0_i4) call error_message("'soilmoisture3' namelist not found.")
-        orgMatterContent_forest = self%parameter_config%soilmoisture3%orgMatterContent_forest
-        orgMatterContent_impervious = self%parameter_config%soilmoisture3%orgMatterContent_impervious
-        orgMatterContent_pervious = self%parameter_config%soilmoisture3%orgMatterContent_pervious
-        PTF_lower66_5_constant = self%parameter_config%soilmoisture3%PTF_lower66_5_constant
-        PTF_lower66_5_clay = self%parameter_config%soilmoisture3%PTF_lower66_5_clay
-        PTF_lower66_5_Db = self%parameter_config%soilmoisture3%PTF_lower66_5_Db
-        PTF_higher66_5_constant = self%parameter_config%soilmoisture3%PTF_higher66_5_constant
-        PTF_higher66_5_clay = self%parameter_config%soilmoisture3%PTF_higher66_5_clay
-        PTF_higher66_5_Db = self%parameter_config%soilmoisture3%PTF_higher66_5_Db
-        PTF_Ks_constant = self%parameter_config%soilmoisture3%PTF_Ks_constant
-        PTF_Ks_sand = self%parameter_config%soilmoisture3%PTF_Ks_sand
-        PTF_Ks_clay = self%parameter_config%soilmoisture3%PTF_Ks_clay
-        PTF_Ks_curveSlope = self%parameter_config%soilmoisture3%PTF_Ks_curveSlope
-        rootFractionCoefficient_forest = self%parameter_config%soilmoisture3%rootFractionCoefficient_forest
-        rootFractionCoefficient_impervious = self%parameter_config%soilmoisture3%rootFractionCoefficient_impervious
-        rootFractionCoefficient_pervious = self%parameter_config%soilmoisture3%rootFractionCoefficient_pervious
-        infiltrationShapeFactor = self%parameter_config%soilmoisture3%infiltrationShapeFactor
-        rootFractionCoefficient_sand = self%parameter_config%soilmoisture3%rootFractionCoefficient_sand
-        rootFractionCoefficient_clay = self%parameter_config%soilmoisture3%rootFractionCoefficient_clay
-        FCmin_glob = self%parameter_config%soilmoisture3%FCmin_glob
-        FCdelta_glob = self%parameter_config%soilmoisture3%FCdelta_glob
-        jarvis_sm_threshold_c1 = self%parameter_config%soilmoisture3%jarvis_sm_threshold_c1
 
         self%process_matrix(3, 2) = 22_i4
         self%process_matrix(3, 3) = sum(self%process_matrix(1 : 3, 2))
-        call append(self%parameters_definition, reshape(orgMatterContent_forest, [1, nColPars]))
-        call append(self%parameters_definition, reshape(orgMatterContent_impervious, [1, nColPars]))
-        call append(self%parameters_definition, reshape(orgMatterContent_pervious, [1, nColPars]))
-        call append(self%parameters_definition, reshape(PTF_lower66_5_constant, [1, nColPars]))
-        call append(self%parameters_definition, reshape(PTF_lower66_5_clay, [1, nColPars]))
-        call append(self%parameters_definition, reshape(PTF_lower66_5_Db, [1, nColPars]))
-        call append(self%parameters_definition, reshape(PTF_higher66_5_constant, [1, nColPars]))
-        call append(self%parameters_definition, reshape(PTF_higher66_5_clay, [1, nColPars]))
-        call append(self%parameters_definition, reshape(PTF_higher66_5_Db, [1, nColPars]))
-        call append(self%parameters_definition, reshape(PTF_Ks_constant, [1, nColPars]))
-        call append(self%parameters_definition, reshape(PTF_Ks_sand, [1, nColPars]))
-        call append(self%parameters_definition, reshape(PTF_Ks_clay, [1, nColPars]))
-        call append(self%parameters_definition, reshape(PTF_Ks_curveSlope, [1, nColPars]))
-        call append(self%parameters_definition, reshape(rootFractionCoefficient_forest, [1, nColPars]))
-        call append(self%parameters_definition, reshape(rootFractionCoefficient_impervious, [1, nColPars]))
-        call append(self%parameters_definition, reshape(rootFractionCoefficient_pervious, [1, nColPars]))
-        call append(self%parameters_definition, reshape(infiltrationShapeFactor, [1, nColPars]))
-        call append(self%parameters_definition, reshape(rootFractionCoefficient_sand, [1, nColPars]))
-        call append(self%parameters_definition, reshape(rootFractionCoefficient_clay, [1, nColPars]))
-        call append(self%parameters_definition, reshape(FCmin_glob, [1, nColPars]))
-        call append(self%parameters_definition, reshape(FCdelta_glob, [1, nColPars]))
-        call append(self%parameters_definition, reshape(jarvis_sm_threshold_c1, [1, nColPars]))
+        call append(self%parameters_definition, reshape(self%parameter_config%soilmoisture3%orgMatterContent_forest, shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%soilmoisture3%orgMatterContent_impervious, shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%soilmoisture3%orgMatterContent_pervious, shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%soilmoisture3%PTF_lower66_5_constant, shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%soilmoisture3%PTF_lower66_5_clay, shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%soilmoisture3%PTF_lower66_5_Db, shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%soilmoisture3%PTF_higher66_5_constant, shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%soilmoisture3%PTF_higher66_5_clay, shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%soilmoisture3%PTF_higher66_5_Db, shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%soilmoisture3%PTF_Ks_constant, shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%soilmoisture3%PTF_Ks_sand, shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%soilmoisture3%PTF_Ks_clay, shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%soilmoisture3%PTF_Ks_curveSlope, shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%soilmoisture3%rootFractionCoefficient_forest, shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%soilmoisture3%rootFractionCoefficient_impervious, shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%soilmoisture3%rootFractionCoefficient_pervious, shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%soilmoisture3%infiltrationShapeFactor, shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%soilmoisture3%rootFractionCoefficient_sand, shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%soilmoisture3%rootFractionCoefficient_clay, shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%soilmoisture3%FCmin_glob, shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%soilmoisture3%FCdelta_glob, shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%soilmoisture3%jarvis_sm_threshold_c1, shp))
 
         call append(self%parameters_name, [     &
                 'orgMatterContent_forest           ', &
@@ -1350,51 +1203,30 @@ contains
         ! 4- Feddes equation for ET reduction and FC dependency on root fraction coefficient
       case(4)
         if (self%parameter_config%soilmoisture4%nml_status /= 0_i4) call error_message("'soilmoisture4' namelist not found.")
-        orgMatterContent_forest = self%parameter_config%soilmoisture4%orgMatterContent_forest
-        orgMatterContent_impervious = self%parameter_config%soilmoisture4%orgMatterContent_impervious
-        orgMatterContent_pervious = self%parameter_config%soilmoisture4%orgMatterContent_pervious
-        PTF_lower66_5_constant = self%parameter_config%soilmoisture4%PTF_lower66_5_constant
-        PTF_lower66_5_clay = self%parameter_config%soilmoisture4%PTF_lower66_5_clay
-        PTF_lower66_5_Db = self%parameter_config%soilmoisture4%PTF_lower66_5_Db
-        PTF_higher66_5_constant = self%parameter_config%soilmoisture4%PTF_higher66_5_constant
-        PTF_higher66_5_clay = self%parameter_config%soilmoisture4%PTF_higher66_5_clay
-        PTF_higher66_5_Db = self%parameter_config%soilmoisture4%PTF_higher66_5_Db
-        PTF_Ks_constant = self%parameter_config%soilmoisture4%PTF_Ks_constant
-        PTF_Ks_sand = self%parameter_config%soilmoisture4%PTF_Ks_sand
-        PTF_Ks_clay = self%parameter_config%soilmoisture4%PTF_Ks_clay
-        PTF_Ks_curveSlope = self%parameter_config%soilmoisture4%PTF_Ks_curveSlope
-        rootFractionCoefficient_forest = self%parameter_config%soilmoisture4%rootFractionCoefficient_forest
-        rootFractionCoefficient_impervious = self%parameter_config%soilmoisture4%rootFractionCoefficient_impervious
-        rootFractionCoefficient_pervious = self%parameter_config%soilmoisture4%rootFractionCoefficient_pervious
-        infiltrationShapeFactor = self%parameter_config%soilmoisture4%infiltrationShapeFactor
-        rootFractionCoefficient_sand = self%parameter_config%soilmoisture4%rootFractionCoefficient_sand
-        rootFractionCoefficient_clay = self%parameter_config%soilmoisture4%rootFractionCoefficient_clay
-        FCmin_glob = self%parameter_config%soilmoisture4%FCmin_glob
-        FCdelta_glob = self%parameter_config%soilmoisture4%FCdelta_glob
 
         self%process_matrix(3, 2) = 21_i4
         self%process_matrix(3, 3) = sum(self%process_matrix(1 : 3, 2))
-        call append(self%parameters_definition, reshape(orgMatterContent_forest, [1, nColPars]))
-        call append(self%parameters_definition, reshape(orgMatterContent_impervious, [1, nColPars]))
-        call append(self%parameters_definition, reshape(orgMatterContent_pervious, [1, nColPars]))
-        call append(self%parameters_definition, reshape(PTF_lower66_5_constant, [1, nColPars]))
-        call append(self%parameters_definition, reshape(PTF_lower66_5_clay, [1, nColPars]))
-        call append(self%parameters_definition, reshape(PTF_lower66_5_Db, [1, nColPars]))
-        call append(self%parameters_definition, reshape(PTF_higher66_5_constant, [1, nColPars]))
-        call append(self%parameters_definition, reshape(PTF_higher66_5_clay, [1, nColPars]))
-        call append(self%parameters_definition, reshape(PTF_higher66_5_Db, [1, nColPars]))
-        call append(self%parameters_definition, reshape(PTF_Ks_constant, [1, nColPars]))
-        call append(self%parameters_definition, reshape(PTF_Ks_sand, [1, nColPars]))
-        call append(self%parameters_definition, reshape(PTF_Ks_clay, [1, nColPars]))
-        call append(self%parameters_definition, reshape(PTF_Ks_curveSlope, [1, nColPars]))
-        call append(self%parameters_definition, reshape(rootFractionCoefficient_forest, [1, nColPars]))
-        call append(self%parameters_definition, reshape(rootFractionCoefficient_impervious, [1, nColPars]))
-        call append(self%parameters_definition, reshape(rootFractionCoefficient_pervious, [1, nColPars]))
-        call append(self%parameters_definition, reshape(infiltrationShapeFactor, [1, nColPars]))
-        call append(self%parameters_definition, reshape(rootFractionCoefficient_sand, [1, nColPars]))
-        call append(self%parameters_definition, reshape(rootFractionCoefficient_clay, [1, nColPars]))
-        call append(self%parameters_definition, reshape(FCmin_glob, [1, nColPars]))
-        call append(self%parameters_definition, reshape(FCdelta_glob, [1, nColPars]))
+        call append(self%parameters_definition, reshape(self%parameter_config%soilmoisture4%orgMatterContent_forest, shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%soilmoisture4%orgMatterContent_impervious, shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%soilmoisture4%orgMatterContent_pervious, shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%soilmoisture4%PTF_lower66_5_constant, shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%soilmoisture4%PTF_lower66_5_clay, shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%soilmoisture4%PTF_lower66_5_Db, shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%soilmoisture4%PTF_higher66_5_constant, shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%soilmoisture4%PTF_higher66_5_clay, shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%soilmoisture4%PTF_higher66_5_Db, shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%soilmoisture4%PTF_Ks_constant, shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%soilmoisture4%PTF_Ks_sand, shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%soilmoisture4%PTF_Ks_clay, shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%soilmoisture4%PTF_Ks_curveSlope, shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%soilmoisture4%rootFractionCoefficient_forest, shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%soilmoisture4%rootFractionCoefficient_impervious, shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%soilmoisture4%rootFractionCoefficient_pervious, shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%soilmoisture4%infiltrationShapeFactor, shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%soilmoisture4%rootFractionCoefficient_sand, shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%soilmoisture4%rootFractionCoefficient_clay, shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%soilmoisture4%FCmin_glob, shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%soilmoisture4%FCdelta_glob, shp))
 
         call append(self%parameters_name, [     &
                 'orgMatterContent_forest           ', &
@@ -1425,7 +1257,6 @@ contains
 
       case DEFAULT
         call error_message('***ERROR: Process description for process "soilmoisture" does not exist!')
-        call error_message('***ERROR: Process description for process "soilmoisture" does not exist!')
     end select
 
     ! Process 4 - sealed area directRunoff
@@ -1433,11 +1264,10 @@ contains
       ! 1 - bucket exceedance approach
       case(1)
         if (self%parameter_config%directrunoff1%nml_status /= 0_i4) call error_message("'directrunoff1' namelist not found.")
-        imperviousStorageCapacity = self%parameter_config%directrunoff1%imperviousStorageCapacity
 
         self%process_matrix(4, 2) = 1_i4
         self%process_matrix(4, 3) = sum(self%process_matrix(1 : 4, 2))
-        call append(self%parameters_definition, reshape(imperviousStorageCapacity, [1, nColPars]))
+        call append(self%parameters_definition, reshape(self%parameter_config%directrunoff1%imperviousStorageCapacity, shp))
 
         call append(self%parameters_name, ['imperviousStorageCapacity'])
 
@@ -1447,26 +1277,20 @@ contains
 
       case DEFAULT
         call error_message('***ERROR: Process description for process "directRunoff" does not exist!')
-        call error_message('***ERROR: Process description for process "directRunoff" does not exist!')
     end select
 
     ! Process 5 - potential evapotranspiration (PET)
     select case (self%process_matrix(5, 1))
       case(-1) ! 0 - PET is input, correct PET by LAI
         if (self%parameter_config%petminus1%nml_status /= 0_i4) call error_message("'petminus1' namelist not found.")
-        PET_a_forest = self%parameter_config%petminus1%PET_a_forest
-        PET_a_impervious = self%parameter_config%petminus1%PET_a_impervious
-        PET_a_pervious = self%parameter_config%petminus1%PET_a_pervious
-        PET_b = self%parameter_config%petminus1%PET_b
-        PET_c = self%parameter_config%petminus1%PET_c
 
         self%process_matrix(5, 2) = 5_i4
         self%process_matrix(5, 3) = sum(self%process_matrix(1 : 5, 2))
-        call append(self%parameters_definition, reshape(PET_a_forest, [1, nColPars]))
-        call append(self%parameters_definition, reshape(PET_a_impervious, [1, nColPars]))
-        call append(self%parameters_definition, reshape(PET_a_pervious, [1, nColPars]))
-        call append(self%parameters_definition, reshape(PET_b, [1, nColPars]))
-        call append(self%parameters_definition, reshape(PET_c, [1, nColPars]))
+        call append(self%parameters_definition, reshape(self%parameter_config%petminus1%PET_a_forest, shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%petminus1%PET_a_impervious, shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%petminus1%PET_a_pervious, shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%petminus1%PET_b, shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%petminus1%PET_c, shp))
 
         call append(self%parameters_name, [ &
                 'PET_a_forest     ', &
@@ -1481,15 +1305,12 @@ contains
 
       case(0) ! 0 - PET is input, correct PET by aspect
         if (self%parameter_config%pet0%nml_status /= 0_i4) call error_message("'pet0' namelist not found.")
-        minCorrectionFactorPET = self%parameter_config%pet0%minCorrectionFactorPET
-        maxCorrectionFactorPET = self%parameter_config%pet0%maxCorrectionFactorPET
-        aspectTresholdPET = self%parameter_config%pet0%aspectTresholdPET
 
         self%process_matrix(5, 2) = 3_i4
         self%process_matrix(5, 3) = sum(self%process_matrix(1 : 5, 2))
-        call append(self%parameters_definition, reshape(minCorrectionFactorPET, [1, nColPars]))
-        call append(self%parameters_definition, reshape(maxCorrectionFactorPET, [1, nColPars]))
-        call append(self%parameters_definition, reshape(aspectTresholdPET, [1, nColPars]))
+        call append(self%parameters_definition, reshape(self%parameter_config%pet0%minCorrectionFactorPET, shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%pet0%maxCorrectionFactorPET, shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%pet0%aspectTresholdPET, shp))
 
         call append(self%parameters_name, [ &
                 'minCorrectionFactorPET ', &
@@ -1502,17 +1323,13 @@ contains
 
       case(1) ! 1 - Hargreaves-Samani method (HarSam) - additional input needed: Tmin, Tmax
         if (self%parameter_config%pet1%nml_status /= 0_i4) call error_message("'pet1' namelist not found.")
-        minCorrectionFactorPET = self%parameter_config%pet1%minCorrectionFactorPET
-        maxCorrectionFactorPET = self%parameter_config%pet1%maxCorrectionFactorPET
-        aspectTresholdPET = self%parameter_config%pet1%aspectTresholdPET
-        HargreavesSamaniCoeff = self%parameter_config%pet1%HargreavesSamaniCoeff
 
         self%process_matrix(5, 2) = 4_i4
         self%process_matrix(5, 3) = sum(self%process_matrix(1 : 5, 2))
-        call append(self%parameters_definition, reshape(minCorrectionFactorPET, [1, nColPars]))
-        call append(self%parameters_definition, reshape(maxCorrectionFactorPET, [1, nColPars]))
-        call append(self%parameters_definition, reshape(aspectTresholdPET, [1, nColPars]))
-        call append(self%parameters_definition, reshape(HargreavesSamaniCoeff, [1, nColPars]))
+        call append(self%parameters_definition, reshape(self%parameter_config%pet1%minCorrectionFactorPET, shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%pet1%maxCorrectionFactorPET, shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%pet1%aspectTresholdPET, shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%pet1%HargreavesSamaniCoeff, shp))
         call append(self%parameters_name, [ &
                 'minCorrectionFactorPET', &
                 'maxCorrectionFactorPET', &
@@ -1525,13 +1342,11 @@ contains
 
       case(2) ! 2 - Priestley-Taylor method (PrieTay) - additional input needed: net_rad
         if (self%parameter_config%pet2%nml_status /= 0_i4) call error_message("'pet2' namelist not found.")
-        PriestleyTaylorCoeff = self%parameter_config%pet2%PriestleyTaylorCoeff
-        PriestleyTaylorLAIcorr = self%parameter_config%pet2%PriestleyTaylorLAIcorr
 
         self%process_matrix(5, 2) = 2_i4
         self%process_matrix(5, 3) = sum(self%process_matrix(1 : 5, 2))
-        call append(self%parameters_definition, reshape(PriestleyTaylorCoeff, [1, nColPars]))
-        call append(self%parameters_definition, reshape(PriestleyTaylorLAIcorr, [1, nColPars]))
+        call append(self%parameters_definition, reshape(self%parameter_config%pet2%PriestleyTaylorCoeff, shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%pet2%PriestleyTaylorLAIcorr, shp))
         call append(self%parameters_name, [ &
                 'PriestleyTaylorCoeff  ', &
                 'PriestleyTaylorLAIcorr'])
@@ -1542,24 +1357,17 @@ contains
 
       case(3) ! 3 - Penman-Monteith method - additional input needed: net_rad, abs. vapour pressue, windspeed
         if (self%parameter_config%pet3%nml_status /= 0_i4) call error_message("'pet3' namelist not found.")
-        canopyheigth_forest = self%parameter_config%pet3%canopyheigth_forest
-        canopyheigth_impervious = self%parameter_config%pet3%canopyheigth_impervious
-        canopyheigth_pervious = self%parameter_config%pet3%canopyheigth_pervious
-        displacementheight_coeff = self%parameter_config%pet3%displacementheight_coeff
-        roughnesslength_momentum_coeff = self%parameter_config%pet3%roughnesslength_momentum_coeff
-        roughnesslength_heat_coeff = self%parameter_config%pet3%roughnesslength_heat_coeff
-        stomatal_resistance = self%parameter_config%pet3%stomatal_resistance
 
         self%process_matrix(5, 2) = 7_i4
         self%process_matrix(5, 3) = sum(self%process_matrix(1 : 5, 2))
 
-        call append(self%parameters_definition, reshape(canopyheigth_forest, [1, nColPars]))
-        call append(self%parameters_definition, reshape(canopyheigth_impervious, [1, nColPars]))
-        call append(self%parameters_definition, reshape(canopyheigth_pervious, [1, nColPars]))
-        call append(self%parameters_definition, reshape(displacementheight_coeff, [1, nColPars]))
-        call append(self%parameters_definition, reshape(roughnesslength_momentum_coeff, [1, nColPars]))
-        call append(self%parameters_definition, reshape(roughnesslength_heat_coeff, [1, nColPars]))
-        call append(self%parameters_definition, reshape(stomatal_resistance, [1, nColPars]))
+        call append(self%parameters_definition, reshape(self%parameter_config%pet3%canopyheigth_forest, shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%pet3%canopyheigth_impervious, shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%pet3%canopyheigth_pervious, shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%pet3%displacementheight_coeff, shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%pet3%roughnesslength_momentum_coeff, shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%pet3%roughnesslength_heat_coeff, shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%pet3%stomatal_resistance, shp))
 
         call append(self%parameters_name, [ &
                 'canopyheigth_forest           ', &
@@ -1576,28 +1384,21 @@ contains
 
       case DEFAULT
         call error_message('***ERROR: Process description for process "actualET" does not exist!')
-        call error_message('***ERROR: Process description for process "actualET" does not exist!')
     end select
-
 
     ! Process 6 - interflow
     select case (self%process_matrix(6, 1))
       ! 1 - parallel soil reservoir approach
       case(1)
         if (self%parameter_config%interflow1%nml_status /= 0_i4) call error_message("'interflow1' namelist not found.")
-        interflowStorageCapacityFactor = self%parameter_config%interflow1%interflowStorageCapacityFactor
-        interflowRecession_slope = self%parameter_config%interflow1%interflowRecession_slope
-        fastInterflowRecession_forest = self%parameter_config%interflow1%fastInterflowRecession_forest
-        slowInterflowRecession_Ks = self%parameter_config%interflow1%slowInterflowRecession_Ks
-        exponentSlowInterflow = self%parameter_config%interflow1%exponentSlowInterflow
 
         self%process_matrix(6, 2) = 5_i4
         self%process_matrix(6, 3) = sum(self%process_matrix(1 : 6, 2))
-        call append(self%parameters_definition, reshape(interflowStorageCapacityFactor, [1, nColPars]))
-        call append(self%parameters_definition, reshape(interflowRecession_slope, [1, nColPars]))
-        call append(self%parameters_definition, reshape(fastInterflowRecession_forest, [1, nColPars]))
-        call append(self%parameters_definition, reshape(slowInterflowRecession_Ks, [1, nColPars]))
-        call append(self%parameters_definition, reshape(exponentSlowInterflow, [1, nColPars]))
+        call append(self%parameters_definition, reshape(self%parameter_config%interflow1%interflowStorageCapacityFactor, shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%interflow1%interflowRecession_slope, shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%interflow1%fastInterflowRecession_forest, shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%interflow1%slowInterflowRecession_Ks, shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%interflow1%exponentSlowInterflow, shp))
 
         call append(self%parameters_name, [ &
                 'interflowStorageCapacityFactor', &
@@ -1612,7 +1413,6 @@ contains
 
       case DEFAULT
         call error_message('***ERROR: Process description for process "interflow" does not exist!')
-        call error_message('***ERROR: Process description for process "interflow" does not exist!')
     end select
 
     ! Process 7 - percolation
@@ -1620,15 +1420,12 @@ contains
       ! 1 - GW layer is assumed as bucket
       case(1)
         if (self%parameter_config%percolation1%nml_status /= 0_i4) call error_message("'percolation1' namelist not found.")
-        rechargeCoefficient = self%parameter_config%percolation1%rechargeCoefficient
-        rechargeFactor_karstic = self%parameter_config%percolation1%rechargeFactor_karstic
-        gain_loss_GWreservoir_karstic = self%parameter_config%percolation1%gain_loss_GWreservoir_karstic
 
         self%process_matrix(7, 2) = 3_i4
         self%process_matrix(7, 3) = sum(self%process_matrix(1 : 7, 2))
-        call append(self%parameters_definition, reshape(rechargeCoefficient, [1, nColPars]))
-        call append(self%parameters_definition, reshape(rechargeFactor_karstic, [1, nColPars]))
-        call append(self%parameters_definition, reshape(gain_loss_GWreservoir_karstic, [1, nColPars]))
+        call append(self%parameters_definition, reshape(self%parameter_config%percolation1%rechargeCoefficient, shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%percolation1%rechargeFactor_karstic, shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%percolation1%gain_loss_GWreservoir_karstic, shp))
 
         call append(self%parameters_name, [ &
                 'rechargeCoefficient          ', &
@@ -1640,7 +1437,6 @@ contains
           call error_message('***ERROR: parameter in namelist "percolation1" out of bound in ', self%parameter_config%file)
 
       case DEFAULT
-        call error_message('***ERROR: Process description for process "percolation" does not exist!')
         call error_message('***ERROR: Process description for process "percolation" does not exist!')
     end select
 
@@ -1727,19 +1523,15 @@ contains
         call message()
         call message('***SELECTION: Neutron count routine is deativated! ')
 
-
       case(1)
         ! 1 - inverse N0 based on Desilets et al. 2010
         if (self%parameter_config%neutrons1%nml_status /= 0_i4) call error_message("'neutrons1' namelist not found.")
-        Desilets_N0 = self%parameter_config%neutrons1%Desilets_N0
-        Desilets_LW0 = self%parameter_config%neutrons1%Desilets_LW0
-        Desilets_LW1 = self%parameter_config%neutrons1%Desilets_LW1
 
         self%process_matrix(10,2) = 3_i4
         self%process_matrix(10,3) = sum(self%process_matrix(1:10, 2))
-        call append(self%parameters_definition, reshape(Desilets_N0,  [1, nColPars]))
-        call append(self%parameters_definition, reshape(Desilets_LW0, [1, nColPars]))
-        call append(self%parameters_definition, reshape(Desilets_LW1, [1, nColPars]))
+        call append(self%parameters_definition, reshape(self%parameter_config%neutrons1%Desilets_N0,  shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%neutrons1%Desilets_LW0, shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%neutrons1%Desilets_LW1, shp))
 
         call append(self%parameters_name, [  &
                 'Desilets_N0   ', &
@@ -1753,27 +1545,18 @@ contains
       case(2)
         ! 2 - COSMIC version
         if (self%parameter_config%neutrons2%nml_status /= 0_i4) call error_message("'neutrons2' namelist not found.")
-        COSMIC_N0 = self%parameter_config%neutrons2%COSMIC_N0
-        COSMIC_N1 = self%parameter_config%neutrons2%COSMIC_N1
-        COSMIC_N2 = self%parameter_config%neutrons2%COSMIC_N2
-        COSMIC_alpha0 = self%parameter_config%neutrons2%COSMIC_alpha0
-        COSMIC_alpha1 = self%parameter_config%neutrons2%COSMIC_alpha1
-        COSMIC_L30 = self%parameter_config%neutrons2%COSMIC_L30
-        COSMIC_L31 = self%parameter_config%neutrons2%COSMIC_L31
-        COSMIC_LW0 = self%parameter_config%neutrons2%COSMIC_LW0
-        COSMIC_LW1 = self%parameter_config%neutrons2%COSMIC_LW1
 
         self%process_matrix(10,2) = 9_i4
         self%process_matrix(10,3) = sum(self%process_matrix(1:10, 2))
-        call append(self%parameters_definition, reshape(COSMIC_N0,     [1, nColPars]))
-        call append(self%parameters_definition, reshape(COSMIC_N1,     [1, nColPars]))
-        call append(self%parameters_definition, reshape(COSMIC_N2,     [1, nColPars]))
-        call append(self%parameters_definition, reshape(COSMIC_alpha0, [1, nColPars]))
-        call append(self%parameters_definition, reshape(COSMIC_alpha1, [1, nColPars]))
-        call append(self%parameters_definition, reshape(COSMIC_L30,    [1, nColPars]))
-        call append(self%parameters_definition, reshape(COSMIC_L31,    [1, nColPars]))
-        call append(self%parameters_definition, reshape(COSMIC_LW0,    [1, nColPars]))
-        call append(self%parameters_definition, reshape(COSMIC_LW1,    [1, nColPars]))
+        call append(self%parameters_definition, reshape(self%parameter_config%neutrons2%COSMIC_N0,     shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%neutrons2%COSMIC_N1,     shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%neutrons2%COSMIC_N2,     shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%neutrons2%COSMIC_alpha0, shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%neutrons2%COSMIC_alpha1, shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%neutrons2%COSMIC_L30,    shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%neutrons2%COSMIC_L31,    shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%neutrons2%COSMIC_LW0,    shp))
+        call append(self%parameters_definition, reshape(self%parameter_config%neutrons2%COSMIC_LW1,    shp))
 
         call append(self%parameters_name, [  &
                 'COSMIC_N0     ', &
