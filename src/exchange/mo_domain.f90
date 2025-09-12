@@ -13,25 +13,17 @@ module mo_domain
   use mo_list, only: list
   use mo_kind, only: i4, dp
   use mo_message, only: message, error_message
-  use mo_exchange_type, only: exchange_t, time_config_t, process_config_t, parameter_config_t
+  use mo_exchange_type, only: exchange_t, time_config_t
   use mo_string_utils, only: n2s=>num2str
   use mo_datetime, only: datetime, timedelta
-  use mo_namelists, only: nml_mainconfig_t
+  ! config
+  use mo_main_config, only: parameters_t
   ! containers
   use mo_input_container, only: input_t, input_config_t
   use mo_meteo_container, only: meteo_t, meteo_config_t
   use mo_mpr_container, only: mpr_t, mpr_config_t
   use mo_mhm_container, only: mhm_t, mhm_config_t
   use mo_mrm_container, only: mrm_t, mrm_config_t
-
-  !> \class   main_config_t
-  !> \brief   Main configuration.
-  type, public :: main_config_t
-    character(:), allocatable :: file    !< mhm namelist file
-    type(nml_mainconfig_t) :: mainconfig !< mainconfig configuration
-  contains
-    procedure :: read => main_config_read
-  end type main_config_t
 
   !> \class   domain_t
   !> \brief   Class for a single mHM domain.
@@ -99,11 +91,10 @@ contains
   end function domain_list_add
 
   !> \brief Initialize a new domain.
-  subroutine domain_init(self, time_cfg, parameter_cfg, process_cfg, input_cfg, meteo_cfg, mpr_cfg, mhm_cfg, mrm_cfg)
+  subroutine domain_init(self, parameters, time_cfg, input_cfg, meteo_cfg, mpr_cfg, mhm_cfg, mrm_cfg)
     class(domain_t), intent(inout) :: self
+    type(parameters_t), intent(in) :: parameters !< configuration for the parameters
     type(time_config_t), intent(in) :: time_cfg !< configuration of the timing
-    type(parameter_config_t), intent(in) :: parameter_cfg !< configuration for the parameters
-    type(process_config_t), intent(in) :: process_cfg !< configuration for the processes
     type(input_config_t), intent(in), optional :: input_cfg !< configuration for the input container
     type(meteo_config_t), intent(in), optional :: meteo_cfg !< configuration for the meteo container
     type(mpr_config_t), intent(in), optional :: mpr_cfg !< configuration for the mpr container
@@ -111,13 +102,13 @@ contains
     type(mrm_config_t), intent(in), optional :: mrm_cfg !< configuration for the mrm container
 
     call message(" ... init domain")
-    call self%exchange%init(time_cfg, parameter_cfg, process_cfg)
+    call self%exchange%init(time_cfg, parameters)
     if (present(input_cfg)) call self%input%init(input_cfg)
     if (present(meteo_cfg)) call self%meteo%init(meteo_cfg)
     if (present(mpr_cfg)) call self%mpr%init(mpr_cfg)
     if (present(mhm_cfg)) call self%mhm%init(mhm_cfg)
     if (present(mrm_cfg)) call self%mrm%init(mrm_cfg)
-
+    ! connect
     if (self%input%config%active) call self%input%connect(self%exchange)
     if (self%meteo%config%active) call self%meteo%connect(self%exchange)
     if (self%mpr%config%active) call self%mpr%connect(self%exchange)
@@ -130,7 +121,7 @@ contains
     !> a set of global parameter (gamma) to run mHM, DIMENSION [no. of global_Parameters]
     real(dp), dimension(:), optional, intent(in) :: parameters
     call message(" ... prepare domain")
-    if (present(parameters)) self%exchange%parameters = parameters
+    call self%exchange%parameters%set(parameters)
     if (self%input%config%active) call self%input%prepare(self%exchange)
     if (self%meteo%config%active) call self%meteo%prepare(self%exchange)
     if (self%mpr%config%active) call self%mpr%prepare(self%exchange)
@@ -153,14 +144,5 @@ contains
     class(domain_t), intent(inout) :: self
     call message(" ... finalizing domain")
   end subroutine domain_finalize
-
-  !> \brief Read main configuration.
-  subroutine main_config_read(self, file)
-    class(main_config_t), intent(inout) :: self
-    character(*), intent(in) :: file !< file containing the namelists
-    call message(" ... config main: ", file)
-    self%file = file
-    call self%mainconfig%read(file)
-  end subroutine main_config_read
 
 end module mo_domain

@@ -5,9 +5,10 @@ program driver
   use mo_message, only: message
   use mo_string_utils, only: n2s => num2str
   ! exchange
-  use mo_domain, only: domains, selected_domains, domain_t, main_config_t
+  use mo_domain, only: domains, selected_domains, domain_t
   use mo_kind, only: i4
-  use mo_exchange_type, only: parameter_config_t, process_config_t, time_config_t
+  use mo_main_config, only: parameter_config_t, process_config_t, main_config_t, parameters_t
+  use mo_exchange_type, only: time_config_t
   ! containers
   use mo_input_container, only: input_config_t
   use mo_meteo_container, only: meteo_config_t
@@ -20,9 +21,10 @@ program driver
 
   ! global configs
   type(main_config_t) :: main_cfg
+  type(parameter_config_t) :: parameter_cfg
+  type(process_config_t) :: process_cfg
+  type(parameters_t) :: parameters
   type(time_config_t), allocatable :: time_cfg(:)
-  type(parameter_config_t), allocatable :: parameter_cfg(:)
-  type(process_config_t), allocatable :: process_cfg(:)
   ! container configs
   type(input_config_t), allocatable :: input_cfg(:)
   type(meteo_config_t), allocatable :: meteo_cfg(:)
@@ -87,12 +89,18 @@ program driver
 
   call message("READ MAIN CONFIG")
   call main_cfg%read(parser%option_value("nml"))
+  call process_cfg%read(parser%option_value("nml"))
+  call parameter_cfg%read(parser%option_value("parameter"))
+  call parameters%init(parameter_cfg, process_cfg)
+
+  call parameters%print()
+  print*, "parameter - canopyInterceptionFactor:", parameters%get("canopyInterceptionFactor")
+  print*, "process(2) parameters:", parameters%get_process(2_i4)
+
   n_domains = main_cfg%mainconfig%nDomains
   allocate(selected_domains(n_domains))
-
   allocate(time_cfg(n_domains))
-  allocate(parameter_cfg(n_domains))
-  allocate(process_cfg(n_domains))
+
   ! container configs
   allocate(input_cfg(n_domains))
   allocate(meteo_cfg(n_domains))
@@ -112,8 +120,6 @@ program driver
     call message("READ CONFIGS domain: ", trim(adjustl(n2s(id))))
     ! global configs
     call time_cfg(id)%read(parser%option_value("nml"), id)
-    call parameter_cfg(id)%read(parser%option_value("parameter"))
-    call process_cfg(id)%read(parser%option_value("nml"))
     ! container configs
     call input_cfg(id)%read(parser%option_value("nml"), id)
     call meteo_cfg(id)%read(parser%option_value("nml"), id)
@@ -123,9 +129,8 @@ program driver
     ! get domain
     call domains%get_domain(id, domain)
     call domain%init( &
+      parameters, &
       time_cfg(id), &
-      parameter_cfg(id), &
-      process_cfg(id), &
       input_cfg(id), &
       meteo_cfg(id), &
       mpr_cfg(id), &
