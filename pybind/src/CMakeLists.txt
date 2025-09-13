@@ -1,5 +1,4 @@
 cmake_minimum_required(VERSION 3.17.2...3.24)
-enable_language(C)
 find_package(Python REQUIRED COMPONENTS Interpreter Development.Module)
 
 if(${SKBUILD_STATE} MATCHES "editable")

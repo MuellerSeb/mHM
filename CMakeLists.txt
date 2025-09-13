@@ -8,7 +8,7 @@ project(mhm
   VERSION ${MHM_VER}
   DESCRIPTION "The mesoscale Hydrological Model"
   HOMEPAGE_URL "https://www.ufz.de/mhm"
-  LANGUAGES Fortran
+  LANGUAGES Fortran C
 )
 
 option(BUILD_MHM_DRIVER "Build mHM with executable driver." ON)
