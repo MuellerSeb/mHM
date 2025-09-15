@@ -24,13 +24,13 @@ program driver
   type(parameter_config_t) :: parameter_cfg
   type(process_config_t) :: process_cfg
   type(parameters_t) :: parameters
-  type(time_config_t), allocatable :: time_cfg(:)
+  type(time_config_t) :: time_cfg
   ! container configs
-  type(input_config_t), allocatable :: input_cfg(:)
-  type(meteo_config_t), allocatable :: meteo_cfg(:)
-  type(mpr_config_t), allocatable :: mpr_cfg(:)
-  type(mhm_config_t), allocatable :: mhm_cfg(:)
-  type(mrm_config_t), allocatable :: mrm_cfg(:)
+  type(input_config_t) :: input_cfg
+  type(meteo_config_t) :: meteo_cfg
+  type(mpr_config_t) :: mpr_cfg
+  type(mhm_config_t) :: mhm_cfg
+  type(mrm_config_t) :: mrm_cfg
 
   ! command line interface parser
   type(cli_parser) :: parser
@@ -88,62 +88,55 @@ program driver
   if (parser%option_was_read("cwd")) call change_dir(parser%option_value("cwd"))
 
   call message("READ MAIN CONFIG")
+  ! global configs
   call main_cfg%read(parser%option_value("nml"))
+  call time_cfg%read(parser%option_value("nml"))
   call process_cfg%read(parser%option_value("nml"))
   call parameter_cfg%read(parser%option_value("parameter"))
-  call parameters%init(parameter_cfg, process_cfg)
+  ! container configs
+  call input_cfg%read(parser%option_value("nml"))
+  call meteo_cfg%read(parser%option_value("nml"))
+  call mpr_cfg%read(parser%option_value("nml"))
+  call mhm_cfg%read(parser%option_value("nml"), parser%option_value("mhm_output"))
+  call mrm_cfg%read(parser%option_value("nml"), parser%option_value("mrm_output"))
 
+  ! create parameters first
+  call message("")
+  call message("CREATE PARAMETERS")
+  call parameters%configure(parameter_cfg, process_cfg)
   call parameters%print()
-  print*, "parameter - canopyInterceptionFactor:", parameters%get("canopyInterceptionFactor")
-  print*, "process(2) parameters:", parameters%get_process(2_i4)
+  ! test output
+  print*, " ... parameter - canopyInterceptionFactor:", parameters%get("canopyInterceptionFactor")
+  print*, " ... process(2) parameters:", parameters%get_process(2_i4)
 
+  ! determine number of domains
   n_domains = main_cfg%mainconfig%nDomains
   allocate(selected_domains(n_domains))
-  allocate(time_cfg(n_domains))
 
-  ! container configs
-  allocate(input_cfg(n_domains))
-  allocate(meteo_cfg(n_domains))
-  allocate(mpr_cfg(n_domains))
-  allocate(mhm_cfg(n_domains))
-  allocate(mrm_cfg(n_domains))
-
+  call message("")
   call message("CREATE domains: ", trim(n2s(n_domains)))
   do i = 1_i4, n_domains
     selected_domains(i) = domains%add_domain() ! returns domain id
   end do
-  print*, "selected_domains", selected_domains
+  print*, " ... selected_domains", selected_domains
 
   ! read configs
   do i = 1_i4, size(selected_domains)
     id = selected_domains(i)
-    call message("READ CONFIGS domain: ", trim(adjustl(n2s(id))))
-    ! global configs
-    call time_cfg(id)%read(parser%option_value("nml"), id)
-    ! container configs
-    call input_cfg(id)%read(parser%option_value("nml"), id)
-    call meteo_cfg(id)%read(parser%option_value("nml"), id)
-    call mpr_cfg(id)%read(parser%option_value("nml"), id)
-    call mhm_cfg(id)%read(parser%option_value("nml"), parser%option_value("mhm_output"), id)
-    call mrm_cfg(id)%read(parser%option_value("nml"), parser%option_value("mrm_output"), id)
+    call message("")
+    call message("CONFIGURE domain: ", trim(adjustl(n2s(id))))
     ! get domain
     call domains%get_domain(id, domain)
-    call domain%init( &
-      parameters, &
-      time_cfg(id), &
-      input_cfg(id), &
-      meteo_cfg(id), &
-      mpr_cfg(id), &
-      mhm_cfg(id), &
-      mrm_cfg(id))
+    call domain%configure(parameters, time_cfg, id, input_cfg, meteo_cfg, mpr_cfg, mhm_cfg, mrm_cfg)
   end do
 
   ! simple run
   do i = 1_i4, size(selected_domains)
+    call message("")
     id = selected_domains(i)
     call domains%get_domain(id, domain)
     call message("PREPARE domain: ", trim(adjustl(n2s(id))))
-    call domain%prepare()
+    call domain%initialize(parameters%values)
     call message("RUN TIME LOOP domain: ", trim(adjustl(n2s(id))))
     ! do while(domain%exchange%time < domain%exchange%end_time)
     call domain%update()

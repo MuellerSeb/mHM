@@ -24,6 +24,7 @@ module mo_exchange_type
   use mo_message, only: message, error_message
   use mo_string_utils, only: n2s=>num2str
   use mo_main_config, only: parameters_t
+  use mo_utils, only: optval
 
   use mo_namelists, only: &
     nml_mainconfig_mhm_mrm_t, &
@@ -45,7 +46,6 @@ module mo_exchange_type
   !> \class   time_config_t
   !> \brief   Configuration for time periods.
   type, public :: time_config_t
-    integer(i4) :: domain !< domain number to read correct configuration
     character(:), allocatable :: file          !< mhm namelist file
     type(nml_mainconfig_mhm_mrm_t) :: mainconfig_mhm_mrm !< mainconfig_mhm_mrm configuration containing time step
     type(nml_time_periods_t) :: time_periods !< time_periods configuration
@@ -106,14 +106,15 @@ module mo_exchange_type
   !> \class   exchange_t
   !> \brief   Class for dynamically exchanging variables in mHM.
   type, public :: exchange_t
-    integer(i4) :: step_count !< current time step
-    type(datetime) :: time    !< time-stamp for the current time step
-    type(datetime) :: start_time    !< start time of simulation
-    type(datetime) :: end_time    !< end time of simulation
-    type(timedelta) :: step   !< time step of the simulation
-    type(time_config_t) :: time_config !< time configuration
-    type(parameters_t) :: parameters !< parameters container
-    integer(i4) :: domain !< Number of this domain
+    integer(i4) :: step_count           !< current time step
+    type(datetime) :: time              !< time-stamp for the current time step
+    type(datetime) :: start_time        !< start time of simulation
+    type(datetime) :: eval_start_time   !< start time of evaluation
+    type(datetime) :: end_time          !< end time of simulation
+    type(timedelta) :: step             !< time step of the simulation
+    type(time_config_t) :: time_config  !< time configuration
+    type(parameters_t) :: parameters    !< parameters container
+    integer(i4) :: domain               !< Number of this domain
 
     ! grids
     type(grid_t), pointer :: level0  => null() !< level0 grid of the morphology
@@ -231,7 +232,7 @@ module mo_exchange_type
     type(var_dp) :: riverhead           !< simulated riverhead [m] on level l0
 
   contains
-    procedure, public  :: init => exchange_init
+    procedure, public  :: configure => exchange_configure
     procedure, public  :: get_grid => exchange_get_grid
     procedure, public  :: has_grid => exchange_has_grid
     procedure, public :: get_meta => exchange_get_var_meta
@@ -250,20 +251,20 @@ module mo_exchange_type
 
 contains
 
-  !> \brief initialize the exchange type
-  subroutine exchange_init(self, time_cfg, parameters)
+  !> \brief Configure the exchange type
+  subroutine exchange_configure(self, time_cfg, parameters, domain)
     class(exchange_t), intent(inout) :: self
     type(time_config_t), intent(in) :: time_cfg !< time configuration
     type(parameters_t), intent(in) :: parameters !< parameters container
+    integer(i4), intent(in), optional :: domain !< domain ID of the current domain in the configuration arrays (1 by default)
 
-    call message(" ... init exchange")
+    call message(" ... configure exchange")
     self%time_config = time_cfg
     self%parameters = parameters
-    self%domain = self%time_config%domain
+    self%domain = optval(domain, 1_i4) ! 1 by default for single domain initialization
 
     ! time settings
-    self%step_count = 0_i4
-    self%start_time = datetime( &
+    self%eval_start_time = datetime( &
       year=self%time_config%time_periods%eval_Per(self%domain)%yStart, &
       month=self%time_config%time_periods%eval_Per(self%domain)%mStart, &
       day=self%time_config%time_periods%eval_Per(self%domain)%dStart &
@@ -273,9 +274,12 @@ contains
       month=self%time_config%time_periods%eval_Per(self%domain)%mEnd, &
       day=self%time_config%time_periods%eval_Per(self%domain)%dEnd &
     )
-    self%start_time = self%start_time - timedelta(days=self%time_config%time_periods%warming_Days(self%domain))
-    self%time = self%start_time
+    self%start_time = self%eval_start_time - timedelta(days=self%time_config%time_periods%warming_Days(self%domain))
     self%step = timedelta(hours=self%time_config%mainconfig_mhm_mrm%timeStep)
+
+    ! initialize time
+    self%step_count = 0_i4
+    self%time = self%start_time
 
     ! variables
     ! raw meteorology (level2)
@@ -381,7 +385,7 @@ contains
 
     ! groundwater (level0)
     self%riverhead         =   var_dp(grid=l0,  name="riverhead",        units="m",                 long_name="simulated riverhead")
-  end subroutine exchange_init
+  end subroutine exchange_configure
 
   !> \brief get the grid specifications for the selected level
   subroutine exchange_get_grid(self, selector, grid)
@@ -811,13 +815,11 @@ contains
   end subroutine exchange_set_data_2d
 
   !> \brief Read time configuration.
-  subroutine time_config_read(self, file, domain)
+  subroutine time_config_read(self, file)
     class(time_config_t), intent(inout) :: self
     character(*), intent(in) :: file !< file containing the namelists
-    integer(i4), intent(in) :: domain !< domain number to read correct configuration
-    call message(" ... config time: ", file)
+    call message(" ... read config time: ", file)
     self%file = file
-    self%domain = domain
     call self%mainconfig_mhm_mrm%read(file)
     call self%time_periods%read(file)
   end subroutine time_config_read

@@ -27,49 +27,47 @@ module mo_input_container
   !> \brief   Class for a single Input container.
   type, public :: input_t
     type(input_config_t) :: config !< configuration of the Input container
+    type(exchange_t), pointer :: exchange => null() !< exchange container of the domain
   contains
-    procedure :: init => input_init
+    procedure :: configure => input_configure
     procedure :: connect => input_connect
-    procedure :: prepare => input_prepare
+    procedure :: initialize => input_initialize
     procedure :: update => input_update
   end type input_t
 
 contains
 
-  !> \brief Initialize the Input container.
-  subroutine input_init(self, config)
+  !> \brief Configure the Input container.
+  subroutine input_configure(self, config, exchange)
     class(input_t), intent(inout) :: self
     type(input_config_t), intent(in) :: config !< initialization config for Input
-    call message(" ... init input")
+    type(exchange_t), intent(in), pointer :: exchange !< exchange container of the domain
+    call message(" ... configure input")
     self%config = config
-  end subroutine input_init
+    self%exchange => exchange
+  end subroutine input_configure
 
   !> \brief Initialize the input configuration.
-  subroutine input_config_read(self, file, domain)
+  subroutine input_config_read(self, file)
     class(input_config_t), intent(inout) :: self
     character(*), intent(in) :: file !< file containing the namelists
-    integer(i4), intent(in) :: domain !< domain number to read correct configuration
-    call message(" ... config input: ", file)
+    call message(" ... read config input: ", file)
     self%active = .true.
-    self%domain = domain
   end subroutine input_config_read
 
-  subroutine input_connect(this, exchange)
-    class(input_t), intent(inout) :: this
-    type(exchange_t), intent(inout) :: exchange
-    call message(" ... connecting input: ", exchange%time%str())
+  subroutine input_connect(self)
+    class(input_t), intent(inout) :: self
+    call message(" ... connecting input: ", self%exchange%time%str())
   end subroutine input_connect
 
-  subroutine input_prepare(this, exchange)
-    class(input_t), intent(inout) :: this
-    type(exchange_t), intent(inout) :: exchange
-    call message(" ... preparing input: ", exchange%time%str())
-  end subroutine input_prepare
+  subroutine input_initialize(self)
+    class(input_t), intent(inout) :: self
+    call message(" ... initialize input: ", self%exchange%time%str())
+  end subroutine input_initialize
 
-  subroutine input_update(this, exchange)
-    class(input_t), intent(inout) :: this
-    type(exchange_t), intent(in) :: exchange
-    call message(" ... updating input: ", exchange%time%str())
+  subroutine input_update(self)
+    class(input_t), intent(inout) :: self
+    call message(" ... updating input: ", self%exchange%time%str())
   end subroutine input_update
 
 end module mo_input_container

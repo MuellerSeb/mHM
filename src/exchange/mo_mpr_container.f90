@@ -18,7 +18,6 @@ module mo_mpr_container
   !> \brief   Configuration for a single MPR process container.
   type, public :: mpr_config_t
     logical :: active = .false. !< flag to activate the MPR process container
-    integer(i4) :: domain !< domain number to read correct configuration
   contains
     procedure :: read => mpr_config_read
   end type mpr_config_t
@@ -27,49 +26,47 @@ module mo_mpr_container
   !> \brief   Class for a single MPR process container.
   type, public :: mpr_t
     type(mpr_config_t) :: config !< configuration of the MPR process container
+    type(exchange_t), pointer :: exchange => null() !< exchange container of the domain
   contains
-    procedure :: init => mpr_init
+    procedure :: configure => mpr_configure
     procedure :: connect => mpr_connect
-    procedure :: prepare => mpr_prepare
+    procedure :: initialize => mpr_initialize
     procedure :: update => mpr_update
   end type mpr_t
 
 contains
 
-  !> \brief Initialize the MPR process container.
-  subroutine mpr_init(self, config)
+  !> \brief Configure the MPR process container.
+  subroutine mpr_configure(self, config, exchange)
     class(mpr_t), intent(inout) :: self
     type(mpr_config_t), intent(in) :: config !< initialization config for MPR
-    call message(" ... init mpr")
+    type(exchange_t), intent(in), pointer :: exchange !< exchange container of the domain
+    call message(" ... configure mpr")
     self%config = config
-  end subroutine mpr_init
+    self%exchange => exchange
+  end subroutine mpr_configure
 
   !> \brief Initialize the mpr configuration.
-  subroutine mpr_config_read(self, file, domain)
+  subroutine mpr_config_read(self, file)
     class(mpr_config_t), intent(inout) :: self
     character(*), intent(in) :: file !< file containing the namelists
-    integer(i4), intent(in) :: domain !< domain number to read correct configuration
-    call message(" ... config mpr: ", file)
+    call message(" ... read config mpr: ", file)
     self%active = .true.
-    self%domain = domain
   end subroutine mpr_config_read
 
-  subroutine mpr_connect(this, exchange)
-    class(mpr_t), intent(inout) :: this
-    type(exchange_t), intent(inout) :: exchange
-    call message(" ... connecting mpr: ", exchange%time%str())
+  subroutine mpr_connect(self)
+    class(mpr_t), intent(inout) :: self
+    call message(" ... connecting mpr: ", self%exchange%time%str())
   end subroutine mpr_connect
 
-  subroutine mpr_prepare(this, exchange)
-    class(mpr_t), intent(inout) :: this
-    type(exchange_t), intent(inout) :: exchange
-    call message(" ... preparing mpr: ", exchange%time%str())
-  end subroutine mpr_prepare
+  subroutine mpr_initialize(self)
+    class(mpr_t), intent(inout) :: self
+    call message(" ... initialize mpr: ", self%exchange%time%str())
+  end subroutine mpr_initialize
 
-  subroutine mpr_update(this, exchange)
-    class(mpr_t), intent(inout) :: this
-    type(exchange_t), intent(in) :: exchange
-    call message(" ... updating mpr: ", exchange%time%str())
+  subroutine mpr_update(self)
+    class(mpr_t), intent(inout) :: self
+    call message(" ... updating mpr: ", self%exchange%time%str())
   end subroutine mpr_update
 
 end module mo_mpr_container

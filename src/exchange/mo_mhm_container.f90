@@ -34,7 +34,6 @@ module mo_mhm_container
   !> \brief   Configuration for a single mHM process container.
   type, public :: mhm_config_t
     logical :: active = .false. !< flag to activate the mHM process container
-    integer(i4) :: domain !< domain number to read correct configuration
     type(nml_project_description_t) :: project_description !< project_description configuration
     type(nml_mainconfig_t) :: mainconfig !< mainconfig configuration
     type(nml_lcover_t) :: lcover !< lcover configuration
@@ -55,6 +54,7 @@ module mo_mhm_container
   !> \brief   Class for a single mHM process container.
   type, public :: mhm_t
     type(mhm_config_t) :: config !< configuration of the mHM process container
+    type(exchange_t), pointer :: exchange => null() !< exchange container of the domain
     ! DEFINE OUTPUTS
     integer(i4) :: output_deflate_level   !< deflate level in nc files
     integer(i4) :: output_time_reference  !< time reference point location in output nc files
@@ -125,31 +125,31 @@ module mo_mhm_container
     real(dp), public, dimension(:), allocatable :: neutron_integral_AFast !< pre-calculated integrand for vertical projection of isotropic neutron flux
 
   contains
-    procedure :: init => mhm_init
+    procedure :: configure => mhm_configure
     procedure :: connect => mhm_connect
-    procedure :: prepare => mhm_prepare
+    procedure :: initialize => mhm_initialize
     procedure :: update => mhm_update
   end type mhm_t
 
 contains
 
-  !> \brief Initialize the mHM process container.
-  subroutine mhm_init(self, config)
+  !> \brief Configure the mHM process container.
+  subroutine mhm_configure(self, config, exchange)
     class(mhm_t), intent(inout) :: self
     type(mhm_config_t), intent(in) :: config !< initialization config for mHM
-    call message(" ... init mhm")
+    type(exchange_t), intent(in), pointer :: exchange !< exchange container of the domain
+    call message(" ... configure mhm")
     self%config = config
-  end subroutine mhm_init
+    self%exchange => exchange
+  end subroutine mhm_configure
 
   !> \brief Initialize the mHM process container.
-  subroutine mhm_config_read(self, file, output_file, domain)
+  subroutine mhm_config_read(self, file, output_file)
     class(mhm_config_t), intent(inout) :: self
     character(*), intent(in) :: file !< file containing the namelists
     character(*), intent(in) :: output_file !< file containing the output namelist
-    integer(i4), intent(in) :: domain !< domain number to read correct configuration
-    call message(" ... config mHM: ", file, ", ", output_file)
+    call message(" ... read config mHM: ", file, ", ", output_file)
     self%active = .true.
-    self%domain = domain
     call self%project_description%read(file)
     call self%mainconfig%read(file)
     call self%lcover%read(file)
@@ -165,22 +165,19 @@ contains
     call self%nloutputresults%read(output_file)
   end subroutine mhm_config_read
 
-  subroutine mhm_connect(this, exchange)
-    class(mhm_t), intent(inout) :: this
-    type(exchange_t), intent(inout) :: exchange
-    call message(" ... connecting mHM: ", exchange%time%str())
+  subroutine mhm_connect(self)
+    class(mhm_t), intent(inout) :: self
+    call message(" ... connecting mHM: ", self%exchange%time%str())
   end subroutine mhm_connect
 
-  subroutine mhm_prepare(this, exchange)
-    class(mhm_t), intent(inout) :: this
-    type(exchange_t), intent(inout) :: exchange
-    call message(" ... preparing mHM: ", exchange%time%str())
-  end subroutine mhm_prepare
+  subroutine mhm_initialize(self)
+    class(mhm_t), intent(inout) :: self
+    call message(" ... initialize mHM: ", self%exchange%time%str())
+  end subroutine mhm_initialize
 
-  subroutine mhm_update(this, exchange)
-    class(mhm_t), intent(inout) :: this
-    type(exchange_t), intent(in) :: exchange
-    call message(" ... updating mHM: ", exchange%time%str())
+  subroutine mhm_update(self)
+    class(mhm_t), intent(inout) :: self
+    call message(" ... updating mHM: ", self%exchange%time%str())
   end subroutine mhm_update
 
 end module mo_mhm_container

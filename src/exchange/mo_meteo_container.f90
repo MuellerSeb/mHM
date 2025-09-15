@@ -18,7 +18,6 @@ module mo_meteo_container
   !> \brief   Class for a single Meteorology process container.
   type, public :: meteo_config_t
     logical :: active = .false. !< flag to activate the Meteorology process container
-    integer(i4) :: domain !< domain number to read correct configuration
   contains
     procedure :: read => meteo_config_read
   end type meteo_config_t
@@ -27,49 +26,47 @@ module mo_meteo_container
   !> \brief   Class for a single Meteorology process container.
   type, public :: meteo_t
     type(meteo_config_t) :: config !< configuration of the Meteorology process container
+    type(exchange_t), pointer :: exchange => null() !< exchange container of the domain
   contains
-    procedure :: init => meteo_init
+    procedure :: configure => meteo_configure
     procedure :: connect => meteo_connect
-    procedure :: prepare => meteo_prepare
+    procedure :: initialize => meteo_initialize
     procedure :: update => meteo_update
   end type meteo_t
 
 contains
 
-  !> \brief Initialize the Meteorology process container.
-  subroutine meteo_init(self, config)
+  !> \brief Configure the Meteorology process container.
+  subroutine meteo_configure(self, config, exchange)
     class(meteo_t), intent(inout) :: self
     type(meteo_config_t), intent(in) :: config !< initialization config for Meteorology
-    call message(" ... init meteo")
+    type(exchange_t), intent(in), pointer :: exchange !< exchange container of the domain
+    call message(" ... configure meteo")
     self%config = config
-  end subroutine meteo_init
+    self%exchange => exchange
+  end subroutine meteo_configure
 
   !> \brief Initialize the meteo configuration.
-  subroutine meteo_config_read(self, file, domain)
+  subroutine meteo_config_read(self, file)
     class(meteo_config_t), intent(inout) :: self
     character(*), intent(in) :: file !< file containing the namelists
-    integer(i4), intent(in) :: domain !< domain number to read correct configuration
-    call message(" ... config meteo: ", file)
+    call message(" ... read config meteo: ", file)
     self%active = .true.
-    self%domain = domain
   end subroutine meteo_config_read
 
-  subroutine meteo_connect(this, exchange)
-    class(meteo_t), intent(inout) :: this
-    type(exchange_t), intent(inout) :: exchange
-    call message(" ... connecting meteo: ", exchange%time%str())
+  subroutine meteo_connect(self)
+    class(meteo_t), intent(inout) :: self
+    call message(" ... connecting meteo: ", self%exchange%time%str())
   end subroutine meteo_connect
 
-  subroutine meteo_prepare(this, exchange)
-    class(meteo_t), intent(inout) :: this
-    type(exchange_t), intent(inout) :: exchange
-    call message(" ... preparing meteo: ", exchange%time%str())
-  end subroutine meteo_prepare
+  subroutine meteo_initialize(self)
+    class(meteo_t), intent(inout) :: self
+    call message(" ... initialize meteo: ", self%exchange%time%str())
+  end subroutine meteo_initialize
 
-  subroutine meteo_update(this, exchange)
-    class(meteo_t), intent(inout) :: this
-    type(exchange_t), intent(in) :: exchange
-    call message(" ... updating meteo: ", exchange%time%str())
+  subroutine meteo_update(self)
+    class(meteo_t), intent(inout) :: self
+    call message(" ... updating meteo: ", self%exchange%time%str())
   end subroutine meteo_update
 
 end module mo_meteo_container

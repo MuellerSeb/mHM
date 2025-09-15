@@ -18,7 +18,7 @@ contains
     type(datetime) :: start_date
 
     start_date = datetime(2025, 8, 4, 0, 0)
-    call exchange%init(start_date)
+    call exchange%configure(start_date)
 
     @assertTrue(exchange%current_time == start_date, message='exchange: check start date')
     @assertTrue(exchange%time_step == 0_i4, message='exchange: check time step')

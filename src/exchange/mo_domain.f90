@@ -27,6 +27,7 @@ module mo_domain
 
   !> \class   domain_t
   !> \brief   Class for a single mHM domain.
+  !> \details Always add the "target" attribute to instances of domain, or use allocated pointers (have implicit target attribute).
   type, public :: domain_t
     type(exchange_t) :: exchange !< the exchange container with all exchanged variables for this domain
     type(input_t) :: input !< the input container providing inputs from file or couplers
@@ -36,8 +37,8 @@ module mo_domain
     type(mrm_t) :: mrm !< the mRM process container for routing related processes
     logical :: is_finished = .false. !< whether the time-loop on this domain is finished
   contains
-    procedure :: init => domain_init
-    procedure :: prepare => domain_prepare
+    procedure :: configure => domain_configure
+    procedure :: initialize => domain_initialize
     procedure :: update => domain_update
     procedure :: finalize => domain_finalize
   end type domain_t
@@ -90,54 +91,58 @@ contains
     call self%add_clone(new_key, new_domain)
   end function domain_list_add
 
-  !> \brief Initialize a new domain.
-  subroutine domain_init(self, parameters, time_cfg, input_cfg, meteo_cfg, mpr_cfg, mhm_cfg, mrm_cfg)
-    class(domain_t), intent(inout) :: self
+  !> \brief Configure the domain.
+  subroutine domain_configure(self, parameters, time_cfg, domain, input_cfg, meteo_cfg, mpr_cfg, mhm_cfg, mrm_cfg)
+    ! domain is always an item of a domain_list, which stores "allocated pointers" and these implicitly have the "target" attribute
+    class(domain_t), intent(inout), target :: self ! needs "target" so components can safely point to "exchange"
     type(parameters_t), intent(in) :: parameters !< configuration for the parameters
     type(time_config_t), intent(in) :: time_cfg !< configuration of the timing
+    integer(i4), intent(in), optional :: domain !< domain ID of the current domain in the configuration arrays (1 by default)
     type(input_config_t), intent(in), optional :: input_cfg !< configuration for the input container
     type(meteo_config_t), intent(in), optional :: meteo_cfg !< configuration for the meteo container
     type(mpr_config_t), intent(in), optional :: mpr_cfg !< configuration for the mpr container
     type(mhm_config_t), intent(in), optional :: mhm_cfg !< configuration for the mhm container
     type(mrm_config_t), intent(in), optional :: mrm_cfg !< configuration for the mrm container
 
-    call message(" ... init domain")
-    call self%exchange%init(time_cfg, parameters)
-    if (present(input_cfg)) call self%input%init(input_cfg)
-    if (present(meteo_cfg)) call self%meteo%init(meteo_cfg)
-    if (present(mpr_cfg)) call self%mpr%init(mpr_cfg)
-    if (present(mhm_cfg)) call self%mhm%init(mhm_cfg)
-    if (present(mrm_cfg)) call self%mrm%init(mrm_cfg)
+    call message(" ... configure domain")
+    call self%exchange%configure(time_cfg, parameters, domain)
+    ! configure
+    if (present(input_cfg)) call self%input%configure(input_cfg, self%exchange)
+    if (present(meteo_cfg)) call self%meteo%configure(meteo_cfg, self%exchange)
+    if (present(mpr_cfg)) call self%mpr%configure(mpr_cfg, self%exchange)
+    if (present(mhm_cfg)) call self%mhm%configure(mhm_cfg, self%exchange)
+    if (present(mrm_cfg)) call self%mrm%configure(mrm_cfg, self%exchange)
     ! connect
-    if (self%input%config%active) call self%input%connect(self%exchange)
-    if (self%meteo%config%active) call self%meteo%connect(self%exchange)
-    if (self%mpr%config%active) call self%mpr%connect(self%exchange)
-    if (self%mhm%config%active) call self%mhm%connect(self%exchange)
-    if (self%mrm%config%active) call self%mrm%connect(self%exchange)
-  end subroutine domain_init
+    if (self%input%config%active) call self%input%connect()
+    if (self%meteo%config%active) call self%meteo%connect()
+    if (self%mpr%config%active) call self%mpr%connect()
+    if (self%mhm%config%active) call self%mhm%connect()
+    if (self%mrm%config%active) call self%mrm%connect()
+  end subroutine domain_configure
 
-  subroutine domain_prepare(self, parameters)
+  !> \brief Initialize the domain and do the initial state calculations in the components.
+  subroutine domain_initialize(self, parameters)
     class(domain_t), intent(inout) :: self
     !> a set of global parameter (gamma) to run mHM, DIMENSION [no. of global_Parameters]
     real(dp), dimension(:), optional, intent(in) :: parameters
-    call message(" ... prepare domain")
+    call message(" ... initialize domain")
     call self%exchange%parameters%set(parameters)
-    if (self%input%config%active) call self%input%prepare(self%exchange)
-    if (self%meteo%config%active) call self%meteo%prepare(self%exchange)
-    if (self%mpr%config%active) call self%mpr%prepare(self%exchange)
-    if (self%mhm%config%active) call self%mhm%prepare(self%exchange)
-    if (self%mrm%config%active) call self%mrm%prepare(self%exchange)
-  end subroutine domain_prepare
+    if (self%input%config%active) call self%input%initialize()
+    if (self%meteo%config%active) call self%meteo%initialize()
+    if (self%mpr%config%active) call self%mpr%initialize()
+    if (self%mhm%config%active) call self%mhm%initialize()
+    if (self%mrm%config%active) call self%mrm%initialize()
+  end subroutine domain_initialize
 
   subroutine domain_update(self)
     class(domain_t), intent(inout) :: self
     call self%exchange%time%add(self%exchange%step)
     self%exchange%step_count = self%exchange%step_count + 1_i4
-    if (self%input%config%active) call self%input%update(self%exchange)
-    if (self%meteo%config%active) call self%meteo%update(self%exchange)
-    if (self%mpr%config%active) call self%mpr%update(self%exchange)
-    if (self%mhm%config%active) call self%mhm%update(self%exchange)
-    if (self%mrm%config%active) call self%mrm%update(self%exchange)
+    if (self%input%config%active) call self%input%update()
+    if (self%meteo%config%active) call self%meteo%update()
+    if (self%mpr%config%active) call self%mpr%update()
+    if (self%mhm%config%active) call self%mhm%update()
+    if (self%mrm%config%active) call self%mrm%update()
   end subroutine domain_update
 
   subroutine domain_finalize(self)

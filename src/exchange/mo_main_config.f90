@@ -109,8 +109,8 @@ module mo_main_config
     real(dp), dimension(:), allocatable :: values
     integer(i4) :: nGeoUnits !< Number of geological formations
   contains
-    procedure :: init => parameters_init
-    procedure :: create => parameters_create
+    procedure :: configure => parameters_configure
+    procedure :: initialize => parameters_initialize
     procedure :: set => parameters_set
     procedure :: get => parameters_get
     procedure :: get_process => parameters_get_process
@@ -123,7 +123,7 @@ contains
   subroutine main_config_read(self, file)
     class(main_config_t), intent(inout) :: self
     character(*), intent(in) :: file !< file containing the namelists
-    call message(" ... config main: ", file)
+    call message(" ... read config main: ", file)
     self%file = file
     call self%mainconfig%read(file)
   end subroutine main_config_read
@@ -132,7 +132,7 @@ contains
   subroutine parameter_config_read(self, file)
     class(parameter_config_t), intent(inout) :: self
     character(*), intent(in) :: file !< file containing the namelists
-    call message(" ... config parameter: ", file)
+    call message(" ... read config parameter: ", file)
     ! all parameter namelists have a "status" attribute to indicate if the namelist was present
     self%file = file
     call self%interception1%read(file)
@@ -161,21 +161,21 @@ contains
   subroutine process_config_read(self, file)
     class(process_config_t), intent(inout) :: self
     character(*), intent(in) :: file !< file containing the namelists
-    call message(" ... config process: ", file)
+    call message(" ... read config process: ", file)
     self%file = file
     call self%processselection%read(file)
   end subroutine process_config_read
 
-  !> \brief Initialize the mRM process container.
-  subroutine parameters_init(self, parameter_cfg, process_cfg)
+  !> \brief Configure the mRM process container.
+  subroutine parameters_configure(self, parameter_cfg, process_cfg)
     class(parameters_t), intent(inout) :: self
     type(parameter_config_t), intent(in) :: parameter_cfg !< parameters configuration
     type(process_config_t), intent(in) :: process_cfg !< process configuration
-    call message(" ... init parameters")
+    call message(" ... configure parameters")
     self%config = parameter_cfg
     self%process_config = process_cfg
-    call self%create()
-  end subroutine parameters_init
+    call self%initialize()
+  end subroutine parameters_configure
 
   !>       \brief Configure parameters
   !>       \authors Stephan Thober
@@ -185,7 +185,7 @@ contains
   ! Stephan Thober  Oct 2015 - added NLoutputResults namelist, fileLatLon to directories_general namelist, and readLatLon flag
   ! Robert Schweppe Dec 2017 - adapted for MPR
   !  Rohini Kumar   Oct 2021 - Added Neutron count module to mHM integrate into develop branch (5.11.2)
-  subroutine parameters_create(self)
+  subroutine parameters_initialize(self)
 
     use mo_append, only : append
     use mo_common_constants, only : nColPars
@@ -823,10 +823,10 @@ contains
     ! set default values
     self%values = self%definition(:, 3)
 
-  end subroutine parameters_create
+  end subroutine parameters_initialize
 
   !> set parameters from optimizer
-  subroutine parameters_set(self,  parameters)
+  subroutine parameters_set(self, parameters)
     class(parameters_t), intent(inout) :: self
     real(dp), dimension(:), optional, intent(in) :: parameters !< parameter values
     if (present(parameters)) then
@@ -838,7 +838,7 @@ contains
   end subroutine parameters_set
 
   !> get parameter by name
-  real(dp) function parameters_get(self,  name)
+  real(dp) function parameters_get(self, name)
     class(parameters_t), intent(in) :: self
     character(*), intent(in) ::  name !< parameter name
     integer(i4) :: i
