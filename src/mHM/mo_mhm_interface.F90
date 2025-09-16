@@ -250,10 +250,10 @@ contains
 
   !> \brief Run mHM with current settings.
   subroutine mhm_interface_run()
-    use mo_common_variables, only: &
 #ifdef MPI
-      domainMeta, &
+    use mo_common_variables, only: domainMeta
 #endif
+    use mo_common_variables, only: &
       itimer, &
       global_parameters
     use mo_timer, only: &
@@ -300,10 +300,16 @@ contains
 
   !> \brief Run mHM optimization with current settings.
   subroutine mhm_interface_run_optimization()
-    use mo_common_variables, only: &
 #ifdef MPI
-      domainMeta, &
+    use mo_common_variables, only: domainMeta
+    use mo_objective_function, only: &
+      objective_subprocess, &
+      objective_master
+    use mo_mrm_objective_function_runoff, only: &
+      single_objective_runoff_master, &
+      single_objective_runoff_subprocess
 #endif
+    use mo_common_variables, only: &
       itimer, &
       dirConfigOut, &
       global_parameters,&
@@ -316,19 +322,9 @@ contains
       timer_stop, &
       timer_get
     use mo_mhm_eval, only: mhm_eval
-    use mo_objective_function, only: &
-#ifdef MPI
-      objective_subprocess, &
-      objective_master, &
-#endif
-      objective
+    use mo_objective_function, only: objective
     use mo_optimization, only: optimization
-    use mo_mrm_objective_function_runoff, only: &
-#ifdef MPI
-      single_objective_runoff_master, &
-      single_objective_runoff_subprocess, &
-#endif
-      single_objective_runoff
+    use mo_mrm_objective_function_runoff, only: single_objective_runoff
     use mo_write_ascii, only: &
       write_optifile, &      ! Writing optimized parameter set and objective
       write_optinamelist     ! Writing optimized parameter set to a namelist
@@ -420,10 +416,10 @@ contains
 
   !> \brief Write mHM restart.
   subroutine mhm_interface_finalize()
-    use mo_common_variables, only: &
 #ifdef MPI
-      domainMeta, &
+    use mo_common_variables, only: domainMeta
 #endif
+    use mo_common_variables, only: &
       itimer, &
       mhmFileRestartOut, &
       write_restart, &
