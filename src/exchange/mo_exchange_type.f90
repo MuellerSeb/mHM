@@ -34,13 +34,13 @@ module mo_exchange_type
   private
 
   !> \name Level Selectors
-  !> \brief Constants to specify the grid for levels in mHM: L0, L1, L2 and L11.
+  !> \brief Constants to specify the grid for levels in mHM: L0, L1, L2 and L3.
   !!@{
   integer(i4), public, parameter :: nogrid = -1_i4 !< no grid (yet) defined
   integer(i4), public, parameter :: l0 = 0_i4      !< level0 - morphology
   integer(i4), public, parameter :: l1 = 1_i4      !< level1 - hydrology
   integer(i4), public, parameter :: l2 = 2_i4      !< level2 - meteorology
-  integer(i4), public, parameter :: l11 = 3_i4     !< level11 - routing
+  integer(i4), public, parameter :: l3 = 3_i4      !< level3 - routing
   !!@}
 
   !> \class   time_config_t
@@ -117,10 +117,16 @@ module mo_exchange_type
     integer(i4) :: domain               !< Number of this domain
 
     ! grids
-    type(grid_t), pointer :: level0  => null() !< level0 grid of the morphology
-    type(grid_t), pointer :: level1  => null() !< level1 grid of the hydrology
-    type(grid_t), pointer :: level2  => null() !< level2 grid of the meteorology
-    type(grid_t), pointer :: level11 => null() !< level11 grid of the river network
+    type(grid_t), pointer :: level0 => null() !< level0 grid of the morphology
+    type(grid_t), pointer :: level1 => null() !< level1 grid of the hydrology
+    type(grid_t), pointer :: level2 => null() !< level2 grid of the meteorology
+    type(grid_t), pointer :: level3 => null() !< level3 grid of the river network
+
+    ! grid resolutions (for deriving grids after configuration)
+    real(dp) :: level0_resolution = -1.0_dp !< level0 resolution of the morphology
+    real(dp) :: level1_resolution = -1.0_dp !< level1 resolution of the hydrology
+    real(dp) :: level2_resolution = -1.0_dp !< level2 resolution of the meteorology
+    real(dp) :: level3_resolution = -1.0_dp !< level3 resolution of the river network
 
     ! variables
     ! raw meteorology (level2)
@@ -221,12 +227,12 @@ module mo_exchange_type
     type(var2d_dp) :: lattice_water     !< Ratio of structurally bound water [g g-1] on level l1
     type(var2d_dp) :: cosmic_l3         !< cosmic L3 parameter [g cm-2] on level l1
 
-    ! routing (level11)
-    type(var_dp) :: q_out               !< accumulated runoff [m3 s-1] on level l11
-    type(var_dp) :: q_mod               !< modelled discharge [m3 s-1] on level l11
-    type(var_dp) :: e_out               !< accumulated source energy [W] on level l11
-    type(var_dp) :: e_mod               !< modelled routed energy [W] on level l11
-    type(var_dp) :: river_temp          !< simulated river temperature [degC] on level l11
+    ! routing (level3)
+    type(var_dp) :: q_out               !< accumulated runoff [m3 s-1] on level L3
+    type(var_dp) :: q_mod               !< modelled discharge [m3 s-1] on level L3
+    type(var_dp) :: e_out               !< accumulated source energy [W] on level L3
+    type(var_dp) :: e_mod               !< modelled routed energy [W] on level L3
+    type(var_dp) :: river_temp          !< simulated river temperature [degC] on level L3
 
     ! groundwater (level0)
     type(var_dp) :: riverhead           !< simulated riverhead [m] on level l0
@@ -376,12 +382,12 @@ contains
     self%lattice_water     = var2d_dp(grid=l1, name="lattice_water",     units="g g-1",             long_name="Ratio of structurally bound water")
     self%cosmic_l3         = var2d_dp(grid=l1, name="cosmic_l3",         units="g cm-2",            long_name="cosmic L3 parameter")
 
-    ! routing (level11)
-    self%q_out             =   var_dp(grid=l11, name="q_out",            units="m3 s-1",            long_name="accumulated runoff")
-    self%q_mod             =   var_dp(grid=l11, name="q_mod",            units="m3 s-1",            long_name="modelled discharge")
-    self%e_out             =   var_dp(grid=l11, name="e_out",            units="W",                 long_name="accumulated source energy")
-    self%e_mod             =   var_dp(grid=l11, name="e_mod",            units="W",                 long_name="modelled routed energy")
-    self%river_temp        =   var_dp(grid=l11, name="river_temp",       units="degC",              long_name="simulated river temperature")
+    ! routing (level3)
+    self%q_out             =   var_dp(grid=l3, name="q_out",            units="m3 s-1",            long_name="accumulated runoff")
+    self%q_mod             =   var_dp(grid=l3, name="q_mod",            units="m3 s-1",            long_name="modelled discharge")
+    self%e_out             =   var_dp(grid=l3, name="e_out",            units="W",                 long_name="accumulated source energy")
+    self%e_mod             =   var_dp(grid=l3, name="e_mod",            units="W",                 long_name="modelled routed energy")
+    self%river_temp        =   var_dp(grid=l3, name="river_temp",       units="degC",              long_name="simulated river temperature")
 
     ! groundwater (level0)
     self%riverhead         =   var_dp(grid=l0,  name="riverhead",        units="m",                 long_name="simulated riverhead")
@@ -391,7 +397,7 @@ contains
   subroutine exchange_get_grid(self, selector, grid)
     use mo_message, only: error_message
     class(exchange_t), intent(in) :: self
-    integer(i4), intent(in) :: selector !< level selector (0: l0, 1: l1, 2: l2, 3: l11, -1: nogrid)
+    integer(i4), intent(in) :: selector !< level selector (0: L0, 1: L1, 2: L2, 3: L3, -1: nogrid)
     type(grid_t), pointer, intent(out) :: grid !< resulting pointer to the selected grid
     select case(selector)
       case(nogrid)
@@ -402,8 +408,8 @@ contains
         grid => self%level1
       case(l2)
         grid => self%level2
-      case(l11)
-        grid => self%level11
+      case(l3)
+        grid => self%level3
       case default
         call error_message("exchange%get_grid: unknown grid selector '", n2s(selector), "'.")
     end select
@@ -413,7 +419,7 @@ contains
   logical function exchange_has_grid(self, selector)
     use mo_message, only: error_message
     class(exchange_t), intent(in) :: self
-    integer(i4), intent(in) :: selector !< level selector (0: l0, 1: l1, 2: l2, 3: l11, -1: nogrid)
+    integer(i4), intent(in) :: selector !< level selector (0: l0, 1: l1, 2: l2, 3: L3, -1: nogrid)
     select case(selector)
       case(l0)
         exchange_has_grid = associated(self%level0)
@@ -421,8 +427,8 @@ contains
         exchange_has_grid = associated(self%level1)
       case(l2)
         exchange_has_grid = associated(self%level2)
-      case(l11)
-        exchange_has_grid = associated(self%level11)
+      case(l3)
+        exchange_has_grid = associated(self%level3)
       case default
         exchange_has_grid = .false.
     end select
@@ -601,7 +607,7 @@ contains
         var_pnt => self%lattice_water
       case("cosmic_l3")
         var_pnt => self%cosmic_l3
-      ! routing (level11)
+      ! routing (level3)
       case("q_out")
         var_pnt => self%q_out
       case("q_mod")
