@@ -23,6 +23,7 @@ Python bindings of mHM.
 #             - access to internal variables
 
 from . import cli, download
+from .cli import __version__
 from .download import download_test
 from .tools import (
     get_mask,
@@ -33,7 +34,6 @@ from .tools import (
     set_meteo,
 )
 from .wrapper import get, model, run, set
-from .cli import __version__
 
 
 def __getattr__(name):

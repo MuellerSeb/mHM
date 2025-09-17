@@ -55,7 +55,7 @@ def mhm():  # pragma: no cover
         "-r", "--mrm_output", default="mrm_outputs.nml", help="The mRM output namelist."
     )
     parser.add_argument(
-        "-q", "--quiet", action='count', default=0, help="Decrease verbosity level."
+        "-q", "--quiet", action="count", default=0, help="Decrease verbosity level."
     )
     parser.add_argument(
         "cwd", nargs="?", default=".", help="The desired working directory."
@@ -63,7 +63,7 @@ def mhm():  # pragma: no cover
 
     args = parser.parse_args()
     # set verbosity
-    model.set_verbosity(level=2-args.quiet)
+    model.set_verbosity(level=2 - args.quiet)
     # init model
     model.init(
         namelist_mhm=args.nml,
