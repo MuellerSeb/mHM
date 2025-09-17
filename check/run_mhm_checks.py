@@ -68,6 +68,8 @@ MATCH_VARS = {
     # "L11_nLinkFracFPimp": "L11_FracFPimp",
 }
 IGNORE_VARS = [
+    "northing_bnds",  # bounds order may changed (only cf convention relevant)
+    "lat_bnds",  # bounds order may changed (only cf convention relevant)
     "ProcessMatrix",  # fails if new process is added
     # "L1_basin_lat",
     # "L11_basin_lat",
