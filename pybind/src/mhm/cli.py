@@ -63,7 +63,7 @@ def mhm():  # pragma: no cover
 
     args = parser.parse_args()
     # set verbosity
-    model.set_verbosity(level=2 - args.quiet)
+    model.set_verbosity(level=3 - args.quiet)
     # init model
     model.init(
         namelist_mhm=args.nml,
