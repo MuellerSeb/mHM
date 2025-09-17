@@ -71,6 +71,7 @@ IGNORE_VARS = [
     "northing_bnds",  # bounds order may changed (only cf convention relevant)
     "lat_bnds",  # bounds order may changed (only cf convention relevant)
     "ProcessMatrix",  # fails if new process is added
+    "L11_aFloodPlain",  # is not calculated for routing case 2 and 3 anymore
     # "L1_basin_lat",
     # "L11_basin_lat",
     # "L1_basin_lon",
