@@ -28,20 +28,20 @@ maxDegreeDayFactor_pervious        =  0.0000,      8.0000,           4.0,     1,
 ! soilmoisture
 &soilmoisture1
 ! organic matter content [%] for forest, impervious and pervious
-orgMatterContent_forest            =  0.0000,      20.000,           3.4,     1,       1
-orgMatterContent_impervious        =  0.0000,      1.0000,           0.1,     1,       1
-orgMatterContent_pervious          =  0.0000,      4.0000,           0.6,     1,       1
+orgMatterContent_forest            =  5.0000,     10.0000,           7.0,     1,       1
+orgMatterContent_impervious        =  0.0000,      1.0000,           0.5,     1,       1
+orgMatterContent_pervious          =  1.0000,      5.0000,           2.5,     1,       1
 ! Zacharias PTF parameters below and above 66.5 % sand content (Zacharias et al., 2007, doi:10.2136/sssaj2006.0098)
 ! constant
-PTF_lower66_5_constant             =  0.6462,      0.9506,          0.76,     1,       1
+PTF_lower66_5_constant             =  0.7500,      0.8000,     7.880E-01,     1,       1
 ! multiplier for clay constant
-PTF_lower66_5_clay                 =  0.0001,      0.0029,        0.0009,     1,       1
+PTF_lower66_5_clay                 =  0.0008,      0.0012,     1.000E-03,     1,       1
 ! multiplier for mineral bulk density
-PTF_lower66_5_Db                   = -0.3727,     -0.1871,        -0.264,     1,       1
+PTF_lower66_5_Db                   = -0.2700,     -0.2500,    -2.630E-01,     1,       1
 ! same as lower
-PTF_higher66_5_constant            =  0.5358,      1.1232,          0.89,     1,       1
-PTF_higher66_5_clay                = -0.0055,      0.0049,        -0.001,     1,       1
-PTF_higher66_5_Db                  = -0.5513,     -0.0913,        -0.324,     1,       1
+PTF_higher66_5_constant            =  0.8000,      0.9000,     8.907E-01,     1,       1
+PTF_higher66_5_clay                = -0.0012,     -0.0008,    -1.000E-03,     1,       1
+PTF_higher66_5_Db                  = -0.3500,     -0.3000,    -3.220E-01,     1,       1
 ! PTF parameters for saturated hydraulic conductivity after Cosby et al. (1984)
 ! constant
 PTF_Ks_constant                    = -1.2000,     -0.2850,        -0.585,     1,       1

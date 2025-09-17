@@ -37,9 +37,7 @@ contains
   subroutine mhm_interface_init(namelist_mhm, namelist_mhm_param, namelist_mhm_output, namelist_mrm_output, cwd)
     use mo_file, only: &
       file_namelist_mhm, &
-      unamelist_mhm, &
       file_namelist_mhm_param, &
-      unamelist_mhm_param, &
       file_defOutput
     use mo_mrm_file, only: mrm_file_defOutput => file_defOutput
     use mo_common_read_config, only: &
@@ -75,9 +73,6 @@ contains
       timer_stop, &
       timer_get
     use mo_startup, only: mhm_initialize
-    use mo_file, only: &
-      unamelist_mhm, &
-      unamelist_mhm_param
     use mo_global_variables, only: &
       couple_cfg, &
       meteo_handler, &
@@ -118,17 +113,17 @@ contains
     call startup_message()
 
     ! coupling configuration
-    call couple_cfg%read_config(file_namelist_mhm, unamelist_mhm)
+    call couple_cfg%read_config(file_namelist_mhm)
     ! read configs
-    call common_read_config(file_namelist_mhm, unamelist_mhm)
-    call mpr_read_config(file_namelist_mhm, unamelist_mhm, file_namelist_mhm_param, unamelist_mhm_param)
-    call common_mHM_mRM_read_config(file_namelist_mhm, unamelist_mhm)
-    call mhm_read_config(file_namelist_mhm, unamelist_mhm)
+    call common_read_config(file_namelist_mhm)
+    call mpr_read_config(file_namelist_mhm, file_namelist_mhm_param)
+    call common_mHM_mRM_read_config(file_namelist_mhm)
+    call mhm_read_config(file_namelist_mhm)
     call couple_cfg%check(domainMeta, optimize)
-    call meteo_handler%config(file_namelist_mhm, unamelist_mhm, optimize, domainMeta, processMatrix, timestep, couple_cfg)
+    call meteo_handler%config(file_namelist_mhm, optimize, domainMeta, processMatrix, timestep, couple_cfg)
     mrm_coupling_mode = 2_i4 ! TODO: this shouldn't be needed
-    call mrm_configuration(file_namelist_mhm, unamelist_mhm, file_namelist_mhm_param, unamelist_mhm_param)
-    call check_optimization_settings()
+    call mrm_configuration(file_namelist_mhm, file_namelist_mhm_param)
+    if (optimize) call check_optimization_settings()
 
     ! Message about input directories
     call domain_dir_check_message()
@@ -171,7 +166,7 @@ contains
     call timer_stop(itimer)
     call message('  in ', trim(num2str(timer_get(itimer), '(F9.3)')), ' seconds.')
     if (processMatrix(8, 1) > 0) &
-        call mrm_init(file_namelist_mhm, unamelist_mhm, file_namelist_mhm_param, unamelist_mhm_param)
+        call mrm_init(file_namelist_mhm, file_namelist_mhm_param)
 
     itimer = itimer + 1
     call message('  Read forcing and optional data ...')
@@ -255,10 +250,10 @@ contains
 
   !> \brief Run mHM with current settings.
   subroutine mhm_interface_run()
-    use mo_common_variables, only: &
 #ifdef MPI
-      domainMeta, &
+    use mo_common_variables, only: domainMeta
 #endif
+    use mo_common_variables, only: &
       itimer, &
       global_parameters
     use mo_timer, only: &
@@ -305,10 +300,16 @@ contains
 
   !> \brief Run mHM optimization with current settings.
   subroutine mhm_interface_run_optimization()
-    use mo_common_variables, only: &
 #ifdef MPI
-      domainMeta, &
+    use mo_common_variables, only: domainMeta
+    use mo_objective_function, only: &
+      objective_subprocess, &
+      objective_master
+    use mo_mrm_objective_function_runoff, only: &
+      single_objective_runoff_master, &
+      single_objective_runoff_subprocess
 #endif
+    use mo_common_variables, only: &
       itimer, &
       dirConfigOut, &
       global_parameters,&
@@ -321,19 +322,9 @@ contains
       timer_stop, &
       timer_get
     use mo_mhm_eval, only: mhm_eval
-    use mo_objective_function, only: &
-#ifdef MPI
-      objective_subprocess, &
-      objective_master, &
-#endif
-      objective
+    use mo_objective_function, only: objective
     use mo_optimization, only: optimization
-    use mo_mrm_objective_function_runoff, only: &
-#ifdef MPI
-      single_objective_runoff_master, &
-      single_objective_runoff_subprocess, &
-#endif
-      single_objective_runoff
+    use mo_mrm_objective_function_runoff, only: single_objective_runoff
     use mo_write_ascii, only: &
       write_optifile, &      ! Writing optimized parameter set and objective
       write_optinamelist     ! Writing optimized parameter set to a namelist
@@ -425,10 +416,10 @@ contains
 
   !> \brief Write mHM restart.
   subroutine mhm_interface_finalize()
-    use mo_common_variables, only: &
 #ifdef MPI
-      domainMeta, &
+    use mo_common_variables, only: domainMeta
 #endif
+    use mo_common_variables, only: &
       itimer, &
       mhmFileRestartOut, &
       write_restart, &

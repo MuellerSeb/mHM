@@ -15,26 +15,27 @@ on:
 jobs:
   build_sdist:
     name: sdist
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
         with:
           fetch-depth: '0'
 
       - name: Set up Python
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v5
         with:
-          python-version: 3.9
+          python-version: 3.11
 
       - name: Build sdist
         run: |
           python -m pip install --upgrade pip
           pip install build
-          python -m build --sdist
+          python -m build --sdist --outdir dist-sdist .
 
-      - uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@v4
         with:
-          path: dist/*.tar.gz
+          name: dist-sdist
+          path: dist-sdist/*.tar.gz
 
   build_wheels:
     name: wheels for ${{ matrix.cfg.os }} / ${{ matrix.cfg.arch }}
@@ -43,33 +44,69 @@ jobs:
       fail-fast: false
       matrix:
         cfg:
-        - { os: ubuntu-latest, arch: x86_64 }
-        - { os: macos-latest, arch: x86_64 }
+        - { os: ubuntu-24.04, arch: x86_64 }
+        - { os: ubuntu-24.04-arm, arch: aarch64 }
+        - { os: macos-13, arch: x86_64 }
+        - { os: macos-14, arch: arm64 }
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
         with:
           fetch-depth: '0'
 
       - name: Build wheels
-        uses: pypa/cibuildwheel@v2.11.2
+        uses: pypa/cibuildwheel@v3.1.4
         env:
           CIBW_ARCHS: ${{ matrix.cfg.arch }}
         with:
-          output-dir: dist
+          output-dir: dist-wheel-${{ matrix.cfg.os }}-${{ matrix.cfg.arch }}
 
-      - uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@v4
         with:
-          path: ./dist/*.whl
+          name: dist-wheel-${{ matrix.cfg.os }}-${{ matrix.cfg.arch }}
+          path: ./dist-wheel-${{ matrix.cfg.os }}-${{ matrix.cfg.arch }}/*.whl
+
+  test_win_conda:
+    name: win_conda
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: '0'
+
+      - uses: mamba-org/setup-micromamba@v2
+        with:
+          init-shell: cmd.exe
+          environment-name: mhm-env
+          create-args: >-
+            python=3.12
+            numpy
+            gfortran_win-64
+            netcdf-fortran
+            pkg-config
+            pytest-cov
+            xarray
+            netcdf4
+
+      - name: build wheel on win
+        run: |
+          pip install -v .
+          mhm -h
+          mhm -V
+          mhm --pyversion
+          mhm .
+          pytest pybind/tests/
+        shell: cmd /C CALL {0}
 
   upload_to_pypi:
     needs: [build_wheels, build_sdist]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     steps:
-      - uses: actions/download-artifact@v2
+      - uses: actions/download-artifact@v4
         with:
-          name: artifact
+          pattern: dist-*
+          merge-multiple: true
           path: dist
 
       - name: Publish to Test PyPI

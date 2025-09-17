@@ -240,18 +240,17 @@ contains
   end subroutine clean_up
 
   !> \brief configure the \ref meteo_handler_type class from the mhm namelist
-  subroutine config(self, file_namelist, unamelist, optimize, domainMeta, processMatrix, timeStep, couple_cfg)
+  subroutine config(self, file_namelist, optimize, domainMeta, processMatrix, timeStep, couple_cfg)
 
     use mo_common_constants, only : maxNoDomains, nodata_i4
     use mo_common_types, only : domain_meta
-    use mo_nml, only : close_nml, open_nml, position_nml
     use mo_common_variables, only : nProcesses
+    use mo_namelists, only : nml_directories_mhm, nml_nightdayratio
 
     implicit none
 
     class(meteo_handler_type), intent(inout) :: self
     character(*), intent(in) :: file_namelist !< mhm namelist file
-    integer, intent(in) :: unamelist !< unit to open namelist file
     logical, intent(in) :: optimize !< Optimization flag
     type(domain_meta), intent(in) :: domainMeta !< domain general description
     integer(i4), dimension(nProcesses, 3), intent(in) :: processMatrix !< Info about which process runs in which option
@@ -269,41 +268,8 @@ contains
     character(256), dimension(maxNoDomains) :: dir_absVapPressure
     character(256), dimension(maxNoDomains) :: dir_ReferenceET
     character(256), dimension(maxNoDomains) :: dir_Radiation ! riv-temp related
-    character(256) :: inputFormat_meteo_forcings
-
-    logical :: read_meteo_weights, bound_error
-    real(dp), dimension(int(YearMonths, i4)) :: fnight_prec
-    real(dp), dimension(int(YearMonths, i4)) :: fnight_pet
-    real(dp), dimension(int(YearMonths, i4)) :: fnight_temp
-    real(dp), dimension(int(YearMonths, i4)) :: fnight_ssrd
-    real(dp), dimension(int(YearMonths, i4)) :: fnight_strd
 
     integer(i4) :: domainID, iDomain
-
-    ! namelist directories
-    namelist /directories_mHM/ &
-      inputFormat_meteo_forcings, &
-      bound_error, &
-      dir_meteo_header, &
-      dir_Precipitation, &
-      dir_Temperature, &
-      dir_ReferenceET, &
-      dir_MinTemperature, &
-      dir_MaxTemperature, &
-      dir_absVapPressure, &
-      dir_windspeed, &
-      dir_NetRadiation, &
-      dir_Radiation, &
-      time_step_model_inputs
-
-    ! namelist for night-day ratio of precipitation, referenceET and temperature
-    namelist /nightDayRatio/ &
-      read_meteo_weights, &
-      fnight_prec, &
-      fnight_pet, &
-      fnight_temp, &
-      fnight_ssrd, &
-      fnight_strd
 
     ! store coupling config
     self%couple_cfg = couple_cfg
@@ -340,20 +306,24 @@ contains
     ! allocate time periods
     allocate(self%timestep_model_inputs(self%nDomains))
 
-    ! open the namelist file
-    call open_nml(file_namelist, unamelist, quiet=.true.)
-
     !===============================================================
     !  Read namelist main directories
     !===============================================================
-    call set_sentinel(dir_meteo_header) ! set sentinal to check reading
-    inputFormat_meteo_forcings = "nc"
-    bound_error = .TRUE.
-    call position_nml(self%dir_nml_name, unamelist)
-    read(unamelist, nml = directories_mHM)
 
-    self%bound_error = bound_error
-    self%inputFormat_meteo_forcings = inputFormat_meteo_forcings
+    call nml_directories_mHM%read(file_namelist)
+    self%bound_error = nml_directories_mhm%bound_error
+    self%inputFormat_meteo_forcings = nml_directories_mhm%inputFormat_meteo_forcings
+    dir_meteo_header = nml_directories_mhm%dir_meteo_header
+    dir_Precipitation = nml_directories_mHM%dir_Precipitation
+    dir_Temperature = nml_directories_mHM%dir_Temperature
+    dir_ReferenceET = nml_directories_mHM%dir_ReferenceET
+    dir_MinTemperature = nml_directories_mHM%dir_MinTemperature
+    dir_MaxTemperature = nml_directories_mHM%dir_MaxTemperature
+    dir_absVapPressure = nml_directories_mHM%dir_absVapPressure
+    dir_windspeed = nml_directories_mHM%dir_windspeed
+    dir_NetRadiation = nml_directories_mHM%dir_NetRadiation
+    dir_Radiation = nml_directories_mHM%dir_Radiation
+    time_step_model_inputs = nml_directories_mHM%time_step_model_inputs
 
     do iDomain = 1, self%nDomains
       domainID = self%indices(iDomain)
@@ -388,30 +358,21 @@ contains
     !===============================================================
     ! Read night-day ratios and pan evaporation
     !===============================================================
-    ! default values for long/shortwave rad.
-    fnight_ssrd = 0.0_dp
-    fnight_strd = 0.45_dp
 
-    ! namelist for night-day ratio of precipitation, referenceET and temperature
-    call position_nml(self%weight_nml_name, unamelist)
-    read(unamelist, nml = nightDayRatio)
-    self%read_meteo_weights = read_meteo_weights
-    self%fnight_prec = fnight_prec
-    self%fnight_pet = fnight_pet
-    self%fnight_temp = fnight_temp
-    self%fnight_ssrd = fnight_ssrd
-    self%fnight_strd = fnight_strd
+    call nml_nightDayRatio%read(file_namelist)
+    self%read_meteo_weights = nml_nightDayRatio%read_meteo_weights
+    self%fnight_prec = nml_nightDayRatio%fnight_prec
+    self%fnight_pet = nml_nightDayRatio%fnight_pet
+    self%fnight_temp = nml_nightDayRatio%fnight_temp
+    self%fnight_ssrd = nml_nightDayRatio%fnight_ssrd
+    self%fnight_strd = nml_nightDayRatio%fnight_strd
     self%fday_prec = 1.0_dp - self%fnight_prec
     self%fday_pet = 1.0_dp - self%fnight_pet
     self%fday_temp = -1.0_dp * self%fnight_temp
     self%fday_ssrd = 1.0_dp - self%fnight_ssrd
     self%fday_strd = 1.0_dp - self%fnight_strd
 
-    ! TODO-RIV-TEMP:
-    ! - add short- and long-wave raidiation weights (nc files)
-
-    ! closing the namelist file
-    call close_nml(unamelist)
+    ! TODO-RIV-TEMP: add short- and long-wave raidiation weights (nc files)
 
     ! check coupling configuration matching process cases
     self%couple_is_hourly = .false.
@@ -504,9 +465,9 @@ contains
   !> \brief Initialize meteo data and level-2 grid
   subroutine init_level2(self, level0, level1)
 
-    use mo_grid, only : set_domain_indices
+    use mo_common_grid, only : set_domain_indices
     use mo_common_types, only : grid
-    use mo_grid, only : init_lowres_level
+    use mo_common_grid, only : init_lowres_level
     use mo_read_spatial_data, only : read_header_ascii
     use mo_string_utils, only : num2str
 

@@ -1,14 +1,14 @@
 [build-system]
 requires = [
-    "scikit_build_core[pyproject]>=0.5,<0.6",
-    "setuptools_scm[toml]>=7,<8",
-    "oldest_supported_numpy",
+    "scikit_build_core>=0.11,<0.12",
+    "setuptools_scm>=8",
+    "numpy>=2.0,<3",
     "fypp",
 ]
 build-backend = "scikit_build_core.build"
 
 [project]
-requires-python = ">=3.8"
+requires-python = ">=3.9"
 name = "mhm"
 description = "Python distribution of mHM with bindings."
 authors = [{name = "mHM Developers", email = "mhm-admin@ufz.de"}]
@@ -29,10 +29,12 @@ classifiers = [
     "Programming Language :: Python",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3 :: Only",
-    "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Topic :: Scientific/Engineering",
     "Topic :: Scientific/Engineering :: Hydrology",
     "Topic :: Scientific/Engineering :: Mathematics",
@@ -61,17 +63,18 @@ mhm = "mhm.cli:mhm"
 mhm-download = "mhm.download:cli"
 
 [tool.scikit-build]
-minimum-version = "0.5"
+minimum-version = "build-system.requires"
 metadata.version.provider = "scikit_build_core.metadata.setuptools_scm"
 wheel.packages = ["pybind/src/mhm"]
 
 [tool.scikit-build.ninja]
-minimum-version = "1.11"
+version = ">=1.11"
 make-fallback = false
 
 [tool.scikit-build.cmake]
-minimum-version = "3.26.1"
+version = ">=3.26.1"
 build-type = "Release"
+args = ["-GNinja"]
 
 [tool.scikit-build.cmake.define]
 BUILD_MHM_PYBIND = "ON"
@@ -115,7 +118,7 @@ search_parent_directories = true
 
 [tool.black]
 exclude = "_version.py"
-target-version = ["py38"]
+target-version = ["py39"]
 
 [tool.isort]
 profile = "black"
@@ -130,17 +133,28 @@ exclude_lines = ["pragma: no cover"]
 show_missing = true
 
 [tool.cibuildwheel]
-# Super-verbose output for debugging purpose
-build-verbosity = 3
-# skip py37, pypy and musl
-skip = ["cp37*", "pp*", "*-musllinux_*"]
+# verbose output for debugging purpose
+build-verbosity = 1
+# skip py38, musl and free-threaded versions
+skip = ["cp38*", "*-musllinux_*", "cp31?t-*"]
 # check command
-test-command = "mhm -h && mhm {project}"
+test-extras = "test"
+test-command = "mhm -h && python -m pytest pybind/tests/"
+test-sources = ["pybind/tests/", "pyproject.toml"]
+test-skip = "cp314*"  # not all test dependencies have wheels for python 3.14 yet
+# force binary numpy dep
+environment.PIP_ONLY_BINARY = "numpy"
+environment.PIP_PREFER_BINARY = "1"
 
 [tool.cibuildwheel.linux]
 environment = { FC="gfortran", F77="gfortran", CC="gcc", CXX="g++" }
 before-all = "source CI-scripts/install-deps -c -p /usr"
 
 [tool.cibuildwheel.macos]
-environment = { FC="gfortran-11", F77="gfortran-11", CC="gcc-11", CXX="g++-11" }
-before-all = "source CI-scripts/install-deps -s -p /opt/local"
+environment = { FC="gfortran-14", F77="gfortran-14", CC="gcc-14", CXX="g++-14", MACOSX_DEPLOYMENT_TARGET="13.0" }
+before-all = "source CI-scripts/install-deps -s -p /opt/local" # "brew install netcdf-fortran"
+
+[[tool.cibuildwheel.overrides]]
+select = "*-macosx_arm64"
+inherit.environment = "append"
+environment.MACOSX_DEPLOYMENT_TARGET = "14.0"

@@ -5,8 +5,8 @@
 ;
 [subrepo]
 	remote = https://git.ufz.de/chs/HPC-Fortran-module-loads.git
-	branch = v2.1
-	commit = 7767f2ba073dc1978d98bcb9ce952ffd576ef8d7
-	parent = 4bc096906254b4b7a981cb5d8c11c23ef9e0024a
+	branch = v2.2
+	commit = 95ea68e669d0c9e3268ab59c319f11f11acca287
+	parent = 3f115ccf46b1fd3e18491bebca0fa22c49fe4612
 	method = merge
-	cmdver = 0.4.1
+	cmdver = 0.4.3

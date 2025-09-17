@@ -38,13 +38,13 @@ module mo_common_variables
   ! -------------------------------------------------------------------
   ! PROJECT DESCRIPTION for the NETCDF output file
   ! -------------------------------------------------------------------
-  character(1024), public :: project_details            ! project including funding instituion., PI, etc.
-  character(1024), public :: setup_description          ! any specific description of simulation
-  character(1024), public :: simulation_type            ! e.g. seasonal forecast, climate projection, ...
-  character(256), public :: Conventions                ! convention used for dataset
-  character(1024), public :: contact                    ! contact details, incl. PI name
-  character(1024), public :: mHM_details                ! developing institution, specific mHM revision
-  character(1024), public :: history                    ! details on version/creation date
+  character(1024), public :: project_details            !< project including funding instituion., PI, etc.
+  character(1024), public :: setup_description          !< any specific description of simulation
+  character(1024), public :: simulation_type            !< e.g. seasonal forecast, climate projection, ...
+  character(256), public :: Conventions                 !< convention used for dataset
+  character(1024), public :: contact                    !< contact details, incl. PI name
+  character(1024), public :: mHM_details                !< developing institution, specific mHM revision
+  character(1024), public :: history                    !< details on version/creation date
 
   ! -------------------------------------------------------------------
   ! INPUT variables for configuration of main part

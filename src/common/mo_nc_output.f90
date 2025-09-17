@@ -301,7 +301,7 @@ contains
   function createOutputFile(iDomain, level, file_name, double_precision, outputs_frequence, time_reference) result(nc)
 
     use mo_common_mhm_mrm_variables, only : evalPer
-    use mo_grid, only : geoCoordinates, mapCoordinates
+    use mo_common_grid, only : geoCoordinates, mapCoordinates
     use mo_julian, only : dec2date
 
     implicit none

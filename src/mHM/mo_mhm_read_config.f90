@@ -44,7 +44,6 @@ CONTAINS
 
   !    INTENT(IN)
   !>       \param[in] "character(*) :: file_namelist"
-  !>       \param[in] "integer :: unamelist"
 
   !    HISTORY
   !>       \authors Matthias Zink
@@ -86,13 +85,18 @@ CONTAINS
   ! Robert Schweppe              Dec  2017 - switched from fractional julian day to integer
   ! Robert Schweppe              Jun  2018 - refactoring and reformatting
 
-  subroutine mhm_read_config(file_namelist, unamelist)
+  subroutine mhm_read_config(file_namelist)
 
+    use mo_namelists, only : &
+      nml_optional_data, &
+      nml_panEvapo, &
+      nml_NLoutputResults, &
+      nml_baseflow_config
     use mo_common_constants, only : maxNoDomains, nodata_i4
     use mo_common_mHM_mRM_read_config, only : common_check_resolution
     use mo_common_mhm_mrm_variables, only : opti_function, optimize
     use mo_common_variables, only : domainMeta, processMatrix
-    use mo_file, only : file_defOutput, udefOutput
+    use mo_file, only : file_defOutput
     use mo_global_variables, only : &
       L1_twsaObs, L1_etObs, L1_smObs, L1_neutronsObs, &
       evap_coeff, &
@@ -102,14 +106,11 @@ CONTAINS
       BFI_calc, BFI_obs
     use mo_mpr_constants, only : maxNoSoilHorizons
     use mo_mpr_global_variables, only : nSoilHorizons_mHM
-    use mo_nml, only : close_nml, open_nml, position_nml
     use mo_string_utils, only : num2str
 
     implicit none
 
     character(*), intent(in) :: file_namelist
-
-    integer, intent(in) :: unamelist
 
     integer(i4) :: iDomain, domainID
 
@@ -131,55 +132,40 @@ CONTAINS
     integer(i4) :: timeStep_neutrons_input    ! time step of optional data: neutrons
 
 
-    ! define namelists
-    ! optional data used for optimization
-    namelist /optional_data/ &
-            dir_soil_moisture, &
-            nSoilHorizons_sm_input, &
-            dir_neutrons, &
-            dir_evapotranspiration, &
-            dir_TWS, &
-            timeStep_sm_input, &
-            timeStep_neutrons_input, &
-            timeStep_et_input, &
-            timeStep_tws_input
-    ! namelist for pan evaporation
-    namelist /panEvapo/evap_coeff
-
-    ! name list regarding output
-    namelist /NLoutputResults/ &
-            output_deflate_level, &
-            output_double_precision, &
-            output_time_reference, &
-            timeStep_model_outputs, &
-            outputFlxState
-    ! namelist for baseflow index optimzation
-    namelist /baseflow_config/ BFI_calc, BFI_obs
-
-    !===============================================================
-    !  Read namelist main directories
-    !===============================================================
-    call open_nml(file_namelist, unamelist, quiet = .true.)
-
     allocate(L1_twsaObs(domainMeta%nDomains))
     allocate(L1_etObs(domainMeta%nDomains))
     allocate(L1_smObs(domainMeta%nDomains))
     allocate(L1_neutronsObs(domainMeta%nDomains))
     ! observed baseflow indizes
     allocate(BFI_obs(domainMeta%nDomains))
-    BFI_obs = -1.0_dp  ! negative value to flag missing values
-    BFI_calc = .false.
 
     !===============================================================
     !  Read namelist of optional input data
     !===============================================================
     ! read optional optional data if necessary
     if (optimize) then
+      ! read nml
+      select case (opti_function)
+        case(10 : 13, 15, 17, 27 : 30, 33)
+          call nml_optional_data%read(file_namelist)
+          nSoilHorizons_sm_input = nml_optional_data%nSoilHorizons_sm_input
+          dir_soil_moisture = nml_optional_data%dir_soil_moisture
+          dir_neutrons = nml_optional_data%dir_neutrons
+          dir_evapotranspiration = nml_optional_data%dir_evapotranspiration
+          dir_TWS = nml_optional_data%dir_TWS
+          timeStep_sm_input = nml_optional_data%timeStep_sm_input
+          timeStep_neutrons_input = nml_optional_data%timeStep_neutrons_input
+          timeStep_et_input = nml_optional_data%timeStep_et_input
+          timeStep_tws_input = nml_optional_data%timeStep_tws_input
+        case(34)
+          call nml_baseflow_config%read(file_namelist)
+          BFI_calc = nml_baseflow_config%BFI_calc
+          BFI_obs = nml_baseflow_config%BFI_obs(1:size(BFI_obs))
+      end select
+
       select case (opti_function)
         case(10 : 13, 28)
           ! soil moisture
-          call position_nml('optional_data', unamelist)
-          read(unamelist, nml = optional_data)
           do iDomain = 1, domainMeta%nDomains
             domainID = domainMeta%indices(iDomain)
             L1_smObs(iDomain)%dir = dir_Soil_moisture(domainID)
@@ -192,8 +178,6 @@ CONTAINS
           end if
         case(17)
           ! neutrons
-          call position_nml('optional_data', unamelist)
-          read(unamelist, nml = optional_data)
           do iDomain = 1, domainMeta%nDomains
             domainID = domainMeta%indices(iDomain)
             L1_neutronsObs(iDomain)%dir = dir_neutrons(domainID)
@@ -203,8 +187,6 @@ CONTAINS
           end do
         case(27, 29, 30)
           ! evapotranspiration
-          call position_nml('optional_data', unamelist)
-          read(unamelist, nml = optional_data)
           do iDomain = 1, domainMeta%nDomains
             domainID = domainMeta%indices(iDomain)
             L1_etObs(iDomain)%dir = dir_evapotranspiration(domainID)
@@ -213,8 +195,6 @@ CONTAINS
           end do
         case(15)
           ! domain average TWS data
-          call position_nml('optional_data', unamelist)
-          read(unamelist, nml = optional_data)
           do iDomain = 1, domainMeta%nDomains
             domainID = domainMeta%indices(iDomain)
             L1_twsaObs(iDomain)%dir = dir_TWS(domainID)
@@ -223,29 +203,19 @@ CONTAINS
           end do
         case(33)
           ! evapotranspiration
-          call position_nml('optional_data', unamelist)
-          read(unamelist, nml = optional_data)
           do iDomain = 1, domainMeta%nDomains
             domainID = domainMeta%indices(iDomain)
             L1_etObs(iDomain)%dir = dir_evapotranspiration(domainID)
             L1_etObs(iDomain)%timeStepInput = timeStep_et_input
             L1_etObs(iDomain)%varname = 'et'
           end do
-
           ! domain average TWS data
-          call position_nml('optional_data', unamelist)
-          read(unamelist, nml = optional_data)
           do iDomain = 1, domainMeta%nDomains
             domainID = domainMeta%indices(iDomain)
             L1_twsaObs(iDomain)%dir = dir_TWS(domainID)
             L1_twsaObs(iDomain)%timeStepInput = timeStep_tws_input
             L1_twsaObs(iDomain)%varname = 'twsa'
           end do
-
-        case(34)
-          !baseflow index optimization
-          call position_nml('baseflow_config', unamelist)
-          read(unamelist, nml = baseflow_config)
 
       end select
     end if
@@ -254,24 +224,20 @@ CONTAINS
     ! Read pan evaporation
     !===============================================================
     ! Evap. coef. for free-water surfaces
-    call position_nml('panEvapo', unamelist)
-    read(unamelist, nml = panEvapo)
+    call nml_panEvapo%read(file_namelist)
+    evap_coeff = nml_panEvapo%evap_coeff
 
     call common_check_resolution(.true., .false.)
-
-    call close_nml(unamelist)
 
     !===============================================================
     ! Read output specifications for mHM
     !===============================================================
-    call open_nml(file_defOutput, udefOutput, quiet = .true.)
-    output_deflate_level = 6
-    output_time_reference = 0
-    output_double_precision = .true.
-    outputFlxState = .FALSE.
-    call position_nml('NLoutputResults', udefOutput)
-    read(udefOutput, nml = NLoutputResults)
-    call close_nml(udefOutput)
+    call nml_NLoutputResults%read(file_defOutput)
+    output_deflate_level = nml_NLoutputResults%output_deflate_level
+    output_double_precision = nml_NLoutputResults%output_double_precision
+    timeStep_model_outputs = nml_NLoutputResults%timeStep_model_outputs
+    outputFlxState = nml_NLoutputResults%outputFlxState
+    output_time_reference = nml_NLoutputResults%output_time_reference
 
     call message('')
     call message('Following output will be written:')

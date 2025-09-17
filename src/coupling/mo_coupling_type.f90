@@ -75,47 +75,12 @@ contains
   end subroutine clean_up
 
   !> \brief read configuration for the \ref couple_cfg_type class from the mhm namelist
-  subroutine read_config(self, file_namelist, unamelist)
-    use mo_nml, only : close_nml, open_nml, position_nml
+  subroutine read_config(self, file_namelist)
+    use mo_namelists, only: nml_coupling
     implicit none
 
     class(couple_cfg_type), intent(inout) :: self
     character(*), intent(in) :: file_namelist !< mhm namelist file
-    integer, intent(in) :: unamelist !< unit to open namelist file
-
-    integer(i4) :: case                 ! coupling case
-    integer(i4) :: meteo_timestep       ! timestep for meteo-data from coupling
-    logical :: meteo_time_ref_endpoint  ! expect meteo has time reference point at end of associated time interval
-    logical :: meteo_expect_pre         ! expect meteo from coupling: [mm]      Precipitation
-    logical :: meteo_expect_temp        ! expect meteo from coupling: [degC]    Air temperature
-    logical :: meteo_expect_pet         ! expect meteo from coupling: [mm TS-1] Potential evapotranspiration
-    logical :: meteo_expect_tmin        ! expect meteo from coupling: [degC]    minimum daily air temperature
-    logical :: meteo_expect_tmax        ! expect meteo from coupling: [degC]    maximum daily air temperature
-    logical :: meteo_expect_netrad      ! expect meteo from coupling: [W m2]    net radiation
-    logical :: meteo_expect_absvappress ! expect meteo from coupling: [Pa]      absolute vapour pressure
-    logical :: meteo_expect_windspeed   ! expect meteo from coupling: [m s-1]   windspeed
-    logical :: meteo_expect_ssrd        ! expect meteo from coupling: [W m2]    short wave radiation
-    logical :: meteo_expect_strd        ! expect meteo from coupling: [W m2]    long wave radiation
-    logical :: meteo_expect_tann        ! expect meteo from coupling: [degC]    annual mean air temperature
-
-    integer(i4) :: status ! nml status
-
-    ! namelist coupling
-    namelist /coupling/ &
-      case, &
-      meteo_timestep, &
-      meteo_time_ref_endpoint, &
-      meteo_expect_pre, &
-      meteo_expect_temp, &
-      meteo_expect_pet, &
-      meteo_expect_tmin, &
-      meteo_expect_tmax, &
-      meteo_expect_netrad, &
-      meteo_expect_absvappress, &
-      meteo_expect_windspeed, &
-      meteo_expect_ssrd, &
-      meteo_expect_strd, &
-      meteo_expect_tann
 
     ! set defaults of namelist should be read
     if (self%read_nml) then
@@ -123,49 +88,23 @@ contains
     else
       return ! config already set via set_config
     end if
-    ! get defaults for local variables
-    case = self%case
-    meteo_timestep = self%meteo_timestep
-    meteo_time_ref_endpoint = self%meteo_time_ref_endpoint
-    meteo_expect_pre = self%meteo_expect_pre
-    meteo_expect_temp = self%meteo_expect_temp
-    meteo_expect_pet = self%meteo_expect_pet
-    meteo_expect_tmin = self%meteo_expect_tmin
-    meteo_expect_tmax = self%meteo_expect_tmax
-    meteo_expect_netrad = self%meteo_expect_netrad
-    meteo_expect_absvappress = self%meteo_expect_absvappress
-    meteo_expect_windspeed = self%meteo_expect_windspeed
-    meteo_expect_ssrd = self%meteo_expect_ssrd
-    meteo_expect_strd = self%meteo_expect_strd
-    meteo_expect_tann = self%meteo_expect_tann
 
-    ! open the namelist file
-    call open_nml(file_namelist, unamelist, quiet=.true.)
-    call position_nml(self%nml_name, unamelist, status=status)
+    call nml_coupling%read(file_namelist)
 
-    ! coupling namelist can be missing
-    if (status == 0_i4) then
-      ! read namelist if present
-      read(unamelist, nml=coupling)
-    end if
-
-    ! closing the namelist file
-    call close_nml(unamelist)
-
-    self%case = case
-    self%meteo_timestep = meteo_timestep
-    self%meteo_time_ref_endpoint = meteo_time_ref_endpoint
-    self%meteo_expect_pre = meteo_expect_pre
-    self%meteo_expect_temp = meteo_expect_temp
-    self%meteo_expect_pet = meteo_expect_pet
-    self%meteo_expect_tmin = meteo_expect_tmin
-    self%meteo_expect_tmax = meteo_expect_tmax
-    self%meteo_expect_netrad = meteo_expect_netrad
-    self%meteo_expect_absvappress = meteo_expect_absvappress
-    self%meteo_expect_windspeed = meteo_expect_windspeed
-    self%meteo_expect_ssrd = meteo_expect_ssrd
-    self%meteo_expect_strd = meteo_expect_strd
-    self%meteo_expect_tann = meteo_expect_tann
+    self%case = nml_coupling%case
+    self%meteo_timestep = nml_coupling%meteo_timestep
+    self%meteo_time_ref_endpoint = nml_coupling%meteo_time_ref_endpoint
+    self%meteo_expect_pre = nml_coupling%meteo_expect_pre
+    self%meteo_expect_temp = nml_coupling%meteo_expect_temp
+    self%meteo_expect_pet = nml_coupling%meteo_expect_pet
+    self%meteo_expect_tmin = nml_coupling%meteo_expect_tmin
+    self%meteo_expect_tmax = nml_coupling%meteo_expect_tmax
+    self%meteo_expect_netrad = nml_coupling%meteo_expect_netrad
+    self%meteo_expect_absvappress = nml_coupling%meteo_expect_absvappress
+    self%meteo_expect_windspeed = nml_coupling%meteo_expect_windspeed
+    self%meteo_expect_ssrd = nml_coupling%meteo_expect_ssrd
+    self%meteo_expect_strd = nml_coupling%meteo_expect_strd
+    self%meteo_expect_tann = nml_coupling%meteo_expect_tann
 
   end subroutine read_config
 
