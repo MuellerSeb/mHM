@@ -134,8 +134,8 @@ show_missing = true
 [tool.cibuildwheel]
 # verbose output for debugging purpose
 build-verbosity = 1
-# skip py38 and musl
-skip = ["cp38*", "*-musllinux_*"]
+# skip py38, musl and free-threaded versions
+skip = ["cp38*", "*-musllinux_*", "cp31?t-*"]
 # check command
 test-extras = "test"
 test-command = "mhm -h && python -m pytest pybind/tests/"
