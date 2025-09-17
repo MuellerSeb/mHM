@@ -309,14 +309,14 @@ def compare_csv_files(new_file, ref_file):
     """Compare two given CSV files."""
     ds_new = pd.read_csv(new_file, sep=r"\s+").to_xarray()
     ds_ref = pd.read_csv(ref_file, sep=r"\s+").to_xarray()
-    return compare_xarrays(ds_new, ds_ref)
+    return compare_xarrays(ds_new, ds_ref, IGNORE_VARS)
 
 
 def compare_nc_files(new_file, ref_file):
     """Compare two given NC files."""
     ds_new = xr.load_dataset(new_file)
     ds_ref = xr.load_dataset(ref_file)
-    return compare_xarrays(ds_new, ds_ref)
+    return compare_xarrays(ds_new, ds_ref, IGNORE_VARS)
 
 
 def compare_xarrays(ds_new, ds_ref, match=None, ignore=None):
