@@ -66,6 +66,38 @@ jobs:
           name: dist-wheel-${{ matrix.cfg.os }}-${{ matrix.cfg.arch }}
           path: ./dist-wheel-${{ matrix.cfg.os }}-${{ matrix.cfg.arch }}/*.whl
 
+  test_win_conda:
+    name: win_conda
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: '0'
+
+      - uses: mamba-org/setup-micromamba@v2
+        with:
+          init-shell: cmd.exe
+          environment-name: mhm-env
+          create-args: >-
+            python=3.12
+            numpy
+            gfortran_win-64
+            netcdf-fortran
+            pkg-config
+            pytest-cov
+            xarray
+            netcdf4
+
+      - name: build wheel on win
+        run: |
+          pip install -v .
+          mhm -h
+          mhm -V
+          mhm --pyversion
+          mhm .
+          pytest pybind/tests/
+        shell: cmd /C CALL {0}
+
   upload_to_pypi:
     needs: [build_wheels, build_sdist]
     runs-on: ubuntu-24.04
