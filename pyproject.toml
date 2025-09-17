@@ -73,6 +73,7 @@ make-fallback = false
 [tool.scikit-build.cmake]
 version = ">=3.26.1"
 build-type = "Release"
+args = ["-GNinja"]
 
 [tool.scikit-build.cmake.define]
 BUILD_MHM_PYBIND = "ON"
