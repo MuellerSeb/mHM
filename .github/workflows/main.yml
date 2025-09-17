@@ -82,28 +82,16 @@ jobs:
             python=3.12
             numpy
             gfortran_win-64
-            gfortran_impl_win-64
-            gcc_win-64
-            gxx_win-64
-            libgomp
-            libwinpthread
             netcdf-fortran
             pkg-config
             pytest-cov
             xarray
             netcdf4
-            cmake
-            ninja
 
       - name: build wheel on win
-        env:
-          MHM_BUILD_PARALLEL: 1
         run: |
           pip install -v .
-          cmake -GNinja -Bdebug -DCMAKE_BUILD_TYPE=Debug
-          cmake --build debug --parallel 4
           mhm -h
-          ./debug/mhm .
           mhm -V
           mhm --pyversion
           mhm .
