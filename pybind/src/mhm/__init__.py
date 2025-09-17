@@ -23,6 +23,7 @@ Python bindings of mHM.
 #             - access to internal variables
 
 from . import cli, download
+from .cli import __version__
 from .download import download_test
 from .tools import (
     get_mask,
@@ -34,17 +35,11 @@ from .tools import (
 )
 from .wrapper import get, model, run, set
 
-try:
-    from ._version import __version__
-except ModuleNotFoundError:  # pragma: no cover
-    # package is not installed
-    __version__ = "0.0.0.dev0"
-
 
 def __getattr__(name):
     """Magic method to provide 'f_version' in Python."""
     if name == "f_version":
-        return model.version().decode("utf-8").strip()
+        return cli.f_version()
     raise AttributeError(f"module {__name__} has no attribute {name}")
 
 

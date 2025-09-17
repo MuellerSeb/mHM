@@ -26,7 +26,7 @@ class TestPybind(unittest.TestCase):
 
     @classmethod
     def tearDownClass(self):
-        shutil.rmtree(self.test_domain)
+        shutil.rmtree(self.test_domain, ignore_errors=True)
 
     def test_coupling(self):
         ref_runoff = np.loadtxt(self.here / "test_files" / "ref_runoff.txt")

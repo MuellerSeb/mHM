@@ -130,7 +130,7 @@ contains
     file_namelist_mhm_param = parser%option_value("parameter")
     file_defOutput = parser%option_value("mhm_output")
     mrm_file_defOutput = parser%option_value("mrm_output")
-    call set_verbosity_level(2_i4 - parser%option_read_count("quiet"))
+    call set_verbosity_level(3_i4 - parser%option_read_count("quiet"))
     ! change working directory first
     if (parser%option_was_read("cwd")) call change_dir(parser%option_value("cwd"))
 
@@ -138,16 +138,18 @@ contains
 
   !> \brief Set the verbosity level of mHM.
   subroutine set_verbosity_level(level)
-    use mo_message, only: SHOW_MSG, SHOW_ERR
+    use mo_message, only: SHOW_MSG, SHOW_ERR, SHOW_WARN
     implicit none
-    integer(i4), intent(in), optional :: level !< verbosity level (0: no output, 1: errors, 2: all)
+    integer(i4), intent(in), optional :: level !< verbosity level (0: no output, 1: errors, 2: warnings, 3: all (default))
     integer(i4) :: level_
     SHOW_MSG = .false.
+    SHOW_WARN = .false.
     SHOW_ERR = .false.
-    level_ = 2_i4
+    level_ = 3_i4
     if ( present(level) ) level_ = level
-    if ( level_ > 0 ) SHOW_ERR = .true.
-    if ( level_ > 1 ) SHOW_MSG = .true.
+    if ( level_ > 0_i4 ) SHOW_ERR = .true.
+    if ( level_ > 1_i4 ) SHOW_WARN = .true.
+    if ( level_ > 2_i4 ) SHOW_MSG = .true.
   end subroutine set_verbosity_level
 
 end module mo_mhm_cli
