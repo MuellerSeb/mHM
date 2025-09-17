@@ -140,6 +140,7 @@ skip = ["cp38*", "*-musllinux_*", "cp31?t-*"]
 test-extras = "test"
 test-command = "mhm -h && python -m pytest pybind/tests/"
 test-sources = ["pybind/tests/", "pyproject.toml"]
+test-skip = "cp314*"  # not all test dependencies have wheels for python 3.14 yet
 # force binary numpy dep
 environment.PIP_ONLY_BINARY = "numpy"
 environment.PIP_PREFER_BINARY = "1"
