@@ -11,6 +11,8 @@ project(mhm
   LANGUAGES Fortran C
 )
 
+message(STATUS "mHM: build type - ${CMAKE_BUILD_TYPE}")
+
 option(BUILD_MHM_DRIVER "Build mHM with executable driver." ON)
 option(BUILD_MHM_PYBIND "Build mHM python bindings." OFF)
 option(BUILD_MHM_LIB_SHARED "Build mhm library as shared." OFF)
