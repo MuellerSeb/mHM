@@ -68,6 +68,8 @@ MATCH_VARS = {
     # "L11_nLinkFracFPimp": "L11_FracFPimp",
 }
 IGNORE_VARS = [
+    "northing_bnds",  # bounds order may changed (only cf convention relevant)
+    "lat_bnds",  # bounds order may changed (only cf convention relevant)
     "ProcessMatrix",  # fails if new process is added
     # "L1_basin_lat",
     # "L11_basin_lat",
@@ -307,14 +309,14 @@ def compare_csv_files(new_file, ref_file):
     """Compare two given CSV files."""
     ds_new = pd.read_csv(new_file, sep=r"\s+").to_xarray()
     ds_ref = pd.read_csv(ref_file, sep=r"\s+").to_xarray()
-    return compare_xarrays(ds_new, ds_ref)
+    return compare_xarrays(ds_new, ds_ref, MATCH_VARS, IGNORE_VARS)
 
 
 def compare_nc_files(new_file, ref_file):
     """Compare two given NC files."""
     ds_new = xr.load_dataset(new_file)
     ds_ref = xr.load_dataset(ref_file)
-    return compare_xarrays(ds_new, ds_ref)
+    return compare_xarrays(ds_new, ds_ref, MATCH_VARS, IGNORE_VARS)
 
 
 def compare_xarrays(ds_new, ds_ref, match=None, ignore=None):
