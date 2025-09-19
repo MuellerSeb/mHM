@@ -11,7 +11,8 @@
 !> \ingroup f_exchange
 module mo_mrm_container
   use mo_kind, only: i4, dp
-  use mo_nml, only: open_nml, position_nml, close_nml
+  use mo_nml, only: open_nml, position_nml ! , close_nml
+  use mo_namelists, only: open_new_nml, close_nml
   use mo_exchange_type, only: exchange_t
   use mo_message, only: message, error_message
   !> \class   mrm_config_t
@@ -19,6 +20,7 @@ module mo_mrm_container
   type, public :: mrm_config_t
     logical :: active = .false. !< flag to activate the mRM process container
 
+    ! main config
     integer(i4)      :: chunk            ! reading chunk size: off (default - 0), monthly (1), yearly (2), once (not sure what this should be)
     integer(i4)      :: out_frequency    ! default="daily", help="Output frequency: hourly, daily (default), monthly, yearly, once")
     integer(i4)      :: level11          ! has_value=.true.,  help="Routing grid resolution. By default: Resolution of runoff.")
@@ -26,6 +28,16 @@ module mo_mrm_container
     character(1024) :: end_time         ! "e", has_value=.true.,  help="Simulation end time (YYYY-MM-DD[Thh:mm]). By default: End of runoff.")
     integer(i4)      :: omp_min          !`"m", has_value=.true.,  help="Minimum river level size to route in parallel with OpenMP. By default: threads * 8")
     integer(i4)      :: parallel_rout    ! "p", has_value=.false., help="Level order for parallel routing starting from river root.")
+    ! directories and files
+    character(1024) :: scc               ! scc gauge locations file. Either CSV with station per line or NetCDF. By default not used.
+    character(1024) :: fdir
+    character(1024) :: slope
+    character(1024) :: runoff
+    character(1024) :: out_file
+    character(1024) :: node_out_file
+    ! parameters
+    real(dp) :: gamma
+    real(dp) :: const_celerity
 
   contains
     procedure :: read => mrm_config_read
@@ -57,7 +69,7 @@ contains
 
   !> \brief Initialize the mrm configuration.
   subroutine mrm_config_read(self, file, output_file)
-    use mo_file, only: file_namelist_mhm
+    use mo_file, only: file_namelist_mhm, file_namelist_mhm_param 
 
     class(mrm_config_t), intent(inout) :: self
     character(*), intent(in) :: file !< file containing the namelists
@@ -73,7 +85,7 @@ contains
     integer(i4)      :: omp_min          !`"m", has_value=.true.,  help="Minimum river level size to route in parallel with OpenMP. By default: threads * 8")
     integer(i4)      :: parallel_rout    ! "p", has_value=.false., help="Level order for parallel routing starting from river root.")
     ! directories and files
-    character(1024) :: scc !                 has_value=.true.,  help="scc gauge locations file. Either CSV with station per line or NetCDF. By default not used.")
+    character(1024) :: scc               ! scc gauge locations file. Either CSV with station per line or NetCDF. By default not used.
     character(1024) :: fdir
     character(1024) :: slope
     character(1024) :: runoff
@@ -89,11 +101,12 @@ contains
 
     call message(" ... read config mrm: ", file, ", ", output_file)
     self%active = .true.
-    
-    call open_nml(file_namelist_mhm, unit)
+
+    ! read main config
+    print *, '***CAUTION: nml files hard-coded in mo_mrm_container'
+    call open_new_nml('mhm.nml', unit)
     call position_nml('mrm_main', unit)
     read(unit, nml=mrm_main)
-    call close_nml(unit)
     self%chunk         = chunk         ! reading chunk size: off (default - 0), monthly (1), yearly (2), once (not sure what this should be)
     self%out_frequency = out_frequency ! default="daily", help="Output frequency: hourly, daily (default), monthly, yearly, once")
     self%level11       = level11       ! has_value=.true.,  help="Routing grid resolution. By default: Resolution of runoff.")
@@ -103,19 +116,23 @@ contains
     self%parallel_rout = parallel_rout ! "p", has_value=.false., help="Level order for parallel routing starting from river root.")
 
     ! read directories
-    call open_nml(file_namelist_mhm, unit)
     call position_nml('mrm_dirs', unit)
     read(unit, nml=mrm_dirs)
     call close_nml(unit)
-    ! call cli%add_option("fdir",           "d", has_value=.true.,  default="src/tests/files/input.nc", help="File (.asc/.nc) with flow direction 'fdir'.")
-    ! call cli%add_option("slope",          "s", has_value=.true.,  default="src/tests/files/input.nc", help="File (.asc/.nc) with 'slope'.")
-    ! call cli%add_option("runoff",         "r", has_value=.true.,  default="src/tests/files/runoff.nc", help="Input runoff NetCDF file with 'Q' as variable.")
-    ! call cli%add_option("out_file",       "o", has_value=.true.,  default="discharge.nc", help="Output NetCDF file.")
-    ! call cli%add_option("node_out_file",  "n", has_value=.true.,  help="Node based NetCDF output file. By default not written.")
-    ! ! read parameters
+    self%scc = scc
+    self%fdir = fdir
+    self%slope = slope
+    self%runoff = runoff 
+    self%out_file = out_file
+    self%node_out_file = node_out_file
 
-    ! call cli%add_option("gamma",          "g", has_value=.true.,  default="30.0", help="Celerity upscaling parameter.")
-    ! call cli%add_option("const_celerity", "c", has_value=.false., help="Use constant celerity given by 'gamma'.")
+    ! read parameters
+    call open_new_nml('mhm_parameter.nml', unit)
+    call position_nml('mrm_params', unit)
+    read(unit, nml=mrm_params)
+    call close_nml(unit)
+    self%gamma = gamma
+    self%const_celerity = const_celerity
 
   end subroutine mrm_config_read
 

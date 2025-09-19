@@ -895,10 +895,9 @@ parallel_rout = 1
 &mrm_dirs
 !
 scc = 'scc_gauges.txt'
-! File (.asc/.nc) with flow direction 'fdir'.
 fdir = "src/tests/files/input.nc"
-    ! call cli%add_option("slope",          "s", has_value=.true.,  default="src/tests/files/input.nc", help="File (.asc/.nc) with 'slope'.")
-    ! call cli%add_option("runoff",         "r", has_value=.true.,  default="src/tests/files/runoff.nc", help="Input runoff NetCDF file with 'Q' as variable.")
-    ! call cli%add_option("out_file",       "o", has_value=.true.,  default="discharge.nc", help="Output NetCDF file.")
-    ! call cli%add_option("node_out_file",  "n", has_value=.true.,  help="Node based NetCDF output file. By default not written.")
+slope = "src/tests/files/input.nc"
+runoff = "src/tests/files/input.nc"
+out_file = "src/tests/files/input.nc"
+node_out_file = "src/tests/files/input.nc"
 /
