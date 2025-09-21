@@ -89,6 +89,7 @@ module mo_river_router
     procedure, private :: setup_muskingum => river_router_setup_muskingum
     procedure, private :: scale_runoff => river_router_scale_runoff
     procedure, private :: route => river_router_route
+    procedure, private :: time_shift => river_router_time_shift
   end type river_router_t
 
 contains
@@ -209,8 +210,10 @@ contains
       this%acc_runoff = this%acc_runoff + input_runoff ! accumulate
     end if
     if (this%input_count < this%accumulations) return ! not yet ready to route
+    ! reset input counter
+    this%input_count = 0_i4
     ! average runoff flux over input time step accumulations
-    if (this%accumulations > 1_i4) this%acc_runoff = this%acc_runoff / real(this%accumulations, dp)
+    if (this%accumulations > 1_i4) this%acc_runoff = this%acc_runoff / this%accumulations
     ! distribute runoff in case of SCC
     if (this%river%scc) then
       this%scaled_runoff = this%scale_runoff(this%acc_runoff)
@@ -223,20 +226,19 @@ contains
     else
       this%runoff = this%scale_runoff(this%acc_runoff)
     end if
-    ! reset input counter
-    this%input_count = 0_i4
-    ! prepare discharge
-    discharge = 0.0_dp
     ! route
     do i = 1_i4, this%iterations
       call this%route(this%discharge, this%tributary)
-      discharge = discharge + this%discharge
+      if (i == 1_i4) then
+        discharge = this%discharge
+      else
+        discharge = discharge + this%discharge
+      end if
       ! store discharge and tributary for next time-step
-      this%previous_discharge = this%discharge
-      this%previous_tributary = this%tributary
+      call this%time_shift()
     end do
     ! average discharge flux over output time step iterations
-    if (this%iterations > 1_i4) discharge = discharge / real(this%iterations, dp)
+    if (this%iterations > 1_i4) discharge = discharge / this%iterations
   end subroutine river_router_update
 
   !> \brief Setup river upscaler from fine river and coarse target grid.
@@ -326,4 +328,18 @@ contains
     end subroutine process_node
   end subroutine river_router_route
 
+  !> \brief Move current discharge and tributary to previous arrays.
+  subroutine river_router_time_shift(this)
+    implicit none
+    class(river_router_t), intent(inout) :: this
+    real(dp), allocatable :: tmp(:)
+    ! swap discharge and previous_discharge
+    call move_alloc(this%previous_discharge, tmp)
+    call move_alloc(this%discharge, this%previous_discharge)
+    call move_alloc(tmp, this%discharge)
+    ! swap tributary and previous_tributary
+    call move_alloc(this%previous_tributary, tmp)
+    call move_alloc(this%tributary, this%previous_tributary)
+    call move_alloc(tmp, this%tributary)
+  end subroutine river_router_time_shift
 end module mo_river_router
