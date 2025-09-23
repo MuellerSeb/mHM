@@ -894,10 +894,11 @@ parallel_rout = 1
 
 &mrm_dirs
 !
-scc = 'scc_gauges.txt'
-fdir = "src/tests/files/input.nc"
-slope = "src/tests/files/input.nc"
-runoff = "src/tests/files/input.nc"
+scc_file = 'scc_gauges.txt'
+fdir_file = "src/tests/files/fdir.asc" ! "src/tests/files/input.nc"
+dem_file = "src/tests/files/dem.asc"
+slope_file = "src/tests/files/input.nc"
+runoff_file = "src/tests/files/input.nc"
 out_file = "src/tests/files/input.nc"
 node_out_file = "src/tests/files/input.nc"
 /

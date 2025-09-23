@@ -29,10 +29,11 @@ module mo_mrm_container
     integer(i4)      :: omp_min          !`"m", has_value=.true.,  help="Minimum river level size to route in parallel with OpenMP. By default: threads * 8")
     integer(i4)      :: parallel_rout    ! "p", has_value=.false., help="Level order for parallel routing starting from river root.")
     ! directories and files
-    character(1024) :: scc               ! scc gauge locations file. Either CSV with station per line or NetCDF. By default not used.
-    character(1024) :: fdir
-    character(1024) :: slope
-    character(1024) :: runoff
+    character(1024) :: scc_file               ! scc gauge locations file. Either CSV with station per line or NetCDF. By default not used.
+    character(1024) :: fdir_file
+    character(1024) :: dem_file
+    character(1024) :: slope_file
+    character(1024) :: runoff_file
     character(1024) :: out_file
     character(1024) :: node_out_file
     ! parameters
@@ -85,10 +86,11 @@ contains
     integer(i4)      :: omp_min          !`"m", has_value=.true.,  help="Minimum river level size to route in parallel with OpenMP. By default: threads * 8")
     integer(i4)      :: parallel_rout    ! "p", has_value=.false., help="Level order for parallel routing starting from river root.")
     ! directories and files
-    character(1024) :: scc               ! scc gauge locations file. Either CSV with station per line or NetCDF. By default not used.
-    character(1024) :: fdir
-    character(1024) :: slope
-    character(1024) :: runoff
+    character(1024) :: scc_file               ! scc gauge locations file. Either CSV with station per line or NetCDF. By default not used.
+    character(1024) :: fdir_file
+    character(1024) :: dem_file
+    character(1024) :: slope_file
+    character(1024) :: runoff_file
     character(1024) :: out_file
     character(1024) :: node_out_file
     ! parameters
@@ -96,7 +98,7 @@ contains
     real(dp) :: const_celerity
 
     namelist /mrm_main/ chunk, out_fequency, level11, start_time, end_time, omp_min, parallel_rout
-    namelist /mrm_dirs/ scc, fdir, slope, runoff, out_file, node_out_file
+    namelist /mrm_dirs/ scc_file, fdir_file, dem_file, slope_file, runoff_file, out_file, node_out_file
     namelist /mrm_params/ gamma, const_celerity
 
     call message(" ... read config mrm: ", file, ", ", output_file)
@@ -119,10 +121,11 @@ contains
     call position_nml('mrm_dirs', unit)
     read(unit, nml=mrm_dirs)
     call close_nml(unit)
-    self%scc = scc
-    self%fdir = fdir
-    self%slope = slope
-    self%runoff = runoff 
+    self%scc_file = scc_file
+    self%fdir_file = fdir_file
+    self%dem_file = dem_file
+    self%slope_file = slope_file
+    self%runoff_file = runoff_file 
     self%out_file = out_file
     self%node_out_file = node_out_file
 
@@ -138,14 +141,63 @@ contains
 
   ! read initial values and populate exchange
   subroutine mrm_connect(self)
+    use mo_grid, only: grid_t
+    use mo_grid_io, only: var, input_dataset
+    use mo_river_tools, only: read_scc_gauges
+    use mo_os, only: path_ext, path_isfile
     class(mrm_t), intent(inout) :: self
+    type(grid_t), target :: grid, cgrid
+    type(input_dataset) :: ds
+    character(:), allocatable   :: file
+    integer(i4), allocatable    :: mfdir(:,:), fdir(:)
+    real(dp), allocatable       :: mdem(:,:), dem(:), mslope(:,:), slope(:), scc_gauges(:,:)
+    logical                     :: scc_latlon
     call message(" ... connecting mrm: ", self%exchange%time%str())
 
     ! read values
     ! <- runoff file if required
+    ! <- scc file
     ! <- fdir file
     ! <- slope file
-    
+
+    print*, 'self%scc_file: ', self%config%scc_file
+    call read_scc_gauges(self%config%scc_file, scc_gauges, scc_latlon)
+    ! call read_scc_gauges("src/tests/files/scc_gauges.nc", scc_gauges, scc_latlon)
+
+    ! file = "src/tests/files/fdir.asc"
+    ! dem_file = "src/tests/files/dem.asc"
+    ! slope_file = "src/tests/files/slope.asc"
+
+    file = self%config%fdir_file
+    print*, "read data: ", file
+    select case(path_ext(file))
+      case(".nc")
+        call ds%init(path=file, grid=grid, vars=[var(name="fdir", static=.true.)], grid_init_var="fdir")
+        allocate(fdir(grid%ncells))
+        call ds%read("fdir", fdir)
+        call ds%close()
+      case(".asc")
+        call grid%from_ascii_file(file)
+        call grid%read_data(file, mfdir)
+        fdir = grid%pack(mfdir)
+        deallocate(mfdir)
+      case default
+        call error_message("unknown file extension: ", path_ext(file))
+    end select
+    if (path_isfile(self%config%dem_file)) then
+      print*, "read dem: ", self%config%dem_file
+      call grid%read_data(self%config%dem_file, mdem)
+      dem = grid%pack(mdem)
+      deallocate(mdem)
+    end if
+    if (path_isfile(self%config%slope_file)) then
+    print*, "read slope: ", self%config%slope_file
+      call grid%read_data(self%config%slope_file, mslope)
+      slope = grid%pack(mslope)
+      deallocate(mslope)
+    end if
+
+
     ! generate river
   ! call message("create river network:", n2s(level0%ncells))
   ! call river%from_fdir(fdir, level0)
