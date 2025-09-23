@@ -104,6 +104,7 @@ module mo_river
     ! scc related attributes
     logical :: scc = .false. !< indicate that this river is a SCC-river (not D8)
     integer(i8), allocatable :: node_cell(:) !< map node to grid cell id size(n_nodes)
+    integer(i8), allocatable :: cell_node_select(:) !< select contained node to represent cell (e.g. highest facc) size(ncells)
     real(dp), allocatable :: area_fraction(:) !< area fraction for each node in cell size(n_nodes)
     real(dp), allocatable :: node_x(:) !< x coordinate for each node size(n_nodes)
     real(dp), allocatable :: node_y(:) !< x coordinate for each node size(n_nodes)
@@ -116,6 +117,7 @@ module mo_river
     procedure, public :: calc_length => river_length
     procedure, public :: calc_slope => river_slope
     procedure, public :: calc_celerity => river_celerity
+    procedure, public :: select_cell_values => river_select_cell_values
     procedure, public :: export => river_export
   end type river_t
 
@@ -253,7 +255,8 @@ contains
     allocate(this%down(this%grid%ncells))
     this%n_nodes = this%grid%ncells
     this%scc = .false. ! if derived from fdir, this is a D8-river
-    this%node_cell = [(i, i=1_i4,this%grid%ncells)] ! nodes correspond to cells
+    this%node_cell = [(i, i=1_i8,this%grid%ncells)] ! nodes correspond to cells
+    this%cell_node_select = [(i, i=1_i8,this%grid%ncells)] ! nodes correspond to cells
     allocate(this%area_fraction(this%n_nodes), source=1.0_dp) ! D8 has no area fraction
 
     periodic = this%grid%is_periodic()
@@ -366,9 +369,9 @@ contains
     dy = -1_i4 ! top-down grid starts north
     if (this%grid%y_direction==bottom_up) dy = 1_i4
     !$omp parallel do default(shared) private(i, j, from, to)
-    do i = 1_i4, this%n_nodes
+    do i = 1_i8, this%n_nodes
       j = this%down(i)
-      if (j==0_i4) cycle ! sink
+      if (j==0_i8) cycle ! sink
       from = this%grid%cell_ij(i,:)
       to = this%grid%cell_ij(j,:)
       ! the pathological case here is a periodic grid with 2 cells along lon-axis (*lol*)
@@ -477,6 +480,19 @@ contains
     ! calculate celerity
     allocate(this%celerity(this%n_nodes), source=(gamma * sqrt(smooth_slope / 100.0_dp)))
   end subroutine river_celerity
+
+  !> \brief Select values from sub-nodes for each cell from an array of values on nodes.
+  function river_select_cell_values(this, values) result(select)
+    class(river_t), intent(in) :: this
+    real(dp), dimension(this%n_nodes), intent(in) :: values
+    real(dp), dimension(this%grid%ncells):: select
+    integer(i8) :: i
+    !$omp parallel do default(shared)
+    do i = 1_i8, this%grid%ncells
+      select(i) = values(this%cell_node_select(i))
+    end do
+    !$omp end parallel do
+  end function river_select_cell_values
 
   !> \brief Export river arrays to netcdf
   subroutine river_export(this, path, sub_map, leaving, stream_mask, stream_sub, highlight, factor)
