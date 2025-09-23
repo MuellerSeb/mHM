@@ -200,8 +200,8 @@ contains
     class(river_output_variable), intent(inout) :: self
     !> index along the time dimension of the netcdf variable
     integer(i4), intent(in), optional :: t_index
-    if (self%static .and. self%static_written) return
     if (self%counter == 0_i4) call error_message("river_output_variable: no data was added before writing: ", self%name)
+    if (self%static .and. self%static_written) return
     if (self%avg) then
       select case(self%kind)
         case("sp")
@@ -259,7 +259,7 @@ contains
   !> \authors Robert Schweppe
   !> \authors Sebastian Müller
   !> \date Apr 2013
-  subroutine output_init(self, path, river, vars, start_time, delta, timestamp, deflate_level)
+  subroutine output_init(self, path, river, vars, start_time, delta, timestamp, deflate_level, network)
     implicit none
     class(river_output_dataset), intent(inout) :: self
     character(*), intent(in) :: path !< path to the file
@@ -269,13 +269,18 @@ contains
     character(*), intent(in), optional :: delta !< time units delta ("minutes", "hours" (default), "days")
     integer(i4), intent(in), optional :: timestamp !< time stamp location in time span (0: begin, 1: center, 2: end (default))
     integer(i4), intent(in), optional :: deflate_level !< deflate level for compression
+    logical, intent(in), optional :: network !< store river-network in the file (default: .true.)
 
     character(:), allocatable :: units, units_dt
-    type(NcDimension) :: t_dim, b_dim, node_dim, link_dim, dims(2)
-    type(NcVariable) :: x_var, y_var, t_var, mesh_var, link_var
-    integer(i4) :: i
+    type(NcDimension) :: t_dim, two_dim, node_dim, link_dim, dims(2)
+    type(NcVariable) :: node_x_var, node_y_var, t_var, mesh_var, link_var
+    integer(i4) :: i, nlinks, topo_dim
     integer(i8) :: n, k
     integer(i8), allocatable :: links(:, :)
+    logical :: net
+
+    net = optval(network, .true.)
+    topo_dim = merge(1_i4, 0_i4, net)
 
     self%path = trim(path)
     self%nc = NcDataset(self%path, "w")
@@ -291,58 +296,61 @@ contains
       self%static = self%static .and. vars(i)%static
     end do
 
-    b_dim = self%nc%setDimension("Two", 2_i4)
     ! node_dim = self%nc%setDimension("node") ! use unlimited dimension to support i8 index
     ! link_dim = self%nc%setDimension("link") ! use unlimited dimension to support i8 index
+    two_dim = self%nc%setDimension("Two", 2_i4)
     node_dim = self%nc%setDimension("node", int(self%river%n_nodes, i4))  ! only works if network is not to huge for i4
-    link_dim = self%nc%setDimension("link", int(self%river%n_nodes, i4) - size(self%river%sinks, kind=i4))
 
     ! 1D network topology following UGRID conventions
     mesh_var = self%nc%setVariable("river", "i32", dims(:0)) ! mesh variable as scalar integer
     call mesh_var%setAttribute("cf_role", "mesh_topology")
     call mesh_var%setAttribute("long_name", "river network definition")
-    call mesh_var%setAttribute("topology_dimension", 1)  ! 0 - only nodes, 1 - with links
-    call mesh_var%setAttribute("node_coordinates", "x y")
-    call mesh_var%setAttribute("edge_node_connectivity", "links")
+    call mesh_var%setAttribute("topology_dimension", topo_dim)  ! 0 - only nodes, 1 - with links
+    call mesh_var%setAttribute("node_coordinates", "river_node_x river_node_y")
+    if (net) call mesh_var%setAttribute("edge_node_connectivity", "links")
 
     ! coordinates
-    x_var = self%nc%setVariable("x", "f64", [node_dim])
-    y_var = self%nc%setVariable("y", "f64", [node_dim])
+    node_x_var = self%nc%setVariable("river_node_x", "f64", [node_dim])
+    node_y_var = self%nc%setVariable("river_node_y", "f64", [node_dim])
 
     if (self%river%grid%coordsys==cartesian) then
-      call x_var%setAttribute("long_name", "x coordinate of projection")
-      call x_var%setAttribute("standard_name", "projection_x_coordinate")
-      call x_var%setAttribute("units", "m") ! TODO: this should be configurable
-      call y_var%setAttribute("long_name", "y coordinate of projection")
-      call y_var%setAttribute("standard_name", "projection_y_coordinate")
-      call y_var%setAttribute("units", "m") ! TODO: this should be configurable
+      call node_x_var%setAttribute("long_name", "x coordinate of projection")
+      call node_x_var%setAttribute("standard_name", "projection_x_coordinate")
+      call node_x_var%setAttribute("units", "m") ! TODO: this should be configurable
+      call node_y_var%setAttribute("long_name", "y coordinate of projection")
+      call node_y_var%setAttribute("standard_name", "projection_y_coordinate")
+      call node_y_var%setAttribute("units", "m") ! TODO: this should be configurable
     else
-      call x_var%setAttribute("long_name", "longitude")
-      call x_var%setAttribute("standard_name", "longitude")
-      call x_var%setAttribute("units", "degrees_east")
-      call y_var%setAttribute("long_name", "latitude")
-      call y_var%setAttribute("standard_name", "latitude")
-      call y_var%setAttribute("units", "degrees_north")
+      call node_x_var%setAttribute("long_name", "longitude")
+      call node_x_var%setAttribute("standard_name", "longitude")
+      call node_x_var%setAttribute("units", "degrees_east")
+      call node_y_var%setAttribute("long_name", "latitude")
+      call node_y_var%setAttribute("standard_name", "latitude")
+      call node_y_var%setAttribute("units", "degrees_north")
     end if
     ! this should set the node-dim size
-    call x_var%setData(self%river%node_x)
-    call y_var%setData(self%river%node_y)
+    call node_x_var%setData(self%river%node_x)
+    call node_y_var%setData(self%river%node_y)
 
     ! links
-    link_var = self%nc%setVariable("links", "i64", [b_dim, link_dim])
-    call link_var%setAttribute("cf_role", "edge_node_connectivity")
-    call link_var%setAttribute("long_name", "river links definition")
-    call link_var%setAttribute("start_index", 1)  ! fortran indices starting with 1
-    allocate(links(2, count(.not.self%river%is_sink)))
-    k = 0_i8
-    do n = 1_i8, self%river%n_nodes
-      if (self%river%is_sink(n)) cycle
-      k = k + 1_i8
-      links(1, k) = n
-      links(2, k) = self%river%down(n)
-    end do
-    call link_var%setData(links)
-    deallocate(links)
+    if (net) then
+      nlinks = int(self%river%n_nodes, i4) - size(self%river%sinks, kind=i4)
+      link_dim = self%nc%setDimension("link", nlinks)
+      link_var = self%nc%setVariable("links", "i64", [two_dim, link_dim])
+      call link_var%setAttribute("cf_role", "edge_node_connectivity")
+      call link_var%setAttribute("long_name", "river links definition")
+      call link_var%setAttribute("start_index", 1)  ! fortran indices starting with 1
+      allocate(links(2_i4, nlinks))
+      k = 0_i8
+      do n = 1_i8, self%river%n_nodes
+        if (self%river%is_sink(n)) cycle
+        k = k + 1_i8
+        links(1_i8, k) = n
+        links(2_i8, k) = self%river%down(n)
+      end do
+      call link_var%setData(links)
+      deallocate(links)
+    end if
 
     if (.not.self%static) then
       if (.not.present(start_time)) call error_message("output: if dataset is not static, a start_time is needed")
@@ -358,7 +366,7 @@ contains
       call t_var%setAttribute("axis", "T")
       call t_var%setAttribute("units", units)
       call t_var%setAttribute("bounds", "time_bnds")
-      t_var = self%nc%setVariable("time_bnds", "i32", [b_dim, t_dim])
+      t_var = self%nc%setVariable("time_bnds", "i32", [two_dim, t_dim])
     end if
 
     dims(:) = [node_dim, t_dim]
