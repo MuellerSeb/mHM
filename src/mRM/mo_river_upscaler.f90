@@ -122,7 +122,6 @@ contains
     logical :: aux, latlon
 
     if (.not.present(scc_gauges)) then
-      this%coarse_river%scc = .false.
       this%nsub = 1_i4
       allocate(this%scc_map(this%fine_river%n_nodes), source=1_i4)
       allocate(this%scc_gauges(0))
@@ -274,7 +273,7 @@ contains
     integer(i8), allocatable :: facc(:,:), all_nodes(:)
     integer(i4), allocatable :: scc_map(:,:)
     logical, allocatable :: base_mask(:,:), dep_mask(:)
-    integer(i8) :: i, k, node, next
+    integer(i8) :: i, k, node, next, facc_max, facc_max_i
     integer(i4) :: j, sub
     integer(i4) :: yl, yu, xl, xu ! lower and upper bounds for x and y
 
@@ -397,6 +396,22 @@ contains
     end do
     !$omp end parallel do
     deallocate(dep_mask, all_nodes)
+
+    ! generate cell_node_select from sub-node with highest flow accumulation
+    allocate(this%coarse_river%cell_node_select(this%coarse_river%grid%ncells))
+    do i = 1_i8, this%coarse_river%grid%ncells
+      facc_max = 0_i8
+      facc_max_i = 0_i8
+      do j = 1_i4, this%nsub
+        node = this%node_from_cell_sub(i, j)
+        if (node == 0_i8) cycle ! sub-catchment not present in current cell
+        if (this%fine_river%facc(node) > facc_max) then
+          facc_max = this%fine_river%facc(node)
+          facc_max_i = node
+        end if
+      end do
+      this%coarse_river%cell_node_select(i) = facc_max_i
+    end do
   end subroutine river_upscaler_scc
 
   !> \brief Setup coarse river from upscaled D8 fdir.
