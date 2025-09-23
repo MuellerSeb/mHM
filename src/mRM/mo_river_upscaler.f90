@@ -403,11 +403,17 @@ contains
       facc_max = 0_i8
       facc_max_i = 0_i8
       do j = 1_i4, this%nsub
-        node = this%node_from_cell_sub(i, j)
-        if (node == 0_i8) cycle ! sub-catchment not present in current cell
+        k = this%node_from_cell_sub(i, j) ! coarse river node-id
+        if (k == 0_i8) cycle ! sub-catchment not present in current cell
+        ! get corresponding fine river node
+        if (this%coarse_river%is_sink(k)) then
+          node = this%sink_map(k)
+        else
+          node = this%link_start(k)
+        end if
         if (this%fine_river%facc(node) > facc_max) then
           facc_max = this%fine_river%facc(node)
-          facc_max_i = node
+          facc_max_i = k
         end if
       end do
       this%coarse_river%cell_node_select(i) = facc_max_i
