@@ -160,7 +160,7 @@ contains
     ! <- fdir file
     ! <- slope file
 
-    print*, 'self%scc_file: ', self%config%scc_file
+    print*, 'self%scc_file: ', trim(self%config%scc_file)
     call read_scc_gauges(self%config%scc_file, scc_gauges, scc_latlon)
     ! call read_scc_gauges("src/tests/files/scc_gauges.nc", scc_gauges, scc_latlon)
 
@@ -169,7 +169,7 @@ contains
     ! slope_file = "src/tests/files/slope.asc"
 
     file = self%config%fdir_file
-    print*, "read data: ", file
+    print*, "read data: ", trim(file)
     select case(path_ext(file))
       case(".nc")
         call ds%init(path=file, grid=grid, vars=[var(name="fdir", static=.true.)], grid_init_var="fdir")
@@ -185,18 +185,17 @@ contains
         call error_message("unknown file extension: ", path_ext(file))
     end select
     if (path_isfile(self%config%dem_file)) then
-      print*, "read dem: ", self%config%dem_file
+      print*, "read dem: ", trim(self%config%dem_file)
       call grid%read_data(self%config%dem_file, mdem)
       dem = grid%pack(mdem)
       deallocate(mdem)
     end if
     if (path_isfile(self%config%slope_file)) then
-    print*, "read slope: ", self%config%slope_file
+    print*, "read slope: ", trim(self%config%slope_file)
       call grid%read_data(self%config%slope_file, mslope)
       slope = grid%pack(mslope)
       deallocate(mslope)
     end if
-
 
     ! generate river
   ! call message("create river network:", n2s(level0%ncells))
