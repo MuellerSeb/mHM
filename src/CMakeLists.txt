@@ -80,6 +80,12 @@ if(CMAKE_Fortran_COMPILER_ID MATCHES "GNU")
     $<$<CONFIG:RELEASE>:-O3>
     $<$<BOOL:${CMAKE_WITH_GPROF}>:-pg>
   )
+  # https://www.scivision.dev/gfortran-15-external-argument-mismatch
+  # AND: passed procedures with pointer attribute should be called with positional arguments
+  # see: mo_mrm_objective_function_runoff / mo_objective_function
+  if(CMAKE_Fortran_COMPILER_VERSION VERSION_GREATER_EQUAL "15.0")
+    target_compile_options(${LIB_NAME} PRIVATE $<$<CONFIG:DEBUG>:-Wno-external-argument-mismatch>)
+  endif()
 endif()
 # ifort (Classic)
 if(CMAKE_Fortran_COMPILER_ID STREQUAL "Intel")
