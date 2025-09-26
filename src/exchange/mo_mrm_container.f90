@@ -10,35 +10,36 @@
 !! mHM is released under the LGPLv3+ license \license_note
 !> \ingroup f_exchange
 module mo_mrm_container
-  use mo_kind, only: i4, dp
-  use mo_nml, only: open_nml, position_nml ! , close_nml
+  use mo_kind, only: i4, i8, dp
+  use mo_nml, only: position_nml ! , close_nml
   use mo_namelists, only: open_new_nml, close_nml
   use mo_exchange_type, only: exchange_t
   use mo_message, only: message, error_message
+  use mo_river, only: river_t
+  use mo_river_router, only: river_router_t
+  use mo_grid, only: grid_t
+  use mo_grid_io, only: output_dataset
+  use mo_utils, only: is_close
   !> \class   mrm_config_t
   !> \brief   Configuration for a single mRM process container.
   type, public :: mrm_config_t
     logical :: active = .false. !< flag to activate the mRM process container
 
     ! main config
-    integer(i4)      :: chunk            ! reading chunk size: off (default - 0), monthly (1), yearly (2), once (not sure what this should be)
-    integer(i4)      :: out_frequency    ! default="daily", help="Output frequency: hourly, daily (default), monthly, yearly, once")
+    character(1024)  :: out_frequency    ! default="daily", help="Output frequency: hourly, daily (default), monthly, yearly, once")
     integer(i4)      :: level11          ! has_value=.true.,  help="Routing grid resolution. By default: Resolution of runoff.")
-    character(1024) :: start_time       ! "t", has_value=.true.,  help="Simulation start time (YYYY-MM-DD[Thh:mm]). By default: Start of runoff.")
-    character(1024) :: end_time         ! "e", has_value=.true.,  help="Simulation end time (YYYY-MM-DD[Thh:mm]). By default: End of runoff.")
     integer(i4)      :: omp_min          !`"m", has_value=.true.,  help="Minimum river level size to route in parallel with OpenMP. By default: threads * 8")
-    integer(i4)      :: parallel_rout    ! "p", has_value=.false., help="Level order for parallel routing starting from river root.")
+    logical          :: parallel_rout    ! "p", has_value=.false., help="Level order for parallel routing starting from river root.")
     ! directories and files
     character(1024) :: scc_file               ! scc gauge locations file. Either CSV with station per line or NetCDF. By default not used.
     character(1024) :: fdir_file
     character(1024) :: dem_file
     character(1024) :: slope_file
-    character(1024) :: runoff_file
     character(1024) :: out_file
     character(1024) :: node_out_file
     ! parameters
     real(dp) :: gamma
-    real(dp) :: const_celerity
+    logical  :: const_celerity
 
   contains
     procedure :: read => mrm_config_read
@@ -47,13 +48,20 @@ module mo_mrm_container
   !> \class   mrm_t
   !> \brief   Class for a single mRM process container.
   type, public :: mrm_t
-    type(mrm_config_t) :: config !< configuration of the mRM process container
+    type(mrm_config_t)        :: config !< configuration of the mRM process container
     type(exchange_t), pointer :: exchange => null() !< exchange container of the domain
+    type(grid_t)              :: level11
+    type(river_router_t)      :: router
+    type(river_t)             :: criver
+    type(output_dataset)      :: ds_out
+    real(dp), allocatable     :: discharge(:)
+    logical                   :: scc_active
   contains
     procedure :: configure => mrm_configure
     procedure :: connect => mrm_connect
     procedure :: initialize => mrm_initialize
     procedure :: update => mrm_update
+    procedure :: close ! don't we need a close
   end type mrm_t
 
 contains
@@ -78,26 +86,22 @@ contains
     ! local variables
     integer(i4)      :: unit
     ! main config
-    integer(i4)      :: chunk            ! reading chunk size: off (default - 0), monthly (1), yearly (2), once (not sure what this should be)
-    integer(i4)      :: out_frequency    ! default="daily", help="Output frequency: hourly, daily (default), monthly, yearly, once")
+    character(1024)  :: out_frequency    ! default="daily", help="Output frequency: hourly, daily (default), monthly, yearly, once")
     integer(i4)      :: level11          ! has_value=.true.,  help="Routing grid resolution. By default: Resolution of runoff.")
-    character(1024) :: start_time       ! "t", has_value=.true.,  help="Simulation start time (YYYY-MM-DD[Thh:mm]). By default: Start of runoff.")
-    character(1024) :: end_time         ! "e", has_value=.true.,  help="Simulation end time (YYYY-MM-DD[Thh:mm]). By default: End of runoff.")
     integer(i4)      :: omp_min          !`"m", has_value=.true.,  help="Minimum river level size to route in parallel with OpenMP. By default: threads * 8")
-    integer(i4)      :: parallel_rout    ! "p", has_value=.false., help="Level order for parallel routing starting from river root.")
+    logical          :: parallel_rout    ! "p", has_value=.false., help="Level order for parallel routing starting from river root.")
     ! directories and files
     character(1024) :: scc_file               ! scc gauge locations file. Either CSV with station per line or NetCDF. By default not used.
     character(1024) :: fdir_file
     character(1024) :: dem_file
     character(1024) :: slope_file
-    character(1024) :: runoff_file
     character(1024) :: out_file
     character(1024) :: node_out_file
     ! parameters
     real(dp) :: gamma
-    real(dp) :: const_celerity
+    logical  :: const_celerity
 
-    namelist /mrm_main/ chunk, out_fequency, level11, start_time, end_time, omp_min, parallel_rout
+    namelist /mrm_main/ chunk, out_frequency, level11, start_time, end_time, omp_min, parallel_rout
     namelist /mrm_dirs/ scc_file, fdir_file, dem_file, slope_file, runoff_file, out_file, node_out_file
     namelist /mrm_params/ gamma, const_celerity
 
@@ -109,11 +113,8 @@ contains
     call open_new_nml('mhm.nml', unit)
     call position_nml('mrm_main', unit)
     read(unit, nml=mrm_main)
-    self%chunk         = chunk         ! reading chunk size: off (default - 0), monthly (1), yearly (2), once (not sure what this should be)
     self%out_frequency = out_frequency ! default="daily", help="Output frequency: hourly, daily (default), monthly, yearly, once")
     self%level11       = level11       ! has_value=.true.,  help="Routing grid resolution. By default: Resolution of runoff.")
-    self%start_time    = start_time    ! "t", has_value=.true.,  help="Simulation start time (YYYY-MM-DD[Thh:mm]). By default: Start of runoff.")
-    self%end_time      = end_time      ! "e", has_value=.true.,  help="Simulation end time (YYYY-MM-DD[Thh:mm]). By default: End of runoff.")
     self%omp_min       = omp_min       !`"m", has_value=.true.,  help="Minimum river level size to route in parallel with OpenMP. By default: threads * 8")
     self%parallel_rout = parallel_rout ! "p", has_value=.false., help="Level order for parallel routing starting from river root.")
 
@@ -125,7 +126,6 @@ contains
     self%fdir_file = fdir_file
     self%dem_file = dem_file
     self%slope_file = slope_file
-    self%runoff_file = runoff_file 
     self%out_file = out_file
     self%node_out_file = node_out_file
 
@@ -141,27 +141,41 @@ contains
 
   ! read initial values and populate exchange
   subroutine mrm_connect(self)
+    use mo_datetime, only: datetime, timedelta, HOUR_SECONDS, DAY_HOURS, one_hour, one_day 
     use mo_grid, only: grid_t
-    use mo_grid_io, only: var, input_dataset
+    use mo_grid_io, only: var, input_dataset, output_dataset, center_timestamp, hourly, daily, monthly, yearly, time_units_delta
+    use mo_river, only: river_t
+    use mo_river_upscaler, only: river_upscaler_t
     use mo_river_tools, only: read_scc_gauges
     use mo_os, only: path_ext, path_isfile
-    class(mrm_t), intent(inout) :: self
-    type(grid_t), target :: grid, cgrid
+    use mo_string_utils, only: n2s => num2str
+
+    implicit none
+
+    class(mrm_t), target, intent(inout) :: self
+    type(input_dataset) :: input, in_ds
+    type(datetime) :: current_time, start_time_frame 
+    type(river_t), target :: river, criver
+    type(grid_t), target :: level0, level1, level11
     type(input_dataset) :: ds
-    character(:), allocatable   :: file
+    type(river_upscaler_t) :: upscaler
+    logical                     :: rout
+    logical, allocatable        :: scc_latlon
+    character(:), allocatable   :: file, tmp
+    character(:), allocatable   :: delta
+    integer(i4)                 :: write_step
+    integer(i4)                 :: chunk_offset
     integer(i4), allocatable    :: mfdir(:,:), fdir(:)
+    integer(i8), allocatable    :: omp_min
     real(dp), allocatable       :: mdem(:,:), dem(:), mslope(:,:), slope(:), scc_gauges(:,:)
-    logical                     :: scc_latlon
+    real(dp), allocatable       :: arr(:,:)
+    real(dp), allocatable       :: discharge(:)
+    real(dp), pointer           :: runoff(:) => null()
+
     call message(" ... connecting mrm: ", self%exchange%time%str())
 
-    ! read values
-    ! <- runoff file if required
-    ! <- scc file
-    ! <- fdir file
-    ! <- slope file
-
-    print*, 'self%scc_file: ', trim(self%config%scc_file)
-    call read_scc_gauges(self%config%scc_file, scc_gauges, scc_latlon)
+    ! call message('self%scc_file: ', trim(self%config%scc_file))
+    if (path_isfile(self%config%scc_file)) call read_scc_gauges(self%config%scc_file, scc_gauges, scc_latlon)
     ! call read_scc_gauges("src/tests/files/scc_gauges.nc", scc_gauges, scc_latlon)
 
     ! file = "src/tests/files/fdir.asc"
@@ -169,72 +183,206 @@ contains
     ! slope_file = "src/tests/files/slope.asc"
 
     file = self%config%fdir_file
-    print*, "read data: ", trim(file)
+    call message("read data: ", trim(file))
     select case(path_ext(file))
       case(".nc")
-        call ds%init(path=file, grid=grid, vars=[var(name="fdir", static=.true.)], grid_init_var="fdir")
-        allocate(fdir(grid%ncells))
+        call ds%init(path=file, grid=level0, vars=[var(name="fdir", static=.true.)], grid_init_var="fdir")
+        allocate(fdir(level0%ncells))
         call ds%read("fdir", fdir)
         call ds%close()
       case(".asc")
-        call grid%from_ascii_file(file)
-        call grid%read_data(file, mfdir)
-        fdir = grid%pack(mfdir)
+        call level0%from_ascii_file(file)
+        call level0%read_data(file, mfdir)
+        fdir = level0%pack(mfdir)
         deallocate(mfdir)
       case default
-        call error_message("unknown file extension: ", path_ext(file))
+        call error_message("unknown file extension (i.e. not '.asc' or '.nc'): ", path_ext(file))
     end select
-    if (path_isfile(self%config%dem_file)) then
-      print*, "read dem: ", trim(self%config%dem_file)
-      call grid%read_data(self%config%dem_file, mdem)
-      dem = grid%pack(mdem)
-      deallocate(mdem)
-    end if
-    if (path_isfile(self%config%slope_file)) then
-    print*, "read slope: ", trim(self%config%slope_file)
-      call grid%read_data(self%config%slope_file, mslope)
-      slope = grid%pack(mslope)
-      deallocate(mslope)
-    end if
+    
+    if (.true.) then ! should only be read if celerity is not constant
+      file = self%config%fdir_file
+      call message("read slope: ", file)
+      select case(path_ext(file))
+        case(".nc")
+          call in_ds%init(path=file, grid=level0, vars=[var(name="slope", static=.true.)])
+          allocate(slope(level0%ncells))
+          call in_ds%read("slope", slope)
+          call in_ds%close()
+        case(".asc")
+          call level0%read_data(file, mslope)
+          slope = level0%pack(mslope)
+          deallocate(mslope)
+        case default
+          call error_message("unknown file extension (i.e. not '.asc' or '.nc'): ", path_ext(file))
+      end select
+  end if
 
-    ! generate river
-  ! call message("create river network:", n2s(level0%ncells))
-  ! call river%from_fdir(fdir, level0)
+  ! generate river
+  call message("create river network:", n2s(level0%ncells))
+  call river%from_fdir(fdir, level0)
 
-  ! call message("calculate facc on level0")
-  ! call river%calc_order()
-  ! call river%calc_facc()
+  call message("calculate facc on level0")
+  call river%calc_order()
+  call river%calc_facc()
 
-  ! call message("upscale river")
-  ! if (cli%option_was_read("level11")) then
-  !   tmp = cli%option_value("level11")
-  !   read(tmp,*) resolution ! convert string to number
-  ! else
-  !   resolution = input%grid%cellsize
+  call message("upscale river")
+  
+  ! derive level11 grid
+  level11 = level0%derive_grid(target_resolution=real(self%config%level11, dp))
+  if (level11%has_aux_coords()) call level11%estimate_aux_vertices()
+  call message(" ... level0 ncells", n2s(level0%ncells))
+  call message(" ... level0 cellsize", n2s(level0%cellsize))
+  call message(" ... level1 ncells", n2s(input%grid%ncells))
+  call message(" ... level1 cellsize", n2s(input%grid%cellsize))
+  call message(" ... level11 ncells", n2s(level11%ncells))
+  call message(" ... level11 cellsize", n2s(level11%cellsize))
+  if (is_close(level11%cellsize, level0%cellsize)) then
+    call message(" ... use L0 river")
+    call criver%from_fdir(fdir, level11)
+    call criver%calc_celerity(gamma=self%config%gamma, slope=slope, constant_celerity=self%config%const_celerity)
+  else
+    call upscaler%init(river, criver, level11, scc_gauges, scc_latlon) ! scc_gauges/scc_latlon not present if not allocated
+    call upscaler%calc_celerity(gamma=self%config%gamma, slope=slope, constant_celerity=self%config%const_celerity)
+  end if
+  
+  if (path_isfile(self%config%scc_file)) then
+    self%scc_active = .true.
+    allocate(scc_latlon)  ! if not isd, it is not present as optional argument
+    call message(" ... read scc gauges file: ", self%config%scc_file)
+    call read_scc_gauges(self%config%scc_file, scc_gauges, scc_latlon)
+    print*, scc_latlon
+    print*, scc_gauges
+  else
+    self%scc_active = .false.
+  end if
+
+  ! TODO: destroy river and upscaler to save memory
+  call message("initialize router")
+  rout = self%config%parallel_rout
+  if (self%config%omp_min .ge. 1_i4) then
+    allocate(omp_min)
+    omp_min = self%config%omp_min
+    call message(" ... set minimum level size for openmp: ", n2s(omp_min))
+  end if
+  call self%router%init(criver, level1, self%exchange%runoff_total%stepping, max_route_step=3600.0_dp, root_levels=rout, omp_level_thresh=omp_min) ! omp_min not present if not allocated
+  call message(" ... router%step: ", n2s(self%router%step))
+  call message(" ... last level in parallel: ", n2s(self%router%last_parallel_level), "/", n2s(self%router%river%order%n_levels))
+
+! node_out = cli%option_was_read("node_out_file")
+  ! if (node_out) then
+  !   call message(" ... create node based output file: ", cli%option_value("node_out_file"))
+  !   call dsr%init(path=cli%option_value("node_out_file"), river=criver, vars=vars, start_time=start_time, delta=delta, timestamp=center_timestamp)
   ! end if
 
-  ! scc = cli%option_was_read("scc")
-  ! if (scc) then
-  !  (scc_latlon)  ! if not isd, it is not present as optional argument
-  !   call message(" ... read scc gauges file: ", cli%option_value("scc"))
-  !   call read_scc_gauges(cli%option_value("scc"), scc_gauges, scc_latlon)
-  !   print*, scc_latlon
-  !   print*, scc_gauges
-  ! end if
-    ! populate exchange type
+  ! prepare run
+  allocate(discharge(criver%n_nodes), source=0.0_dp)
+
+  ! populate exchange type
+  ! ST: what should I do here???
+  ! self%exchange%runoff_total => runoff_chunk -> happens in input
+  self%exchange%q_mod%data => self%discharge
+  ! runoff has to be provided via exchange
+  ! runoff is input
 
   end subroutine mrm_connect
 
   ! set initial values like timestep 0
   subroutine mrm_initialize(self)
-    class(mrm_t), intent(inout) :: self
+    use mo_grid_io, only: var, center_timestamp, hourly, daily, monthly, yearly, time_units_delta
+    class(mrm_t), target, intent(inout) :: self
+    integer(i4)                         :: write_step
+    character(:), allocatable           :: delta
+    type(var), allocatable              :: vars(:)
     call message(" ... initialize mrm: ", self%exchange%time%str())
+
+    ! should be moved here from connect call self%router%init()
+
+    ! create output
+    call message("create output file: ", self%config%out_file)
+    select case(self%config%out_frequency)
+      case("hourly")
+        write_step = hourly
+        call message(" ... hourly output")
+      case("daily")
+        write_step = daily
+        call message(" ... daily output")
+      case("monthly")
+        write_step = monthly
+        call message(" ... monthly output")
+      case("yearly")
+        write_step = yearly
+        call message(" ... yearly output")
+      case("once")
+        write_step = 0_i4
+        call message(" ... output once at end of run")
+      case default
+        call error_message("Unknown value for 'out_frequency': ", self%config%out_frequency)
+    end select
+    delta = time_units_delta(write_step, center_timestamp)
+    vars = [var(name="discharge", units="m3 s-1", avg=.true.)]
+    call self%ds_out%init(path=self%config%out_file, &
+          grid=self%level11, &
+          vars=vars, &
+          start_time=self%exchange%start_time, &
+          delta=delta, &
+          timestamp=center_timestamp)
+  
   end subroutine mrm_initialize
 
   ! perform routing within time loop
   subroutine mrm_update(self)
-    class(mrm_t), intent(inout) :: self
+    use mo_grid_io, only: hourly, daily, monthly, yearly
+    class(mrm_t), target, intent(inout) :: self
+    logical :: write_stamp
     call message(" ... updating mrm: ", self%exchange%time%str())
+ 
+    ! route runoff
+    call self%router%update(self%exchange%runoff_total%data, self%exchange%q_mod%data)
+    
+    ! update output
+    if (self%scc_active) then
+      call self%ds_out%update("discharge", self%criver%select_cell_values(self%discharge))
+    else
+      call self%ds_out%update("discharge", self%discharge)
+    end if
+    ! currently deactivated
+    ! if (node_out) call self%dsr%update("discharge", self%discharge)
+
+    ! write time-stamp depending on config
+    write_stamp = .false.
+    select case(self%config%out_frequency)
+      case("hourly")
+        write_stamp = .true.
+      case("daily")
+        if (self%exchange%time%is_new_day()) write_stamp = .true.
+      case("monthly")
+        if (self%exchange%time%is_new_month()) write_stamp = .true.
+      case("yearly")
+        if (self%exchange%time%is_new_year()) write_stamp = .true.
+      case("once")
+        if (self%exchange%time == self%exchange%end_time) write_stamp = .true.
+    end select
+    if (write_stamp) call self%ds_out%write(self%exchange%time)
+    ! if (write_stamp.and.node_out) call dsr%write(current_time)
+
   end subroutine mrm_update
+
+  subroutine close(self)
+    class(mrm_t), intent(inout) :: self
+
+    call message("close ... mRM")
+  ! if (write_step == 0_i4) then
+  !   call ds%write(current_time)
+  !   if (node_out) call dsr%write(current_time)
+  ! end if
+  ! call ds%close()
+  ! if (node_out) call dsr%close()
+  ! call input%close()
+
+  ! ! destroy runoff pointer
+  ! if (.not.chunking) deallocate(runoff)
+  ! nullify(runoff)
+
+  end subroutine close
 
 end module mo_mrm_container
