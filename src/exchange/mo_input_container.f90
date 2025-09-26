@@ -14,6 +14,7 @@ module mo_input_container
   use mo_exchange_type, only: exchange_t
   use mo_message, only: message, error_message
   use mo_datetime, only: datetime, timedelta, HOUR_SECONDS, DAY_HOURS, one_hour, one_day 
+  use mo_grid, only: grid_t
   use mo_grid_io, only: var, input_dataset
   use mo_string_utils, only: n2s => num2str
 
@@ -44,6 +45,7 @@ module mo_input_container
     integer(i4)           :: chunk_offset
     real(dp), allocatable :: runoff(:) ! current step
     real(dp), allocatable :: runoff_chunk(:,:)
+    type(grid_t)          :: level1
     type(input_dataset)   :: input_runoff
   contains
     procedure :: configure => input_configure
@@ -95,22 +97,19 @@ contains
   end subroutine input_config_read
 
   subroutine input_connect(self)
-    use mo_grid, only: grid_t
     ! input/output variables
     class(input_t), target, intent(inout) :: self
     ! local variables
-    logical         :: chunking
-    integer(i4)     :: input_step
-    character(1024) :: file
-    type(grid_t), target    :: level1
-    type(timedelta) :: model_step
+    logical              :: chunking
+    integer(i4)          :: input_step
+    character(1024)      :: file
+    type(timedelta)      :: model_step
     call message(" ... connecting input: ", self%exchange%time%str())
     ! read values
     ! <- runoff file if required
     file = self%config%runoff_file
     call message("open runoff file: ", file)
-    call message("level 1 grid is initialized here but should be done in configure of exchange")
-    call self%input_runoff%init(path=file, grid=level1, vars=[var(name="Q", static=.false.)], grid_init_var="Q")
+    call self%input_runoff%init(path=file, grid=self%level1, vars=[var(name="Q", static=.false.)], grid_init_var="Q")
     ! model time config
     if (self%input_runoff%static) call error_message("runoff file is static.")
     if (self%input_runoff%timestep > 0_i4) model_step = one_hour() * self%input_runoff%timestep
@@ -143,12 +142,13 @@ contains
     else
       call message(" ... read each input separately")
       ! allocate pointer
-      allocate(self%runoff_chunk(self%exchange%level1%ncells, 1), source=0.0_dp)
+      allocate(self%runoff_chunk(self%level1%ncells, 1), source=0.0_dp)
     end if
 
     ! exchange points to runoff
     self%exchange%runoff_total%data => self%runoff_chunk(:, 1)
     self%exchange%runoff_total%stepping = self%runoff_input_step
+    self%exchange%level1 => self%level1
 
   end subroutine input_connect
 
@@ -176,8 +176,9 @@ contains
   ! updates input for mRM
   subroutine input_update_mrm(self)
     class(input_t), target, intent(inout) :: self
+    integer(i4) :: slice
 
-    call message(" ... updating mrm")
+    call message(" ... updating reading of runoff")
 
     if (self%config%chunk /= 'off') then
       if (self%exchange%time > self%chunk_time_end) then
@@ -193,12 +194,12 @@ contains
         self%chunk_offset = self%input_runoff%time_index(self%chunk_time_start)
       end if
       ! update pointer if a different day
-      self%exchange%runoff_total%data => self%runoff_chunk(:, self%input_runoff%time_index(self%exchange%time) - self%chunk_offset)
+      slice = int(self%input_runoff%time_index(self%exchange%time) - self%chunk_offset, i4) ! ST: need to put this into an integer, otherwise segfault with gfortran14
+      self%exchange%runoff_total%data => self%runoff_chunk(:, slice)
     else
       call self%input_runoff%read("Q", self%runoff_chunk(:, 1), self%exchange%time) ! read every time-step separately
       self%exchange%runoff_total%data => self%runoff_chunk(:, 1)  
     end if
-
   end subroutine
 
 end module mo_input_container

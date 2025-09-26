@@ -50,7 +50,7 @@ module mo_mrm_container
   type, public :: mrm_t
     type(mrm_config_t)        :: config !< configuration of the mRM process container
     type(exchange_t), pointer :: exchange => null() !< exchange container of the domain
-    type(grid_t)              :: level11
+    type(grid_t)              :: level0, level11
     type(river_router_t)      :: router
     type(river_t)             :: criver
     type(output_dataset)      :: ds_out
@@ -101,8 +101,8 @@ contains
     real(dp) :: gamma
     logical  :: const_celerity
 
-    namelist /mrm_main/ chunk, out_frequency, level11, start_time, end_time, omp_min, parallel_rout
-    namelist /mrm_dirs/ scc_file, fdir_file, dem_file, slope_file, runoff_file, out_file, node_out_file
+    namelist /mrm_main/ out_frequency, level11, omp_min, parallel_rout
+    namelist /mrm_dirs/ scc_file, fdir_file, dem_file, slope_file, out_file, node_out_file
     namelist /mrm_params/ gamma, const_celerity
 
     call message(" ... read config mrm: ", file, ", ", output_file)
@@ -156,7 +156,6 @@ contains
     type(input_dataset) :: input, in_ds
     type(datetime) :: current_time, start_time_frame 
     type(river_t), target :: river, criver
-    type(grid_t), target :: level0, level1, level11
     type(input_dataset) :: ds
     type(river_upscaler_t) :: upscaler
     logical                     :: rout
@@ -186,14 +185,14 @@ contains
     call message("read data: ", trim(file))
     select case(path_ext(file))
       case(".nc")
-        call ds%init(path=file, grid=level0, vars=[var(name="fdir", static=.true.)], grid_init_var="fdir")
-        allocate(fdir(level0%ncells))
+        call ds%init(path=file, grid=self%level0, vars=[var(name="fdir", static=.true.)], grid_init_var="fdir")
+        allocate(fdir(self%level0%ncells))
         call ds%read("fdir", fdir)
         call ds%close()
       case(".asc")
-        call level0%from_ascii_file(file)
-        call level0%read_data(file, mfdir)
-        fdir = level0%pack(mfdir)
+        call self%level0%from_ascii_file(file)
+        call self%level0%read_data(file, mfdir)
+        fdir = self%level0%pack(mfdir)
         deallocate(mfdir)
       case default
         call error_message("unknown file extension (i.e. not '.asc' or '.nc'): ", path_ext(file))
@@ -204,13 +203,13 @@ contains
       call message("read slope: ", file)
       select case(path_ext(file))
         case(".nc")
-          call in_ds%init(path=file, grid=level0, vars=[var(name="slope", static=.true.)])
-          allocate(slope(level0%ncells))
+          call in_ds%init(path=file, grid=self%level0, vars=[var(name="slope", static=.true.)])
+          allocate(slope(self%level0%ncells))
           call in_ds%read("slope", slope)
           call in_ds%close()
         case(".asc")
-          call level0%read_data(file, mslope)
-          slope = level0%pack(mslope)
+          call self%level0%read_data(file, mslope)
+          slope = self%level0%pack(mslope)
           deallocate(mslope)
         case default
           call error_message("unknown file extension (i.e. not '.asc' or '.nc'): ", path_ext(file))
@@ -218,8 +217,8 @@ contains
   end if
 
   ! generate river
-  call message("create river network:", n2s(level0%ncells))
-  call river%from_fdir(fdir, level0)
+  call message("create river network:", n2s(self%level0%ncells))
+  call river%from_fdir(fdir, self%level0)
 
   call message("calculate facc on level0")
   call river%calc_order()
@@ -228,20 +227,26 @@ contains
   call message("upscale river")
   
   ! derive level11 grid
-  level11 = level0%derive_grid(target_resolution=real(self%config%level11, dp))
-  if (level11%has_aux_coords()) call level11%estimate_aux_vertices()
-  call message(" ... level0 ncells", n2s(level0%ncells))
-  call message(" ... level0 cellsize", n2s(level0%cellsize))
-  call message(" ... level1 ncells", n2s(input%grid%ncells))
-  call message(" ... level1 cellsize", n2s(input%grid%cellsize))
-  call message(" ... level11 ncells", n2s(level11%ncells))
-  call message(" ... level11 cellsize", n2s(level11%cellsize))
-  if (is_close(level11%cellsize, level0%cellsize)) then
+  self%level11 = self%level0%derive_grid(target_resolution=real(self%config%level11, dp))
+  if (self%level11%has_aux_coords()) call self%level11%estimate_aux_vertices()
+  call message(" ... level0 ncells", n2s(self%level0%ncells))
+  call message(" ... level0 cellsize", n2s(self%level0%cellsize))
+  call message(" ... level0 xllcorner", n2s(self%level0%xllcorner))
+  call message(" ... level0 yllcorner", n2s(self%level0%yllcorner))
+  call message(" ... level1 ncells", n2s(self%exchange%level1%ncells))
+  call message(" ... level1 cellsize", n2s(self%exchange%level1%cellsize))
+  call message(" ... level1 xllcorner", n2s(self%exchange%level1%xllcorner))
+  call message(" ... level1 yllcorner", n2s(self%exchange%level1%yllcorner))
+  call message(" ... level11 ncells", n2s(self%level11%ncells))
+  call message(" ... level11 cellsize", n2s(self%level11%cellsize))
+  call message(" ... level11 xllcorner", n2s(self%level11%xllcorner))
+  call message(" ... level11 yllcorner", n2s(self%level11%yllcorner))
+  if (is_close(self%level11%cellsize, self%level0%cellsize)) then
     call message(" ... use L0 river")
-    call criver%from_fdir(fdir, level11)
+    call criver%from_fdir(fdir, self%level11)
     call criver%calc_celerity(gamma=self%config%gamma, slope=slope, constant_celerity=self%config%const_celerity)
   else
-    call upscaler%init(river, criver, level11, scc_gauges, scc_latlon) ! scc_gauges/scc_latlon not present if not allocated
+    call upscaler%init(river, criver, self%level11, scc_gauges, scc_latlon) ! scc_gauges/scc_latlon not present if not allocated
     call upscaler%calc_celerity(gamma=self%config%gamma, slope=slope, constant_celerity=self%config%const_celerity)
   end if
   
@@ -264,7 +269,7 @@ contains
     omp_min = self%config%omp_min
     call message(" ... set minimum level size for openmp: ", n2s(omp_min))
   end if
-  call self%router%init(criver, level1, self%exchange%runoff_total%stepping, max_route_step=3600.0_dp, root_levels=rout, omp_level_thresh=omp_min) ! omp_min not present if not allocated
+  call self%router%init(criver, self%exchange%level1, self%exchange%runoff_total%stepping, max_route_step=3600.0_dp, root_levels=rout, omp_level_thresh=omp_min) ! omp_min not present if not allocated
   call message(" ... router%step: ", n2s(self%router%step))
   call message(" ... last level in parallel: ", n2s(self%router%last_parallel_level), "/", n2s(self%router%river%order%n_levels))
 
@@ -337,6 +342,8 @@ contains
     call message(" ... updating mrm: ", self%exchange%time%str())
  
     ! route runoff
+    ! print *, self%router%input_grid%ncells
+    ! print *, 'ha...'
     call self%router%update(self%exchange%runoff_total%data, self%exchange%q_mod%data)
     
     ! update output

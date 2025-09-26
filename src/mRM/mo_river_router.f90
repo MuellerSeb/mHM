@@ -227,6 +227,7 @@ contains
       this%runoff = this%scale_runoff(this%acc_runoff)
     end if
     ! route
+    print *, 'ha...a'
     do i = 1_i4, this%iterations
       call this%route(this%discharge, this%tributary)
       if (i == 1_i4) then
