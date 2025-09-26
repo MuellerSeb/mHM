@@ -651,7 +651,7 @@ contains
 
     type(NcVariable) :: var
 
-    integer(i4) :: i, j, k
+    integer(i4) :: i, j
 
     ! set file name
     fname = trim(InFile)
@@ -835,10 +835,10 @@ contains
 
     ! generate sink cells
     do i = 1_i4, level11(iDomain)%nCells
-      k = size(L11_sink) - level11(iDomain)%nCells + i ! %iStart not yet determined
-      if (.not.L11_sink(k)) cycle
-      j = L11_toN(k)
-      if (.not.any(sink_cells(iDomain)%ids == j)) sink_cells(iDomain)%ids = [sink_cells(iDomain)%ids, j]
+      j = size(L11_sink) - level11(iDomain)%nCells + i ! %iStart not yet determined
+      if (.not.L11_sink(j)) cycle
+      ! add sink target cell to sink_cells if not already present (in case of multiple inflows (rare case))
+      if (.not.any(sink_cells(iDomain)%ids == L11_toN(j))) sink_cells(iDomain)%ids = [sink_cells(iDomain)%ids, L11_toN(j)]
     end do
   end subroutine mrm_read_restart_config
 
