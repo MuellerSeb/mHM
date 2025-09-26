@@ -598,7 +598,7 @@ contains
     nInflowGauges, &
     InflowHeadwater, &
     InflowNodeList, &
-    sink, &
+    sink_cells, &
     L11_qTR, &
     L11_Qmod &
   )
@@ -626,7 +626,7 @@ contains
     !> [-]      L11 ID of inflow points
     integer(i4), dimension(:), intent(in) :: InflowNodeList
     ! [-]      sink nodes
-    logical, dimension(:), intent(in) :: sink
+    integer(i4), dimension(:), intent(in) :: sink_cells
     !> [m3 s-1] Transformed outflow leaving node I at current timestep(Muskingum)
     real(dp), intent(in), dimension(:) :: L11_qTR
     !> [m3 s-1] Simulated routed discharge
@@ -694,11 +694,11 @@ contains
 
     ! Accumulate all inputs at sinks
     ! calculate riv temp at sinks
-    do k = 1, size(sink)
-      if (.not.sink(k)) cycle
-      L11to = k + self%s11 - 1_i4
+    do k = 1, size(sink_cells)
+      tNode = sink_cells(k)
+      L11to = tNode + self%s11 - 1_i4
       self%netNode_E_IN(L11to, 2) = self%netNode_E_IN(L11to, 2) + self%netNode_E_out(L11to)
-      self%river_temp(L11to) = self%netNode_E_IN(L11to, 2) / L11_Qmod(k) - T0_dp
+      self%river_temp(L11to) = self%netNode_E_IN(L11to, 2) / L11_Qmod(tNode) - T0_dp
     end do
 
     ! backflow t-> t-1

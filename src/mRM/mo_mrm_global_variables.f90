@@ -124,6 +124,14 @@ module mo_mrm_global_variables
 
   ! dim1 = domainId
   type(domainInfo_mRM), dimension(:), allocatable, public, target :: domain_mrm ! domain structure
+
+  !> \class sink_cells_t
+  !> \brief container to hold all sink cell ids for a domain
+  type, public :: sink_cells_t
+    integer(i4), dimension(:), allocatable :: ids   ! cell ids of sinks
+  end type sink_cells_t
+  type(sink_cells_t), dimension(:), allocatable :: sink_cells !< sink cell ids for each domain
+
   ! -------------------------------------------------------------------
   ! L0 DOMAIN description -> those are needed within the mrm_net_startup routines only
   ! TODO: deallocate when net_startup is done

@@ -730,7 +730,7 @@ contains
     use mo_append, only : append
     use mo_common_constants, only : nodata_i4
     use mo_mrm_global_variables, only : L11_fDir, L11_fromN, L11_label, L11_nOutlets, L11_netPerm, L11_rOrder, L11_sink, L11_toN, &
-                                        level11
+                                        level11, sink_cells
 
     implicit none
 
@@ -832,7 +832,11 @@ contains
 
       ! identify sink cells
       do ii = 1, nLinks
-        if (L11_fdir(level11(iDomain)%iStart + nLinkToN(ii) - 1_i4) .eq. 0_i4) nlinksink(ii) = .True.
+        if (L11_fdir(level11(iDomain)%iStart + nLinkToN(ii) - 1_i4) .eq. 0_i4) then
+          nlinksink(ii) = .True.
+          ! add sink target cell to sink_cells if not already present (in case of multiple inflows (rare case))
+          if (.not.any(sink_cells(iDomain)%ids == nLinkToN(ii))) sink_cells(iDomain)%ids = [sink_cells(iDomain)%ids, nLinkToN(ii)]
+        end if
       end do
       where(nlinksink) nLinkLabel = 2 !  'Sink'
 
