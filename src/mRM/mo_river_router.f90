@@ -215,6 +215,7 @@ contains
     ! average runoff flux over input time step accumulations
     if (this%accumulations > 1_i4) this%acc_runoff = this%acc_runoff / this%accumulations
     ! distribute runoff in case of SCC
+    this%river%scc = .False.
     if (this%river%scc) then
       this%scaled_runoff = this%scale_runoff(this%acc_runoff)
       !$omp parallel do simd default(none) schedule(static) shared(this) private(c)
@@ -227,7 +228,6 @@ contains
       this%runoff = this%scale_runoff(this%acc_runoff)
     end if
     ! route
-    print *, 'ha...a'
     do i = 1_i4, this%iterations
       call this%route(this%discharge, this%tributary)
       if (i == 1_i4) then

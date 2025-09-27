@@ -53,6 +53,7 @@ module mo_mrm_container
     type(grid_t)              :: level0, level11
     type(river_router_t)      :: router
     type(river_t)             :: criver
+    type(river_t)             :: river
     type(output_dataset)      :: ds_out
     real(dp), allocatable     :: discharge(:)
     logical                   :: scc_active
@@ -155,7 +156,6 @@ contains
     class(mrm_t), target, intent(inout) :: self
     type(input_dataset) :: input, in_ds
     type(datetime) :: current_time, start_time_frame 
-    type(river_t), target :: river, criver
     type(input_dataset) :: ds
     type(river_upscaler_t) :: upscaler
     logical                     :: rout
@@ -167,8 +167,6 @@ contains
     integer(i4), allocatable    :: mfdir(:,:), fdir(:)
     integer(i8), allocatable    :: omp_min
     real(dp), allocatable       :: mdem(:,:), dem(:), mslope(:,:), slope(:), scc_gauges(:,:)
-    real(dp), allocatable       :: arr(:,:)
-    real(dp), allocatable       :: discharge(:)
     real(dp), pointer           :: runoff(:) => null()
 
     call message(" ... connecting mrm: ", self%exchange%time%str())
@@ -218,11 +216,11 @@ contains
 
   ! generate river
   call message("create river network:", n2s(self%level0%ncells))
-  call river%from_fdir(fdir, self%level0)
+  call self%river%from_fdir(fdir, self%level0)
 
   call message("calculate facc on level0")
-  call river%calc_order()
-  call river%calc_facc()
+  call self%river%calc_order()
+  call self%river%calc_facc()
 
   call message("upscale river")
   
@@ -231,22 +229,16 @@ contains
   if (self%level11%has_aux_coords()) call self%level11%estimate_aux_vertices()
   call message(" ... level0 ncells", n2s(self%level0%ncells))
   call message(" ... level0 cellsize", n2s(self%level0%cellsize))
-  call message(" ... level0 xllcorner", n2s(self%level0%xllcorner))
-  call message(" ... level0 yllcorner", n2s(self%level0%yllcorner))
   call message(" ... level1 ncells", n2s(self%exchange%level1%ncells))
   call message(" ... level1 cellsize", n2s(self%exchange%level1%cellsize))
-  call message(" ... level1 xllcorner", n2s(self%exchange%level1%xllcorner))
-  call message(" ... level1 yllcorner", n2s(self%exchange%level1%yllcorner))
   call message(" ... level11 ncells", n2s(self%level11%ncells))
   call message(" ... level11 cellsize", n2s(self%level11%cellsize))
-  call message(" ... level11 xllcorner", n2s(self%level11%xllcorner))
-  call message(" ... level11 yllcorner", n2s(self%level11%yllcorner))
   if (is_close(self%level11%cellsize, self%level0%cellsize)) then
     call message(" ... use L0 river")
-    call criver%from_fdir(fdir, self%level11)
-    call criver%calc_celerity(gamma=self%config%gamma, slope=slope, constant_celerity=self%config%const_celerity)
+    call self%criver%from_fdir(fdir, self%level11)
+    call self%criver%calc_celerity(gamma=self%config%gamma, slope=slope, constant_celerity=self%config%const_celerity)
   else
-    call upscaler%init(river, criver, self%level11, scc_gauges, scc_latlon) ! scc_gauges/scc_latlon not present if not allocated
+    call upscaler%init(self%river, self%criver, self%level11, scc_gauges, scc_latlon) ! scc_gauges/scc_latlon not present if not allocated
     call upscaler%calc_celerity(gamma=self%config%gamma, slope=slope, constant_celerity=self%config%const_celerity)
   end if
   
@@ -269,7 +261,7 @@ contains
     omp_min = self%config%omp_min
     call message(" ... set minimum level size for openmp: ", n2s(omp_min))
   end if
-  call self%router%init(criver, self%exchange%level1, self%exchange%runoff_total%stepping, max_route_step=3600.0_dp, root_levels=rout, omp_level_thresh=omp_min) ! omp_min not present if not allocated
+  call self%router%init(self%criver, self%exchange%level1, self%exchange%runoff_total%stepping, max_route_step=3600.0_dp, root_levels=rout, omp_level_thresh=omp_min) ! omp_min not present if not allocated
   call message(" ... router%step: ", n2s(self%router%step))
   call message(" ... last level in parallel: ", n2s(self%router%last_parallel_level), "/", n2s(self%router%river%order%n_levels))
 
@@ -280,7 +272,7 @@ contains
   ! end if
 
   ! prepare run
-  allocate(discharge(criver%n_nodes), source=0.0_dp)
+  allocate(self%discharge(self%criver%n_nodes), source=0.0_dp)
 
   ! populate exchange type
   ! ST: what should I do here???
@@ -339,12 +331,11 @@ contains
     use mo_grid_io, only: hourly, daily, monthly, yearly
     class(mrm_t), target, intent(inout) :: self
     logical :: write_stamp
-    call message(" ... updating mrm: ", self%exchange%time%str())
+    call message(" ... updating mRM: ", self%exchange%time%str())
  
     ! route runoff
     ! print *, self%router%input_grid%ncells
-    ! print *, 'ha...'
-    call self%router%update(self%exchange%runoff_total%data, self%exchange%q_mod%data)
+    call self%router%update(self%exchange%runoff_total%data, self%discharge)
     
     ! update output
     if (self%scc_active) then
