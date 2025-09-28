@@ -4,11 +4,14 @@
 
 !> \brief   Module for a mHM process container.
 !> \version 0.1
-!> \authors Sebastian Mueller
+!> \authors Sebastian Mueller, Stephan Thober
 !> \date    Aug 2025
 !> \copyright Copyright 2005-\today, the mHM Developers, Luis Samaniego, Sabine Attinger: All rights reserved.
 !! mHM is released under the LGPLv3+ license \license_note
 !> \ingroup f_exchange
+!
+! history
+! Sep 2026 - Stephan Thober: initial version using river dag
 module mo_mrm_container
   use mo_kind, only: i4, i8, dp
   use mo_nml, only: position_nml ! , close_nml
@@ -17,6 +20,7 @@ module mo_mrm_container
   use mo_message, only: message, error_message
   use mo_river, only: river_t
   use mo_river_router, only: river_router_t
+  use mo_river_output, only: river_output_dataset
   use mo_grid, only: grid_t
   use mo_grid_io, only: output_dataset
   use mo_utils, only: is_close
@@ -55,6 +59,7 @@ module mo_mrm_container
     type(river_t)             :: criver
     type(river_t)             :: river
     type(output_dataset)      :: ds_out
+    type(river_output_dataset)      :: dsr
     real(dp), allocatable     :: discharge(:)
     logical                   :: scc_active
   contains
@@ -171,14 +176,6 @@ contains
 
     call message(" ... connecting mrm: ", self%exchange%time%str())
 
-    ! call message('self%scc_file: ', trim(self%config%scc_file))
-    if (path_isfile(self%config%scc_file)) call read_scc_gauges(self%config%scc_file, scc_gauges, scc_latlon)
-    ! call read_scc_gauges("src/tests/files/scc_gauges.nc", scc_gauges, scc_latlon)
-
-    ! file = "src/tests/files/fdir.asc"
-    ! dem_file = "src/tests/files/dem.asc"
-    ! slope_file = "src/tests/files/slope.asc"
-
     file = self%config%fdir_file
     call message("read data: ", trim(file))
     select case(path_ext(file))
@@ -265,21 +262,12 @@ contains
   call message(" ... router%step: ", n2s(self%router%step))
   call message(" ... last level in parallel: ", n2s(self%router%last_parallel_level), "/", n2s(self%router%river%order%n_levels))
 
-! node_out = cli%option_was_read("node_out_file")
-  ! if (node_out) then
-  !   call message(" ... create node based output file: ", cli%option_value("node_out_file"))
-  !   call dsr%init(path=cli%option_value("node_out_file"), river=criver, vars=vars, start_time=start_time, delta=delta, timestamp=center_timestamp)
-  ! end if
-
   ! prepare run
   allocate(self%discharge(self%criver%n_nodes), source=0.0_dp)
 
   ! populate exchange type
-  ! ST: what should I do here???
-  ! self%exchange%runoff_total => runoff_chunk -> happens in input
   self%exchange%q_mod%data => self%discharge
-  ! runoff has to be provided via exchange
-  ! runoff is input
+
 
   end subroutine mrm_connect
 
@@ -323,6 +311,16 @@ contains
           start_time=self%exchange%start_time, &
           delta=delta, &
           timestamp=center_timestamp)
+
+    if (self%scc_active) then
+      call message(" ... create node based output file: ", self%config%node_out_file)
+      call self%dsr%init(path=self%config%node_out_file, &
+        river=self%criver, &
+        vars=vars, &
+        start_time=self%exchange%start_time, &
+        delta=delta, &
+        timestamp=center_timestamp)
+  end if
   
   end subroutine mrm_initialize
 
@@ -339,12 +337,11 @@ contains
     
     ! update output
     if (self%scc_active) then
+     call self%dsr%update("discharge", self%discharge)
       call self%ds_out%update("discharge", self%criver%select_cell_values(self%discharge))
     else
       call self%ds_out%update("discharge", self%discharge)
     end if
-    ! currently deactivated
-    ! if (node_out) call self%dsr%update("discharge", self%discharge)
 
     ! write time-stamp depending on config
     write_stamp = .false.
@@ -362,7 +359,7 @@ contains
     end select
     ! print *, self%exchange%time, self%config%out_frequency, write_stamp, self%exchange%start_time, self%exchange%end_time
     if (write_stamp) call self%ds_out%write(self%exchange%time)
-    ! if (write_stamp.and.node_out) call dsr%write(current_time)
+    if (write_stamp .and. self%scc_active) call self%dsr%write(self%exchange%time)
 
   end subroutine mrm_update
 

@@ -889,7 +889,7 @@ parallel_rout = .false.
 
 &mrm_dirs
 !
-scc_file = "NONE" ! src/tests/files/scc_gauges.nc"
+scc_file = "src/tests/files/scc_gauges.nc"
 fdir_file = "src/tests/files/fdir.asc" ! "src/tests/files/input.nc"
 dem_file = "src/tests/files/dem.asc"
 slope_file = "src/tests/files/slope.asc"
