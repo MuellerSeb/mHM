@@ -881,9 +881,6 @@
 out_frequency = 'daily'
 ! has_value=.true.,  help="Routing grid resolution. By default: Resolution of runoff.")
 level11 = 4000
-!start_time = "1990-01-01T01:00"
-! Simulation end time (YYYY-MM-DD[Thh:mm]). By default: End of runoff.
-!end_time = "1990-12-31"
 ! "Minimum river level size to route in parallel with OpenMP. By default: threads * 8
 omp_min = 1
 ! Level order for parallel routing starting from river root

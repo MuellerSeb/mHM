@@ -360,6 +360,7 @@ contains
       case("once")
         if (self%exchange%time == self%exchange%end_time) write_stamp = .true.
     end select
+    ! print *, self%exchange%time, self%config%out_frequency, write_stamp, self%exchange%start_time, self%exchange%end_time
     if (write_stamp) call self%ds_out%write(self%exchange%time)
     ! if (write_stamp.and.node_out) call dsr%write(current_time)
 
