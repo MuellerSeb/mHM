@@ -121,6 +121,8 @@ CONTAINS
     use mo_read_latlon, only : read_latlon
     use mo_mrm_river_head, only: init_masked_zeros_l0, calc_channel_elevation
     use mo_mrm_mpr, only : mrm_init_param
+    use mo_timer, only : timer_get, timer_start, timer_stop, timer_clear
+    use mo_string_utils, only : num2str
 
     implicit none
 
@@ -216,14 +218,58 @@ CONTAINS
     ! ----------------------------------------------------------
     do iDomain = 1, domainMeta%nDomains
        if (.not. mrm_read_river_network) then
+        
+        call timer_clear(1)
+        call timer_start(1)
         call L11_flow_direction(iDomain)
+        call message(' ')
+        call message('    Flow direction upscaled      ...')
+        call timer_stop(1)
+        call message('    in ', trim(num2str(timer_get(1), '(F9.3)')), ' seconds.')
+        
+        call timer_clear(1)
+        call timer_start(1)
         call L11_flow_accumulation(iDomain)
+        call message('    Flow accumulation upscaled   ...')
+        call timer_stop(1)
+        call message('    in ', trim(num2str(timer_get(1), '(F9.3)')), ' seconds.')
+        
+        call timer_clear(1)
+        call timer_start(1)
         call L11_set_network_topology(iDomain)
+        call message('    Topology configured          ...')
+        call timer_stop(1)
+        call message('    in ', trim(num2str(timer_get(1), '(F9.3)')), ' seconds.')
+        
+        call timer_clear(1)
+        call timer_start(1)
         call L11_routing_order(iDomain)
+        call message('    Routing order ready          ...')
+        call timer_stop(1)
+        call message('    in ', trim(num2str(timer_get(1), '(F9.3)')), ' seconds.')
+        
+        call timer_clear(1)
+        call timer_start(1)
         call L11_link_location(iDomain)
+        call message('    Link location done           ...')
+        call timer_stop(1)
+        call message('    in ', trim(num2str(timer_get(1), '(F9.3)')), ' seconds.')
+        
+        call timer_clear(1)
+        call timer_start(1)
         call L11_set_drain_outlet_gauges(iDomain)
+        call message('    Gauges assigned with nodes   ...')
+        call timer_stop(1)
+        call message('    in ', trim(num2str(timer_get(1), '(F9.3)')), ' seconds.')
+        
         ! stream characteristics
+        call timer_clear(1)
+        call timer_start(1)
         call L11_stream_features(iDomain)
+        call message('    Stream features generated    ...')
+        call timer_stop(1)
+        call message('    in ', trim(num2str(timer_get(1), '(F9.3)')), ' seconds.')
+        call timer_clear(1)
       end if
     end do
 
