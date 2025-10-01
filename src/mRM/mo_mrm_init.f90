@@ -111,7 +111,8 @@ CONTAINS
                                         gw_coupling, L0_river_head_mon_sum, &
                                         L11_netPerm, L11_fromN, L11_length, L11_nOutlets, &
                                         riv_temp_pcs, &
-                                        readLatLon
+                                        readLatLon, &
+                                        sink_cells
     use mo_mrm_net_startup, only : L11_flow_direction, L11_flow_accumulation, L11_fraction_sealed_floodplain, &
                                    L11_link_location, L11_routing_order, L11_set_drain_outlet_gauges, &
                                    L11_set_network_topology, L11_stream_features, l11_l1_mapping
@@ -147,6 +148,7 @@ CONTAINS
     ! ----------------------------------------------------------
     allocate(level11(domainMeta%nDomains))
     allocate(l0_l11_remap(domainMeta%nDomains))
+    allocate(sink_cells(domainMeta%nDomains))
 
     if (.not. mrm_read_river_network) then
       ! read all (still) necessary level 0 data
@@ -156,6 +158,7 @@ CONTAINS
     end if
 
     do iDomain = 1, domainMeta%nDomains
+      allocate(sink_cells(iDomain)%ids(0))
       domainID = domainMeta%indices(iDomain)
       if (mrm_read_river_network) then
         ! this reads the domain properties

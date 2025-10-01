@@ -94,6 +94,7 @@ module mo_mhm_interface_run
     L11_TSrout, &
     L11_fromN, &
     L11_length, &
+    sink_cells, &
     L11_nLinkFracFPimp, &
     L11_nOutlets, &
     L11_netPerm, &
@@ -579,6 +580,7 @@ contains
         L11_length(run_cfg%s11 : run_cfg%e11 - 1), & ! link length
         L11_slope(run_cfg%s11 : run_cfg%e11 - 1), &
         L11_nLinkFracFPimp(run_cfg%s11 : run_cfg%e11, run_cfg%domainDateTime%yId), & ! fraction of impervious layer at L11 scale
+        sink_cells(iDomain)%ids, &
         ! general INPUT/OUTPUT variables
         L11_C1(run_cfg%s11 : run_cfg%e11), & ! first muskingum parameter
         L11_C2(run_cfg%s11 : run_cfg%e11), & ! second muskigum parameter
