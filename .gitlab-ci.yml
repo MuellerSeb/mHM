@@ -361,7 +361,7 @@ documentation:
 
 documentation_stable:
   only:
-    - develop
+    - main
   variables:
     GIT_DEPTH: 0  # to have all tags
     DOC_TYPE: stable
@@ -369,7 +369,7 @@ documentation_stable:
 
 pages:
   only:
-    - develop
+    - main
   stage: deploy
   needs:
     - job: documentation
