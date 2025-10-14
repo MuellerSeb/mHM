@@ -2,6 +2,26 @@
 
 [TOC]
 
+## mHM v5.13.2 (Oct 2025)
+
+### Enhancements
+- add netcdf support for morphological input data ([!183](https://git.ufz.de/mhm/mhm/-/merge_requests/183))
+- updated FORCES to v0.7.1 to solve orderpack issue with huge arrays ([!177](https://git.ufz.de/mhm/mhm/-/merge_requests/177))
+- flood plain calculation is expensive and only required for processCase = 1, so we now skip it for case 2 and 3 ([!177](https://git.ufz.de/mhm/mhm/-/merge_requests/177))
+- namelists refactored to be represented as derived types ([!131](https://git.ufz.de/mhm/mhm/-/merge_requests/131))
+- add the outputs `L1_melt`, `L1_rain`, `L1_snow` and `L1_Throughfall` to mHM wrapper ([!176](https://git.ufz.de/mhm/mhm/-/merge_requests/176))
+
+### Changes
+- reverting to default parameters used within HICAM project ([!190](https://git.ufz.de/mhm/mhm/-/merge_requests/190))
+- `Optimization` namelist: set documented defaults for optimization config ([!186](https://git.ufz.de/mhm/mhm/-/merge_requests/186))
+- updated Python bindings and better CLI ([!192](https://git.ufz.de/mhm/mhm/-/merge_requests/192))
+- logos are now CC-BY([!171](https://git.ufz.de/mhm/mhm/-/merge_requests/171), [!172](https://git.ufz.de/mhm/mhm/-/merge_requests/172), [!173](https://git.ufz.de/mhm/mhm/-/merge_requests/173))
+
+### Bugfixes
+- MPI: better use statements with preprocessing to not confuse the cmake dependency generator ([!188](https://git.ufz.de/mhm/mhm/-/merge_requests/188))
+- netcdf output: make y-axis bounds decreasing, since y-axis is top-down (CF-conventions) ([!191](https://git.ufz.de/mhm/mhm/-/merge_requests/191))
+- mRM: add runoff for all sinks, not only the last in the list ([!194](https://git.ufz.de/mhm/mhm/-/merge_requests/194))
+
 ## mHM v5.13.1 (Aug 2023)
 
 ### Enhancements
