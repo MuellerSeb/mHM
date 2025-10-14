@@ -81,7 +81,7 @@ contains
     class(domain_list), intent(inout) :: self
     integer(i4), optional, intent(in) :: key !< domain key
     integer(i4) :: new_key !< key of the added domain
-    type(domain_t) :: new_domain
+    type(domain_t), save :: new_domain ! template for the new domain to be added (saved to avoid reallocation on each call)
     self%counter = self%counter + 1_i4
     if (present(key)) then
       new_key = key
@@ -92,12 +92,13 @@ contains
   end function domain_list_add
 
   !> \brief Configure the domain.
-  subroutine domain_configure(self, parameters, time_cfg, domain, input_cfg, meteo_cfg, mpr_cfg, mhm_cfg, mrm_cfg)
+  subroutine domain_configure(self, parameters, time_cfg, domain, cwd, input_cfg, meteo_cfg, mpr_cfg, mhm_cfg, mrm_cfg)
     ! domain is always an item of a domain_list, which stores "allocated pointers" and these implicitly have the "target" attribute
     class(domain_t), intent(inout), target :: self ! needs "target" so components can safely point to "exchange"
     type(parameters_t), intent(in) :: parameters !< configuration for the parameters
     type(time_config_t), intent(in) :: time_cfg !< configuration of the timing
     integer(i4), intent(in), optional :: domain !< domain ID of the current domain in the configuration arrays (1 by default)
+    character(len=*), intent(in), optional :: cwd !< current working directory to set relative paths
     type(input_config_t), intent(in), optional :: input_cfg !< configuration for the input container
     type(meteo_config_t), intent(in), optional :: meteo_cfg !< configuration for the meteo container
     type(mpr_config_t), intent(in), optional :: mpr_cfg !< configuration for the mpr container
@@ -105,7 +106,7 @@ contains
     type(mrm_config_t), intent(in), optional :: mrm_cfg !< configuration for the mrm container
 
     call message(" ... configure domain")
-    call self%exchange%configure(time_cfg, parameters, domain)
+    call self%exchange%configure(time_cfg, parameters, domain, cwd)
     ! configure
     if (present(input_cfg)) call self%input%configure(input_cfg, self%exchange)
     if (present(meteo_cfg)) call self%meteo%configure(meteo_cfg, self%exchange)

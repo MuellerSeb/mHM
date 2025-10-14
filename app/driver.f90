@@ -1,7 +1,7 @@
 !> \brief mHM next gen driver.
 program driver
   use mo_cli, only: cli_parser
-  use mo_os, only: change_dir
+  use mo_os, only: path_abspath, path_join, check_path_isdir
   use mo_message, only: message
   use mo_string_utils, only: n2s => num2str
   ! exchange
@@ -17,6 +17,7 @@ program driver
   use mo_mrm_container, only: mrm_config_t
 
   integer(i4) :: n_domains, i, id
+  character(len=:), allocatable :: cwd
   type(domain_t), pointer :: domain
 
   ! global configs
@@ -84,21 +85,24 @@ program driver
     help="Decrease verbosity level.")
 
   ! parse given command line arguments
+  cwd = "."
   call parser%parse()
-  if (parser%option_was_read("cwd")) call change_dir(parser%option_value("cwd"))
+  if (parser%option_was_read("cwd")) cwd = parser%option_value("cwd")
+  cwd = path_abspath(cwd)
+  call check_path_isdir(cwd, raise=.true.)
 
   call message("READ MAIN CONFIG")
   ! global configs
-  call main_cfg%read(parser%option_value("nml"))
-  call time_cfg%read(parser%option_value("nml"))
-  call process_cfg%read(parser%option_value("nml"))
-  call parameter_cfg%read(parser%option_value("parameter"))
+  call main_cfg%read(path_join(cwd, parser%option_value("nml")))
+  call time_cfg%read(path_join(cwd, parser%option_value("nml")))
+  call process_cfg%read(path_join(cwd, parser%option_value("nml")))
+  call parameter_cfg%read(path_join(cwd, parser%option_value("parameter")))
   ! container configs
-  call input_cfg%read(parser%option_value("nml"))
-  call meteo_cfg%read(parser%option_value("nml"))
-  call mpr_cfg%read(parser%option_value("nml"))
-  call mhm_cfg%read(parser%option_value("nml"), parser%option_value("mhm_output"))
-  call mrm_cfg%read(parser%option_value("nml"), parser%option_value("mrm_output"))
+  call input_cfg%read(path_join(cwd, parser%option_value("nml")))
+  call meteo_cfg%read(path_join(cwd, parser%option_value("nml")))
+  call mpr_cfg%read(path_join(cwd, parser%option_value("nml")))
+  call mhm_cfg%read(path_join(cwd, parser%option_value("nml")), path_join(cwd, parser%option_value("mhm_output")))
+  call mrm_cfg%read(path_join(cwd, parser%option_value("nml")), path_join(cwd, parser%option_value("mrm_output")))
 
   ! create parameters first
   call message("")
@@ -127,7 +131,7 @@ program driver
     call message("CONFIGURE domain: ", trim(adjustl(n2s(id))))
     ! get domain
     call domains%get_domain(id, domain)
-    call domain%configure(parameters, time_cfg, id, input_cfg, meteo_cfg, mpr_cfg, mhm_cfg, mrm_cfg)
+    call domain%configure(parameters, time_cfg, id, cwd, input_cfg, meteo_cfg, mpr_cfg, mhm_cfg, mrm_cfg)
   end do
 
   ! simple run
