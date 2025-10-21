@@ -348,8 +348,9 @@ contains
       allocate(y_bnds(2, size(northing)))
       x_bnds(1, :) = easting - half_step
       x_bnds(2, :) = easting + half_step
-      y_bnds(1, :) = northing - half_step
-      y_bnds(2, :) = northing + half_step
+      ! y-axis is top-down, so bounds should be also decreasing
+      y_bnds(2, :) = northing - half_step
+      y_bnds(1, :) = northing + half_step
 
       dimids1 = (/&
         nc%setDimension("easting", size(easting)), &
@@ -393,8 +394,9 @@ contains
       ! cellsize is given in degree in case of lat-lon coordinates
       x_bnds(1, :) = lon1d - half_step
       x_bnds(2, :) = lon1d + half_step
-      y_bnds(1, :) = lat1d - half_step
-      y_bnds(2, :) = lat1d + half_step
+      ! y-axis is top-down, so bounds should be also decreasing
+      y_bnds(2, :) = lat1d - half_step
+      y_bnds(1, :) = lat1d + half_step
 
       dimids1 = (/&
         nc%setDimension("lon", size(lon1d)), &

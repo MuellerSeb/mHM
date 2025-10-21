@@ -610,7 +610,7 @@ contains
                                         L11_L1_Id, L11_TSrout, L11_aFloodPlain, L11_colOut, L11_fCol, &
                                         L11_fDir, L11_fAcc, L11_fRow, L11_fromN, L11_label, L11_length, L11_nOutlets, L11_netPerm, &
                                         L11_rOrder, L11_rowOut, L11_sink, L11_slope, L11_tCol, L11_tRow, L11_toN, &
-                                        L1_L11_Id, domain_mrm, level11
+                                        L1_L11_Id, domain_mrm, level11, sink_cells
     use mo_netcdf, only : NcDataset, NcVariable
     use mo_string_utils, only : num2str
 
@@ -651,6 +651,7 @@ contains
 
     type(NcVariable) :: var
 
+    integer(i4) :: i, j
 
     ! set file name
     fname = trim(InFile)
@@ -832,6 +833,13 @@ contains
     call var%getData(dummyD1)
     call append(L11_slope, dummyD1)
 
+    ! generate sink cells
+    do i = 1_i4, level11(iDomain)%nCells
+      j = size(L11_sink) - level11(iDomain)%nCells + i ! %iStart not yet determined
+      if (.not.L11_sink(j)) cycle
+      ! add sink target cell to sink_cells if not already present (in case of multiple inflows (rare case))
+      if (.not.any(sink_cells(iDomain)%ids == L11_toN(j))) sink_cells(iDomain)%ids = [sink_cells(iDomain)%ids, L11_toN(j)]
+    end do
   end subroutine mrm_read_restart_config
 
 end module mo_mrm_restart

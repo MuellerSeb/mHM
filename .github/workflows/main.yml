@@ -8,7 +8,7 @@ on:
       - "*"
   pull_request:
     branches:
-      - "develop"
+      - "main"
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
@@ -55,7 +55,7 @@ jobs:
           fetch-depth: '0'
 
       - name: Build wheels
-        uses: pypa/cibuildwheel@v3.0.1
+        uses: pypa/cibuildwheel@v3.1.4
         env:
           CIBW_ARCHS: ${{ matrix.cfg.arch }}
         with:
@@ -65,6 +65,38 @@ jobs:
         with:
           name: dist-wheel-${{ matrix.cfg.os }}-${{ matrix.cfg.arch }}
           path: ./dist-wheel-${{ matrix.cfg.os }}-${{ matrix.cfg.arch }}/*.whl
+
+  test_win_conda:
+    name: win_conda
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: '0'
+
+      - uses: mamba-org/setup-micromamba@v2
+        with:
+          init-shell: cmd.exe
+          environment-name: mhm-env
+          create-args: >-
+            python=3.12
+            numpy
+            gfortran_win-64
+            netcdf-fortran
+            pkg-config
+            pytest-cov
+            xarray
+            netcdf4
+
+      - name: build wheel on win
+        run: |
+          pip install -v .
+          mhm -h
+          mhm -V
+          mhm --pyversion
+          mhm .
+          pytest pybind/tests/
+        shell: cmd /C CALL {0}
 
   upload_to_pypi:
     needs: [build_wheels, build_sdist]
@@ -79,7 +111,7 @@ jobs:
 
       - name: Publish to Test PyPI
         # only if working on main
-        if: github.ref == 'refs/heads/develop'
+        if: github.ref == 'refs/heads/main'
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           user: __token__
