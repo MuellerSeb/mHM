@@ -133,16 +133,6 @@ module mo_mhm_container
 
 contains
 
-  !> \brief Configure the mHM process container.
-  subroutine mhm_configure(self, config, exchange)
-    class(mhm_t), intent(inout) :: self
-    type(mhm_config_t), intent(in) :: config !< initialization config for mHM
-    type(exchange_t), intent(in), pointer :: exchange !< exchange container of the domain
-    call message(" ... configure mhm")
-    self%config = config
-    self%exchange => exchange
-  end subroutine mhm_configure
-
   !> \brief Initialize the mHM process container.
   subroutine mhm_config_read(self, file, output_file)
     class(mhm_config_t), intent(inout) :: self
@@ -164,6 +154,16 @@ contains
     ! output defined in mhm_outputs.nml
     call self%nloutputresults%read(output_file)
   end subroutine mhm_config_read
+
+  !> \brief Configure the mHM process container.
+  subroutine mhm_configure(self, config, exchange)
+    class(mhm_t), intent(inout) :: self
+    type(mhm_config_t), intent(in) :: config !< initialization config for mHM
+    type(exchange_t), intent(in), pointer :: exchange !< exchange container of the domain
+    call message(" ... configure mhm")
+    self%config = config
+    self%exchange => exchange
+  end subroutine mhm_configure
 
   subroutine mhm_connect(self)
     class(mhm_t), intent(inout) :: self
