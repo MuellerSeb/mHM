@@ -16,6 +16,7 @@ module mo_input_container
   use mo_exchange_type, only: exchange_t
   use mo_message, only: message, error_message
   use mo_string_utils, only: n2s => num2str
+  use mo_namelists, only: nml_directories_mhm_t, nml_coupling_t
 
   !> \class   input_list
   !> \brief   Class to hold a list of input containers with absolute paths as keys.
@@ -29,7 +30,8 @@ module mo_input_container
   !> \brief   Class for a single Input container.
   type, public :: input_config_t
     logical :: active = .false. !< flag to activate the Input container
-    integer(i4) :: domain !< domain number to read correct configuration
+    type(nml_directories_mhm_t) :: directories_mhm !< directories for mHM input files
+    type(nml_coupling_t) :: coupling !< coupling configuration
   contains
     procedure :: read => input_config_read
   end type input_config_t
@@ -76,6 +78,16 @@ contains
     call self%add_clone(path, new_input)
   end subroutine input_list_add
 
+  !> \brief Initialize the input configuration.
+  subroutine input_config_read(self, file)
+    class(input_config_t), intent(inout) :: self
+    character(*), intent(in) :: file !< file containing the namelists
+    call message(" ... read config input: ", file)
+    self%active = .true.
+    self%directories_mhm%read(file)
+    self%coupling%read(file)
+  end subroutine input_config_read
+
   !> \brief Configure the Input container.
   subroutine input_configure(self, config, exchange)
     class(input_t), intent(inout) :: self
@@ -85,14 +97,6 @@ contains
     self%config = config
     self%exchange => exchange
   end subroutine input_configure
-
-  !> \brief Initialize the input configuration.
-  subroutine input_config_read(self, file)
-    class(input_config_t), intent(inout) :: self
-    character(*), intent(in) :: file !< file containing the namelists
-    call message(" ... read config input: ", file)
-    self%active = .true.
-  end subroutine input_config_read
 
   subroutine input_connect(self)
     class(input_t), intent(inout) :: self
