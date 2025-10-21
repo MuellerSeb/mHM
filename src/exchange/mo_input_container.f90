@@ -84,8 +84,8 @@ contains
     character(*), intent(in) :: file !< file containing the namelists
     call message(" ... read config input: ", file)
     self%active = .true.
-    self%directories_mhm%read(file)
-    self%coupling%read(file)
+    call self%directories_mhm%read(file)
+    call self%coupling%read(file)
   end subroutine input_config_read
 
   !> \brief Configure the Input container.
