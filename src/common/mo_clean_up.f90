@@ -191,7 +191,8 @@ module mo_clean_up
       gauge, &
       InflowGauge, &
       riv_temp_pcs, &
-      mrm_L0_slope => L0_slope
+      mrm_L0_slope => L0_slope, &
+      sink_cells
 
     use mo_common_mHM_mRM_variables, only : &
       resolutionRouting, &
@@ -402,6 +403,7 @@ module mo_clean_up
     if ( allocated(InflowGauge%gaugeId) ) deallocate(InflowGauge%gaugeId)
     if ( allocated(InflowGauge%Q) ) deallocate(InflowGauge%Q)
     if ( allocated(InflowGauge%T) ) deallocate(InflowGauge%T)
+    if ( allocated(sink_cells) ) deallocate(sink_cells)
     call riv_temp_pcs%clean_up()
 
     ! mo_common_mHM_mRM_variables

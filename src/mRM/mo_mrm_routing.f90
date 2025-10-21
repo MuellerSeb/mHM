@@ -106,7 +106,7 @@ CONTAINS
     L11_areaCell, L11_L1_Id, L11_netPerm, L11_fromN, L11_toN, L11_nOutlets, timestep, tsRoutFactor, &
     nNodes, nInflowGauges, InflowGaugeIndexList, InflowGaugeHeadwater, InflowGaugeNodeList, &
     InflowDischarge, nGauges, gaugeIndexList, gaugeNodeList, map_flag, L11_length, L11_slope, &
-    L11_FracFPimp, L11_C1, L11_C2, L11_qOut, L11_qTIN, L11_qTR, L11_qMod, GaugeDischarge &
+    L11_FracFPimp, sink_cells, L11_C1, L11_C2, L11_qOut, L11_qTIN, L11_qTR, L11_qMod, GaugeDischarge &
   )
 
     use mo_constants, only : T0_dp
@@ -171,6 +171,8 @@ CONTAINS
     real(dp), dimension(:), intent(in) :: L11_slope
     ! L11 fraction of flood plain with impervios cover
     real(dp), dimension(:), intent(in) :: L11_FracFPimp
+    ! [-]      sink nodes
+    integer(i4), dimension(:), intent(in) :: sink_cells
     ! L11 muskingum parameter 1
     real(dp), dimension(:), intent(inout) :: L11_C1
     ! L11 muskingum parameter 2
@@ -257,6 +259,7 @@ CONTAINS
           nInflowGauges, & ! Intent IN
           InflowGaugeHeadwater, & ! Intent IN
           InflowGaugeNodeList, & ! Intent IN
+          sink_cells, & ! Intent IN
           L11_qTIN, & ! Intent INOUT
           L11_qTR, & ! Intent INOUT
           L11_Qmod & ! Intent OUT
@@ -275,6 +278,7 @@ CONTAINS
             nInflowGauges, & ! Intent IN
             InflowGaugeHeadwater, & ! Intent IN
             InflowGaugeNodeList, & ! Intent IN
+            sink_cells, & ! Intent IN
             L11_qTR(:, 1), & ! Intent IN
             L11_Qmod & ! Intent IN
           )
@@ -378,7 +382,7 @@ CONTAINS
   ! Robert Schweppe Jun 2018 - refactoring and reformatting
 
   subroutine L11_routing(nNodes, nLinks, netPerm, netLink_fromN, netLink_toN, netLink_C1, netLink_C2, netNode_qOUT, &
-                        nInflowGauges, InflowHeadwater, InflowNodeList, netNode_qTIN, netNode_qTR, netNode_Qmod)
+                        nInflowGauges, InflowHeadwater, InflowNodeList, sink_cells, netNode_qTIN, netNode_qTR, netNode_Qmod)
     implicit none
 
     ! number of network nodes = nCells1
@@ -403,6 +407,8 @@ CONTAINS
     logical, dimension(:), intent(in) :: InflowHeadwater
     ! [-]      L11 ID of inflow points
     integer(i4), dimension(:), intent(in) :: InflowNodeList
+    ! [-]      sink nodes
+    integer(i4), dimension(:), intent(in) :: sink_cells
     ! [m3 s-1] Total inputs at t-1 and t
     real(dp), dimension(:, :), intent(inout) :: netNode_qTIN
     ! [m3 s-1] Transformed outflow leaving node I (Muskingum)
@@ -461,11 +467,12 @@ CONTAINS
     !!$OMP end parallel
 
     !--------------------------------------------------------------------------
-    ! Accumulate all inputs in tNode (netNode_qOUT) ONLY for last link
+    ! add runoff to sinks
     !--------------------------------------------------------------------------
-    tNode = netLink_toN(netPerm(nLinks))
-    netNode_qTIN(tNode, IT) = netNode_qTIN(tNode, IT) + netNode_qOUT(tNode)
-
+    do k = 1, size(sink_cells)
+      tNode = sink_cells(k)
+      netNode_qTIN(tNode, IT) = netNode_qTIN(tNode, IT) + netNode_qOUT(tNode)
+    end do
     !--------------------------------------------------------------------------
     ! save modeled discharge at time step tt then shift flow storages
     ! (NOTE aggregation to daily values to be done outside)

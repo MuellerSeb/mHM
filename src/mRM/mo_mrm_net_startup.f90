@@ -730,7 +730,7 @@ contains
     use mo_append, only : append
     use mo_constants, only : nodata_i4
     use mo_mrm_global_variables, only : L11_fDir, L11_fromN, L11_label, L11_nOutlets, L11_netPerm, L11_rOrder, L11_sink, L11_toN, &
-                                        level11
+                                        level11, sink_cells
 
     implicit none
 
@@ -832,7 +832,11 @@ contains
 
       ! identify sink cells
       do ii = 1, nLinks
-        if (L11_fdir(level11(iDomain)%iStart + nLinkToN(ii) - 1_i4) .eq. 0_i4) nlinksink(ii) = .True.
+        if (L11_fdir(level11(iDomain)%iStart + nLinkToN(ii) - 1_i4) .eq. 0_i4) then
+          nlinksink(ii) = .True.
+          ! add sink target cell to sink_cells if not already present (in case of multiple inflows (rare case))
+          if (.not.any(sink_cells(iDomain)%ids == nLinkToN(ii))) sink_cells(iDomain)%ids = [sink_cells(iDomain)%ids, nLinkToN(ii)]
+        end if
       end do
       where(nlinksink) nLinkLabel = 2 !  'Sink'
 
@@ -1392,23 +1396,28 @@ contains
         tId = iD0(nLinkToRow(ii), nLinkToCol(ii))
 
         do while (.NOT. (fId == tId))
+
           ! Search flood plain from point(frow,fcol) upwards, keep co-ordinates in STACK
-          do while (ns > 0)
-            if (ns + 8 .gt. size(stack, 1)) then
-              call append(stack, append_chunk)
-            end if
-            call moveUp(elev0, fDir0, frow, fcol, stack, ns)
-            stack(1, 1) = 0
-            stack(1, 2) = 0
-            ! stack = cshift(stack, SHIFT = 1, DIM = 1)
-            ! substitute cshift <<<
-            dummy_1d = stack(1, :)
-            stack(: size(stack, dim = 1) - 1, :) = stack(2 :, :)
-            stack(size(stack, dim = 1), :) = dummy_1d
-            ! substitute cshift >>>
-            if (stack(1, 1) > 0 .and. stack(1, 2) > 0) floodPlain0(stack(1, 1), stack(1, 2)) = ii
-            ns = count(stack > 0) / 2
-          end do
+
+          ! flood plain calculation is expensive and only required for processCase = 1
+          if (processMatrix(8,1) == 1) then
+            do while (ns > 0)
+              if (ns + 8 .gt. size(stack, 1)) then
+                call append(stack, append_chunk)
+              end if
+              call moveUp(elev0, fDir0, frow, fcol, stack, ns)
+              stack(1, 1) = 0
+              stack(1, 2) = 0
+              ! stack = cshift(stack, SHIFT = 1, DIM = 1)
+              ! substitute cshift <<<
+              dummy_1d = stack(1, :)
+              stack(: size(stack, dim = 1) - 1, :) = stack(2 :, :)
+              stack(size(stack, dim = 1), :) = dummy_1d
+              ! substitute cshift >>>
+              if (stack(1, 1) > 0 .and. stack(1, 2) > 0) floodPlain0(stack(1, 1), stack(1, 2)) = ii
+              ns = count(stack > 0) / 2
+            end do
+          end if
 
           ! move downstream
           call moveDownOneCell(fDir0(frow, fcol), frow, fcol)
