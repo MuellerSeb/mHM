@@ -2,7 +2,7 @@ module test_meteo_spatial_tools
   use funit
   use mo_meteo_spatial_tools, only: spatial_aggregation, spatial_disaggregation
   use mo_kind, only: dp, i4
-  use mo_common_constants, only: nodata_dp
+  use mo_constants, only: nodata_dp
 
   implicit none
 

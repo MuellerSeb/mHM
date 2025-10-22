@@ -90,7 +90,7 @@ CONTAINS
 
   FUNCTION objective(parameterset, eval, arg1, arg2, arg3)
 
-    use mo_common_constants, only : nodata_dp
+    use mo_constants, only : nodata_dp
     use mo_common_mHM_mRM_variables, only : opti_function
 
     implicit none
@@ -204,7 +204,7 @@ CONTAINS
 #ifdef MPI
   FUNCTION objective_master(parameterset, eval, arg1, arg2, arg3)
 
-    use mo_common_constants, only : nodata_dp
+    use mo_constants, only : nodata_dp
     use mo_common_mHM_mRM_variables, only : opti_function
     use mo_common_mpi_tools, only : distribute_parameterset
     use mo_common_variables, only : domainMeta
@@ -351,7 +351,7 @@ CONTAINS
 
   subroutine objective_subprocess(eval, arg1, arg2, arg3)
 
-    use mo_common_constants, only : nodata_dp
+    use mo_constants, only : nodata_dp
     use mo_common_mHM_mRM_variables, only : opti_function
     use mo_common_mpi_tools, only : get_parameterset
     use mo_common_variables, only : domainMeta
@@ -498,7 +498,7 @@ CONTAINS
   FUNCTION objective_sm_kge_catchment_avg(parameterset, eval)
 
     use mo_optimization_types, only : optidata_sim
-    use mo_common_constants, only : nodata_dp
+    use mo_constants, only : nodata_dp
     use mo_common_variables, only : level1, domainMeta
     use mo_errormeasures, only : KGE
     use mo_global_variables, only : L1_smObs
@@ -642,7 +642,7 @@ CONTAINS
   FUNCTION objective_q_et_tws_kge_catchment_avg(parameterset, eval)
 
     use mo_optimization_types, only : optidata_sim
-    use mo_common_constants, only : nodata_dp
+    use mo_constants, only : nodata_dp
     use mo_common_variables, only : domainMeta
     use mo_global_variables, only : L1_etObs, L1_twsaObs
     use mo_errormeasures, only : kge
@@ -1110,7 +1110,7 @@ CONTAINS
   FUNCTION objective_sm_pd(parameterset, eval)
 
     use mo_optimization_types, only : optidata_sim
-    use mo_common_constants, only : nodata_dp
+    use mo_constants, only : nodata_dp
     use mo_common_variables, only : level1, domainMeta
     use mo_global_variables, only : L1_smObs
     use mo_spatialsimilarity, only : PD
@@ -1383,7 +1383,7 @@ CONTAINS
   FUNCTION objective_kge_q_rmse_tws(parameterset, eval)
 
     use mo_optimization_types, only : optidata_sim
-    use mo_common_constants, only : eps_dp, nodata_dp
+    use mo_constants, only : eps_dp, nodata_dp
     use mo_common_mhm_mrm_variables, only : evalPer
     use mo_common_variables, only : domainMeta
     use mo_global_variables, only : L1_twsaObs
@@ -1619,7 +1619,7 @@ CONTAINS
   FUNCTION objective_neutrons_kge_catchment_avg(parameterset, eval)
 
     use mo_optimization_types, only : optidata_sim
-    use mo_common_constants, only : nodata_dp
+    use mo_constants, only : nodata_dp
     use mo_common_variables, only : domainMeta
     use mo_errormeasures, only : KGE
     use mo_global_variables, only : L1_neutronsObs
@@ -1765,7 +1765,7 @@ CONTAINS
   FUNCTION objective_et_kge_catchment_avg(parameterset, eval)
 
     use mo_optimization_types, only : optidata_sim
-    use mo_common_constants, only : nodata_dp
+    use mo_constants, only : nodata_dp
     use mo_common_variables, only : domainMeta
     use mo_errormeasures, only : KGE
     use mo_moment, only : average
@@ -2353,7 +2353,7 @@ CONTAINS
   FUNCTION objective_kge_q_rmse_et(parameterset, eval)
 
     use mo_optimization_types, only : optidata_sim
-    use mo_common_constants, only : eps_dp, nodata_dp
+    use mo_constants, only : eps_dp, nodata_dp
     use mo_common_mhm_mrm_variables, only : evalPer
     use mo_common_variables, only : domainMeta
     use mo_errormeasures, only : rmse
@@ -2603,7 +2603,7 @@ CONTAINS
   subroutine create_domain_avg_tws(iDomain, twsOptiSim, tws_catch_avg_domain, &
                                            tws_opti_catch_avg_domain, mask_times)
     use mo_optimization_types, only : optidata_sim
-    use mo_common_constants, only : nodata_dp
+    use mo_constants, only : nodata_dp
     use mo_global_variables, only : L1_twsaObs
     use mo_moment, only : average
     ! current domain Id
@@ -2658,7 +2658,7 @@ CONTAINS
   subroutine create_domain_avg_et(iDomain, etOptiSim, et_catch_avg_domain, &
                                            et_opti_catch_avg_domain, mask_times)
     use mo_optimization_types, only : optidata_sim
-    use mo_common_constants, only : nodata_dp
+    use mo_constants, only : nodata_dp
     use mo_global_variables, only : L1_etObs
     use mo_moment, only : average
     ! current domain Id

@@ -99,7 +99,7 @@ CONTAINS
     use mo_kind, only : i4
     use mo_string_utils, only : num2str
     use mo_os, only : check_path_isdir
-    use mo_common_constants, only : nodata_dp
+    use mo_constants, only : nodata_dp
     use mo_common_mHM_mRM_variables, only : resolutionRouting
     use mo_common_variables, only : processMatrix
     use mo_mrm_global_variables, only : InflowGauge, L11_fromN, L11_label, L11_length, L11_netPerm, L11_rOrder, &
@@ -515,7 +515,8 @@ CONTAINS
   subroutine write_optinamelist(processMatrix, parameters, maskpara, parameters_name)
 
     use mo_common_mhm_mrm_file, only : file_opti_nml, uopti_nml
-    use mo_common_variables, only : dirConfigOut, nProcesses
+    use mo_common_variables, only : dirConfigOut
+    use mo_common_constants, only : nProcesses
     use mo_string_utils, only : num2str
     use mo_os, only : check_path_isdir
 

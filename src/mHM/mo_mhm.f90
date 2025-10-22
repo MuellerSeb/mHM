@@ -473,8 +473,8 @@ CONTAINS
               fSealed1(k), water_thresh_sealed(k), & ! Intent IN
               pet_calc(k), evap_coeff(month), soil_moist_sat(k, :), frac_roots(k, :), & ! Intent IN
               soil_moist_FC(k, :), wilting_point(k, :), soil_moist_exponen(k, :), & ! Intent IN
-              jarvis_thresh_c1(k), aet_canopy(k), & ! Intent IN
-              prec_effect(k), runoff_sealed(k), sealedStorage(k), & ! Intent INOUT
+              jarvis_thresh_c1(k), aet_canopy(k), prec_effect(k), & ! Intent IN
+              runoff_sealed(k), sealedStorage(k), & ! Intent INOUT
               tmp_infiltration(:), tmp_soilMoisture(:), & ! Intent INOUT
               tmp_aet_soil(:), aet_sealed(k))                                                     ! Intent OUT
 

@@ -2,7 +2,7 @@ module test_soil_moisture
   use funit
   use mo_soil_moisture
   use mo_kind, only: dp
-  use mo_common_constants, only: eps_dp
+  use mo_constants, only: eps_dp
 
   implicit none
 

@@ -50,7 +50,7 @@ contains
 
   subroutine mrm_write
 
-    use mo_common_constants, only : nodata_dp
+    use mo_constants, only : nodata_dp
     use mo_common_mhm_mrm_variables, only : evalPer, mrm_coupling_mode, nTstepDay, simPer, warmingDays
     use mo_common_variables, only : mrmFileRestartOut, domainMeta, write_restart
     use mo_mrm_global_variables, only : domain_mrm, &
@@ -248,7 +248,7 @@ contains
 
   Subroutine write_configfile
 
-    use mo_common_constants, only : nodata_dp
+    use mo_constants, only : nodata_dp
     use mo_common_file, only : file_config, uconfig
     use mo_common_mHM_mRM_variables, only : LCyearId, SimPer, evalPer, mrm_coupling_mode, read_restart, &
                                             resolutionRouting, timeStep, warmPer
@@ -567,7 +567,7 @@ contains
 
   subroutine write_daily_obs_sim_discharge(Qobs, Qsim)
 
-    use mo_common_constants, only : nodata_dp
+    use mo_constants, only : nodata_dp
     use mo_common_mhm_mrm_variables, only : evalPer
     use mo_common_variables, only : dirOut, domainMeta
     use mo_errormeasures, only : kge, nse
@@ -760,7 +760,7 @@ contains
 
   subroutine write_subdaily_obs_sim_discharge(Qobs, Qsim, factor)
 
-    use mo_common_constants, only : nodata_dp
+    use mo_constants, only : nodata_dp
     use mo_common_mhm_mrm_variables, only : evalPer
     use mo_common_variables, only : dirOut, domainMeta
     use mo_errormeasures, only : kge, nse

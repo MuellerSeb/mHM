@@ -14,29 +14,24 @@
 !> \ingroup f_common
 MODULE mo_common_constants
 
-  USE mo_kind, ONLY : i4, dp, sp
+  USE mo_kind, ONLY : i4, dp
 
   IMPLICIT NONE
 
   PRIVATE
 
-  ! Computational
-  !> epsilon(1.0) in double precision
-  REAL(dp), public, PARAMETER :: eps_dp = epsilon(1.0_dp)
-  !> epsilon(1.0) in single precision
-  REAL(sp), public, PARAMETER :: eps_sp = epsilon(1.0_sp)
+  integer(i4), public, parameter :: nerror_model = 2    !< # possible parameters in error model
 
-  ! computational, these values need to be the same!!!
-  integer(i4), public, parameter :: nodata_i4 = -9999_i4  ! [-]     global no data value
-  real(dp), public, parameter :: nodata_dp = -9999._dp ! [-]     global no data value
+  ! PROCESSES description
+  integer(i4), parameter, public :: nProcesses = 11 !< Number of possible processes to consider
 
-  ! default inital values for states and fluxes as well as parameter fields
+  !> default inital values for states and fluxes as well as parameter fields
   real(dp), public, parameter :: P1_InitStateFluxes = 0.00_dp
 
   ! hydrologic modeling
-  integer(i4), public, parameter :: nColPars = 5_i4      ! number of properties of the global variables
-  integer(i4), public, parameter :: maxNoDomains = 50_i4     ! maximum number of allowed domains
-  integer(i4), public, parameter :: maxNLcovers = 50_i4     ! maximum number of allowed LCover scenes
+  integer(i4), public, parameter :: nColPars = 5_i4      !< number of properties of the global variables
+  integer(i4), public, parameter :: maxNoDomains = 50_i4     !< maximum number of allowed domains
+  integer(i4), public, parameter :: maxNLcovers = 50_i4     !< maximum number of allowed LCover scenes
 
   character(64), public, parameter :: soilHorizonsVarName = "L1_SoilHorizons"
   character(64), public, parameter :: landCoverPeriodsVarName = "L1_LandCoverPeriods"

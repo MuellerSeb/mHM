@@ -28,6 +28,7 @@ module mo_common_variables
 
   use mo_kind, only : i4, dp
   use mo_common_types, only: grid, gridremapper, domain_meta
+  use mo_common_constants, only: nProcesses
 #ifdef MPI
   USE mpi_f08
 #endif
@@ -111,7 +112,6 @@ module mo_common_variables
   ! -------------------------------------------------------------------
   ! PROCESSES description
   ! -------------------------------------------------------------------
-  integer(i4), parameter, public :: nProcesses = 11 ! Number of possible processes to consider
   !                                                                !   process 1 :: interception
   !                                                                !   process 2 :: snow
   !                                                                !   process 3 :: soilmoisture

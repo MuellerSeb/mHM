@@ -80,7 +80,8 @@ contains
       nml_neutrons2, &
       nml_geoparameter
     use mo_append, only : append
-    use mo_common_constants, only : eps_dp, maxNoDomains, nColPars, nodata_dp
+    use mo_common_constants, only : maxNoDomains, nColPars
+    use mo_constants, only : eps_dp, nodata_dp
     use mo_common_functions, only : in_bound
     use mo_common_variables, only : global_parameters, global_parameters_name, domainMeta, processMatrix
     use mo_message, only : message, error_message

@@ -14,7 +14,7 @@ module mo_mrm_river_head
   use mo_mrm_global_variables, only : L0_L11_remap, L11_bankfull_runoff_in, &
                                       L0_slope, L0_channel_elevation
   use mo_kind,                 only : i4, dp
-  use mo_common_constants,     only : nodata_dp
+  use mo_constants,     only : nodata_dp
   use mo_append,               only : append
 
   implicit none
@@ -41,7 +41,7 @@ module mo_mrm_river_head
 
   !> \brief calculates the channel elevation from the bankfull river discharge
   subroutine calc_channel_elevation()
-    use mo_common_constants, only : nodata_i4
+    use mo_constants, only : nodata_i4
     use mo_common_variables, only : domainMeta, L0_elev
     use mo_mrm_global_variables, only : L0_fDir, L0_fAcc, L0_channel_depth
     real(dp), dimension(:,:), allocatable :: channel_dpth

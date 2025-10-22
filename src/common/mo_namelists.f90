@@ -12,18 +12,23 @@ module mo_namelists
 
   use mo_kind, only : i4, i8, dp
   use mo_nml, only : position_nml
-  use mo_constants, only : YearMonths
-  use mo_mhm_constants, only : nOutFlxState
-  use mo_common_constants, only : maxNLcovers, maxNoDomains, nColPars, nodata_dp, nodata_i4
-  use mo_common_variables, only : nProcesses
   use mo_common_types, only : period
-  use mo_common_mHM_mRM_variables, only : nerror_model
+  use mo_constants, only : YearMonths, nodata_dp, nodata_i4
+  use mo_common_constants, only : maxNLcovers, maxNoDomains, nColPars, nProcesses, nerror_model
   use mo_mpr_constants, only : maxGeoUnit, maxNoSoilHorizons
+  use mo_mhm_constants, only : nOutFlxState
   use mo_mrm_constants, only : maxNoGauges, mrm_nOutFlxState => nOutFlxState
   use mo_string_utils, only : num2str
   use mo_sentinel, only : set_sentinel
 
   implicit none
+
+  !> \class   nml_abc
+  !> \brief   Abstract base class for a namelist.
+  type, abstract :: nml_abc
+    logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
+    integer(i4) :: nml_status = -1_i4  !< status: -1 (file not opened), 0 (found), 1 (missing), 2 (length error), 3 (read error)
+  end type nml_abc
 
   !######## mo_common_read_config
 
@@ -38,9 +43,8 @@ module mo_namelists
   !
   !> \class   nml_project_description_t
   !> \brief   'project_description' namelist content
-  type, public :: nml_project_description_t
+  type, public, extends(nml_abc) :: nml_project_description_t
     character(19) :: name = "project_description" !< namelist name
-    logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
     character(1024) :: project_details !< project including funding instituion., PI, etc.
     character(1024) :: setup_description !< any specific description of simulation
     character(1024) :: simulation_type !< e.g. seasonal forecast, climate projection, ...
@@ -66,9 +70,8 @@ module mo_namelists
   !
   !> \class   nml_directories_general_t
   !> \brief   'directories_general' namelist content
-  type, public :: nml_directories_general_t
+  type, public, extends(nml_abc) :: nml_directories_general_t
     character(19) :: name = "directories_general" !< namelist name
-    logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
     character(256) :: dirConfigOut !< directory for config file output
     character(256) :: dirCommonFiles !< directory where common input files should be located
     character(256), dimension(maxNoDomains) :: mhm_file_RestartOut !< Directory where mhm output of restart is written
@@ -93,9 +96,8 @@ module mo_namelists
   !
   !> \class   nml_mainconfig_t
   !> \brief   'mainconfig' namelist content
-  type, public :: nml_mainconfig_t
+  type, public, extends(nml_abc) :: nml_mainconfig_t
     character(10) :: name = "mainconfig" !< namelist name
-    logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
     integer(i4) :: iFlag_cordinate_sys !< options model for the run cordinate system
     real(dp), dimension(maxNoDomains) :: resolution_Hydrology !< [m or degree] resolution of hydrology - Level 1
     integer(i4) :: nDomains !< number of domains
@@ -113,9 +115,8 @@ module mo_namelists
   !
   !> \class   nml_processselection_t
   !> \brief   'processSelection' namelist content
-  type, public :: nml_processselection_t
+  type, public, extends(nml_abc) :: nml_processselection_t
     character(16) :: name = "processselection" !< namelist name
-    logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
     integer(i4), dimension(nProcesses) :: processCase !< ! Choosen process description number
   contains
     procedure, public :: read => read_processselection
@@ -131,9 +132,8 @@ module mo_namelists
   !
   !> \class   nml_lcover_t
   !> \brief   'LCover' namelist content
-  type, public :: nml_lcover_t
+  type, public, extends(nml_abc) :: nml_lcover_t
     character(6) :: name = "lcover" !< namelist name
-    logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
     integer(i4) :: nLCoverScene !< Number of land cover scene (lcs)
     integer(i4), dimension(maxNLCovers) :: LCoverYearStart !< starting year LCover
     integer(i4), dimension(maxNLCovers) :: LCoverYearEnd !< ending year LCover
@@ -161,9 +161,8 @@ module mo_namelists
   !
   !> \class   nml_mainconfig_mhm_mrm_t
   !> \brief   'mainconfig_mhm_mrm' namelist content
-  type, public :: nml_mainconfig_mhm_mrm_t
+  type, public, extends(nml_abc) :: nml_mainconfig_mhm_mrm_t
     character(18) :: name = "mainconfig_mhm_mrm" !< namelist name
-    logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
     integer(i4) :: timeStep !< [h] simulation time step (= TS) in [h] either 1, 2, 3, 4, 6, 12 or 24
     real(dp), dimension(maxNoDomains) :: resolution_Routing !< resolution of Level-11 discharge routing [m or degree] per domain
     logical :: optimize !< Optimization (.true.) or Evaluation run (.false.)
@@ -195,9 +194,8 @@ module mo_namelists
   !
   !> \class   nml_optimization_t
   !> \brief   'optimization' namelist content
-  type, public :: nml_optimization_t
+  type, public, extends(nml_abc) :: nml_optimization_t
     character(12) :: name = "optimization" !< namelist name
-    logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
     integer(i4) :: nIterations !< number of iterations for optimization
     integer(i8) :: seed !< seed used for optimization, default: -9 --> system time
     real(dp) :: dds_r !< DDS: perturbation rate, default: 0.2
@@ -219,9 +217,8 @@ module mo_namelists
   !
   !> \class   nml_time_periods_t
   !> \brief   'time_periods' namelist content
-  type, public :: nml_time_periods_t
+  type, public, extends(nml_abc) :: nml_time_periods_t
     character(12) :: name = "time_periods" !< namelist name
-    logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
     integer(i4), dimension(maxNoDomains) :: warming_Days !< number of days for warm up period
     type(period), dimension(maxNoDomains) :: eval_Per !< time period for model evaluation
   contains
@@ -247,9 +244,8 @@ module mo_namelists
   !
   !> \class   nml_directories_mhm_t
   !> \brief   'directories_mhm' namelist content
-  type, public :: nml_directories_mhm_t
+  type, public, extends(nml_abc) :: nml_directories_mhm_t
     character(15) :: name = "directories_mhm" !< namelist name
-    logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
     !> .FALSE. to only warn about bound (lower, upper) violations in meteo files, default = .TRUE. - raise an error
     logical :: bound_error = .true.
     character(256), public :: inputFormat_meteo_forcings !< format of meteo input data (nc)
@@ -283,9 +279,8 @@ module mo_namelists
   !
   !> \class   nml_optional_data_t
   !> \brief   'optional_data' namelist content
-  type, public :: nml_optional_data_t
+  type, public, extends(nml_abc) :: nml_optional_data_t
     character(13) :: name = "optional_data" !< namelist name
-    logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
     integer(i4) :: nSoilHorizons_sm_input !< No. of mhm soil horizons equivalent to sm input
     character(256), dimension(maxNoDomains) :: dir_soil_moisture !< soil moisture input
     character(256), dimension(maxNoDomains) :: dir_neutrons !< ground albedo neutron input
@@ -306,9 +301,8 @@ module mo_namelists
   !
   !> \class   nml_panevapo_t
   !> \brief   'panevapo' namelist content
-  type, public :: nml_panevapo_t
+  type, public, extends(nml_abc) :: nml_panevapo_t
     character(8) :: name = "panevapo" !< namelist name
-    logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
     real(dp), dimension(int(YearMonths, i4)) :: evap_coeff !< [-] Evap. coef. for free-water surfaces
   contains
     procedure, public :: read => read_panevapo
@@ -326,9 +320,8 @@ module mo_namelists
   !
   !> \class   nml_nightdayratio_t
   !> \brief   'nightdayratio' namelist content
-  type, public :: nml_nightdayratio_t
+  type, public, extends(nml_abc) :: nml_nightdayratio_t
     character(13) :: name = "nightdayratio" !< namelist name
-    logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
     logical :: read_meteo_weights !< read weights for meteo data
     real(dp), dimension(int(YearMonths, i4)) :: fnight_prec !< [-] Night ratio precipitation < 1
     real(dp), dimension(int(YearMonths, i4)) :: fnight_pet !< [-] Night ratio PET  < 1
@@ -349,9 +342,8 @@ module mo_namelists
   !
   !> \class   nml_nloutputresults_t
   !> \brief   'nloutputresults' namelist content
-  type, public :: nml_nloutputresults_t
+  type, public, extends(nml_abc) :: nml_nloutputresults_t
     character(15) :: name = "nloutputresults" !< namelist name
-    logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
     integer(i4) :: output_deflate_level !< deflate level in nc files
     logical :: output_double_precision !< output precision in nc files
     integer(i4) :: timeStep_model_outputs !< timestep for writing model outputs
@@ -369,9 +361,8 @@ module mo_namelists
   !
   !> \class   nml_baseflow_config_t
   !> \brief   'baseflow_config' namelist content
-  type, public :: nml_baseflow_config_t
+  type, public, extends(nml_abc) :: nml_baseflow_config_t
     character(15) :: name = "baseflow_config" !< namelist name
-    logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
     logical :: BFI_calc !< calculate observed BFI from gauges with Eckhardt filter
     real(dp), dimension(maxNoDomains) :: BFI_obs !< given base-flow index per domain
 contains
@@ -386,9 +377,8 @@ contains
   !
   !> \class   nml_directories_mpr_t
   !> \brief   'directories_mpr' namelist content
-  type, public :: nml_directories_mpr_t
+  type, public, extends(nml_abc) :: nml_directories_mpr_t
     character(15) :: name = "directories_mpr" !< namelist name
-    logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
     character(256), dimension(maxNoDomains) :: dir_gridded_LAI !< directory of gridded LAI data, used when timeStep_LAI_input<0
   contains
     procedure, public :: read => read_directories_mpr
@@ -404,9 +394,8 @@ contains
   !
   !> \class   nml_soildata_t
   !> \brief   'soildata' namelist content
-  type, public :: nml_soildata_t
+  type, public, extends(nml_abc) :: nml_soildata_t
     character(8) :: name = "soildata" !< namelist name
-    logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
     integer(i4) :: iFlag_soilDB !< options to handle different soil databases
     real(dp) :: tillageDepth !< [mm] Soil depth down to which organic
     integer(i4) :: nSoilHorizons_mHM !< Number of horizons to model
@@ -423,9 +412,8 @@ contains
   !
   !> \class   nml_lai_data_information_t
   !> \brief   'lai_data_information' namelist content
-  type, public :: nml_lai_data_information_t
+  type, public, extends(nml_abc) :: nml_lai_data_information_t
     character(20) :: name = "lai_data_information" !< namelist name
-    logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
     character(256) :: inputFormat_gridded_LAI !< format of gridded LAI data (nc only)
     integer(i4) :: timeStep_LAI_input !< time step of gridded LAI input
   contains
@@ -439,9 +427,8 @@ contains
   !
   !> \class   nml_lcover_mpr_t
   !> \brief   'lcover_mpr' namelist content
-  type, public :: nml_lcover_mpr_t
+  type, public, extends(nml_abc) :: nml_lcover_mpr_t
     character(10) :: name = "lcover_mpr" !< namelist name
-    logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
     real(dp) :: fracSealed_cityArea !< fraction of area within city assumed to be perfectly sealed [0-1]
   contains
     procedure, public :: read => read_lcover_mpr
@@ -454,9 +441,8 @@ contains
   !
   !> \class   nml_interception1_t
   !> \brief   'interception1' namelist content
-  type, public :: nml_interception1_t
+  type, public, extends(nml_abc) :: nml_interception1_t
     character(13) :: name = "interception1" !< namelist name
-    logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
     real(dp), dimension(nColPars) :: canopyInterceptionFactor !< multiplier to relate LAI to interception storage [-]
   contains
     procedure, public :: read => read_interception1
@@ -476,9 +462,8 @@ contains
   !
   !> \class   nml_snow1_t
   !> \brief   'snow1' namelist content
-  type, public :: nml_snow1_t
+  type, public, extends(nml_abc) :: nml_snow1_t
     character(5) :: name = "snow1" !< namelist name
-    logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
     real(dp), dimension(nColPars) :: snowTreshholdTemperature !< Threshold for rain/snow partitioning [degC]
     real(dp), dimension(nColPars) :: degreeDayFactor_forest !< forest: deg day factors to determine melting flux [m degC-1]
     real(dp), dimension(nColPars) :: degreeDayFactor_impervious !< impervious: deg day factors to determine melting flux [m degC-1]
@@ -514,9 +499,8 @@ contains
   !
   !> \class   nml_soilmoisture1_t
   !> \brief   'soilmoisture1' namelist content
-  type, public :: nml_soilmoisture1_t
+  type, public, extends(nml_abc) :: nml_soilmoisture1_t
     character(13) :: name = "soilmoisture1" !< namelist name
-    logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
     real(dp), dimension(nColPars) :: orgMatterContent_forest !< organic matter content [%] for forest
     real(dp), dimension(nColPars) :: orgMatterContent_impervious !< organic matter content [%] for impervious
     real(dp), dimension(nColPars) :: orgMatterContent_pervious !< organic matter content [%] for pervious
@@ -569,9 +553,8 @@ contains
   !
   !> \class   nml_soilmoisture2_t
   !> \brief   'soilmoisture2' namelist content
-  type, public :: nml_soilmoisture2_t
+  type, public, extends(nml_abc) :: nml_soilmoisture2_t
     character(13) :: name = "soilmoisture2" !< namelist name
-    logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
     real(dp), dimension(nColPars) :: orgMatterContent_forest !< organic matter content [%] for forest
     real(dp), dimension(nColPars) :: orgMatterContent_impervious !< organic matter content [%] for impervious
     real(dp), dimension(nColPars) :: orgMatterContent_pervious !< organic matter content [%] for pervious
@@ -629,9 +612,8 @@ contains
   !
   !> \class   nml_soilmoisture3_t
   !> \brief   'soilmoisture3' namelist content
-  type, public :: nml_soilmoisture3_t
+  type, public, extends(nml_abc) :: nml_soilmoisture3_t
     character(13) :: name = "soilmoisture3" !< namelist name
-    logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
     real(dp), dimension(nColPars) :: orgMatterContent_forest !< organic matter content [%] for forest
     real(dp), dimension(nColPars) :: orgMatterContent_impervious !< organic matter content [%] for impervious
     real(dp), dimension(nColPars) :: orgMatterContent_pervious !< organic matter content [%] for pervious
@@ -692,9 +674,8 @@ contains
   !
   !> \class   nml_soilmoisture4_t
   !> \brief   'soilmoisture4' namelist content
-  type, public :: nml_soilmoisture4_t
+  type, public, extends(nml_abc) :: nml_soilmoisture4_t
     character(13) :: name = "soilmoisture4" !< namelist name
-    logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
     real(dp), dimension(nColPars) :: orgMatterContent_forest !< organic matter content [%] for forest
     real(dp), dimension(nColPars) :: orgMatterContent_impervious !< organic matter content [%] for impervious
     real(dp), dimension(nColPars) :: orgMatterContent_pervious !< organic matter content [%] for pervious
@@ -734,9 +715,8 @@ contains
   !
   !> \class   nml_directrunoff1_t
   !> \brief   'directrunoff1' namelist content
-  type, public :: nml_directrunoff1_t
+  type, public, extends(nml_abc) :: nml_directrunoff1_t
     character(13) :: name = "directrunoff1" !< namelist name
-    logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
     real(dp), dimension(nColPars) :: imperviousStorageCapacity !< direct Runoff: Sealed Area storage capacity
   contains
     procedure, public :: read => read_directrunoff1
@@ -754,9 +734,8 @@ contains
   !> \class   nml_petminus1_t
   !> \brief   'petminus1' namelist content
   !> \details PET is input, LAI driven correction
-  type, public :: nml_petminus1_t
+  type, public, extends(nml_abc) :: nml_petminus1_t
     character(9) :: name = "petminus1" !< namelist name
-    logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
     real(dp), dimension(nColPars) :: PET_a_forest !< DSF=PET_a+PET_b*(1-exp(PET_c*LAI)) to correct PET as PET=DSF*PET
     real(dp), dimension(nColPars) :: PET_a_impervious !< DSF=PET_a+PET_b*(1-exp(PET_c*LAI)) to correct PET as PET=DSF*PET
     real(dp), dimension(nColPars) :: PET_a_pervious !< DSF=PET_a+PET_b*(1-exp(PET_c*LAI)) to correct PET as PET=DSF*PET
@@ -776,9 +755,8 @@ contains
   !> \class   nml_pet0_t
   !> \brief   'pet0' namelist content
   !> \details PET is input, aspect driven correction
-  type, public :: nml_pet0_t
+  type, public, extends(nml_abc) :: nml_pet0_t
     character(4) :: name = "pet0" !< namelist name
-    logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
     real(dp), dimension(nColPars) :: minCorrectionFactorPET !< minimum factor for PET correction with aspect
     real(dp), dimension(nColPars) :: maxCorrectionFactorPET !< maximum factor for PET correction with aspect
     real(dp), dimension(nColPars) :: aspectTresholdPET !< aspect threshold for PET correction with aspect
@@ -797,9 +775,8 @@ contains
   !> \class   nml_pet1_t
   !> \brief   'pet1' namelist content
   !> \details PET - Hargreaves Samani
-  type, public :: nml_pet1_t
+  type, public, extends(nml_abc) :: nml_pet1_t
     character(4) :: name = "pet1" !< namelist name
-    logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
     real(dp), dimension(nColPars) :: minCorrectionFactorPET !< minimum factor for PET correction with aspect
     real(dp), dimension(nColPars) :: maxCorrectionFactorPET !< maximum factor for PET correction with aspect
     real(dp), dimension(nColPars) :: aspectTresholdPET !< aspect threshold for PET correction with aspect
@@ -817,9 +794,8 @@ contains
   !> \class   nml_pet2_t
   !> \brief   'pet2' namelist content
   !> \details PET - Priestley Taylor
-  type, public :: nml_pet2_t
+  type, public, extends(nml_abc) :: nml_pet2_t
     character(4) :: name = "pet2" !< namelist name
-    logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
     real(dp), dimension(nColPars) :: PriestleyTaylorCoeff !< Priestley-Taylor coefficient
     real(dp), dimension(nColPars) :: PriestleyTaylorLAIcorr !< Priestley-Taylor LAI correction factor
   contains
@@ -840,9 +816,8 @@ contains
   !> \class   nml_pet3_t
   !> \brief   'pet3' namelist content
   !> \details PET - Penman Monteith
-  type, public :: nml_pet3_t
+  type, public, extends(nml_abc) :: nml_pet3_t
     character(4) :: name = "pet3" !< namelist name
-    logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
     real(dp), dimension(nColPars) :: canopyheigth_forest !< canopy height for foreset
     real(dp), dimension(nColPars) :: canopyheigth_impervious !< canopy height for impervious
     real(dp), dimension(nColPars) :: canopyheigth_pervious !< canopy height for pervious
@@ -865,9 +840,8 @@ contains
   !
   !> \class   nml_interflow1_t
   !> \brief   'interflow1' namelist content
-  type, public :: nml_interflow1_t
+  type, public, extends(nml_abc) :: nml_interflow1_t
     character(10) :: name = "interflow1" !< namelist name
-    logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
     real(dp), dimension(nColPars) :: interflowStorageCapacityFactor !< interflow storage capacity factor
     real(dp), dimension(nColPars) :: interflowRecession_slope !< multiplier for slope to derive interflow recession constant
     !> multiplier to derive fast interflow recession constant for forest
@@ -889,9 +863,8 @@ contains
   !
   !> \class   nml_percolation1_t
   !> \brief   'percolation1' namelist content
-  type, public :: nml_percolation1_t
+  type, public, extends(nml_abc) :: nml_percolation1_t
     character(12) :: name = "percolation1" !< namelist name
-    logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
     real(dp), dimension(nColPars) :: rechargeCoefficient !< recharge coefficient
     real(dp), dimension(nColPars) :: rechargeFactor_karstic !< recharge factor for karstic percolation
     real(dp), dimension(nColPars) :: gain_loss_GWreservoir_karstic !< gain loss in ground water reservoir for karstic
@@ -908,9 +881,8 @@ contains
   !
   !> \class   nml_neutrons1_t
   !> \brief   'neutrons1' namelist content
-  type, public :: nml_neutrons1_t
+  type, public, extends(nml_abc) :: nml_neutrons1_t
     character(9) :: name = "neutrons1" !< namelist name
-    logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
     real(dp), dimension(nColPars) :: Desilets_N0 !< Desilets N0 parameter
     real(dp), dimension(nColPars) :: Desilets_LW0 !< Desilets LW0 parameter
     real(dp), dimension(nColPars) :: Desilets_LW1 !< Desilets LW1 parameter
@@ -933,9 +905,8 @@ contains
   !
   !> \class   nml_neutrons2_t
   !> \brief   'neutrons2' namelist content
-  type, public :: nml_neutrons2_t
+  type, public, extends(nml_abc) :: nml_neutrons2_t
     character(9) :: name = "neutrons2" !< namelist name
-    logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
     real(dp), dimension(nColPars) :: COSMIC_N0 !< cosmic N0 parameter
     real(dp), dimension(nColPars) :: COSMIC_N1 !< cosmic N1 parameter
     real(dp), dimension(nColPars) :: COSMIC_N2 !< cosmic N2 parameter
@@ -956,9 +927,8 @@ contains
   !
   !> \class   nml_geoparameter_t
   !> \brief   'geoparameter' namelist content
-  type, public :: nml_geoparameter_t
+  type, public, extends(nml_abc) :: nml_geoparameter_t
     character(12) :: name = "geoparameter" !< namelist name
-    logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
     !> geological parameters (ordering according to file 'geology_classdefinition.txt')
     real(dp), dimension(maxGeoUnit, nColPars) :: GeoParam
   contains
@@ -976,9 +946,8 @@ contains
   !
   !> \class   nml_mainconfig_mrm_t
   !> \brief   'mainconfig_mrm' namelist content
-  type, public :: nml_mainconfig_mrm_t
+  type, public, extends(nml_abc) :: nml_mainconfig_mrm_t
     character(14) :: name = "mainconfig_mrm" !< namelist name
-    logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
     logical :: ALMA_convention !< flag for ALMA convention (see http://www.lmd.jussieu.fr/~polcher/ALMA/convention_3.html)
     character(256) :: filenameTotalRunoff !< Filename of simulated total runoff file
     character(256) :: varnameTotalRunoff !< variable name of total runoff
@@ -996,9 +965,8 @@ contains
   !
   !> \class   nml_directories_mrm_t
   !> \brief   'directories_mrm' namelist content
-  type, public :: nml_directories_mrm_t
+  type, public, extends(nml_abc) :: nml_directories_mrm_t
     character(15) :: name = "directories_mrm" !< namelist name
-    logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
     character(256), dimension(maxNoDomains) :: dir_Gauges !< directory containing gauge time series
     character(256), dimension(maxNoDomains) :: dir_Total_Runoff !< directory where simulated runoff can be found
     character(256), dimension(maxNoDomains) :: dir_Bankfull_Runoff !< directory where runoff at bankfull conditions can be found
@@ -1016,9 +984,8 @@ contains
   !
   !> \class   nml_evaluation_gauges_t
   !> \brief   'evaluation_gauges' namelist content
-  type, public :: nml_evaluation_gauges_t
+  type, public, extends(nml_abc) :: nml_evaluation_gauges_t
     character(17) :: name = "evaluation_gauges" !< namelist name
-    logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
     integer(i4) :: nGaugesTotal !< Number of evaluation gauges for all domains
     integer(i4), dimension(maxNoDomains) :: NoGauges_domain !< number of gauges per domain
     integer(i4), dimension(maxNoDomains, maxNoGauges) :: Gauge_id !< gauge ID for each gauge
@@ -1038,9 +1005,8 @@ contains
   !
   !> \class   nml_inflow_gauges_t
   !> \brief   'inflow_gauges' namelist content
-  type, public :: nml_inflow_gauges_t
+  type, public, extends(nml_abc) :: nml_inflow_gauges_t
     character(13) :: name = "inflow_gauges" !< namelist name
-    logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
     integer(i4) :: nInflowGaugesTotal !< Number of evaluation gauges for all domains
     integer(i4), dimension(maxNoDomains) :: NoInflowGauges_domain !< number of gauges for subdomain (1)
     integer(i4), dimension(maxNoDomains, maxNoGauges) :: InflowGauge_id !< id of inflow gauge(1) for subdomain(1) --> (1,1)
@@ -1062,9 +1028,8 @@ contains
   !
   !> \class   nml_mrm_outputs_t
   !> \brief   'mrm_outputs' namelist content
-  type, public :: nml_mrm_outputs_t
+  type, public, extends(nml_abc) :: nml_mrm_outputs_t
     character(15) :: name = "nloutputresults" !< namelist name
-    logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
     integer(i4) :: output_deflate_level_mrm !< netcdf deflate level
     logical :: output_double_precision_mrm !< switch to enable double precision in netcdf
     integer(i4) :: output_time_reference_mrm !< time reference point location in output nc files
@@ -1085,9 +1050,8 @@ contains
   !
   !> \class   nml_routing1_t
   !> \brief   'routing1' namelist content
-  type, public :: nml_routing1_t
+  type, public, extends(nml_abc) :: nml_routing1_t
     character(8) :: name = "routing1" !< namelist name
-    logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
     real(dp), dimension(nColPars) :: muskingumTravelTime_constant !< muskingum parameter constant
     real(dp), dimension(nColPars) :: muskingumTravelTime_riverLength !< muskingum parameter river length
     real(dp), dimension(nColPars) :: muskingumTravelTime_riverSlope !< muskingum parameter river slope
@@ -1104,9 +1068,8 @@ contains
   !
   !> \class   nml_routing2_t
   !> \brief   'routing2' namelist content
-  type, public :: nml_routing2_t
+  type, public, extends(nml_abc) :: nml_routing2_t
     character(8) :: name = "routing2" !< namelist name
-    logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
     real(dp), dimension(nColPars) :: streamflow_celerity !< streamflow celerity
   contains
     procedure, public :: read => read_routing2
@@ -1119,9 +1082,8 @@ contains
   !
   !> \class   nml_routing3_t
   !> \brief   'routing3' namelist content
-  type, public :: nml_routing3_t
+  type, public, extends(nml_abc) :: nml_routing3_t
     character(8) :: name = "routing3" !< namelist name
-    logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
     real(dp), dimension(nColPars) :: slope_factor !< slope factor
   contains
     procedure, public :: read => read_routing3
@@ -1144,9 +1106,8 @@ contains
   !
   !> \class   nml_config_riv_temp_t
   !> \brief   'config_riv_temp' namelist content
-  type, public :: nml_config_riv_temp_t
+  type, public, extends(nml_abc) :: nml_config_riv_temp_t
     character(15) :: name = "config_riv_temp" !< namelist name
-    logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
     real(dp) :: albedo_water !< albedo of open water
     real(dp) :: pt_a_water !< priestley taylor alpha parameter for PET on open water
     real(dp) :: emissivity_water !< emissivity of water
@@ -1182,9 +1143,8 @@ contains
   !
   !> \class   nml_coupling_t
   !> \brief   'coupling' namelist content
-  type, public :: nml_coupling_t
+  type, public, extends(nml_abc) :: nml_coupling_t
     character(8) :: name = "coupling" !< namelist name
-    logical :: read_from_file = .true. !< whether the associated variables are already set by interfaces
     integer(i4) :: case !< coupling case
     integer(i4) :: meteo_timestep !< timestep for meteo-data from coupling
     logical :: meteo_time_ref_endpoint !< expect meteo has time reference point at end of associated time interval
@@ -1467,7 +1427,7 @@ contains
     class(nml_optimization_t), intent(inout) :: self
     character(*), intent(in) :: file !< file containing the namelist
 
-    integer :: unit, status
+    integer :: unit
     integer(i4) :: nIterations !< number of iterations for optimization
     integer(i8) :: seed !< seed used for optimization, default: -9 --> system time
     real(dp) :: dds_r !< DDS: perturbation rate, default: 0.2
@@ -1500,8 +1460,8 @@ contains
       mcmc_opti = .true.
       ! mcmc_error_params -> no defaults
       call open_new_nml(file, unit)
-      call position_nml(self%name, unit, status=status)
-      if (status == 0) read(unit, nml=optimization)
+      call position_nml(self%name, unit, status=self%nml_status)
+      if (self%nml_status == 0_i4) read(unit, nml=optimization)
       call close_nml(unit)
       self%nIterations = nIterations
       self%seed = seed
@@ -1530,7 +1490,8 @@ contains
       warming_Days, &
       eval_Per
 
-      if ( self%read_from_file ) then
+    if ( self%read_from_file ) then
+      warming_Days = 0_i4
       call open_new_nml(file, unit)
       call position_nml(self%name, unit)
       read(unit, nml=time_periods)
@@ -1633,9 +1594,11 @@ contains
 
     if ( self%read_from_file ) then
       call open_new_nml(file, unit)
-      call position_nml(self%name, unit)
-      read(unit, nml=optional_data)
+      call position_nml(self%name, unit, status=self%nml_status)
+      if (self%nml_status == 0_i4) read(unit, nml=optional_data)
       call close_nml(unit)
+      self%read_from_file = .false.
+      if (self%nml_status /= 0_i4) return
       self%nSoilHorizons_sm_input = nSoilHorizons_sm_input
       self%dir_soil_moisture = dir_soil_moisture
       self%dir_neutrons = dir_neutrons
@@ -1645,7 +1608,6 @@ contains
       self%timeStep_neutrons_input = timeStep_neutrons_input
       self%timeStep_et_input = timeStep_et_input
       self%timeStep_tws_input = timeStep_tws_input
-      self%read_from_file = .false.
     end if
   end subroutine read_optional_data
 
@@ -1768,8 +1730,8 @@ contains
       BFI_calc = .false. ! default value
       BFI_obs = -1.0_dp  ! negative value to flag missing values
       call open_new_nml(file, unit)
-      call position_nml(self%name, unit)
-      read(unit, nml=baseflow_config)
+      call position_nml(self%name, unit, status=self%nml_status)
+      if (self%nml_status == 0_i4) read(unit, nml=baseflow_config)
       call close_nml(unit)
       self%BFI_calc = BFI_calc
       self%BFI_obs = BFI_obs
@@ -1892,11 +1854,12 @@ contains
 
     if ( self%read_from_file ) then
       call open_new_nml(file, unit)
-      call position_nml(self%name, unit)
-      read(unit, nml=interception1)
+      call position_nml(self%name, unit, status=self%nml_status)
+      if (self%nml_status == 0_i4) read(unit, nml=interception1)
       call close_nml(unit)
-      self%canopyInterceptionFactor = canopyInterceptionFactor
       self%read_from_file = .false.
+      if (self%nml_status /= 0_i4) return
+      self%canopyInterceptionFactor = canopyInterceptionFactor
     end if
   end subroutine read_interception1
 
@@ -1928,9 +1891,11 @@ contains
 
     if ( self%read_from_file ) then
       call open_new_nml(file, unit)
-      call position_nml(self%name, unit)
-      read(unit, nml=snow1)
+      call position_nml(self%name, unit, status=self%nml_status)
+      if (self%nml_status == 0_i4) read(unit, nml=snow1)
       call close_nml(unit)
+      self%read_from_file = .false.
+      if (self%nml_status /= 0_i4) return
       self%snowTreshholdTemperature = snowTreshholdTemperature
       self%degreeDayFactor_forest = degreeDayFactor_forest
       self%degreeDayFactor_impervious = degreeDayFactor_impervious
@@ -1939,8 +1904,8 @@ contains
       self%maxDegreeDayFactor_forest = maxDegreeDayFactor_forest
       self%maxDegreeDayFactor_impervious = maxDegreeDayFactor_impervious
       self%maxDegreeDayFactor_pervious = maxDegreeDayFactor_pervious
-      self%read_from_file = .false.
     end if
+
   end subroutine read_snow1
 
   !> \brief Read 'soilmoisture1' namelist content.
@@ -1996,9 +1961,11 @@ contains
 
     if ( self%read_from_file ) then
       call open_new_nml(file, unit)
-      call position_nml(self%name, unit)
-      read(unit, nml=soilmoisture1)
+      call position_nml(self%name, unit, status=self%nml_status)
+      if (self%nml_status == 0_i4) read(unit, nml=soilmoisture1)
       call close_nml(unit)
+      self%read_from_file = .false.
+      if (self%nml_status /= 0_i4) return
       self%orgMatterContent_forest = orgMatterContent_forest
       self%orgMatterContent_impervious = orgMatterContent_impervious
       self%orgMatterContent_pervious = orgMatterContent_pervious
@@ -2016,8 +1983,8 @@ contains
       self%rootFractionCoefficient_impervious = rootFractionCoefficient_impervious
       self%rootFractionCoefficient_pervious = rootFractionCoefficient_pervious
       self%infiltrationShapeFactor = infiltrationShapeFactor
-      self%read_from_file = .false.
     end if
+
   end subroutine read_soilmoisture1
 
   !> \brief Read 'soilmoisture2' namelist content.
@@ -2075,9 +2042,11 @@ contains
 
     if ( self%read_from_file ) then
       call open_new_nml(file, unit)
-      call position_nml(self%name, unit)
-      read(unit, nml=soilmoisture2)
+      call position_nml(self%name, unit, status=self%nml_status)
+      if (self%nml_status == 0_i4) read(unit, nml=soilmoisture2)
       call close_nml(unit)
+      self%read_from_file = .false.
+      if (self%nml_status /= 0_i4) return
       self%orgMatterContent_forest = orgMatterContent_forest
       self%orgMatterContent_impervious = orgMatterContent_impervious
       self%orgMatterContent_pervious = orgMatterContent_pervious
@@ -2096,8 +2065,8 @@ contains
       self%rootFractionCoefficient_pervious = rootFractionCoefficient_pervious
       self%infiltrationShapeFactor = infiltrationShapeFactor
       self%jarvis_sm_threshold_c1 = jarvis_sm_threshold_c1
-      self%read_from_file = .false.
     end if
+
   end subroutine read_soilmoisture2
 
   !> \brief Read 'soilmoisture3' namelist content.
@@ -2163,9 +2132,11 @@ contains
 
     if ( self%read_from_file ) then
       call open_new_nml(file, unit)
-      call position_nml(self%name, unit)
-      read(unit, nml=soilmoisture3)
+      call position_nml(self%name, unit, status=self%nml_status)
+      if (self%nml_status == 0_i4) read(unit, nml=soilmoisture3)
       call close_nml(unit)
+      self%read_from_file = .false.
+      if (self%nml_status /= 0_i4) return
       self%orgMatterContent_forest = orgMatterContent_forest
       self%orgMatterContent_impervious = orgMatterContent_impervious
       self%orgMatterContent_pervious = orgMatterContent_pervious
@@ -2188,8 +2159,8 @@ contains
       self%FCmin_glob = FCmin_glob
       self%FCdelta_glob = FCdelta_glob
       self%jarvis_sm_threshold_c1 = jarvis_sm_threshold_c1
-      self%read_from_file = .false.
     end if
+
   end subroutine read_soilmoisture3
 
   !> \brief Read 'soilmoisture4' namelist content.
@@ -2253,9 +2224,11 @@ contains
 
     if ( self%read_from_file ) then
       call open_new_nml(file, unit)
-      call position_nml(self%name, unit)
-      read(unit, nml=soilmoisture4)
+      call position_nml(self%name, unit, status=self%nml_status)
+      if (self%nml_status == 0_i4) read(unit, nml=soilmoisture4)
       call close_nml(unit)
+      self%read_from_file = .false.
+      if (self%nml_status /= 0_i4) return
       self%orgMatterContent_forest = orgMatterContent_forest
       self%orgMatterContent_impervious = orgMatterContent_impervious
       self%orgMatterContent_pervious = orgMatterContent_pervious
@@ -2277,8 +2250,8 @@ contains
       self%rootFractionCoefficient_clay = rootFractionCoefficient_clay
       self%FCmin_glob = FCmin_glob
       self%FCdelta_glob = FCdelta_glob
-      self%read_from_file = .false.
     end if
+
   end subroutine read_soilmoisture4
 
   !> \brief Read 'directrunoff1' namelist content.
@@ -2295,12 +2268,14 @@ contains
 
     if ( self%read_from_file ) then
       call open_new_nml(file, unit)
-      call position_nml(self%name, unit)
-      read(unit, nml=directrunoff1)
+      call position_nml(self%name, unit, status=self%nml_status)
+      if (self%nml_status == 0_i4) read(unit, nml=directrunoff1)
       call close_nml(unit)
-      self%imperviousStorageCapacity = imperviousStorageCapacity
       self%read_from_file = .false.
+      if (self%nml_status /= 0_i4) return
+      self%imperviousStorageCapacity = imperviousStorageCapacity
     end if
+
   end subroutine read_directrunoff1
 
   !> \brief Read 'petminus1' namelist content.
@@ -2325,16 +2300,18 @@ contains
 
     if ( self%read_from_file ) then
       call open_new_nml(file, unit)
-      call position_nml(self%name, unit)
-      read(unit, nml=petminus1)
+      call position_nml(self%name, unit, status=self%nml_status)
+      if (self%nml_status == 0_i4) read(unit, nml=petminus1)
       call close_nml(unit)
+      self%read_from_file = .false.
+      if (self%nml_status /= 0_i4) return
       self%PET_a_forest = PET_a_forest
       self%PET_a_impervious = PET_a_impervious
       self%PET_a_pervious = PET_a_pervious
       self%PET_b = PET_b
       self%PET_c = PET_c
-      self%read_from_file = .false.
     end if
+
   end subroutine read_petminus1
 
   !> \brief Read 'pet0' namelist content.
@@ -2355,14 +2332,16 @@ contains
 
     if ( self%read_from_file ) then
       call open_new_nml(file, unit)
-      call position_nml(self%name, unit)
-      read(unit, nml=pet0)
+      call position_nml(self%name, unit, status=self%nml_status)
+      if (self%nml_status == 0_i4) read(unit, nml=pet0)
       call close_nml(unit)
+      self%read_from_file = .false.
+      if (self%nml_status /= 0_i4) return
       self%minCorrectionFactorPET = minCorrectionFactorPET
       self%maxCorrectionFactorPET = maxCorrectionFactorPET
       self%aspectTresholdPET = aspectTresholdPET
-      self%read_from_file = .false.
     end if
+
   end subroutine read_pet0
 
   !> \brief Read 'pet1' namelist content.
@@ -2385,15 +2364,17 @@ contains
 
     if ( self%read_from_file ) then
       call open_new_nml(file, unit)
-      call position_nml(self%name, unit)
-      read(unit, nml=pet1)
+      call position_nml(self%name, unit, status=self%nml_status)
+      if (self%nml_status == 0_i4) read(unit, nml=pet1)
       call close_nml(unit)
+      self%read_from_file = .false.
+      if (self%nml_status /= 0_i4) return
       self%minCorrectionFactorPET = minCorrectionFactorPET
       self%maxCorrectionFactorPET = maxCorrectionFactorPET
       self%aspectTresholdPET = aspectTresholdPET
       self%HargreavesSamaniCoeff = HargreavesSamaniCoeff
-      self%read_from_file = .false.
     end if
+
   end subroutine read_pet1
 
   !> \brief Read 'pet2' namelist content.
@@ -2412,13 +2393,15 @@ contains
 
     if ( self%read_from_file ) then
       call open_new_nml(file, unit)
-      call position_nml(self%name, unit)
-      read(unit, nml=pet2)
+      call position_nml(self%name, unit, status=self%nml_status)
+      if (self%nml_status == 0_i4) read(unit, nml=pet2)
       call close_nml(unit)
+      self%read_from_file = .false.
+      if (self%nml_status /= 0_i4) return
       self%PriestleyTaylorCoeff = PriestleyTaylorCoeff
       self%PriestleyTaylorLAIcorr = PriestleyTaylorLAIcorr
-      self%read_from_file = .false.
     end if
+
   end subroutine read_pet2
 
   !> \brief Read 'pet3' namelist content.
@@ -2447,9 +2430,11 @@ contains
 
     if ( self%read_from_file ) then
       call open_new_nml(file, unit)
-      call position_nml(self%name, unit)
-      read(unit, nml=pet3)
+      call position_nml(self%name, unit, status=self%nml_status)
+      if (self%nml_status == 0_i4) read(unit, nml=pet3)
       call close_nml(unit)
+      self%read_from_file = .false.
+      if (self%nml_status /= 0_i4) return
       self%canopyheigth_forest = canopyheigth_forest
       self%canopyheigth_impervious = canopyheigth_impervious
       self%canopyheigth_pervious = canopyheigth_pervious
@@ -2457,8 +2442,8 @@ contains
       self%roughnesslength_momentum_coeff = roughnesslength_momentum_coeff
       self%roughnesslength_heat_coeff = roughnesslength_heat_coeff
       self%stomatal_resistance = stomatal_resistance
-      self%read_from_file = .false.
     end if
+
   end subroutine read_pet3
 
   !> \brief Read 'interflow1' namelist content.
@@ -2486,16 +2471,18 @@ contains
 
     if ( self%read_from_file ) then
       call open_new_nml(file, unit)
-      call position_nml(self%name, unit)
-      read(unit, nml=interflow1)
+      call position_nml(self%name, unit, status=self%nml_status)
+      if (self%nml_status == 0_i4) read(unit, nml=interflow1)
       call close_nml(unit)
+      self%read_from_file = .false.
+      if (self%nml_status /= 0_i4) return
       self%interflowStorageCapacityFactor = interflowStorageCapacityFactor
       self%interflowRecession_slope = interflowRecession_slope
       self%fastInterflowRecession_forest = fastInterflowRecession_forest
       self%slowInterflowRecession_Ks = slowInterflowRecession_Ks
       self%exponentSlowInterflow = exponentSlowInterflow
-      self%read_from_file = .false.
     end if
+
   end subroutine read_interflow1
 
   !> \brief Read 'percolation1' namelist content.
@@ -2516,14 +2503,16 @@ contains
 
     if ( self%read_from_file ) then
       call open_new_nml(file, unit)
-      call position_nml(self%name, unit)
-      read(unit, nml=percolation1)
+      call position_nml(self%name, unit, status=self%nml_status)
+      if (self%nml_status == 0_i4) read(unit, nml=percolation1)
       call close_nml(unit)
+      self%read_from_file = .false.
+      if (self%nml_status /= 0_i4) return
       self%rechargeCoefficient = rechargeCoefficient
       self%rechargeFactor_karstic = rechargeFactor_karstic
       self%gain_loss_GWreservoir_karstic = gain_loss_GWreservoir_karstic
-      self%read_from_file = .false.
     end if
+
   end subroutine read_percolation1
 
   !> \brief Read 'neutrons1' namelist content.
@@ -2544,14 +2533,16 @@ contains
 
     if ( self%read_from_file ) then
       call open_new_nml(file, unit)
-      call position_nml(self%name, unit)
-      read(unit, nml=neutrons1)
+      call position_nml(self%name, unit, status=self%nml_status)
+      if (self%nml_status == 0_i4) read(unit, nml=neutrons1)
       call close_nml(unit)
+      self%read_from_file = .false.
+      if (self%nml_status /= 0_i4) return
       self%Desilets_N0 = Desilets_N0
       self%Desilets_LW0 = Desilets_LW0
       self%Desilets_LW1 = Desilets_LW1
-      self%read_from_file = .false.
     end if
+
   end subroutine read_neutrons1
 
   !> \brief Read 'neutrons2' namelist content.
@@ -2584,9 +2575,11 @@ contains
 
     if ( self%read_from_file ) then
       call open_new_nml(file, unit)
-      call position_nml(self%name, unit)
-      read(unit, nml=neutrons2)
+      call position_nml(self%name, unit, status=self%nml_status)
+      if (self%nml_status == 0_i4) read(unit, nml=neutrons2)
       call close_nml(unit)
+      self%read_from_file = .false.
+      if (self%nml_status /= 0_i4) return
       self%COSMIC_N0 = COSMIC_N0
       self%COSMIC_N1 = COSMIC_N1
       self%COSMIC_N2 = COSMIC_N2
@@ -2596,8 +2589,8 @@ contains
       self%COSMIC_L31 = COSMIC_L31
       self%COSMIC_LW0 = COSMIC_LW0
       self%COSMIC_LW1 = COSMIC_LW1
-      self%read_from_file = .false.
     end if
+
   end subroutine read_neutrons2
 
   !> \brief Read 'geoparameter' namelist content.
@@ -2616,12 +2609,14 @@ contains
     if ( self%read_from_file ) then
       GeoParam = nodata_dp
       call open_new_nml(file, unit)
-      call position_nml(self%name, unit)
-      read(unit, nml=geoparameter)
+      call position_nml(self%name, unit, status=self%nml_status)
+      if (self%nml_status == 0_i4) read(unit, nml=geoparameter)
       call close_nml(unit)
-      self%GeoParam = GeoParam
       self%read_from_file = .false.
+      if (self%nml_status /= 0_i4) return
+      self%GeoParam = GeoParam
     end if
+
   end subroutine read_geoparameter
 
   !> \brief Read 'mainconfig_mrm' namelist content.
@@ -2831,16 +2826,18 @@ contains
 
     if ( self%read_from_file ) then
       call open_new_nml(file, unit)
-      call position_nml(self%name, unit)
-      read(unit, nml=routing1)
+      call position_nml(self%name, unit, status=self%nml_status)
+      if (self%nml_status == 0_i4) read(unit, nml=routing1)
       call close_nml(unit)
+      self%read_from_file = .false.
+      if (self%nml_status /= 0_i4) return
       self%muskingumTravelTime_constant = muskingumTravelTime_constant
       self%muskingumTravelTime_riverLength = muskingumTravelTime_riverLength
       self%muskingumTravelTime_riverSlope = muskingumTravelTime_riverSlope
       self%muskingumTravelTime_impervious = muskingumTravelTime_impervious
       self%muskingumAttenuation_riverSlope = muskingumAttenuation_riverSlope
-      self%read_from_file = .false.
     end if
+
   end subroutine read_routing1
 
   !> \brief Read 'routing2' namelist content.
@@ -2856,12 +2853,14 @@ contains
       streamflow_celerity
     if ( self%read_from_file ) then
       call open_new_nml(file, unit)
-      call position_nml(self%name, unit)
-      read(unit, nml=routing2)
+      call position_nml(self%name, unit, status=self%nml_status)
+      if (self%nml_status == 0_i4) read(unit, nml=routing2)
       call close_nml(unit)
-      self%streamflow_celerity = streamflow_celerity
       self%read_from_file = .false.
+      if (self%nml_status /= 0_i4) return
+      self%streamflow_celerity = streamflow_celerity
     end if
+
   end subroutine read_routing2
 
   !> \brief Read 'routing3' namelist content.
@@ -2878,12 +2877,14 @@ contains
 
     if ( self%read_from_file ) then
       call open_new_nml(file, unit)
-      call position_nml(self%name, unit)
-      read(unit, nml=routing3)
+      call position_nml(self%name, unit, status=self%nml_status)
+      if (self%nml_status == 0_i4) read(unit, nml=routing3)
       call close_nml(unit)
-      self%slope_factor = slope_factor
       self%read_from_file = .false.
+      if (self%nml_status /= 0_i4) return
+      self%slope_factor = slope_factor
     end if
+
   end subroutine read_routing3
 
   !> \brief Read 'config_riv_temp' namelist content.
@@ -2948,7 +2949,7 @@ contains
     class(nml_coupling_t), intent(inout) :: self
     character(*), intent(in) :: file !< file containing the namelist
 
-    integer :: unit, status
+    integer :: unit
     integer(i4) :: case !< coupling case
     integer(i4) :: meteo_timestep !< timestep for meteo-data from coupling
     logical :: meteo_time_ref_endpoint !< expect meteo has time reference point at end of associated time interval
@@ -2996,8 +2997,8 @@ contains
       meteo_expect_strd = .false.
       meteo_expect_tann = .false.
       call open_new_nml(file, unit)
-      call position_nml(self%name, unit, status=status)
-      if (status == 0) read(unit, nml=coupling)
+      call position_nml(self%name, unit, status=self%nml_status)
+      if (self%nml_status == 0_i4) read(unit, nml=coupling)
       call close_nml(unit)
       self%case = case
       self%meteo_timestep = meteo_timestep

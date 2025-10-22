@@ -159,7 +159,7 @@ CONTAINS
   !> \date Jun 2018
   subroutine write_eff_params(mask1, s1, e1, rows1, cols1, soil1, lcscenes, lais, nc)
 
-    use mo_common_constants, only : nodata_dp, nodata_i4
+    use mo_constants, only : nodata_dp, nodata_i4
     use mo_common_variables, only : LC_year_end, LC_year_start, processMatrix
     use mo_kind, only : i4
     use mo_mpr_global_variables, only : L1_HarSamCoeff, L1_PrieTayAlpha, L1_aeroResist, &

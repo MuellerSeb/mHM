@@ -423,7 +423,7 @@ contains
   !> \brief Get the information of Level-0 of the mHM model.
   subroutine L0_domain_info(ncols, nrows, ncells, xll, yll, cell_size, no_data, domain)
     use mo_common_variables, only : level0
-    use mo_common_constants, only : nodata_dp
+    use mo_constants, only : nodata_dp
     use mo_common_run_variables, only : run_cfg
     implicit none
     integer(i4), intent(out) :: ncols !< number of columns
@@ -536,7 +536,7 @@ contains
   !> \brief Get the information of Level-1 of the mHM model.
   subroutine L1_domain_info(ncols, nrows, ncells, xll, yll, cell_size, no_data, domain)
     use mo_common_variables, only : level1
-    use mo_common_constants, only : nodata_dp
+    use mo_constants, only : nodata_dp
     use mo_common_run_variables, only : run_cfg
     implicit none
     integer(i4), intent(out) :: ncols !< number of columns
@@ -730,7 +730,7 @@ contains
   !> \brief Get the information of Level-11 of the mHM model.
   subroutine L11_domain_info(ncols, nrows, ncells, xll, yll, cell_size, no_data, domain)
     use mo_mrm_global_variables, only : level11
-    use mo_common_constants, only : nodata_dp
+    use mo_constants, only : nodata_dp
     use mo_common_run_variables, only : run_cfg
     implicit none
     integer(i4), intent(out) :: ncols !< number of columns
@@ -847,7 +847,7 @@ contains
   !> \brief Get the information of Level-2 of the mHM model.
   subroutine L2_domain_info(ncols, nrows, ncells, xll, yll, cell_size, no_data, domain)
     use mo_global_variables, only : meteo_handler
-    use mo_common_constants, only : nodata_dp
+    use mo_constants, only : nodata_dp
     use mo_common_run_variables, only : run_cfg
     implicit none
     integer(i4), intent(out) :: ncols !< number of columns

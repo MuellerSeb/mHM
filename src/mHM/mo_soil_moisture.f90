@@ -64,10 +64,10 @@ CONTAINS
   !>       \param[in] "real(dp) :: jarvis_thresh_c1"                 Jarvis critical value for normalized soil water
   !>       content
   !>       \param[in] "real(dp) :: aet_canopy"                       Actual ET from canopy [mm TS-1]
+  !>       \param[in] "real(dp) :: prec_effec"                                       Effective precipitation (rain +
+  !>       snow melt) [mm]
 
   !    INTENT(INOUT)
-  !>       \param[inout] "real(dp) :: prec_effec"                                       Effective precipitation (rain +
-  !>       snow melt) [mm]
   !>       \param[inout] "real(dp) :: runoff_sealed"                                    Direct runoff from impervious
   !>       areas
   !>       \param[inout] "real(dp) :: storage_sealed"                                   Retention storage of impervious
@@ -95,7 +95,7 @@ CONTAINS
                           soil_moist_FC, wilting_point, soil_moist_exponen, jarvis_thresh_c1, aet_canopy, prec_effec, &
                           runoff_sealed, storage_sealed, infiltration, soil_moist, aet, aet_sealed)
 
-    use mo_common_constants, only : eps_dp
+    use mo_constants, only : eps_dp
 
     implicit none
 

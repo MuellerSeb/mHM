@@ -20,6 +20,7 @@ module mo_common_mHM_mRM_variables
 
   use mo_kind, only : i4, i8, dp
   use mo_common_types, only: period
+  use mo_common_constants, only: nerror_model
   implicit none
 
   ! -------------------------------------------------------------------
@@ -88,7 +89,6 @@ module mo_common_mHM_mRM_variables
   !                                                                       !      default: -9 --> n+1
   logical, public :: mcmc_opti           ! MCMC: Optimization (.true. ) or
   !                                                                       !       Only parameter uncertainty (.false.)
-  integer(i4), public, parameter :: nerror_model = 2    ! # possible parameters in error model
   !                                                                       !       e.g. for opti_function=8: 2
   real(dp), public, dimension(nerror_model) :: mcmc_error_params   !       Parameters of error model if mcmc_opti=.false.
   !                                                                       !       e.g. for opti_function=8: 0.01, 0.3

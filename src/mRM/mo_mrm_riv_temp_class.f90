@@ -161,7 +161,8 @@ contains
     file_namelist_param &
   )
 
-    use mo_common_constants, only : maxNoDomains, nodata_i4
+    use mo_common_constants, only : maxNoDomains
+    use mo_constants, only : nodata_i4
     use mo_common_variables, only : domainMeta
     use mo_check, only : check_dir
     USE mo_string_utils, ONLY : num2str

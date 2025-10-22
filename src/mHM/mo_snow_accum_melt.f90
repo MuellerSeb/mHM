@@ -71,7 +71,7 @@ CONTAINS
                             snow_pack, deg_day, melt, prec_effect, rain, snow)
     implicit none
 
-    ! Increase of the Degree-day factor per mm of increasein precipitation [s-1 degreeC-1]
+    ! Increase of the Degree-day factor per mm of increase in precipitation [s-1 degreeC-1]
     REAL(dp), INTENT(IN) :: deg_day_incr
 
     ! Maximum Degree-day factor [m-1 degreeC-1]
