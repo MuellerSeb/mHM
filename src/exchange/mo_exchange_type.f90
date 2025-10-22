@@ -116,6 +116,7 @@ module mo_exchange_type
     type(time_config_t) :: time_config  !< time configuration
     type(parameters_t) :: parameters    !< parameters container
     integer(i4) :: domain               !< Number of this domain
+    character(:), allocatable :: cwd    !< current working directory to set relative paths
 
     ! grids
     type(grid_t), pointer :: level0 => null() !< level0 grid of the morphology
@@ -141,6 +142,7 @@ module mo_exchange_type
     type(var_dp) :: raw_netrad          !< raw net radiation [W m-2] on level l2
     type(var_dp) :: raw_eabs            !< raw vapor pressure [Pa] on level l2
     type(var_dp) :: raw_wind            !< raw wind speed [m s-1] on level l2
+    type(var_dp) :: raw_pet             !< input potential evapotranspiration [mm] on level l2
 
     ! processed meteorology (level1)
     type(var_dp) :: pre                 !< precipitation [mm] on level l1
@@ -243,6 +245,7 @@ module mo_exchange_type
     procedure, public  :: get_grid => exchange_get_grid
     procedure, public  :: has_grid => exchange_has_grid
     procedure, public :: get_meta => exchange_get_var_meta
+    procedure, public :: get_path => exchange_get_path
     procedure, private :: get_var_class => exchange_get_var_class
     procedure, private  :: get_data_1d_dp => exchange_get_data_1d_dp
     procedure, private  :: get_data_1d_i4 => exchange_get_data_1d_i4
@@ -259,16 +262,20 @@ module mo_exchange_type
 contains
 
   !> \brief Configure the exchange type
-  subroutine exchange_configure(self, time_cfg, parameters, domain)
+  subroutine exchange_configure(self, time_cfg, parameters, domain, cwd)
+    use mo_os, only: path_abspath, check_path_isdir
     class(exchange_t), intent(inout) :: self
     type(time_config_t), intent(in) :: time_cfg !< time configuration
     type(parameters_t), intent(in) :: parameters !< parameters container
     integer(i4), intent(in), optional :: domain !< domain ID of the current domain in the configuration arrays (1 by default)
+    character(len=*), intent(in), optional :: cwd !< current working directory to set relative paths
 
     call message(" ... configure exchange")
     self%time_config = time_cfg
     self%parameters = parameters
     self%domain = optval(domain, 1_i4) ! 1 by default for single domain initialization
+    self%cwd = path_abspath(optval(cwd, "."))
+    call check_path_isdir(self%cwd, raise=.true.)
 
     ! time settings
     self%eval_start_time = datetime( &
@@ -820,6 +827,16 @@ contains
         call error_message("exchange%get_var: variable data of '", var, "' not two dimensional.")
     end select
   end subroutine exchange_set_data_2d
+
+  !> \brief Format a path by prepending the current working directory and appending a file name if given.
+  function exchange_get_path(self, path, file) result(norm_path)
+    use mo_os, only: path_join, path_normpath
+    class(exchange_t), intent(in) :: self
+    character(len=*), intent(in) :: path !< path to be formatted
+    character(len=*), optional, intent(in) :: file !< file to be appended
+    character(:), allocatable :: norm_path !< formatted path
+    norm_path = path_normpath(path_join(self%cwd, path, file))
+  end function exchange_get_path
 
   !> \brief Read time configuration.
   subroutine time_config_read(self, file)

@@ -36,6 +36,14 @@ module mo_meteo_container
 
 contains
 
+  !> \brief Initialize the meteo configuration.
+  subroutine meteo_config_read(self, file)
+    class(meteo_config_t), intent(inout) :: self
+    character(*), intent(in) :: file !< file containing the namelists
+    call message(" ... read config meteo: ", file)
+    self%active = .true.
+  end subroutine meteo_config_read
+
   !> \brief Configure the Meteorology process container.
   subroutine meteo_configure(self, config, exchange)
     class(meteo_t), intent(inout) :: self
@@ -45,14 +53,6 @@ contains
     self%config = config
     self%exchange => exchange
   end subroutine meteo_configure
-
-  !> \brief Initialize the meteo configuration.
-  subroutine meteo_config_read(self, file)
-    class(meteo_config_t), intent(inout) :: self
-    character(*), intent(in) :: file !< file containing the namelists
-    call message(" ... read config meteo: ", file)
-    self%active = .true.
-  end subroutine meteo_config_read
 
   subroutine meteo_connect(self)
     class(meteo_t), intent(inout) :: self
