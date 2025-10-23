@@ -16,6 +16,7 @@ module mo_river
   use mo_grid_io, only: var, output_dataset
   use mo_message, only: error_message
   use mo_utils, only: optval
+  use mo_netcdf, only: NcDataset, NcDimension, NcVariable
 
   implicit none
   private
@@ -119,6 +120,7 @@ module mo_river
     procedure, public :: calc_celerity => river_celerity
     procedure, public :: select_cell_values => river_select_cell_values
     procedure, public :: export => river_export
+    procedure, public :: write_restart => river_write_restart
   end type river_t
 
 contains
@@ -582,5 +584,163 @@ contains
     call ds%close()
     deallocate(vars)
   end subroutine river_export
+
+  subroutine river_write_restart(this, path, deflate_level)
+    class(river_t), intent(in) :: this
+    character(*), intent(in) :: path !< path to the file
+    integer(i4), intent(in), optional :: deflate_level
+
+    character(:), allocatable :: units, units_dt
+    type(NcDimension) :: t_dim, two_dim, node_dim, link_dim, dims(2), order_dim, sinks_dim
+    type(NcVariable) :: node_x_var, node_y_var, t_var, mesh_var, facc_var, &
+    fdir_var, down_var, is_sink_var, upstream_area_var, link_length_var, &
+    link_slope_var, celerity_var, node_cell_var, cell_node_select_var, &
+    area_fraction_var, link_var, order_id_var, order_level_start_var, order_level_end_var, &
+    order_level_size_var
+    type(NcDataset) :: restart_nc
+    integer(i4) :: i, nlinks, topo_dim, deflate
+    integer(i8) :: n, k
+    integer(i8), allocatable :: links(:, :)
+    ! logical :: net
+
+    ! TODO: acutally use deflate
+    deflate = optval(deflate_level, 6_i4)
+    ! topo_dim = merge(1_i4, 0_i4, net)
+
+    restart_nc = NcDataset(trim(path), "w")
+    call this%grid%to_netcdf(restart_nc)
+
+    two_dim = restart_nc%setDimension("Two", 2_i4)
+    node_dim = restart_nc%setDimension("node", int(this%n_nodes, i4))  ! only works if network is not to huge for i4
+    order_dim = restart_nc%setDimension("order_dim", int(this%order%n_levels, i4))
+    sinks_dim = restart_nc%setDimension("sinks_dim", size(this%sinks))
+
+    ! 1D network topology following UGRID conventions
+    mesh_var = restart_nc%setVariable("river", "i32", dims(:0)) ! mesh variable as scalar integer
+    call mesh_var%setAttribute("cf_role", "mesh_topology")
+    call mesh_var%setAttribute("long_name", "river network definition")
+    call mesh_var%setAttribute("topology_dimension", 1_i4)  ! 0 - only nodes, 1 - with links
+    call mesh_var%setAttribute("node_coordinates", "river_node_x river_node_y")
+    call mesh_var%setAttribute("edge_node_connectivity", "links")
+
+    ! coordinates
+    node_x_var = restart_nc%setVariable("river_node_x", "f64", [node_dim])
+    node_y_var = restart_nc%setVariable("river_node_y", "f64", [node_dim])
+
+    if (this%grid%coordsys==cartesian) then
+      call node_x_var%setAttribute("long_name", "x coordinate of projection")
+      call node_x_var%setAttribute("standard_name", "projection_x_coordinate")
+      call node_x_var%setAttribute("units", "m") ! TODO: this should be configurable
+      call node_y_var%setAttribute("long_name", "y coordinate of projection")
+      call node_y_var%setAttribute("standard_name", "projection_y_coordinate")
+      call node_y_var%setAttribute("units", "m") ! TODO: this should be configurable
+    else
+      call node_x_var%setAttribute("long_name", "longitude")
+      call node_x_var%setAttribute("standard_name", "longitude")
+      call node_x_var%setAttribute("units", "degrees_east")
+      call node_y_var%setAttribute("long_name", "latitude")
+      call node_y_var%setAttribute("standard_name", "latitude")
+      call node_y_var%setAttribute("units", "degrees_north")
+    end if
+    ! this should set the node-dim size
+    call node_x_var%setData(this%node_x)
+    call node_y_var%setData(this%node_y)
+
+    ! fdir
+    fdir_var = restart_nc%setVariable("fdir", "i64", [node_dim])
+    call fdir_var%setAttribute("long_name", "flow direction")
+    call fdir_var%setData(this%fdir)
+
+    ! facc
+    facc_var = restart_nc%setVariable("facc", "i64", [node_dim])
+    call facc_var%setAttribute("long_name", "flow accumulation")
+    call facc_var%setData(this%facc)
+
+    ! down
+    down_var = restart_nc%setVariable("down", "i64", [node_dim])
+    call down_var%setAttribute("long_name", "downstream cell")
+    call down_var%setData(this%down)
+
+    ! is_sink
+    is_sink_var = restart_nc%setVariable("is_sink", "i64", [node_dim])
+    call is_sink_var%setAttribute("long_name", "flag to indicate if node is sink")
+    call is_sink_var%setData(merge(1_i4, 0_i4, this%is_sink))
+
+    ! upstream_area
+    upstream_area_var = restart_nc%setVariable("upstream_area", "i64", [node_dim])
+    call upstream_area_var%setAttribute("long_name", "upstream area")
+    call upstream_area_var%setData(this%upstream_area)
+
+    ! link_length
+    link_length_var = restart_nc%setVariable("link_length", "i64", [node_dim])
+    call link_length_var%setAttribute("long_name", "link length")
+    call link_length_var%setData(this%link_length)
+
+    ! link_slope
+    link_slope_var = restart_nc%setVariable("link_slope", "i64", [node_dim])
+    call link_slope_var%setAttribute("long_name", "average slope of link")
+    call link_slope_var%setData(this%link_slope)
+
+    ! celerity
+    celerity_var = restart_nc%setVariable("celerity", "i64", [node_dim])
+    call celerity_var%setAttribute("long_name", "streamflow celerity")
+    call celerity_var%setData(this%celerity)
+
+    ! node_cell
+    node_cell_var = restart_nc%setVariable("node_cell", "i64", [node_dim])
+    call node_cell_var%setAttribute("long_name", "map node to grid cell")
+    call node_cell_var%setData(this%node_cell)
+
+    ! cell_node_select
+    cell_node_select_var = restart_nc%setVariable("cell_node_select", "i64", [node_dim])
+    call cell_node_select_var%setAttribute("long_name", "cell node select")
+    call cell_node_select_var%setData(this%cell_node_select)
+
+    ! area_fraction
+    area_fraction_var = restart_nc%setVariable("area_fraction", "i64", [node_dim])
+    call area_fraction_var%setAttribute("long_name", "area fraction for each node in cell")
+    call area_fraction_var%setData(this%area_fraction)
+
+    ! order%id
+    order_id_var = restart_nc%setVariable("order_id_var", "i64", [node_dim])
+    call order_id_var%setAttribute("long_name", "id in order")
+    call order_id_var%setData(this%order%id)
+
+    ! order%level_start
+    order_level_start_var = restart_nc%setVariable("order_level_start_var", "i64", [order_dim])
+    call order_level_start_var%setAttribute("long_name", "level start in order")
+    call order_level_start_var%setData(this%order%level_start)
+
+    ! order%level_end
+    order_level_end_var = restart_nc%setVariable("order_level_end_var", "i64", [order_dim])
+    call order_level_end_var%setAttribute("long_name", "level start in order")
+    call order_level_end_var%setData(this%order%level_end)
+
+    ! order%level_size
+    order_level_size_var = restart_nc%setVariable("order_level_size_var", "i64", [order_dim])
+    call order_level_size_var%setAttribute("long_name", "level start in order")
+    call order_level_size_var%setData(this%order%level_size)
+
+    ! links
+    nlinks = int(this%n_nodes, i4) - size(this%sinks, kind=i4)
+    link_dim = restart_nc%setDimension("link", nlinks)
+    link_var = restart_nc%setVariable("links", "i64", [two_dim, link_dim])
+    call link_var%setAttribute("cf_role", "edge_node_connectivity")
+    call link_var%setAttribute("long_name", "river links definition")
+    call link_var%setAttribute("start_index", 1)  ! fortran indices starting with 1
+    allocate(links(2_i4, nlinks))
+    k = 0_i8
+    do n = 1_i8, this%n_nodes
+      if (this%is_sink(n)) cycle
+      k = k + 1_i8
+      links(1_i8, k) = n
+      links(2_i8, k) = this%down(n)
+    end do
+    call link_var%setData(links)
+    deallocate(links)
+
+    call restart_nc%close()
+
+  end subroutine
 
 end module mo_river
