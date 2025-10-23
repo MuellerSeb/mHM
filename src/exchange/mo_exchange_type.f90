@@ -18,7 +18,8 @@
 !! mHM is released under the LGPLv3+ license \license_note
 !> \ingroup f_exchange
 module mo_exchange_type
-  use mo_common_types, only: grid_t => grid
+  ! use mo_common_types, only: grid_t  => grid
+  use mo_grid, only: grid_t
   use mo_datetime, only: datetime, timedelta
   use mo_kind, only: dp, i4
   use mo_message, only: message, error_message

@@ -75,7 +75,7 @@
   !> IF routing process is ON then give nDomains = 1, for this case, mHM will internally
   !> discard gauging station information.
   !-----------------------------------------------------------------------------
-  nDomains             = 2
+  nDomains             = 1
   !-----------------------------------------------------------------------------
   !> resolution of Level-1 hydrological simulations in mHM [m or degree] per domain
   !> NOTE: if iFlag_cordinate_sys = 0, then resolution_Hydrology is in [m]
@@ -872,3 +872,34 @@
   ! BFI_obs(1) = 0.124
   ! BFI_obs(2) = 0.256
 /
+
+!******************************************************************************************
+! NEW MRM v6 NMLs
+!******************************************************************************************
+&mrm_main
+! default="daily", help="Output frequency: hourly, daily (default), monthly, yearly, once")
+out_frequency = 'daily'
+! has_value=.true.,  help="Routing grid resolution. By default: Resolution of runoff.")
+level11 = 4000
+! "Minimum river level size to route in parallel with OpenMP. By default: threads * 8
+omp_min = 1
+! Level order for parallel routing starting from river root
+parallel_rout = .false.
+/
+
+&mrm_dirs
+!
+scc_file = "src/tests/files/scc_gauges.nc"
+fdir_file = "src/tests/files/fdir.asc" ! "src/tests/files/input.nc"
+dem_file = "src/tests/files/dem.asc"
+slope_file = "src/tests/files/slope.asc"
+out_file = "out_test.nc"
+node_out_file = "out_node_test.nc"
+/
+
+&runoff_input
+! reading chunk size: off (default - 0), monthly (1), yearly (2), once (not sure what this should be)
+chunk = 'monthly'
+runoff_file = "src/tests/files/runoff.nc"
+/
+
