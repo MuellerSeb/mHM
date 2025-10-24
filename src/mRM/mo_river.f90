@@ -586,6 +586,7 @@ contains
     deallocate(vars)
   end subroutine river_export
 
+  !> \brief Write setup file
   subroutine river_write_restart(this, path, deflate_level)
     class(river_t), intent(in) :: this
     character(*), intent(in) :: path !< path to the file
@@ -788,6 +789,7 @@ contains
 
   end subroutine river_write_restart
 
+  !> \brief Read setup file
   subroutine river_read_restart(this, path)
     class(river_t), intent(inout) :: this
     character(*), intent(in) :: path !< path to the file
@@ -800,6 +802,7 @@ contains
     integer(i4), allocatable :: dummy(:)
     integer(i8), allocatable :: ids(:)
     real(dp), allocatable :: dummy2d(:, :)
+    logical, allocatable :: mask(:)
   
     restart_nc = NcDataset(trim(path), "r")
 
@@ -917,13 +920,17 @@ contains
 
     call this%init(this%n_nodes)
 
-    !!$omp parallel do default(shared) private(i, n_up, up, down)
     ids = [(i, i=1_i8, this%n_nodes)]
+    allocate(mask(this%n_nodes))
+    !$omp parallel do default(shared) private(mask)
     do i = 1_i8, this%n_nodes
-      this%nodes(i)%edges = pack(ids, ( this%down == i ))
+      mask = ( this%down == i )
+      allocate(this%nodes(i)%edges(count(mask, kind=i8)))
+      this%nodes(i)%edges(:) = pack(ids, mask)
+      ! this%nodes(i)%edges = pack(ids, this%down==i)
       if (this%down(i) > 0_i8) allocate(this%nodes(i)%dependents(1), source=this%down(i))
     end do
-    !!$omp end parallel do
+    !$omp end parallel do
     deallocate(ids)
     
   end subroutine river_read_restart
