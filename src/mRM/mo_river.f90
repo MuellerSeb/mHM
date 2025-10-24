@@ -592,12 +592,8 @@ contains
     integer(i4), intent(in), optional :: deflate_level
 
     character(:), allocatable :: units, units_dt
-    type(NcDimension) :: t_dim, two_dim, node_dim, link_dim, dims(2), order_dim, sinks_dim
-    type(NcVariable) :: node_x_var, node_y_var, t_var, mesh_var, facc_var, &
-    fdir_var, down_var, is_sink_var, upstream_area_var, link_length_var, &
-    link_slope_var, celerity_var, node_cell_var, cell_node_select_var, &
-    area_fraction_var, link_var, order_id_var, order_level_start_var, order_level_end_var, &
-    order_level_size_var, n_nodes_var
+    type(NcDimension) :: t_dim, two_dim, node_dim, link_dim, dims(2), order_dim, sinks_dim, xdim, ydim
+    type(NcVariable) :: node_x_var, node_y_var, nc_var
     type(NcDataset) :: restart_nc
     integer(i4) :: i, nlinks, topo_dim, deflate
     integer(i8) :: n, k
@@ -610,6 +606,22 @@ contains
 
     restart_nc = NcDataset(trim(path), "w")
     call this%grid%to_netcdf(restart_nc)
+    if ( this%grid%coordsys == cartesian ) then 
+      xdim = restart_nc%getDimension("x")
+      ydim = restart_nc%getDimension("y")
+    else
+      xdim = restart_nc%getDimension("lon")
+      ydim = restart_nc%getDimension("lat")
+    end if
+    nc_var = restart_nc%setVariable("cell_area", "f64", [xdim, ydim], deflate_level=deflate_level, shuffle=.true.)
+    call nc_var%setData(this%grid%unpack(this%grid%cell_area))
+
+    call nc_var%setAttribute("long_name", "cell area")
+    call nc_var%setAttribute("standard_name", "cell area")
+    call nc_var%setAttribute("units", "m2")
+    if (this%grid%has_aux_coords()) call nc_var%setAttribute("coordinates", "lat lon")
+
+    ! self%nc = nc%setVariable(self%name, self%dtype, dims(:2), deflate_level=deflate_level, shuffle=.true.)
 
     two_dim = restart_nc%setDimension("Two", 2_i4)
     node_dim = restart_nc%setDimension("node", int(this%n_nodes, i4))  ! only works if network is not to huge for i4
@@ -617,12 +629,12 @@ contains
     sinks_dim = restart_nc%setDimension("sinks_dim", size(this%sinks))
 
     ! 1D network topology following UGRID conventions
-    mesh_var = restart_nc%setVariable("river", "i32", dims(:0)) ! mesh variable as scalar integer
-    call mesh_var%setAttribute("cf_role", "mesh_topology")
-    call mesh_var%setAttribute("long_name", "river network definition")
-    call mesh_var%setAttribute("topology_dimension", 1_i4)  ! 0 - only nodes, 1 - with links
-    call mesh_var%setAttribute("node_coordinates", "river_node_x river_node_y")
-    call mesh_var%setAttribute("edge_node_connectivity", "links")
+    nc_var = restart_nc%setVariable("river", "i32", dims(:0)) ! mesh variable as scalar integer
+    call nc_var%setAttribute("cf_role", "mesh_topology")
+    call nc_var%setAttribute("long_name", "river network definition")
+    call nc_var%setAttribute("topology_dimension", 1_i4)  ! 0 - only nodes, 1 - with links
+    call nc_var%setAttribute("node_coordinates", "river_node_x river_node_y")
+    call nc_var%setAttribute("edge_node_connectivity", "links")
 
     if ( allocated(this%node_x) .and. allocated(this%node_y) ) then
       ! coordinates
@@ -651,116 +663,116 @@ contains
 
     ! fdir
     if ( allocated(this%fdir) ) then
-      fdir_var = restart_nc%setVariable("fdir", "i64", [node_dim])
-      call fdir_var%setAttribute("long_name", "flow direction")
-      call fdir_var%setData(this%fdir)
+      nc_var = restart_nc%setVariable("fdir", "i64", [node_dim])
+      call nc_var%setAttribute("long_name", "flow direction")
+      call nc_var%setData(this%fdir)
     end if
 
     ! facc
     if ( allocated(this%facc) ) then
-      facc_var = restart_nc%setVariable("facc", "i64", [node_dim])
-      call facc_var%setAttribute("long_name", "flow accumulation")
-      call facc_var%setData(this%facc)
+      nc_var = restart_nc%setVariable("facc", "i64", [node_dim])
+      call nc_var%setAttribute("long_name", "flow accumulation")
+      call nc_var%setData(this%facc)
     end if
 
     ! down
     if ( allocated(this%down) ) then
-      down_var = restart_nc%setVariable("down", "i64", [node_dim])
-      call down_var%setAttribute("long_name", "downstream cell")
-      call down_var%setData(this%down)
+      nc_var = restart_nc%setVariable("down", "i64", [node_dim])
+      call nc_var%setAttribute("long_name", "downstream cell")
+      call nc_var%setData(this%down)
     end if
 
     if ( allocated(this%is_sink) ) then
       ! is_sink
-      is_sink_var = restart_nc%setVariable("is_sink", "i8", [node_dim])
-      call is_sink_var%setAttribute("long_name", "flag to indicate if node is sink")
-      call is_sink_var%setData(merge(1_i4, 0_i4, this%is_sink))
+      nc_var = restart_nc%setVariable("is_sink", "i8", [node_dim])
+      call nc_var%setAttribute("long_name", "flag to indicate if node is sink")
+      call nc_var%setData(merge(1_i4, 0_i4, this%is_sink))
     end if
 
     ! upstream_area
     if ( allocated(this%upstream_area) ) then
-      upstream_area_var = restart_nc%setVariable("upstream_area", "i64", [node_dim])
-      call upstream_area_var%setAttribute("long_name", "upstream area")
-      call upstream_area_var%setData(this%upstream_area)
+      nc_var = restart_nc%setVariable("upstream_area", "i64", [node_dim])
+      call nc_var%setAttribute("long_name", "upstream area")
+      call nc_var%setData(this%upstream_area)
     end if
 
     ! link_length
     if ( allocated(this%link_length) ) then
-      link_length_var = restart_nc%setVariable("link_length", "i64", [node_dim])
-      call link_length_var%setAttribute("long_name", "link length")
-      call link_length_var%setData(this%link_length)
+      nc_var = restart_nc%setVariable("link_length", "f64", [node_dim])
+      call nc_var%setAttribute("long_name", "link length")
+      call nc_var%setData(this%link_length)
     end if
 
     ! link_slope
     if ( allocated(this%link_slope) ) then
-      link_slope_var = restart_nc%setVariable("link_slope", "i64", [node_dim])
-      call link_slope_var%setAttribute("long_name", "average slope of link")
-      call link_slope_var%setData(this%link_slope)
+      nc_var = restart_nc%setVariable("link_slope", "f64", [node_dim])
+      call nc_var%setAttribute("long_name", "average slope of link")
+      call nc_var%setData(this%link_slope)
     end if
 
     ! celerity
     if ( allocated(this%celerity) ) then
-      celerity_var = restart_nc%setVariable("celerity", "i64", [node_dim])
-      call celerity_var%setAttribute("long_name", "streamflow celerity")
-      call celerity_var%setData(this%celerity)
+      nc_var = restart_nc%setVariable("celerity", "f64", [node_dim])
+      call nc_var%setAttribute("long_name", "streamflow celerity")
+      call nc_var%setData(this%celerity)
     end if
 
     ! node_cell
     if ( allocated(this%node_cell) ) then
-      node_cell_var = restart_nc%setVariable("node_cell", "i64", [node_dim])
-      call node_cell_var%setAttribute("long_name", "map node to grid cell")
-      call node_cell_var%setData(this%node_cell)
+      nc_var = restart_nc%setVariable("node_cell", "i64", [node_dim])
+      call nc_var%setAttribute("long_name", "map node to grid cell")
+      call nc_var%setData(this%node_cell)
     end if
 
     ! cell_node_select
     if ( allocated(this%cell_node_select) ) then
-      cell_node_select_var = restart_nc%setVariable("cell_node_select", "i64", [node_dim])
-      call cell_node_select_var%setAttribute("long_name", "cell node select")
-      call cell_node_select_var%setData(this%cell_node_select)
+      nc_var = restart_nc%setVariable("cell_node_select", "i64", [node_dim])
+      call nc_var%setAttribute("long_name", "cell node select")
+      call nc_var%setData(this%cell_node_select)
     end if
 
     ! area_fraction
     if ( allocated(this%area_fraction) ) then
-      area_fraction_var = restart_nc%setVariable("area_fraction", "i64", [node_dim])
-      call area_fraction_var%setAttribute("long_name", "area fraction for each node in cell")
-      call area_fraction_var%setData(this%area_fraction)
+      nc_var = restart_nc%setVariable("area_fraction", "f64", [node_dim])
+      call nc_var%setAttribute("long_name", "area fraction for each node in cell")
+      call nc_var%setData(this%area_fraction)
     end if
 
     ! order%id
     if ( allocated(this%order%id) ) then
-      order_id_var = restart_nc%setVariable("order_id_var", "i64", [node_dim])
-      call order_id_var%setAttribute("long_name", "id in order")
-      call order_id_var%setData(this%order%id)
+      nc_var = restart_nc%setVariable("order_id_var", "i64", [node_dim])
+      call nc_var%setAttribute("long_name", "id in order")
+      call nc_var%setData(this%order%id)
     end if
 
     ! order%level_start
     if ( allocated(this%order%level_start) ) then
-      order_level_start_var = restart_nc%setVariable("order_level_start_var", "i64", [order_dim])
-      call order_level_start_var%setAttribute("long_name", "level start in order")
-      call order_level_start_var%setData(this%order%level_start)
+      nc_var = restart_nc%setVariable("order_level_start_var", "i64", [order_dim])
+      call nc_var%setAttribute("long_name", "level start in order")
+      call nc_var%setData(this%order%level_start)
     end if
 
     ! order%level_end
     if ( allocated(this%order%level_end) ) then
-      order_level_end_var = restart_nc%setVariable("order_level_end_var", "i64", [order_dim])
-      call order_level_end_var%setAttribute("long_name", "level start in order")
-      call order_level_end_var%setData(this%order%level_end)
+      nc_var = restart_nc%setVariable("order_level_end_var", "i64", [order_dim])
+      call nc_var%setAttribute("long_name", "level start in order")
+      call nc_var%setData(this%order%level_end)
     end if
 
     ! order%level_size
     if ( allocated(this%order%level_size) ) then
-      order_level_size_var = restart_nc%setVariable("order_level_size_var", "i64", [order_dim])
-      call order_level_size_var%setAttribute("long_name", "level start in order")
-      call order_level_size_var%setData(this%order%level_size)
+      nc_var = restart_nc%setVariable("order_level_size_var", "i64", [order_dim])
+      call nc_var%setAttribute("long_name", "level start in order")
+      call nc_var%setData(this%order%level_size)
     end if
 
     ! links
     nlinks = int(this%n_nodes, i4) - size(this%sinks, kind=i4)
     link_dim = restart_nc%setDimension("link", nlinks)
-    link_var = restart_nc%setVariable("links", "i64", [two_dim, link_dim])
-    call link_var%setAttribute("cf_role", "edge_node_connectivity")
-    call link_var%setAttribute("long_name", "river links definition")
-    call link_var%setAttribute("start_index", 1)  ! fortran indices starting with 1
+    nc_var = restart_nc%setVariable("links", "i64", [two_dim, link_dim])
+    call nc_var%setAttribute("cf_role", "edge_node_connectivity")
+    call nc_var%setAttribute("long_name", "river links definition")
+    call nc_var%setAttribute("start_index", 1)  ! fortran indices starting with 1
     allocate(links(2_i4, nlinks))
     k = 0_i8
     do n = 1_i8, this%n_nodes
@@ -769,7 +781,7 @@ contains
       links(1_i8, k) = n
       links(2_i8, k) = this%down(n)
     end do
-    call link_var%setData(links)
+    call nc_var%setData(links)
     deallocate(links)
 
     call restart_nc%close()
@@ -784,12 +796,22 @@ contains
     type(NcVariable) :: nc_var
     type(NcDimension) :: nc_dim
 
+    integer(i8) :: i
     integer(i4), allocatable :: dummy(:)
+    integer(i8), allocatable :: ids(:)
+    real(dp), allocatable :: dummy2d(:, :)
   
     restart_nc = NcDataset(trim(path), "r")
 
     nc_dim = restart_nc%getDimension("node")
     this%n_nodes = nc_dim%getLength()
+
+    call this%grid%from_netcdf(restart_nc, "cell_area")
+
+    nc_var = restart_nc%getVariable("cell_area")
+    call nc_var%getData(dummy2d)
+    this%grid%cell_area = this%grid%pack(dummy2d)
+    deallocate(dummy2d)
 
     if (restart_nc%hasVariable("river_node_x")) then
       nc_var = restart_nc%getVariable("river_node_x")
@@ -892,6 +914,17 @@ contains
       allocate(this%order%level_size(this%order%n_levels))
       call nc_var%getData(this%order%level_size)
     end if
+
+    call this%init(this%n_nodes)
+
+    !!$omp parallel do default(shared) private(i, n_up, up, down)
+    ids = [(i, i=1_i8, this%n_nodes)]
+    do i = 1_i8, this%n_nodes
+      this%nodes(i)%edges = pack(ids, ( this%down == i ))
+      if (this%down(i) > 0_i8) allocate(this%nodes(i)%dependents(1), source=this%down(i))
+    end do
+    !!$omp end parallel do
+    deallocate(ids)
     
   end subroutine river_read_restart
 
