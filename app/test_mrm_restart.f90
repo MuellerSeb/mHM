@@ -11,6 +11,7 @@ program test_mrm
   use mo_os, only: path_ext, path_isfile
   use mo_message, only: error_message
   use mo_utils, only: locate, is_close
+  use mo_timer, only: timer_start, timer_stop, timer_get, timers_init
 
   implicit none
 
@@ -18,7 +19,7 @@ program test_mrm
   type(river_upscaler_t) :: upscaler
   type(grid_t), target :: grid, cgrid
   type(input_dataset) :: ds
-  character(:), allocatable :: file, dem_file, slope_file
+  character(:), allocatable :: file, dem_file, slope_file, latlon_file
   integer(i4), allocatable :: mfdir(:,:), fdir(:)
   real(dp), allocatable :: mdem(:,:), dem(:), mslope(:,:), slope(:), scc_gauges(:,:)
   integer(i4) :: itime
@@ -28,6 +29,16 @@ program test_mrm
   file = "src/tests/files/fdir.asc"
   dem_file = "src/tests/files/dem.asc"
   slope_file = "src/tests/files/slope.asc"
+  latlon_file = "test_domain/input/latlon/latlon_1.nc"
+
+  rriver%grid => cgrid
+
+  call timers_init
+  itime = 0
+
+  itime = itime + 1
+  call timer_start(itime)
+
   print*, "read data: ", file
 
   select case(path_ext(file))
@@ -38,6 +49,7 @@ program test_mrm
       call ds%close()
     case(".asc")
       call grid%from_ascii_file(file)
+      call grid%aux_from_netcdf(latlon_file, "lat_l0", "lon_l0")
       call grid%read_data(file, mfdir)
       fdir = grid%pack(mfdir)
       deallocate(mfdir)
@@ -80,10 +92,28 @@ program test_mrm
 !   print*, "calculate celerity"
 !   call upscaler%calc_celerity(gamma=30.0_dp, slope=slope)
 
+  call timer_stop(itime)
+  print*, '    in ', trim(num2str(timer_get(itime), '(F7.3)')), ' seconds.'
+
+  itime = itime + 1
   print*, "write restart file to: river_restart.nc"
+  call timer_start(itime)
+
   call river%write_restart("river_restart.nc")
 
+  call timer_stop(itime)
+  print*, '    in ', trim(num2str(timer_get(itime), '(F7.3)')), ' seconds.'
+  itime = itime + 1
+  print*, "reading restart file"
+  call timer_start(itime)
+
   call rriver%read_restart("river_restart.nc")
+
+  call timer_stop(itime)
+  print*, '    in ', trim(num2str(timer_get(itime), '(F7.3)')), ' seconds.'
+
+  itime = itime + 1
+  call timer_start(itime)
 
   print*, "comparing with read restart:"
   print*, "  n_nodes:", river%n_nodes, rriver%n_nodes
