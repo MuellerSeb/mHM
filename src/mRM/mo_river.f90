@@ -767,7 +767,7 @@ contains
     type(NcDataset) :: restart_nc
     integer(i4) :: i, nlinks, topo_dim, deflate
     integer(i8) :: n, k
-    integer(i8), allocatable :: links(:, :)
+    integer(i8), allocatable :: links(:, :), dummy(:)
     ! logical :: net
 
     ! TODO: acutally use deflate
@@ -841,86 +841,89 @@ contains
 
     ! fdir
     if ( allocated(this%fdir) ) then
-      nc_var = restart_nc%setVariable("fdir", "i64", [node_dim])
+      nc_var = restart_nc%setVariable("fdir", "i64", [xdim, ydim], deflate_level=deflate_level, shuffle=.true.)
       call nc_var%setAttribute("long_name", "flow direction")
-      call nc_var%setData(this%fdir)
+      call nc_var%setData(this%grid%unpack(this%fdir))
     end if
 
     ! facc
     if ( allocated(this%facc) ) then
-      nc_var = restart_nc%setVariable("facc", "i64", [node_dim])
+      nc_var = restart_nc%setVariable("facc", "i64", [xdim, ydim], deflate_level=deflate_level, shuffle=.true.)
       call nc_var%setAttribute("long_name", "flow accumulation")
-      call nc_var%setData(this%facc)
+      call nc_var%setData(this%grid%unpack(this%facc))
     end if
 
     ! down
     if ( allocated(this%down) ) then
-      nc_var = restart_nc%setVariable("down", "i64", [node_dim])
+      nc_var = restart_nc%setVariable("down", "i64", [xdim, ydim], deflate_level=deflate_level, shuffle=.true.)
       call nc_var%setAttribute("long_name", "downstream cell")
-      call nc_var%setData(this%down)
+      call nc_var%setData(this%grid%unpack(this%down))
     end if
 
     if ( allocated(this%is_sink) ) then
       ! is_sink
-      nc_var = restart_nc%setVariable("is_sink", "i8", [node_dim])
+      nc_var = restart_nc%setVariable("is_sink", "i64", [xdim, ydim], deflate_level=deflate_level, shuffle=.true.)
       call nc_var%setAttribute("long_name", "flag to indicate if node is sink")
-      call nc_var%setData(merge(1_i4, 0_i4, this%is_sink))
+      allocate(dummy(this%n_nodes))
+      dummy = merge(1_i4, 0_i4, this%is_sink)
+      call nc_var%setData(this%grid%unpack(dummy))
+      deallocate(dummy)
     end if
 
     ! upstream_area
     if ( allocated(this%upstream_area) ) then
-      nc_var = restart_nc%setVariable("upstream_area", "i64", [node_dim])
+      nc_var = restart_nc%setVariable("upstream_area", "i64", [xdim, ydim], deflate_level=deflate_level, shuffle=.true.)
       call nc_var%setAttribute("long_name", "upstream area")
-      call nc_var%setData(this%upstream_area)
+      call nc_var%setData(this%grid%unpack(this%upstream_area))
     end if
 
     ! link_length
     if ( allocated(this%link_length) ) then
-      nc_var = restart_nc%setVariable("link_length", "f64", [node_dim])
+      nc_var = restart_nc%setVariable("link_length", "f64", [xdim, ydim], deflate_level=deflate_level, shuffle=.true.)
       call nc_var%setAttribute("long_name", "link length")
-      call nc_var%setData(this%link_length)
+      call nc_var%setData(this%grid%unpack(this%link_length))
     end if
 
     ! link_slope
     if ( allocated(this%link_slope) ) then
-      nc_var = restart_nc%setVariable("link_slope", "f64", [node_dim])
+      nc_var = restart_nc%setVariable("link_slope", "f64", [xdim, ydim], deflate_level=deflate_level, shuffle=.true.)
       call nc_var%setAttribute("long_name", "average slope of link")
-      call nc_var%setData(this%link_slope)
+      call nc_var%setData(this%grid%unpack(this%link_slope))
     end if
 
     ! celerity
     if ( allocated(this%celerity) ) then
-      nc_var = restart_nc%setVariable("celerity", "f64", [node_dim])
+      nc_var = restart_nc%setVariable("celerity", "f64", [xdim, ydim], deflate_level=deflate_level, shuffle=.true.)
       call nc_var%setAttribute("long_name", "streamflow celerity")
-      call nc_var%setData(this%celerity)
+      call nc_var%setData(this%grid%unpack(this%celerity))
     end if
 
     ! node_cell
     if ( allocated(this%node_cell) ) then
-      nc_var = restart_nc%setVariable("node_cell", "i64", [node_dim])
+      nc_var = restart_nc%setVariable("node_cell", "i64", [xdim, ydim], deflate_level=deflate_level, shuffle=.true.)
       call nc_var%setAttribute("long_name", "map node to grid cell")
-      call nc_var%setData(this%node_cell)
+      call nc_var%setData(this%grid%unpack(this%node_cell))
     end if
 
     ! cell_node_select
     if ( allocated(this%cell_node_select) ) then
-      nc_var = restart_nc%setVariable("cell_node_select", "i64", [node_dim])
+      nc_var = restart_nc%setVariable("cell_node_select", "i64", [xdim, ydim], deflate_level=deflate_level, shuffle=.true.)
       call nc_var%setAttribute("long_name", "cell node select")
-      call nc_var%setData(this%cell_node_select)
+      call nc_var%setData(this%grid%unpack(this%cell_node_select))
     end if
 
     ! area_fraction
     if ( allocated(this%area_fraction) ) then
-      nc_var = restart_nc%setVariable("area_fraction", "f64", [node_dim])
+      nc_var = restart_nc%setVariable("area_fraction", "f64", [xdim, ydim], deflate_level=deflate_level, shuffle=.true.)
       call nc_var%setAttribute("long_name", "area fraction for each node in cell")
-      call nc_var%setData(this%area_fraction)
+      call nc_var%setData(this%grid%unpack(this%area_fraction))
     end if
 
     ! order%id
     if ( allocated(this%order%id) ) then
-      nc_var = restart_nc%setVariable("order_id_var", "i64", [node_dim])
+      nc_var = restart_nc%setVariable("order_id_var", "i64", [xdim, ydim], deflate_level=deflate_level, shuffle=.true.)
       call nc_var%setAttribute("long_name", "id in order")
-      call nc_var%setData(this%order%id)
+      call nc_var%setData(this%grid%unpack(this%order%id))
     end if
 
     ! order%level_start
@@ -982,15 +985,25 @@ contains
     class(grid_t), intent(in), target :: grid
     type(NcDataset), intent(in) :: restart_nc
     type(NcVariable) :: nc_var
-    type(NcDimension) :: nc_dim
+    type(NcDimension) :: nc_dim, xdim, ydim
 
-    integer(i8) :: i, n_sinks
+    integer(i8) :: i, n_sinks, x, y
     integer(i4), allocatable :: dummy(:)
-    integer(i8), allocatable :: ids(:)
+    integer(i4), allocatable :: dummy2di4(:, :)
+    integer(i8), allocatable :: ids(:), dummy1di8(:), dummy2di8(:, :)
     real(dp), allocatable :: dummy2d(:, :)
 
     this%grid => grid
 
+    if ( this%grid%coordsys == cartesian ) then
+      xdim = restart_nc%getDimension("x")
+      ydim = restart_nc%getDimension("y")
+    else
+      xdim = restart_nc%getDimension("lon")
+      ydim = restart_nc%getDimension("lat")
+    end if
+    x = xdim%getLength()
+    y = ydim%getLength()
     nc_dim = restart_nc%getDimension("node")
     this%n_nodes = nc_dim%getLength()
     nc_dim = restart_nc%getDimension("sinks_dim")
@@ -1023,71 +1036,82 @@ contains
 
     if (restart_nc%hasVariable("fdir")) then
       nc_var = restart_nc%getVariable("fdir")
-      allocate(this%fdir(this%n_nodes))
-      call nc_var%getData(this%fdir)
+      call nc_var%getData(dummy2di4)
+      allocate(this%fdir(this%n_nodes), source=this%grid%pack(dummy2di4))
+      deallocate(dummy2di4)
     end if
 
     if (restart_nc%hasVariable("facc")) then
       nc_var = restart_nc%getVariable("facc")
-      allocate(this%facc(this%n_nodes))
-      call nc_var%getData(this%facc)
+      call nc_var%getData(dummy2di8)
+      allocate(this%facc(this%n_nodes), source=this%grid%pack(dummy2di8))
+      deallocate(dummy2di8)
     end if
 
     if (restart_nc%hasVariable("down")) then
       nc_var = restart_nc%getVariable("down")
-      allocate(this%down(this%n_nodes))
-      call nc_var%getData(this%down)
+      call nc_var%getData(dummy2di8)
+      allocate(this%down(this%n_nodes), source=this%grid%pack(dummy2di8))
+      deallocate(dummy2di8)
     end if
 
     if (restart_nc%hasVariable("is_sink")) then
       nc_var = restart_nc%getVariable("is_sink")
       allocate(this%is_sink(this%n_nodes))
-      allocate(dummy(this%n_nodes))
-      call nc_var%getData(dummy)
+      call nc_var%getData(dummy2di4)
+      dummy = this%grid%pack(dummy2di4)
       this%is_sink(:) = merge(.true., .false., dummy == 1_i4)
+      deallocate(dummy2di4)
       deallocate(dummy)
     end if
 
     if (restart_nc%hasVariable("upstream_area")) then
       nc_var = restart_nc%getVariable("upstream_area")
-      allocate(this%upstream_area(this%n_nodes))
-      call nc_var%getData(this%upstream_area)
+      call nc_var%getData(dummy2d)
+      allocate(this%upstream_area(this%n_nodes), source=this%grid%pack(dummy2d))
+      deallocate(dummy2d)
     end if
 
     if (restart_nc%hasVariable("link_length")) then
       nc_var = restart_nc%getVariable("link_length")
-      allocate(this%link_length(this%n_nodes))
-      call nc_var%getData(this%link_length)
+      call nc_var%getData(dummy2d)
+      allocate(this%link_length(this%n_nodes), source=this%grid%pack(dummy2d))
+      deallocate(dummy2d)
     end if
 
     if (restart_nc%hasVariable("link_slope")) then
       nc_var = restart_nc%getVariable("link_slope")
-      allocate(this%link_slope(this%n_nodes))
-      call nc_var%getData(this%link_slope)
+      call nc_var%getData(dummy2d)
+      allocate(this%link_slope(this%n_nodes), source=this%grid%pack(dummy2d))
+      deallocate(dummy2d)
     end if
 
     if (restart_nc%hasVariable("celerity")) then
       nc_var = restart_nc%getVariable("celerity")
-      allocate(this%celerity(this%n_nodes))
-      call nc_var%getData(this%celerity)
+      call nc_var%getData(dummy2d)
+      allocate(this%celerity(this%n_nodes), source=this%grid%pack(dummy2d))
+      deallocate(dummy2d)
     end if
 
     if (restart_nc%hasVariable("node_cell")) then
       nc_var = restart_nc%getVariable("node_cell")
-      allocate(this%node_cell(this%n_nodes))
-      call nc_var%getData(this%node_cell)
+      call nc_var%getData(dummy2di8)
+      allocate(this%node_cell(this%n_nodes), source=this%grid%pack(dummy2di8))
+      deallocate(dummy2di8)
     end if
 
     if (restart_nc%hasVariable("area_fraction")) then
       nc_var = restart_nc%getVariable("area_fraction")
-      allocate(this%area_fraction(this%n_nodes))
-      call nc_var%getData(this%area_fraction)
+      call nc_var%getData(dummy2d)
+      allocate(this%area_fraction(this%n_nodes), source=this%grid%pack(dummy2d))
+      deallocate(dummy2d)
     end if
 
     if (restart_nc%hasVariable("cell_node_select")) then
       nc_var = restart_nc%getVariable("cell_node_select")
-      allocate(this%cell_node_select(this%n_nodes))
-      call nc_var%getData(this%cell_node_select)
+      call nc_var%getData(dummy2di8)
+      allocate(this%cell_node_select(this%n_nodes), source=this%grid%pack(dummy2di8))
+      deallocate(dummy2di8)
     end if
 
     nc_dim = restart_nc%getDimension("order_dim")
@@ -1095,8 +1119,9 @@ contains
 
     if (restart_nc%hasVariable("order_id_var")) then
       nc_var = restart_nc%getVariable("order_id_var")
-      allocate(this%order%id(this%n_nodes))
-      call nc_var%getData(this%order%id)
+      call nc_var%getData(dummy2di8)
+      allocate(this%order%id(this%n_nodes), source=this%grid%pack(dummy2di8))
+      deallocate(dummy2di8)
     end if
 
     if (restart_nc%hasVariable("order_level_start_var")) then
