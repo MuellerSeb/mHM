@@ -108,7 +108,9 @@ module mo_river
     procedure, public :: select_cell_values => river_select_cell_values
     procedure, public :: export => river_export
     procedure, public :: write_restart => river_write_restart
+    procedure, public :: write_restart_to_dataset => river_write_restart_to_dataset
     procedure, public :: read_restart => river_read_restart
+    procedure, public :: init_from_restart => river_init_from_restart
   end type river_t
 
 contains
@@ -744,6 +746,21 @@ contains
     character(*), intent(in) :: path !< path to the file
     integer(i4), intent(in), optional :: deflate_level
 
+    type(NcDataset) :: restart_nc
+    integer(i4) :: deflate
+
+    deflate = optval(deflate_level, 6_i4)
+    restart_nc = NcDataset(trim(path), "w")
+    call this%write_restart_to_dataset(restart_nc, deflate)
+    call restart_nc%close()
+
+  end subroutine river_write_restart
+
+  !> \brief Write setup file
+  subroutine river_write_restart_to_dataset(this, restart_nc, deflate_level)
+    class(river_t), intent(in) :: this
+    integer(i4), intent(in), optional :: deflate_level
+
     character(:), allocatable :: units, units_dt
     type(NcDimension) :: t_dim, two_dim, node_dim, link_dim, dims(2), order_dim, sinks_dim, xdim, ydim
     type(NcVariable) :: node_x_var, node_y_var, nc_var
@@ -757,7 +774,6 @@ contains
     deflate = optval(deflate_level, 6_i4)
     ! topo_dim = merge(1_i4, 0_i4, net)
 
-    restart_nc = NcDataset(trim(path), "w")
     call this%grid%to_netcdf(restart_nc)
     if ( this%grid%coordsys == cartesian ) then 
       xdim = restart_nc%getDimension("x")
@@ -937,15 +953,23 @@ contains
     call nc_var%setData(links)
     deallocate(links)
 
-    call restart_nc%close()
-
-  end subroutine river_write_restart
+  end subroutine river_write_restart_to_dataset
 
   subroutine river_read_restart(this, path)
     class(river_t), intent(inout) :: this
     character(*), intent(in) :: path !< path to the file
 
     type(NcDataset) :: restart_nc
+  
+    restart_nc = NcDataset(trim(path), "r")
+    call this%init_from_restart(restart_nc)
+    ! call restart_nc%close()
+    
+  end subroutine river_read_restart
+
+  subroutine river_init_from_restart(this, restart_nc)
+    class(river_t), intent(inout) :: this
+    type(NcDataset), intent(in) :: restart_nc
     type(NcVariable) :: nc_var
     type(NcDimension) :: nc_dim
 
@@ -954,8 +978,6 @@ contains
     integer(i8), allocatable :: ids(:)
     real(dp), allocatable :: dummy2d(:, :)
   
-    restart_nc = NcDataset(trim(path), "r")
-
     nc_dim = restart_nc%getDimension("node")
     this%n_nodes = nc_dim%getLength()
 
@@ -1078,7 +1100,7 @@ contains
     end do
     !!$omp end parallel do
     deallocate(ids)
-    
-  end subroutine river_read_restart
+
+  end subroutine river_init_from_restart
 
 end module mo_river
