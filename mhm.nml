@@ -885,6 +885,8 @@ level11 = 4000
 omp_min = 1
 ! Level order for parallel routing starting from river root
 parallel_rout = .false.
+read_restart = .true.
+write_restart = .true.
 /
 
 &mrm_dirs
