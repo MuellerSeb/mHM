@@ -17,7 +17,7 @@ module mo_river
   use mo_message, only: error_message
   use mo_utils, only: optval
   use mo_netcdf, only: NcDataset, NcDimension, NcVariable
-  use mo_constants, only: nodata_i1, nodata_i2, nodata_i4, nodata_i8
+  use mo_constants, only: nodata_i1, nodata_i2, nodata_i4, nodata_i8, nodata_dp
 
   implicit none
   private
@@ -597,7 +597,7 @@ contains
       if (j == 0_i8) cycle ! sinks ain't links
       if (dem(i) < dem(j)) then
         k = k + 1_i8
-        ! print*, "link is going upwards: ", i, j, dem(i), dem(j)
+        ! *, "link is going upwards: ", i, j, dem(i), dem(j)
       end if
       this%link_slope(i) = max(( dem(i) - dem(j) ) / this%link_length(i), 0.0_dp)
     end do
@@ -775,7 +775,7 @@ contains
     ! topo_dim = merge(1_i4, 0_i4, net)
 
     call this%grid%to_netcdf(restart_nc)
-    if ( this%grid%coordsys == cartesian ) then 
+    if ( this%grid%coordsys == cartesian ) then
       xdim = restart_nc%getDimension("x")
       ydim = restart_nc%getDimension("y")
     else
@@ -783,6 +783,8 @@ contains
       ydim = restart_nc%getDimension("lat")
     end if
     nc_var = restart_nc%setVariable("cell_area", "f64", [xdim, ydim], deflate_level=deflate_level, shuffle=.true.)
+    call nc_var%setFillValue(nodata_dp)
+    call nc_var%setAttribute("missing_value", nodata_dp)
     call nc_var%setData(this%grid%unpack(this%grid%cell_area))
 
     call nc_var%setAttribute("long_name", "cell area")
@@ -828,6 +830,13 @@ contains
       ! this should set the node-dim size
       call node_x_var%setData(this%node_x)
       call node_y_var%setData(this%node_y)
+    end if
+
+    ! sinks
+    if ( allocated(this%sinks) ) then
+      nc_var = restart_nc%setVariable("sinks", "i64", [sinks_dim])
+      call nc_var%setAttribute("long_name", "sinks")
+      call nc_var%setData(this%sinks)
     end if
 
     ! fdir
@@ -960,28 +969,40 @@ contains
     character(*), intent(in) :: path !< path to the file
 
     type(NcDataset) :: restart_nc
-  
+
     restart_nc = NcDataset(trim(path), "r")
-    call this%init_from_restart(restart_nc)
+
+    call this%init_from_restart(restart_nc, this%grid)
     ! call restart_nc%close()
-    
+
   end subroutine river_read_restart
 
-  subroutine river_init_from_restart(this, restart_nc)
+  subroutine river_init_from_restart(this, restart_nc, grid)
     class(river_t), intent(inout) :: this
+    class(grid_t), intent(in), target :: grid
     type(NcDataset), intent(in) :: restart_nc
     type(NcVariable) :: nc_var
     type(NcDimension) :: nc_dim
 
-    integer(i8) :: i
+    integer(i8) :: i, n_sinks
     integer(i4), allocatable :: dummy(:)
     integer(i8), allocatable :: ids(:)
     real(dp), allocatable :: dummy2d(:, :)
-  
+
+    this%grid => grid
+
     nc_dim = restart_nc%getDimension("node")
     this%n_nodes = nc_dim%getLength()
+    nc_dim = restart_nc%getDimension("sinks_dim")
+    n_sinks = nc_dim%getLength()
 
-    call this%grid%from_netcdf(restart_nc, "cell_area")
+    ! call this%grid%from_netcdf(restart_nc, "cell_area")
+
+    if (restart_nc%hasVariable("sinks")) then
+      nc_var = restart_nc%getVariable("sinks")
+      allocate(this%sinks(n_sinks))
+      call nc_var%getData(this%sinks)
+    end if
 
     nc_var = restart_nc%getVariable("cell_area")
     call nc_var%getData(dummy2d)
@@ -1017,7 +1038,7 @@ contains
       allocate(this%down(this%n_nodes))
       call nc_var%getData(this%down)
     end if
-    
+
     if (restart_nc%hasVariable("is_sink")) then
       nc_var = restart_nc%getVariable("is_sink")
       allocate(this%is_sink(this%n_nodes))
@@ -1032,7 +1053,7 @@ contains
       allocate(this%upstream_area(this%n_nodes))
       call nc_var%getData(this%upstream_area)
     end if
-    
+
     if (restart_nc%hasVariable("link_length")) then
       nc_var = restart_nc%getVariable("link_length")
       allocate(this%link_length(this%n_nodes))
@@ -1061,6 +1082,12 @@ contains
       nc_var = restart_nc%getVariable("area_fraction")
       allocate(this%area_fraction(this%n_nodes))
       call nc_var%getData(this%area_fraction)
+    end if
+
+    if (restart_nc%hasVariable("cell_node_select")) then
+      nc_var = restart_nc%getVariable("cell_node_select")
+      allocate(this%cell_node_select(this%n_nodes))
+      call nc_var%getData(this%cell_node_select)
     end if
 
     nc_dim = restart_nc%getDimension("order_dim")
