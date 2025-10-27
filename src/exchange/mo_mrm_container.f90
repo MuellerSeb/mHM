@@ -98,7 +98,8 @@ contains
     end if
     call message(" ... read mRM restart from file: ", file)
     restart_nc = NcDataset(trim(file), "r")
-    call self%criver%init_from_restart(restart_nc)
+    call self%level11%from_netcdf(restart_nc, "cell_area")
+    call self%criver%init_from_restart(restart_nc, self%level11)
     call self%router%init_from_restart(restart_nc, self%criver, self%exchange%level1, self%exchange%runoff_total%stepping, max_route_step=3600.0_dp, root_levels=rout, omp_level_thresh=omp_min)
     call restart_nc%close()
 
@@ -302,8 +303,8 @@ contains
     allocate(scc_latlon)  ! if not isd, it is not present as optional argument
     call message(" ... read scc gauges file: ", self%config%scc_file)
     call read_scc_gauges(self%config%scc_file, scc_gauges, scc_latlon)
-    print*, scc_latlon
-    print*, scc_gauges
+    ! print*, scc_latlon
+    ! print*, scc_gauges
   else
     self%scc_active = .false.
   end if
