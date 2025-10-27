@@ -149,6 +149,7 @@ contains
   subroutine domain_finalize(self)
     class(domain_t), intent(inout) :: self
     call message(" ... finalizing domain")
+    if (self%mrm%config%active) call self%mrm%finalize()
   end subroutine domain_finalize
 
 end module mo_domain
