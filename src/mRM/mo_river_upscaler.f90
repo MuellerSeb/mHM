@@ -63,6 +63,7 @@ module mo_river_upscaler
     procedure, private :: calc_stream => river_upscaler_stream
     procedure, public :: calc_celerity => river_upscaler_celerity
     procedure, public :: node_from_cell_sub => river_upscaler_cell_sub
+    procedure, public :: destroy => river_upscaler_destroy
   end type river_upscaler_t
 
 contains
@@ -663,4 +664,29 @@ contains
     id = sum(this%sub_size(1_i4:sub-1_i4)) ! count of nodes from previous sub-catchments
     id = id + count(this%has_sub(1_i8:cell, sub), kind=i8)
   end function river_upscaler_cell_sub
+
+  subroutine river_upscaler_destroy(this)
+    implicit none
+    class(river_upscaler_t), intent(inout) :: this
+
+    if (allocated(this%scc_gauges)) deallocate(this%scc_gauges)
+    if (allocated(this%scc_coarse_gauges)) deallocate(this%scc_coarse_gauges)
+    if (allocated(this%scc_map)) deallocate(this%scc_map)
+    if (allocated(this%is_scc_gauge)) deallocate(this%is_scc_gauge)
+    if (allocated(this%is_scc_coarse_gauge)) deallocate(this%is_scc_coarse_gauge)
+    if (allocated(this%leaving_cells)) deallocate(this%leaving_cells)
+    if (allocated(this%has_sub)) deallocate(this%has_sub)
+    if (allocated(this%sub_size)) deallocate(this%sub_size)
+    if (allocated(this%n_sub_nodes)) deallocate(this%n_sub_nodes)
+    if (allocated(this%node_sub)) deallocate(this%node_sub)
+    if (allocated(this%sink_map)) deallocate(this%sink_map)
+    if (allocated(this%link_start)) deallocate(this%link_start)
+    if (allocated(this%is_link_start)) deallocate(this%is_link_start)
+    if (allocated(this%stream_mask)) deallocate(this%stream_mask)
+    if (allocated(this%stream_sub)) deallocate(this%stream_sub)
+    if (allocated(this%link_from)) deallocate(this%link_from)
+    if (allocated(this%link_to)) deallocate(this%link_to)
+
+  end subroutine river_upscaler_destroy
+
 end module mo_river_upscaler
