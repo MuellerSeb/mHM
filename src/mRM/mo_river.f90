@@ -770,9 +770,7 @@ contains
     integer(i8), allocatable :: links(:, :), dummy(:)
     ! logical :: net
 
-    ! TODO: acutally use deflate
     deflate = optval(deflate_level, 6_i4)
-    ! topo_dim = merge(1_i4, 0_i4, net)
 
     call this%grid%to_netcdf(restart_nc)
     if ( this%grid%coordsys == cartesian ) then
@@ -782,7 +780,7 @@ contains
       xdim = restart_nc%getDimension("lon")
       ydim = restart_nc%getDimension("lat")
     end if
-    nc_var = restart_nc%setVariable("cell_area", "f64", [xdim, ydim], deflate_level=deflate_level, shuffle=.true.)
+    nc_var = restart_nc%setVariable("cell_area", "f64", [xdim, ydim], deflate_level=deflate, shuffle=.true.)
     call nc_var%setFillValue(nodata_dp)
     call nc_var%setAttribute("missing_value", nodata_dp)
     call nc_var%setData(this%grid%unpack(this%grid%cell_area))
@@ -792,7 +790,7 @@ contains
     call nc_var%setAttribute("units", "m2")
     if (this%grid%has_aux_coords()) call nc_var%setAttribute("coordinates", "lat lon")
 
-    ! self%nc = nc%setVariable(self%name, self%dtype, dims(:2), deflate_level=deflate_level, shuffle=.true.)
+    ! self%nc = nc%setVariable(self%name, self%dtype, dims(:2), deflate_level=deflate, shuffle=.true.)
 
     two_dim = restart_nc%setDimension("Two", 2_i4)
     node_dim = restart_nc%setDimension("node", int(this%n_nodes, i4))  ! only works if network is not to huge for i4
@@ -834,94 +832,130 @@ contains
 
     ! sinks
     if ( allocated(this%sinks) ) then
+      print*, "writing sinks to restart file"
       nc_var = restart_nc%setVariable("sinks", "i64", [sinks_dim])
       call nc_var%setAttribute("long_name", "sinks")
+      call nc_var%setFillValue(nodata_i8)
+      call nc_var%setAttribute("missing_value", nodata_i8)
       call nc_var%setData(this%sinks)
     end if
 
     ! fdir
     if ( allocated(this%fdir) ) then
-      nc_var = restart_nc%setVariable("fdir", "i64", [xdim, ydim], deflate_level=deflate_level, shuffle=.true.)
+      print*, "writing fdir to restart file"
+      nc_var = restart_nc%setVariable("fdir", "i64", [xdim, ydim], deflate_level=deflate, shuffle=.true.)
       call nc_var%setAttribute("long_name", "flow direction")
+      call nc_var%setFillValue(nodata_i8)
+      call nc_var%setAttribute("missing_value", nodata_i8)
       call nc_var%setData(this%grid%unpack(this%fdir))
     end if
 
     ! facc
     if ( allocated(this%facc) ) then
-      nc_var = restart_nc%setVariable("facc", "i64", [xdim, ydim], deflate_level=deflate_level, shuffle=.true.)
+      print*, "writing facc to restart file"
+      nc_var = restart_nc%setVariable("facc", "i64", [xdim, ydim], deflate_level=deflate, shuffle=.true.)
       call nc_var%setAttribute("long_name", "flow accumulation")
+      call nc_var%setFillValue(nodata_i8)
+      call nc_var%setAttribute("missing_value", nodata_i8)
       call nc_var%setData(this%grid%unpack(this%facc))
     end if
 
     ! down
     if ( allocated(this%down) ) then
-      nc_var = restart_nc%setVariable("down", "i64", [xdim, ydim], deflate_level=deflate_level, shuffle=.true.)
+      print*, "writing down to restart file"
+      nc_var = restart_nc%setVariable("down", "i64", [xdim, ydim], deflate_level=deflate, shuffle=.true.)
       call nc_var%setAttribute("long_name", "downstream cell")
+      call nc_var%setFillValue(nodata_i8)
+      call nc_var%setAttribute("missing_value", nodata_i8)
       call nc_var%setData(this%grid%unpack(this%down))
     end if
 
     if ( allocated(this%is_sink) ) then
       ! is_sink
-      nc_var = restart_nc%setVariable("is_sink", "i64", [xdim, ydim], deflate_level=deflate_level, shuffle=.true.)
+      print*, "writing is_sink to restart file"
+      nc_var = restart_nc%setVariable("is_sink", "i64", [xdim, ydim], deflate_level=deflate, shuffle=.true.)
       call nc_var%setAttribute("long_name", "flag to indicate if node is sink")
       allocate(dummy(this%n_nodes))
       dummy = merge(1_i4, 0_i4, this%is_sink)
+      call nc_var%setFillValue(nodata_i8)
+      call nc_var%setAttribute("missing_value", nodata_i8)
       call nc_var%setData(this%grid%unpack(dummy))
       deallocate(dummy)
     end if
 
     ! upstream_area
     if ( allocated(this%upstream_area) ) then
-      nc_var = restart_nc%setVariable("upstream_area", "i64", [xdim, ydim], deflate_level=deflate_level, shuffle=.true.)
+      print*, "writing upstream_area to restart file"
+      nc_var = restart_nc%setVariable("upstream_area", "i64", [xdim, ydim], deflate_level=deflate, shuffle=.true.)
       call nc_var%setAttribute("long_name", "upstream area")
+      call nc_var%setFillValue(nodata_dp)
+      call nc_var%setAttribute("missing_value", nodata_dp)
       call nc_var%setData(this%grid%unpack(this%upstream_area))
     end if
 
     ! link_length
     if ( allocated(this%link_length) ) then
-      nc_var = restart_nc%setVariable("link_length", "f64", [xdim, ydim], deflate_level=deflate_level, shuffle=.true.)
+      print*, "writing link_length to restart file"
+      nc_var = restart_nc%setVariable("link_length", "f64", [xdim, ydim], deflate_level=deflate, shuffle=.true.)
       call nc_var%setAttribute("long_name", "link length")
+      call nc_var%setFillValue(nodata_dp)
+      call nc_var%setAttribute("missing_value", nodata_dp)
       call nc_var%setData(this%grid%unpack(this%link_length))
     end if
 
     ! link_slope
     if ( allocated(this%link_slope) ) then
-      nc_var = restart_nc%setVariable("link_slope", "f64", [xdim, ydim], deflate_level=deflate_level, shuffle=.true.)
+      print*, "writing link_slope to restart file"
+      nc_var = restart_nc%setVariable("link_slope", "f64", [xdim, ydim], deflate_level=deflate, shuffle=.true.)
       call nc_var%setAttribute("long_name", "average slope of link")
+      call nc_var%setFillValue(nodata_dp)
+      call nc_var%setAttribute("missing_value", nodata_dp)
       call nc_var%setData(this%grid%unpack(this%link_slope))
     end if
 
     ! celerity
     if ( allocated(this%celerity) ) then
-      nc_var = restart_nc%setVariable("celerity", "f64", [xdim, ydim], deflate_level=deflate_level, shuffle=.true.)
+      print*, "writing celerity to restart file"
+      nc_var = restart_nc%setVariable("celerity", "f64", [xdim, ydim], deflate_level=deflate, shuffle=.true.)
       call nc_var%setAttribute("long_name", "streamflow celerity")
+      call nc_var%setFillValue(nodata_dp)
+      call nc_var%setAttribute("missing_value", nodata_dp)
       call nc_var%setData(this%grid%unpack(this%celerity))
     end if
 
     ! node_cell
     if ( allocated(this%node_cell) ) then
-      nc_var = restart_nc%setVariable("node_cell", "i64", [xdim, ydim], deflate_level=deflate_level, shuffle=.true.)
+      print*, "writing node_cell to restart file"
+      nc_var = restart_nc%setVariable("node_cell", "i64", [xdim, ydim], deflate_level=deflate, shuffle=.true.)
       call nc_var%setAttribute("long_name", "map node to grid cell")
+      call nc_var%setFillValue(nodata_i8)
+      call nc_var%setAttribute("missing_value", nodata_i8)
       call nc_var%setData(this%grid%unpack(this%node_cell))
     end if
 
     ! cell_node_select
     if ( allocated(this%cell_node_select) ) then
-      nc_var = restart_nc%setVariable("cell_node_select", "i64", [xdim, ydim], deflate_level=deflate_level, shuffle=.true.)
+      print*, "writing cell_node_select to restart file"
+      nc_var = restart_nc%setVariable("cell_node_select", "i64", [xdim, ydim], deflate_level=deflate, shuffle=.true.)
       call nc_var%setAttribute("long_name", "cell node select")
+      call nc_var%setFillValue(nodata_i8)
+      call nc_var%setAttribute("missing_value", nodata_i8)
       call nc_var%setData(this%grid%unpack(this%cell_node_select))
     end if
 
     ! area_fraction
     if ( allocated(this%area_fraction) ) then
-      nc_var = restart_nc%setVariable("area_fraction", "f64", [xdim, ydim], deflate_level=deflate_level, shuffle=.true.)
+      print*, "writing area_fraction to restart file"
+      nc_var = restart_nc%setVariable("area_fraction", "f64", [xdim, ydim], deflate_level=deflate, shuffle=.true.)
       call nc_var%setAttribute("long_name", "area fraction for each node in cell")
+      call nc_var%setFillValue(nodata_dp)
+      call nc_var%setAttribute("missing_value", nodata_dp)
       call nc_var%setData(this%grid%unpack(this%area_fraction))
     end if
 
     ! order%id
     if ( allocated(this%order%id) ) then
-      nc_var = restart_nc%setVariable("order_id_var", "i64", [xdim, ydim], deflate_level=deflate_level, shuffle=.true.)
+      nc_var = restart_nc%setVariable("order_id_var", "i64", [xdim, ydim], deflate_level=deflate, shuffle=.true.)
       call nc_var%setAttribute("long_name", "id in order")
       call nc_var%setData(this%grid%unpack(this%order%id))
     end if
@@ -1002,8 +1036,7 @@ contains
       xdim = restart_nc%getDimension("lon")
       ydim = restart_nc%getDimension("lat")
     end if
-    x = xdim%getLength()
-    y = ydim%getLength()
+
     nc_dim = restart_nc%getDimension("node")
     this%n_nodes = nc_dim%getLength()
     nc_dim = restart_nc%getDimension("sinks_dim")
