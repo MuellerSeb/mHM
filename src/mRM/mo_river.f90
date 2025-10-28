@@ -125,6 +125,7 @@ module mo_river
     procedure, public :: write_restart_to_dataset => river_write_restart_to_dataset
     procedure, public :: read_restart => river_read_restart
     procedure, public :: init_from_restart => river_init_from_restart
+    procedure, public :: destroy => river_destroy
   end type river_t
 
 contains
@@ -1041,5 +1042,28 @@ contains
     deallocate(ids)
 
   end subroutine river_init_from_restart
+
+  subroutine river_destroy(this)
+    class(river_t), intent(inout) :: this
+    integer(i8) :: i
+    if (allocated(this%fdir)) deallocate(this%fdir)
+    if (allocated(this%facc)) deallocate(this%facc)
+    if (allocated(this%down)) deallocate(this%down)
+    if (allocated(this%is_sink)) deallocate(this%is_sink)
+    if (allocated(this%upstream_area)) deallocate(this%upstream_area)
+    if (allocated(this%link_length)) deallocate(this%link_length)
+    if (allocated(this%link_slope)) deallocate(this%link_slope)
+    if (allocated(this%celerity)) deallocate(this%celerity)
+    if (allocated(this%node_x)) deallocate(this%node_x)
+    if (allocated(this%node_y)) deallocate(this%node_y)
+    if (allocated(this%node_cell)) deallocate(this%node_cell)
+    if (allocated(this%cell_node_select)) deallocate(this%cell_node_select)
+    if (allocated(this%area_fraction)) deallocate(this%area_fraction)
+    if (allocated(this%sinks)) deallocate(this%sinks)
+    ! do i = 1_i8, this%n_nodes
+    !   call this%nodes(i)%destroy()
+    ! end do
+    this%n_nodes = 0_i8
+  end subroutine river_destroy
 
 end module mo_river
