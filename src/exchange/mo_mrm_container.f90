@@ -61,7 +61,6 @@ module mo_mrm_container
     type(exchange_t), pointer :: exchange => null() !< exchange container of the domain
     type(grid_t)              :: level0, level11
     type(river_router_t)      :: router
-    type(river_t)             :: criver
     type(river_t)             :: river
     type(output_dataset)      :: ds_out
     type(river_output_dataset)      :: dsr
@@ -99,8 +98,8 @@ contains
     call message(" ... read mRM restart from file: ", file)
     restart_nc = NcDataset(trim(file), "r")
     call self%level11%from_netcdf(restart_nc, "cell_area")
-    call self%criver%init_from_restart(restart_nc, self%level11)
-    call self%router%init_from_restart(restart_nc, self%criver, self%exchange%level1, self%exchange%runoff_total%stepping, max_route_step=3600.0_dp, root_levels=rout, omp_level_thresh=omp_min)
+    call self%river%init_from_restart(restart_nc, self%level11)
+    call self%router%init_from_restart(restart_nc, self%river, self%exchange%level1, self%exchange%runoff_total%stepping, max_route_step=3600.0_dp, root_levels=rout, omp_level_thresh=omp_min)
     call restart_nc%close()
 
   end subroutine mrm_read_restart
@@ -113,7 +112,7 @@ contains
 
     restart_nc = NcDataset(trim(file), "w")
     call message(" ... write mRM restart to file: ", file)
-    call self%criver%write_restart_to_dataset(restart_nc)
+    call self%river%write_restart_to_dataset(restart_nc)
     call self%router%write_restart_to_dataset(restart_nc)
     call restart_nc%close()
 
@@ -210,6 +209,7 @@ contains
     implicit none
 
     class(mrm_t), target, intent(inout) :: self
+    type(river_t), target :: river_l0
     type(input_dataset) :: input, in_ds
     type(datetime) :: current_time, start_time_frame 
     type(input_dataset) :: ds
@@ -271,11 +271,11 @@ contains
     call self%read_restart(self%config%restart_file_in)
   else
     call message("create river network:", n2s(self%level0%ncells))
-    call self%river%from_fdir(fdir, self%level0)
+    call river_l0%from_fdir(fdir, self%level0)
 
     call message("calculate facc on level0")
-    call self%river%calc_order()
-    call self%river%calc_facc()
+    call river_l0%calc_order()
+    call river_l0%calc_facc()
 
     call message("upscale river")
   
@@ -290,12 +290,14 @@ contains
     call message(" ... level11 cellsize", n2s(self%level11%cellsize))
     if (is_close(self%level11%cellsize, self%level0%cellsize)) then
       call message(" ... use L0 river")
-      call self%criver%from_fdir(fdir, self%level11)
-      call self%criver%calc_celerity(gamma=self%config%gamma, slope=slope, constant_celerity=self%config%const_celerity)
+      call self%river%from_fdir(fdir, self%level11)
+      call self%river%calc_celerity(gamma=self%config%gamma, slope=slope, constant_celerity=self%config%const_celerity)
     else
-      call upscaler%init(self%river, self%criver, self%level11, scc_gauges, scc_latlon) ! scc_gauges/scc_latlon not present if not allocated
+      call upscaler%init(river_l0, self%river, self%level11, scc_gauges, scc_latlon) ! scc_gauges/scc_latlon not present if not allocated
       call upscaler%calc_celerity(gamma=self%config%gamma, slope=slope, constant_celerity=self%config%const_celerity)
+      call upscaler%destroy()
     end if
+    call river_l0%destroy()
   end if
   
   if (path_isfile(self%config%scc_file)) then
@@ -309,7 +311,6 @@ contains
     self%scc_active = .false.
   end if
 
-  ! TODO: destroy river and upscaler to save memory
   call message("initialize router")
   rout = self%config%parallel_rout
   if (self%config%omp_min .ge. 1_i4) then
@@ -318,13 +319,13 @@ contains
     call message(" ... set minimum level size for openmp: ", n2s(omp_min))
   end if
   if (.not. self%config%read_restart) then
-    call self%router%init(self%criver, self%exchange%level1, self%exchange%runoff_total%stepping, max_route_step=3600.0_dp, root_levels=rout, omp_level_thresh=omp_min) ! omp_min not present if not allocated
+    call self%router%init(self%river, self%exchange%level1, self%exchange%runoff_total%stepping, max_route_step=3600.0_dp, root_levels=rout, omp_level_thresh=omp_min) ! omp_min not present if not allocated
   end if
   call message(" ... router%step: ", n2s(self%router%step))
   call message(" ... last level in parallel: ", n2s(self%router%last_parallel_level), "/", n2s(self%router%river%order%n_levels))
 
   ! prepare run
-  allocate(self%discharge(self%criver%n_nodes), source=0.0_dp)
+  allocate(self%discharge(self%river%n_nodes), source=0.0_dp)
 
   ! populate exchange type
   self%exchange%q_mod%data => self%discharge
@@ -376,7 +377,7 @@ contains
     if (self%scc_active) then
       call message(" ... create node based output file: ", self%config%node_out_file)
       call self%dsr%init(path=self%config%node_out_file, &
-        river=self%criver, &
+        river=self%river, &
         vars=vars, &
         start_time=self%exchange%start_time, &
         delta=delta, &
@@ -399,7 +400,7 @@ contains
     ! update output
     if (self%scc_active) then
      call self%dsr%update("discharge", self%discharge)
-      call self%ds_out%update("discharge", self%criver%select_cell_values(self%discharge))
+      call self%ds_out%update("discharge", self%river%select_cell_values(self%discharge))
     else
       call self%ds_out%update("discharge", self%discharge)
     end if
