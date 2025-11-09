@@ -11,14 +11,15 @@
 module mo_river_router
 
   use mo_kind, only: i4, i8, dp
-  use mo_constants, only: nodata_i4
+  use mo_constants, only: nodata_i4, nodata_dp
   use mo_utils, only: equal, optval
   use mo_string_utils, only: n2s => num2str
   use mo_river, only: river_t
-  use mo_grid, only: grid_t, bottom_up
+  use mo_grid, only: grid_t, bottom_up, cartesian
   use mo_grid_scaler, only: scaler_t, up_sum, down_nearest, down_scaling
   use mo_message, only: error_message
   use mo_datetime, only: HOUR_SECONDS
+  use mo_netcdf, only: NcDataset, NcVariable, NcDimension
 
   implicit none
   private
@@ -85,6 +86,8 @@ module mo_river_router
     integer(i8) :: last_parallel_level = 0_i8 !< last level to run in parallel
   contains
     procedure, public :: init => river_router_init
+    procedure, public :: init_from_restart => river_router_init_from_restart
+    procedure, public :: write_restart_to_dataset => river_router_write_restart_to_dataset
     procedure, public :: update => river_router_update
     procedure, private :: setup_muskingum => river_router_setup_muskingum
     procedure, private :: scale_runoff => river_router_scale_runoff
@@ -154,6 +157,215 @@ contains
       if (this%omp_level_thresh > 0_i8) this%last_parallel_level = this%river%order%n_levels
     end if
   end subroutine river_router_init
+
+  ! !> \brief Setup river upscaler from restart file
+  subroutine river_router_init_from_restart(this, restart_nc, river, input_grid, input_step, inflow_handler, max_route_step, root_levels, omp_level_thresh)
+    use mo_utils, only: locate
+    !$ use omp_lib, only: omp_get_num_threads
+    implicit none
+    class(river_router_t), intent(inout) :: this
+    type(NcDataset), intent(in) :: restart_nc !< restart dataset
+    type(river_t), pointer, intent(in) :: river !< river definition
+    type(grid_t), pointer, intent(in) :: input_grid !< input grid
+    integer(i4), intent(in), optional :: input_step !< [h] input time step size (1 by default)
+    type(inflow_t), intent(in), optional :: inflow_handler !< inflow specifications
+    type(NcVariable) :: nc_var
+
+    real(dp), allocatable :: k(:), dummy2d(:,:)
+    integer(i8) :: i
+    integer(i8), pointer :: level_size(:)
+    integer(i4) :: step_id
+    real(dp), optional, intent(in) :: max_route_step !< [s] maximum routing time step (default: 86400.0)
+    logical, intent(in), optional :: root_levels !< order levels as distance from graph roots (default: .false.)
+    !> minimum size of river-levels to route in parallel (default: threads * 8, 0 to run all in serial, 1 to run all in parallel)
+    integer(i8), optional, intent(in) :: omp_level_thresh
+
+    this%river => river
+    this%input_grid => input_grid
+    call this%scaler%init( &
+      source_grid=this%input_grid, &
+      target_grid=this%river%grid, &
+      upscaling_operator=up_sum, &       ! if L11 coarser than L1: sum runoff
+      downscaling_operator=down_nearest) ! if L11 finer than L1: distribute same value on fine cells
+    if (present(inflow_handler)) this%inflow_handler = inflow_handler
+    this%input_count = 0_i4
+    this%input_step = optval(input_step, 1_i4)
+    ! only need scaled runoff as intermediate result in case of SCC
+    if (this%river%scc) allocate(this%scaled_runoff(this%river%grid%ncells), source=0.0_dp)
+    allocate(this%runoff(this%river%n_nodes), source=0.0_dp)
+    allocate(this%acc_runoff(this%input_grid%ncells), source=0.0_dp)
+    if (restart_nc%hasVariable("discharge")) then
+      nc_var = restart_nc%getVariable("discharge")
+      call nc_var%getData(dummy2d)
+      allocate(this%discharge(this%river%n_nodes), source=this%river%grid%pack(dummy2d))
+      deallocate(dummy2d)
+    else
+      allocate(this%discharge(this%river%n_nodes), source=0.0_dp)
+    end if
+    if (restart_nc%hasVariable("previous_discharge")) then
+      nc_var = restart_nc%getVariable("previous_discharge")
+      call nc_var%getData(dummy2d)
+      allocate(this%previous_discharge(this%river%n_nodes), source=this%river%grid%pack(dummy2d))
+      deallocate(dummy2d)
+    else
+      allocate(this%previous_discharge(this%river%n_nodes), source=0.0_dp)
+    end if
+    if (restart_nc%hasVariable("tributary")) then
+      nc_var = restart_nc%getVariable("tributary")
+      call nc_var%getData(dummy2d)
+      allocate(this%tributary(this%river%n_nodes), source=this%river%grid%pack(dummy2d))
+      deallocate(dummy2d)
+    else
+      allocate(this%tributary(this%river%n_nodes), source=0.0_dp)
+    end if
+    if (restart_nc%hasVariable("previous_tributary")) then
+      nc_var = restart_nc%getVariable("previous_tributary")
+      call nc_var%getData(dummy2d)
+      allocate(this%previous_tributary(this%river%n_nodes), source=this%river%grid%pack(dummy2d))
+      deallocate(dummy2d)
+    else
+      allocate(this%previous_tributary(this%river%n_nodes), source=0.0_dp)
+    end if
+    if (restart_nc%hasVariable("nu1")) then
+      nc_var = restart_nc%getVariable("nu1")
+      call nc_var%getData(dummy2d)
+      allocate(this%nu1(this%river%n_nodes), source=this%river%grid%pack(dummy2d))
+      deallocate(dummy2d)
+    else
+      allocate(this%nu1(this%river%n_nodes), source=0.0_dp)
+    end if
+    if (restart_nc%hasVariable("nu2")) then
+      nc_var = restart_nc%getVariable("nu2")
+      call nc_var%getData(dummy2d)
+      allocate(this%nu2(this%river%n_nodes), source=this%river%grid%pack(dummy2d))
+      deallocate(dummy2d)
+    else
+      allocate(this%nu2(this%river%n_nodes), source=0.0_dp)
+    end if
+
+    ! wave travel time parameter [s]
+    allocate(k(this%river%n_nodes), source=(this%river%link_length / this%river%celerity))
+    step_id = max(1_i4, locate(routing_steps, minval(k, mask=.not.this%river%is_sink)))
+    this%step = routing_steps(step_id)
+    this%output_step = max(this%input_step, merge(1_i4, nint(this%step, i4) / HOUR_SECONDS, this%step < 3600.0_dp))
+    this%iterations = (this%output_step * HOUR_SECONDS) / nint(this%step, i4) ! 1 if step > 3600
+
+    if (this%output_step > this%input_step) then
+      this%accumulations = this%output_step / this%input_step
+    else
+      this%accumulations = 1_i4
+    end if
+
+    !$omp parallel
+    !$ this%omp_level_thresh = int(omp_get_num_threads() * 8, kind=i8)
+    !$ if (present(omp_level_thresh)) this%omp_level_thresh = omp_level_thresh
+    !$omp end parallel
+
+    ! determine last level to run in parallel
+    if (this%river%order%n_levels == 1_i8) then
+      if (this%omp_level_thresh > 0_i8) this%last_parallel_level = 1_i8
+      return
+    end if
+    level_size => this%river%order%level_size
+    if (all(level_size(:this%river%order%n_levels-1_i8) >= level_size(2_i8:))) then
+      if (this%omp_level_thresh > 0_i8) then
+        do i = 1_i8, this%river%order%n_levels
+          this%last_parallel_level = i
+          if (this%river%order%level_size(i) < this%omp_level_thresh) exit
+        end do
+      end if
+    else
+      ! root based levels are not sorted in size, so run all in parallel if wanted
+      if (this%omp_level_thresh > 0_i8) this%last_parallel_level = this%river%order%n_levels
+    end if
+  end subroutine river_router_init_from_restart
+
+  subroutine river_router_write_restart_to_dataset(this, restart_nc, deflate_level)
+    use mo_netcdf, only: NcDataset, NcVariable
+    implicit none
+    class(river_router_t), intent(in) :: this
+    integer(i4), intent(in), optional :: deflate_level
+    type(NcDataset), intent(inout) :: restart_nc !< restart dataset
+    type(NcVariable) :: nc_var
+    type(NcDimension) :: node_dim, xdim, ydim
+    integer(i4) :: deflate
+
+    deflate = optval(deflate_level, 6_i4)
+
+    if ( this%river%grid%coordsys == cartesian ) then
+      xdim = restart_nc%getDimension("x")
+      ydim = restart_nc%getDimension("y")
+    else 
+      xdim = restart_nc%getDimension("lon")
+      ydim = restart_nc%getDimension("lat")
+    end if
+
+    if ( .not.restart_nc%hasDimension("node") ) then
+      node_dim = restart_nc%setDimension("node", int(this%river%n_nodes, i4))  ! only works if network is not to huge for i4
+    else
+      node_dim = restart_nc%getDimension("node")
+    end if
+
+    ! write discharge
+    if ( allocated(this%discharge) ) then
+      print*, "writing discharge to restart_file"
+      nc_var = restart_nc%setVariable("discharge", "f64", [xdim, ydim], deflate_level=deflate, shuffle=.true.)
+      call nc_var%setAttribute("long_name", "discharge")
+      call nc_var%setFillValue(nodata_dp)
+      call nc_var%setAttribute("missing_value", nodata_dp)
+      call nc_var%setData(this%river%grid%unpack(this%discharge))
+    end if
+
+    ! write previous_discharge
+    if ( allocated(this%previous_discharge) ) then
+      print*, "writing previous_discharge to restart_file"
+      nc_var = restart_nc%setVariable("previous_discharge", "f64", [xdim, ydim], deflate_level=deflate, shuffle=.true.)
+      call nc_var%setAttribute("long_name", "previous_discharge")
+      call nc_var%setFillValue(nodata_dp)
+      call nc_var%setAttribute("missing_value", nodata_dp)
+      call nc_var%setData(this%river%grid%unpack(this%previous_discharge))
+    end if
+
+    ! write tributary
+    if ( allocated(this%tributary) ) then
+      print*, "writing tributary to restart_file"
+      nc_var = restart_nc%setVariable("tributary", "f64", [xdim, ydim], deflate_level=deflate, shuffle=.true.)
+      call nc_var%setAttribute("long_name", "tributary")
+      call nc_var%setFillValue(nodata_dp)
+      call nc_var%setAttribute("missing_value", nodata_dp)
+      call nc_var%setData(this%river%grid%unpack(this%tributary))
+    end if
+
+    ! write previous_tributary
+    if ( allocated(this%previous_tributary) ) then
+      print*, "writing previous_tributary to restart_file"
+      nc_var = restart_nc%setVariable("previous_tributary", "f64", [xdim, ydim], deflate_level=deflate, shuffle=.true.)
+      call nc_var%setAttribute("long_name", "previous_tributary")
+      call nc_var%setFillValue(nodata_dp)
+      call nc_var%setAttribute("missing_value", nodata_dp)
+      call nc_var%setData(this%river%grid%unpack(this%previous_tributary))
+    end if
+
+    ! write muskingum parameters
+    if ( allocated(this%nu1) ) then
+      print*, "writing nu1 to restart_file"
+      nc_var = restart_nc%setVariable("nu1", "f64", [xdim, ydim], deflate_level=deflate, shuffle=.true.)
+      call nc_var%setAttribute("long_name", "muskingum parameter nu1")
+      call nc_var%setFillValue(nodata_dp)
+      call nc_var%setAttribute("missing_value", nodata_dp)
+      call nc_var%setData(this%river%grid%unpack(this%nu1))
+    end if
+
+    if ( allocated(this%nu2) ) then
+      print*, "writing nu2 to restart_file"
+      nc_var = restart_nc%setVariable("nu2", "f64", [xdim, ydim], deflate_level=deflate, shuffle=.true.)
+      call nc_var%setAttribute("long_name", "muskingum parameter nu2")
+      call nc_var%setFillValue(nodata_dp)
+      call nc_var%setAttribute("missing_value", nodata_dp)
+      call nc_var%setData(this%river%grid%unpack(this%nu2))
+    end if
+
+  end subroutine river_router_write_restart_to_dataset
 
   !> \brief calculate the muskingum parameters nu1 and nu2
   subroutine river_router_setup_muskingum(this, max_route_step)

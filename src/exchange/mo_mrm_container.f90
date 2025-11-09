@@ -24,6 +24,7 @@ module mo_mrm_container
   use mo_grid, only: grid_t
   use mo_grid_io, only: output_dataset
   use mo_utils, only: is_close
+  use mo_netcdf, only: NcDataset
   !> \class   mrm_config_t
   !> \brief   Configuration for a single mRM process container.
   type, public :: mrm_config_t
@@ -34,6 +35,8 @@ module mo_mrm_container
     integer(i4)      :: level11          ! has_value=.true.,  help="Routing grid resolution. By default: Resolution of runoff.")
     integer(i4)      :: omp_min          !`"m", has_value=.true.,  help="Minimum river level size to route in parallel with OpenMP. By default: threads * 8")
     logical          :: parallel_rout    ! "p", has_value=.false., help="Level order for parallel routing starting from river root.")
+    logical          :: read_restart     ! has_value=.true., help="Read restart file.")
+    logical          :: write_restart    ! has_value=.true., help="Write restart file.")
     ! directories and files
     character(1024) :: scc_file               ! scc gauge locations file. Either CSV with station per line or NetCDF. By default not used.
     character(1024) :: fdir_file
@@ -41,6 +44,8 @@ module mo_mrm_container
     character(1024) :: slope_file
     character(1024) :: out_file
     character(1024) :: node_out_file
+    character(1024) :: restart_file_in = "mrm_restart_in.nc"
+    character(1024) :: restart_file_out = "mrm_restart_out.nc"
     ! parameters
     real(dp) :: gamma
     logical  :: const_celerity
@@ -56,7 +61,6 @@ module mo_mrm_container
     type(exchange_t), pointer :: exchange => null() !< exchange container of the domain
     type(grid_t)              :: level0, level11
     type(river_router_t)      :: router
-    type(river_t)             :: criver
     type(river_t)             :: river
     type(output_dataset)      :: ds_out
     type(river_output_dataset)      :: dsr
@@ -68,9 +72,51 @@ module mo_mrm_container
     procedure :: initialize => mrm_initialize
     procedure :: update => mrm_update
     procedure :: close ! don't we need a close
+    procedure :: finalize
+    procedure :: read_restart => mrm_read_restart
+    procedure :: write_restart => mrm_write_restart
   end type mrm_t
 
 contains
+
+  !> \brief Read restart file and populate mRM state.
+  subroutine mrm_read_restart(self, file)
+    use mo_string_utils, only: n2s => num2str
+    class(mrm_t), target, intent(inout) :: self
+    character(*), intent(in) :: file !< restart file to read
+
+    type(NcDataset) :: restart_nc
+    integer(i8), allocatable :: omp_min
+    logical :: rout
+
+    rout = self%config%parallel_rout
+    if (self%config%omp_min .ge. 1_i4) then
+      allocate(omp_min)
+      omp_min = self%config%omp_min
+      call message(" ... set minimum level size for openmp: ", n2s(omp_min))
+    end if
+    call message(" ... read mRM restart from file: ", file)
+    restart_nc = NcDataset(trim(file), "r")
+    call self%level11%from_netcdf(restart_nc, "cell_area")
+    call self%river%init_from_restart(restart_nc, self%level11)
+    call self%router%init_from_restart(restart_nc, self%river, self%exchange%level1, self%exchange%runoff_total%stepping, max_route_step=3600.0_dp, root_levels=rout, omp_level_thresh=omp_min)
+    call restart_nc%close()
+
+  end subroutine mrm_read_restart
+
+  subroutine mrm_write_restart(self, file)
+    class(mrm_t), intent(inout) :: self
+    character(*), intent(in) :: file !< restart file to write
+
+    type(NcDataset) :: restart_nc
+
+    restart_nc = NcDataset(trim(file), "w")
+    call message(" ... write mRM restart to file: ", file)
+    call self%river%write_restart_to_dataset(restart_nc)
+    call self%router%write_restart_to_dataset(restart_nc)
+    call restart_nc%close()
+
+  end subroutine mrm_write_restart
 
   !> \brief Configure the mRM process container.
   subroutine mrm_configure(self, config, exchange)
@@ -96,6 +142,8 @@ contains
     integer(i4)      :: level11          ! has_value=.true.,  help="Routing grid resolution. By default: Resolution of runoff.")
     integer(i4)      :: omp_min          !`"m", has_value=.true.,  help="Minimum river level size to route in parallel with OpenMP. By default: threads * 8")
     logical          :: parallel_rout    ! "p", has_value=.false., help="Level order for parallel routing starting from river root.")
+    logical          :: read_restart     ! 
+    logical          :: write_restart    !
     ! directories and files
     character(1024) :: scc_file               ! scc gauge locations file. Either CSV with station per line or NetCDF. By default not used.
     character(1024) :: fdir_file
@@ -107,7 +155,7 @@ contains
     real(dp) :: gamma
     logical  :: const_celerity
 
-    namelist /mrm_main/ out_frequency, level11, omp_min, parallel_rout
+    namelist /mrm_main/ out_frequency, level11, omp_min, parallel_rout, read_restart, write_restart
     namelist /mrm_dirs/ scc_file, fdir_file, dem_file, slope_file, out_file, node_out_file
     namelist /mrm_params/ gamma, const_celerity
 
@@ -123,6 +171,8 @@ contains
     self%level11       = level11       ! has_value=.true.,  help="Routing grid resolution. By default: Resolution of runoff.")
     self%omp_min       = omp_min       !`"m", has_value=.true.,  help="Minimum river level size to route in parallel with OpenMP. By default: threads * 8")
     self%parallel_rout = parallel_rout ! "p", has_value=.false., help="Level order for parallel routing starting from river root.")
+    self%read_restart  = read_restart  ! has_value=.true., help="Read restart file.")
+    self%write_restart = write_restart ! has_value=.true., help="Write restart file.")
 
     ! read directories
     call position_nml('mrm_dirs', unit)
@@ -159,6 +209,7 @@ contains
     implicit none
 
     class(mrm_t), target, intent(inout) :: self
+    type(river_t), target :: river_l0
     type(input_dataset) :: input, in_ds
     type(datetime) :: current_time, start_time_frame 
     type(input_dataset) :: ds
@@ -212,31 +263,41 @@ contains
   end if
 
   ! generate river
-  call message("create river network:", n2s(self%level0%ncells))
-  call self%river%from_fdir(fdir, self%level0)
-
-  call message("calculate facc on level0")
-  call self%river%calc_order()
-  call self%river%calc_facc()
-
-  call message("upscale river")
-  
-  ! derive level11 grid
-  self%level11 = self%level0%derive_grid(target_resolution=real(self%config%level11, dp))
-  if (self%level11%has_aux_coords()) call self%level11%estimate_aux_vertices()
-  call message(" ... level0 ncells", n2s(self%level0%ncells))
-  call message(" ... level0 cellsize", n2s(self%level0%cellsize))
-  call message(" ... level1 ncells", n2s(self%exchange%level1%ncells))
-  call message(" ... level1 cellsize", n2s(self%exchange%level1%cellsize))
-  call message(" ... level11 ncells", n2s(self%level11%ncells))
-  call message(" ... level11 cellsize", n2s(self%level11%cellsize))
-  if (is_close(self%level11%cellsize, self%level0%cellsize)) then
-    call message(" ... use L0 river")
-    call self%criver%from_fdir(fdir, self%level11)
-    call self%criver%calc_celerity(gamma=self%config%gamma, slope=slope, constant_celerity=self%config%const_celerity)
+  if (self%config%read_restart) then
+    if (.not. path_isfile(self%config%restart_file_in)) then
+      call error_message("restart file not found: ", self%config%restart_file_in)
+    end if
+    call message("read river from restart file: ", self%config%restart_file_in)
+    call self%read_restart(self%config%restart_file_in)
   else
-    call upscaler%init(self%river, self%criver, self%level11, scc_gauges, scc_latlon) ! scc_gauges/scc_latlon not present if not allocated
-    call upscaler%calc_celerity(gamma=self%config%gamma, slope=slope, constant_celerity=self%config%const_celerity)
+    call message("create river network:", n2s(self%level0%ncells))
+    call river_l0%from_fdir(fdir, self%level0)
+
+    call message("calculate facc on level0")
+    call river_l0%calc_order()
+    call river_l0%calc_facc()
+
+    call message("upscale river")
+  
+    ! derive level11 grid
+    self%level11 = self%level0%derive_grid(target_resolution=real(self%config%level11, dp))
+    if (self%level11%has_aux_coords()) call self%level11%estimate_aux_vertices()
+    call message(" ... level0 ncells", n2s(self%level0%ncells))
+    call message(" ... level0 cellsize", n2s(self%level0%cellsize))
+    call message(" ... level1 ncells", n2s(self%exchange%level1%ncells))
+    call message(" ... level1 cellsize", n2s(self%exchange%level1%cellsize))
+    call message(" ... level11 ncells", n2s(self%level11%ncells))
+    call message(" ... level11 cellsize", n2s(self%level11%cellsize))
+    if (is_close(self%level11%cellsize, self%level0%cellsize)) then
+      call message(" ... use L0 river")
+      call self%river%from_fdir(fdir, self%level11)
+      call self%river%calc_celerity(gamma=self%config%gamma, slope=slope, constant_celerity=self%config%const_celerity)
+    else
+      call upscaler%init(river_l0, self%river, self%level11, scc_gauges, scc_latlon) ! scc_gauges/scc_latlon not present if not allocated
+      call upscaler%calc_celerity(gamma=self%config%gamma, slope=slope, constant_celerity=self%config%const_celerity)
+      call upscaler%destroy()
+    end if
+    call river_l0%destroy()
   end if
   
   if (path_isfile(self%config%scc_file)) then
@@ -244,13 +305,12 @@ contains
     allocate(scc_latlon)  ! if not isd, it is not present as optional argument
     call message(" ... read scc gauges file: ", self%config%scc_file)
     call read_scc_gauges(self%config%scc_file, scc_gauges, scc_latlon)
-    print*, scc_latlon
-    print*, scc_gauges
+    ! print*, scc_latlon
+    ! print*, scc_gauges
   else
     self%scc_active = .false.
   end if
 
-  ! TODO: destroy river and upscaler to save memory
   call message("initialize router")
   rout = self%config%parallel_rout
   if (self%config%omp_min .ge. 1_i4) then
@@ -258,12 +318,14 @@ contains
     omp_min = self%config%omp_min
     call message(" ... set minimum level size for openmp: ", n2s(omp_min))
   end if
-  call self%router%init(self%criver, self%exchange%level1, self%exchange%runoff_total%stepping, max_route_step=3600.0_dp, root_levels=rout, omp_level_thresh=omp_min) ! omp_min not present if not allocated
+  if (.not. self%config%read_restart) then
+    call self%router%init(self%river, self%exchange%level1, self%exchange%runoff_total%stepping, max_route_step=3600.0_dp, root_levels=rout, omp_level_thresh=omp_min) ! omp_min not present if not allocated
+  end if
   call message(" ... router%step: ", n2s(self%router%step))
   call message(" ... last level in parallel: ", n2s(self%router%last_parallel_level), "/", n2s(self%router%river%order%n_levels))
 
   ! prepare run
-  allocate(self%discharge(self%criver%n_nodes), source=0.0_dp)
+  allocate(self%discharge(self%river%n_nodes), source=0.0_dp)
 
   ! populate exchange type
   self%exchange%q_mod%data => self%discharge
@@ -315,7 +377,7 @@ contains
     if (self%scc_active) then
       call message(" ... create node based output file: ", self%config%node_out_file)
       call self%dsr%init(path=self%config%node_out_file, &
-        river=self%criver, &
+        river=self%river, &
         vars=vars, &
         start_time=self%exchange%start_time, &
         delta=delta, &
@@ -338,7 +400,7 @@ contains
     ! update output
     if (self%scc_active) then
      call self%dsr%update("discharge", self%discharge)
-      call self%ds_out%update("discharge", self%criver%select_cell_values(self%discharge))
+      call self%ds_out%update("discharge", self%river%select_cell_values(self%discharge))
     else
       call self%ds_out%update("discharge", self%discharge)
     end if
@@ -380,5 +442,15 @@ contains
   ! nullify(runoff)
 
   end subroutine close
+
+  subroutine finalize(self)
+    class(mrm_t), intent(inout) :: self
+
+    call message("finalize ... mRM")
+    if (self%config%write_restart) then
+      call self%write_restart(self%config%restart_file_out)
+    end if
+
+  end subroutine finalize
 
 end module mo_mrm_container
