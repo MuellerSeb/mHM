@@ -265,12 +265,10 @@ contains
     class(river_router_t), intent(in) :: this
     real(dp), dimension(this%river%n_nodes), intent(out) :: discharge, tributary
     integer(i8) :: i, j, n_levels
-    type(node), pointer, contiguous :: nodes(:)
     logical, pointer, contiguous :: is_sink(:)
     integer(i8), pointer, contiguous :: id(:), level_start(:), level_end(:)
 
     ! pointers for speeding up dereferencing attributes (river is a pointer, so this works)
-    nodes => this%river%nodes
     id => this%river%order%id
     level_start => this%river%order%level_start
     level_end => this%river%order%level_end
@@ -307,7 +305,7 @@ contains
       ! add runoff to inflow
       inflow = this%runoff(n)
       ! add upstream routed flux to inflow
-      edges => nodes(n)%edges
+      call this%river%src_view(n, edges)
       n_edges = size(edges)
       !$omp simd reduction(+:inflow)
       do m = 1_i4, n_edges
