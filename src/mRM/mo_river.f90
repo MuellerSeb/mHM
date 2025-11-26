@@ -11,11 +11,12 @@
 module mo_river
 
   use mo_kind,   only: i1, i2, i4, i8, sp, dp
-  use mo_dag, only: dag, order_t, traversal_visit
+  use mo_dag, only: branching, order_t, traversal_visit
   use mo_grid, only: grid_t, bottom_up, cartesian, dist_latlon
   use mo_grid_io, only: var, output_dataset
   use mo_message, only: error_message
   use mo_utils, only: optval
+  use mo_constants, only: nodata_i1, nodata_i2, nodata_i4, nodata_i8
 
   implicit none
   private
@@ -23,19 +24,19 @@ module mo_river
   !> \name D8 direction values
   !> \brief Constants describing the D8 routing direction of a cell.
   !!@{
-  integer(i4), public, parameter :: sink = 0_i4 !< sink
-  integer(i4), public, parameter :: d8_E = 1_i4 !< east
-  integer(i4), public, parameter :: d8_SE = 2_i4 !< south-east
-  integer(i4), public, parameter :: d8_S = 4_i4 !< south
-  integer(i4), public, parameter :: d8_SW = 8_i4 !< south-west
-  integer(i4), public, parameter :: d8_W = 16_i4 !< west
-  integer(i4), public, parameter :: d8_NW = 32_i4 !< north-west
-  integer(i4), public, parameter :: d8_N = 64_i4 !< north
-  integer(i4), public, parameter :: d8_NE = 128_i4 !< north-east
+  integer(i2), public, parameter :: sink = 0_i2 !< sink
+  integer(i2), public, parameter :: d8_E = 1_i2 !< east
+  integer(i2), public, parameter :: d8_SE = 2_i2 !< south-east
+  integer(i2), public, parameter :: d8_S = 4_i2 !< south
+  integer(i2), public, parameter :: d8_SW = 8_i2 !< south-west
+  integer(i2), public, parameter :: d8_W = 16_i2 !< west
+  integer(i2), public, parameter :: d8_NW = 32_i2 !< north-west
+  integer(i2), public, parameter :: d8_N = 64_i2 !< north
+  integer(i2), public, parameter :: d8_NE = 128_i2 !< north-east
   !> all directions as array
-  integer(i4), public, dimension(8), parameter :: d8_all = [d8_E, d8_SE, d8_S, d8_SW, d8_W, d8_NW, d8_N, d8_NE]
+  integer(i2), public, dimension(8), parameter :: d8_all = [d8_E, d8_SE, d8_S, d8_SW, d8_W, d8_NW, d8_N, d8_NE]
   !> matching back pointing directions as array
-  integer(i4), public, dimension(8), parameter :: d8_back = [d8_W, d8_NW, d8_N, d8_NE, d8_E, d8_SE, d8_S, d8_SW]
+  integer(i2), public, dimension(8), parameter :: d8_back = [d8_W, d8_NW, d8_N, d8_NE, d8_E, d8_SE, d8_S, d8_SW]
   !!@}
 
   !> \name ldd direction values
@@ -60,9 +61,9 @@ module mo_river
   !> y direction change for given ldd flow direction (bottom-up)
   integer(i4), public, dimension(9), parameter :: ldd_dy = [-1_i4, -1_i4, -1_i4, 0_i4, 0_i4, 0_i4, 1_i4, 1_i4, 1_i4]
   !> ldd to d8 conversion
-  integer(i4), public, dimension(9), parameter :: ldd_to_d8 = [d8_SW, d8_S, d8_SE, d8_W, sink, d8_E, d8_NW, d8_N, d8_NE]
+  integer(i2), public, dimension(9), parameter :: map_ldd_to_d8 = [d8_SW, d8_S, d8_SE, d8_W, sink, d8_E, d8_NW, d8_N, d8_NE]
   !> d8 to ldd conversion (array mostly empty)
-  integer(i1), public, dimension(128), parameter :: d8_to_ldd = [ &
+  integer(i1), public, dimension(128), parameter :: map_d8_to_ldd = [ &
     ldd_E, &
     ldd_SE, o, &
     ldd_S,  o,o,o, &
@@ -74,28 +75,13 @@ module mo_river
     ldd_NE]
   !!@}
 
-  !> \class simple_river_t
-  !> \brief Simple LDD river network representation
-  type, public :: simple_river_t
-    integer(i1) :: nodata = 0_i1 !< no-data value to determine mask
-    integer(i1), allocatable :: fdir(:,:) !< LDD flow direction
-    integer(i4), allocatable :: facc(:,:) !< flow accumulation
-    real(sp), allocatable :: width(:,:) !< river width
-    real(dp) :: xllcorner    !< x coordinate of the lowerleft corner
-    real(dp) :: yllcorner    !< y coordinate of the lowerleft corner
-    real(dp) :: cellsize     !< cellsize x = cellsize y
-  end type simple_river_t
-
   !> \class river_t
   !> \brief River network representation
-  type, extends(dag), public :: river_t
-    integer(i8) :: n_nodes !< number of nodes in the river (D8-river: number of grid cells, SCC-river: number of all nodes)
+  type, extends(branching), public :: river_t
     type(grid_t), pointer :: grid => null() !< grid the river network is defined on
-    integer(i4), allocatable :: fdir(:) !< D8 flow direction (only for a D8-river) size(ncells)
-    integer(i8), allocatable :: facc(:) !< flow accumulation size(n_nodes)
-    integer(i8), allocatable :: down(:) !< downstream cell by id size(n_nodes)
     logical, allocatable :: is_sink(:) !< flag to indicate sinks size(n_nodes)
-    integer(i8), allocatable :: sinks(:) !< node ids of sinks
+    integer(i2), allocatable :: fdir(:) !< D8 flow direction (only for a D8-river) size(ncells)
+    integer(i4), allocatable :: facc(:) !< flow accumulation size(n_nodes)
     real(dp), allocatable :: upstream_area(:) !< upstream area of node size(n_nodes)
     real(dp), allocatable :: link_length(:) !< length of link starting at node (0 if node is sink) size(n_nodes)
     real(dp), allocatable :: link_slope(:) !< slope of link starting at node (in [0,1]) size(n_nodes)
@@ -123,11 +109,83 @@ module mo_river
 
 contains
 
+  !> \brief Convert D8 flow direction to LDD flow direction
+  subroutine d8_to_ldd(fdir_d8, fdir_ldd)
+    integer(i2), dimension(:), intent(in) :: fdir_d8 !< D8 flow direction
+    integer(i1), dimension(:), intent(out) :: fdir_ldd !< LDD flow direction
+    integer(i8) :: i
+    if (size(fdir_ldd, kind=i8) /= size(fdir_d8, kind=i8)) then
+      call error_message("d8_to_ldd: input and output arrays have different size")
+    end if
+    !$omp parallel do default(shared) schedule(static)
+    do i = 1_i8, size(fdir_d8, kind=i8)
+      select case (fdir_d8(i))
+        case (sink)
+          fdir_ldd(i) = ldd_sink
+        case (d8_E)
+          fdir_ldd(i) = ldd_E
+        case (d8_SE)
+          fdir_ldd(i) = ldd_SE
+        case (d8_S)
+          fdir_ldd(i) = ldd_S
+        case (d8_SW)
+          fdir_ldd(i) = ldd_SW
+        case (d8_W)
+          fdir_ldd(i) = ldd_W
+        case (d8_NW)
+          fdir_ldd(i) = ldd_NW
+        case (d8_N)
+          fdir_ldd(i) = ldd_N
+        case (d8_NE)
+          fdir_ldd(i) = ldd_NE
+        case default
+          fdir_ldd(i) = nodata_i1
+      end select
+    end do
+    !$omp end parallel do
+  end subroutine d8_to_ldd
+
+  !> \brief Convert LDD flow direction to D8 flow direction
+  subroutine ldd_to_d8(fdir_ldd, fdir_d8)
+    integer(i1), dimension(:), intent(in) :: fdir_ldd !< LDD flow direction
+    integer(i2), dimension(:), intent(out) :: fdir_d8 !< D8 flow direction
+    integer(i8) :: i
+    if (size(fdir_ldd, kind=i8) /= size(fdir_d8, kind=i8)) then
+      call error_message("ldd_to_d8: input and output arrays have different size")
+    end if
+    !$omp parallel do default(shared) schedule(static) private(i)
+    do i = 1_i8, size(fdir_d8, kind=i8)
+      select case (fdir_ldd(i))
+        case (ldd_sink)
+          fdir_d8(i) = sink
+        case (ldd_E)
+          fdir_d8(i) = d8_E
+        case (ldd_SE)
+          fdir_d8(i) = d8_SE
+        case (ldd_S)
+          fdir_d8(i) = d8_S
+        case (ldd_SW)
+          fdir_d8(i) = d8_SW
+        case (ldd_W)
+          fdir_d8(i) = d8_W
+        case (ldd_NW)
+          fdir_d8(i) = d8_NW
+        case (ldd_N)
+          fdir_d8(i) = d8_N
+        case (ldd_NE)
+          fdir_d8(i) = d8_NE
+        case default
+          fdir_d8(i) = nodata_i2
+      end select
+    end do
+    !$omp end parallel do
+  end subroutine ldd_to_d8
+
   !> \brief Get all links to and from given cell depending on flow direction
   pure subroutine get_links(mask, cells, fdir, i, j, dy, periodic, n_up, up, down)
     logical, dimension(:,:), intent(in) :: mask !< grid mask
     integer(i8), dimension(:,:), intent(in) :: cells !< cells id matrix
-    integer(i4), dimension(:), intent(in) :: fdir !< flow direction array
+    integer(i2), dimension(:), intent(in) :: fdir !< flow direction array
     integer(i4), intent(in) :: i !< i index of current cell (on x-axis)
     integer(i4), intent(in) :: j !< j index of current cell (on y-axis)
     integer(i4), intent(in) :: dy !< direction of north in the grid matrix (1/-1)
@@ -153,6 +211,21 @@ contains
       up(n_up) = cells(ni,nj) ! add the upstream neighbor to the list
     end do
     ! downstream
+    call get_down(mask, cells, fdir, i, j, dy, periodic, down)
+  end subroutine get_links
+
+  pure subroutine get_down(mask, cells, fdir, i, j, dy, periodic, down)
+    logical, dimension(:,:), intent(in) :: mask !< grid mask
+    integer(i8), dimension(:,:), intent(in) :: cells !< cells id matrix
+    integer(i2), dimension(:), intent(in) :: fdir !< flow direction array
+    integer(i4), intent(in) :: i !< i index of current cell (on x-axis)
+    integer(i4), intent(in) :: j !< j index of current cell (on y-axis)
+    integer(i4), intent(in) :: dy !< direction of north in the grid matrix (1/-1)
+    logical, intent(in) :: periodic !< flag to indicate periodic latlon grid (360 deg lon axis)
+    integer(i8), intent(out) :: down !< the downstream cell
+    integer(i4) :: imax, jmax, ni, nj
+    imax = size(cells, dim=1)
+    jmax = size(cells, dim=2)
     down = 0_i8
     call next(fdir(cells(i,j)), dy, i, j, ni, nj) ! get downstream cell
     if (periodic) then ! sinks still indicated by nj=0
@@ -162,11 +235,11 @@ contains
     if (ni < 1_i4 .or. imax < ni .or. nj < 1_i4 .or. jmax < nj ) return ! outside matrix / sink
     if (.not.mask(ni,nj)) return ! outside mask
     down = cells(ni,nj)
-  end subroutine get_links
+  end subroutine get_down
 
   !> \brief Get next matrix indices from flow direction: (i,j) -> (ni,nj)
   pure subroutine next(fdir, dy, i, j, ni, nj)
-    integer(i4), intent(in) :: fdir !< flow direction
+    integer(i2), intent(in) :: fdir !< flow direction
     integer(i4), intent(in) :: dy !< direction of north in the grid matrix (1/-1)
     integer(i4), intent(in) :: i !< i index of current cell (on x-axis)
     integer(i4), intent(in) :: j !< j index of current cell (on y-axis)
@@ -204,7 +277,7 @@ contains
   end subroutine next
 
   !> \brief Get next matrix indices from flow direction: (i,j) -> (ni,nj)
-  pure integer(i4) function get_fdir(from, to, dy)
+  pure integer(i2) function get_fdir(from, to, dy)
     integer(i4), intent(in) :: from(2) !< from-cell indices
     integer(i4), intent(in) :: to(2) !< to-cell indices
     integer(i4), intent(in) :: dy !< direction of north in the grid matrix (1/-1)
@@ -232,57 +305,66 @@ contains
   !> \brief Initialize river network from flow direction.
   subroutine river_from_fdir(this, fdir, grid, calculate_length, calculate_node_xy)
     class(river_t), intent(inout) :: this
-    integer(i4), dimension(:), intent(in) :: fdir !< D8 flow direction
+    integer(i2), dimension(:), intent(in) :: fdir !< D8 flow direction
     type(grid_t), pointer, intent(in), optional :: grid !< grid the river network is defined on
     logical, intent(in), optional :: calculate_length !< whether to calculate the link length from fdir (default: .true.)
     logical, intent(in), optional :: calculate_node_xy !< whether to calculate node locations (default: .true.)
-    integer(i8), allocatable :: cells(:,:)
-    integer(i4) :: dy ! direction of north in the grid matrix (1/-1)
-    integer(i4) :: n_up ! number of upstream neighbor cells
-    integer(i8), dimension(8) :: up ! all upstream neighbor cells
-    integer(i8) :: down ! the downstream cell
-    integer(i8) :: i, j
-    logical :: periodic ! periodic latlon grid
-    logical :: calc_length, calc_node_xy
+    integer(i8), allocatable :: cells(:,:), down(:)
+    integer(i8) :: downstream, i
+    integer(i4) :: ix, iy, dy ! direction of north in the grid matrix (1/-1)
+    logical :: periodic, calc_length, calc_node_xy
     real(dp), allocatable :: xax(:), yax(:)
 
     calc_length = optval(calculate_length, .true.)
     calc_node_xy = optval(calculate_node_xy, .true.)
     if (present(grid)) this%grid => grid
     if (.not.associated(this%grid)) call error_message("river%from_fdir: grid not associated")
-    call this%init(this%grid%ncells)
-    this%fdir = fdir
-    allocate(this%down(this%grid%ncells))
-    this%n_nodes = this%grid%ncells
+    if (size(fdir, kind=i8) /= this%grid%ncells) call error_message("river%from_fdir: size of fdir does not match grid ncells")
+
     this%scc = .false. ! if derived from fdir, this is a D8-river
-    this%node_cell = [(i, i=1_i8,this%grid%ncells)] ! nodes correspond to cells
-    this%cell_node_select = [(i, i=1_i8,this%grid%ncells)] ! nodes correspond to cells
-    allocate(this%area_fraction(this%n_nodes), source=1.0_dp) ! D8 has no area fraction
+    allocate(this%fdir(this%grid%ncells))
+    ! allocate(this%node_cell(this%grid%ncells)) ! nodes correspond to cells
+    ! allocate(this%cell_node_select(this%grid%ncells)) ! nodes correspond to cells
+    ! allocate(this%area_fraction(this%grid%ncells)) ! D8 has no area fraction
+    !$omp parallel do default(shared) schedule(static)
+    do i = 1_i8, this%grid%ncells
+      this%fdir(i) = fdir(i)
+      ! this%node_cell(i) = i
+      ! this%cell_node_select(i) = i
+      ! this%area_fraction(i) = 1.0_dp
+    end do
+    !$omp end parallel do
 
     periodic = this%grid%is_periodic()
     dy = -1_i4 ! top-down grid starts north
     if (this%grid%y_direction==bottom_up) dy = 1_i4
 
-    cells = this%grid%id_matrix()
-    !$omp parallel do default(shared) private(i, n_up, up, down)
+    allocate(cells(this%grid%nx, this%grid%ny))
+    call this%grid%gen_id_matrix(cells)
+    allocate(down(this%grid%ncells))
+
+    !$omp parallel do default(shared) private(downstream) schedule(static)
     do i = 1_i8, this%grid%ncells
-      call get_links(this%grid%mask, cells, this%fdir, this%grid%cell_ij(i,1), this%grid%cell_ij(i,2), dy, periodic, n_up, up, down)
-      allocate(this%nodes(i)%edges(n_up), source=up(1_i4:n_up))
-      if (down > 0_i8) allocate(this%nodes(i)%dependents(1), source=down)
-      this%down(i) = down
+      call get_down(this%grid%mask, cells, this%fdir, &
+                    this%grid%cell_ij(i,1), this%grid%cell_ij(i,2), dy, periodic, &
+                    downstream)
+      down(i) = downstream
+      if (downstream == 0_i8 .and. this%fdir(i) /= sink) then
+        this%fdir(i) = sink ! ensure sink direction
+      end if
     end do
     !$omp end parallel do
     deallocate(cells)
+    call this%init(down)
+    deallocate(down)
 
     ! determine sinks
-    this%is_sink = (this%down == 0_i8)
-    allocate(this%sinks(count(this%is_sink)))
-    j = 0_i8
+    allocate(this%is_sink(this%grid%ncells))
+    !$omp parallel do default(shared) schedule(static)
     do i = 1_i8, this%grid%ncells
-      if (.not.this%is_sink(i)) cycle
-      j = j + 1_i8
-      this%sinks(j) = i
+      this%is_sink(i) = (this%down(i) == 0_i8)
     end do
+    !$omp end parallel do
 
     ! calculate d8 reach length
     if (calc_length) call this%calc_length()
@@ -293,10 +375,12 @@ contains
       allocate(this%node_y(this%n_nodes))
       xax = this%grid%x_axis()
       yax = this%grid%y_axis()
+      !$omp parallel do default(shared) schedule(static)
       do i = 1_i8, this%grid%ncells
         this%node_x(i) = xax(this%grid%cell_ij(i, 1))
         this%node_y(i) = yax(this%grid%cell_ij(i, 2))
       end do
+      !$omp end parallel do
     end if
   end subroutine river_from_fdir
 
@@ -316,17 +400,20 @@ contains
   subroutine river_facc(this)
     use mo_message, only: error_message
     class(river_t), intent(inout) :: this
-    integer(i8) :: i, j, n, m
+    integer(i8) :: i, j, n, m, k
+    ! integer(i8), pointer :: sources(:)
     if (allocated(this%facc)) deallocate(this%facc)
-    allocate(this%facc(this%n_nodes))
     if (.not.allocated(this%order%id)) call error_message("river%calc_facc: order not initialized")
-    do i = 1_i8, size(this%order%level_start, kind=i8)
-      !$omp parallel do default(shared) private(j, n, m)
+    allocate(this%facc(this%n_nodes))
+    do i = 1_i8, this%order%n_levels
+      !$omp parallel do default(shared) private(n,m,k) schedule(static)
       do j = this%order%level_start(i), this%order%level_end(i)
         n = this%order%id(j)
-        this%facc(n) = 1_i8
-        do m = 1, this%nodes(n)%nedges()
-          this%facc(n) = this%facc(n) + this%facc(this%nodes(n)%edges(m))
+        this%facc(n) = 1_i4
+        k = this%off_up(n)
+        ! call this%src_view(n, sources)
+        do m = k, k + this%n_up(n) - 1_i8
+          this%facc(n) = this%facc(n) + this%facc(this%up(m))
         end do
       end do
       !$omp end parallel do
@@ -336,18 +423,20 @@ contains
   !> \brief Calculate upstream area for each node (inclusive).
   subroutine river_upstream_area(this)
     use mo_message, only: error_message
-    class(river_t), intent(inout) :: this
+    class(river_t), intent(inout), target :: this
     integer(i8) :: i, j, n, m
+    integer(i8), pointer, contiguous :: sources(:)
     if (allocated(this%upstream_area)) deallocate(this%upstream_area)
     allocate(this%upstream_area(this%n_nodes))
     if (.not.allocated(this%order%id)) call error_message("river%calc_upstream_area: order not initialized")
     do i = 1_i8, size(this%order%level_start, kind=i8)
-      !$omp parallel do default(shared) private(j, n, m)
+      !$omp parallel do default(shared) private(n, m) schedule(static)
       do j = this%order%level_start(i), this%order%level_end(i)
         n = this%order%id(j)
         this%upstream_area(n) = this%grid%cell_area(this%node_cell(n)) * this%area_fraction(n)
-        do m = 1, this%nodes(n)%nedges()
-          this%upstream_area(n) = this%upstream_area(n) + this%upstream_area(this%nodes(n)%edges(m))
+        call this%src_view(n, sources)
+        do m = 1_i8, size(sources, kind=i8)
+          this%upstream_area(n) = this%upstream_area(n) + this%upstream_area(sources(m))
         end do
       end do
       !$omp end parallel do
@@ -364,11 +453,11 @@ contains
     logical :: periodic ! periodic latlon grid
     if (this%scc) call error_message("river%calc_fdir: can not calculated fdir for a SCC river.")
     if (allocated(this%fdir)) deallocate(this%fdir)
-    allocate(this%fdir(this%n_nodes), source=0_i4)
+    allocate(this%fdir(this%n_nodes), source=0_i2)
     periodic = this%grid%is_periodic()
     dy = -1_i4 ! top-down grid starts north
     if (this%grid%y_direction==bottom_up) dy = 1_i4
-    !$omp parallel do default(shared) private(i, j, from, to)
+    !$omp parallel do default(shared) private(j, from, to) schedule(static)
     do i = 1_i8, this%n_nodes
       j = this%down(i)
       if (j==0_i8) cycle ! sink
@@ -393,11 +482,15 @@ contains
     real(dp), allocatable, dimension(:) :: x_axis, y_axis
     if (this%scc) call error_message("river%calc_length: can't calculate D8 link lengths for a SCC river.")
     if (allocated(this%link_length)) deallocate(this%link_length)
-    allocate(this%link_length(this%grid%ncells), source=0.0_dp)
+    allocate(this%link_length(this%grid%ncells))
     if (this%grid%coordsys == cartesian) then
-      !$omp parallel do default(shared) private(i)
+      !$omp parallel do default(shared) schedule(static)
       do i = 1_i8, this%grid%ncells
-        if (this%down(i) == 0_i8) cycle ! sinks ain't links
+        if (this%down(i) == 0_i8) then
+          ! sinks ain't links
+          this%link_length(i) = 0.0_dp
+          cycle
+        end if
         select case (this%fdir(i))
           case(d8_E, d8_S, d8_W, d8_N)
             this%link_length(i) = this%grid%cellsize
@@ -409,10 +502,14 @@ contains
     else
       x_axis = this%grid%x_axis()
       y_axis = this%grid%y_axis()
-      !$omp parallel do default(shared) private(i, to)
+      !$omp parallel do default(shared) private(to) schedule(static)
       do i = 1_i8, this%grid%ncells
         to = this%down(i)
-        if (to == 0_i8) cycle ! sinks ain't links
+        if (to == 0_i8) then
+          ! sinks ain't links
+          this%link_length(i) = 0.0_dp
+          cycle
+        end if
         this%link_length(i) = dist_latlon( &
           lat1=y_axis(this%grid%cell_ij(i, 2)), &
           lon1=x_axis(this%grid%cell_ij(i, 1)), &
@@ -524,8 +621,8 @@ contains
       end do
     end if
     allocate(vars(0))
-    vars = [vars, var("fdir", "flow direction", dtype="i32", static=.true.)]
-    if (allocated(this%facc)) vars = [vars, var("facc", "flow accumulation", dtype="i32", kind="i8", static=.true.)]
+    vars = [vars, var("fdir", "flow direction", dtype="i16", static=.true.)]
+    if (allocated(this%facc)) vars = [vars, var("facc", "flow accumulation", dtype="i32", static=.true.)]
     if (allocated(this%order%id)) vars = [vars, var("level", "order level", dtype="i32", static=.true.)]
     if (allocated(this%upstream_area)) vars = [vars, var("upstream_area", "upstream area", units="m2", dtype="f64", static=.true.)]
     if (allocated(this%link_length)) vars = [vars, var("length", "link length", dtype="f64", static=.true.)]
