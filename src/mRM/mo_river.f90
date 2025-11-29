@@ -99,6 +99,7 @@ module mo_river
     procedure, public :: calc_order => river_order
     procedure, public :: calc_fdir => river_fdir
     procedure, public :: calc_facc => river_facc
+    procedure, public :: label_subcatchments => river_label_subcatchments
     procedure, public :: calc_upstream_area => river_upstream_area
     procedure, public :: calc_length => river_length
     procedure, public :: calc_slope => river_slope
@@ -404,6 +405,7 @@ contains
     ! integer(i8), pointer :: sources(:)
     if (allocated(this%facc)) deallocate(this%facc)
     if (.not.allocated(this%order%id)) call error_message("river%calc_facc: order not initialized")
+    if (.not.this%order%to_root) call this%order%reverse()
     allocate(this%facc(this%n_nodes))
     do i = 1_i8, this%order%n_levels
       !$omp parallel do default(shared) private(n,m,k) schedule(static)
@@ -419,6 +421,60 @@ contains
       !$omp end parallel do
     end do
   end subroutine river_facc
+
+  !> \brief Calculate flow accumulation
+  subroutine river_label_subcatchments(this, label_map, selected_nodes, labels, default_label)
+    use mo_message, only: error_message
+    class(river_t), intent(inout) :: this
+    integer(i8), allocatable, intent(out) :: label_map(:) !< subcatchment labels
+    integer(i8), dimension(:), intent(in) :: selected_nodes !< nodes to label subcatchments from
+    integer(i8), dimension(:), optional, intent(in) :: labels !< labels used for subcatchments
+    integer(i8), optional, intent(in) :: default_label !< default label for unlabeled nodes (default: 0)
+    integer(i8) :: i, j, n, def
+
+    if (present(labels)) then
+      if (size(labels, kind=i8) /= size(selected_nodes, kind=i8)) then
+        call error_message("river_label_subcatchments: size of labels does not match size of selected_nodes")
+      end if
+    end if
+
+    if (.not.allocated(this%order%id)) call error_message("river%calc_facc: order not initialized")
+    if (this%order%to_root) call this%order%reverse()
+
+    def = optval(default_label, 0_i8)
+    allocate(label_map(this%n_nodes))
+
+    !$omp parallel do default(shared) schedule(static)
+    do i = 1_i8, this%n_nodes
+      label_map(i) = def
+    end do
+    !$omp end parallel do
+
+    if (present(labels)) then
+      !$omp parallel do default(shared) schedule(static)
+      do i = 1_i8, size(selected_nodes, kind=i8)
+        label_map(selected_nodes(i)) = labels(i)
+      end do
+      !$omp end parallel do
+    else
+      !$omp parallel do default(shared) schedule(static)
+      do i = 1_i8, size(selected_nodes, kind=i8)
+        label_map(selected_nodes(i)) = i
+      end do
+      !$omp end parallel do
+    end if
+
+    do i = 1_i8, this%order%n_levels
+      !$omp parallel do default(shared) private(n) schedule(static)
+      do j = this%order%level_start(i), this%order%level_end(i)
+        n = this%order%id(j)
+        if (this%down(n) == 0_i8) cycle ! sink
+        if (label_map(n) /= def) cycle ! pre-labeled
+        label_map(n) = label_map(this%down(n))
+      end do
+      !$omp end parallel do
+    end do
+  end subroutine river_label_subcatchments
 
   !> \brief Calculate upstream area for each node (inclusive).
   subroutine river_upstream_area(this)
