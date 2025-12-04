@@ -677,7 +677,7 @@ contains
       end do
     end if
     allocate(vars(0))
-    vars = [vars, var("fdir", "flow direction", dtype="i16", static=.true.)]
+    vars = [vars, var("fdir", "flow direction", dtype="i16", kind="i2", static=.true.)]
     if (allocated(this%facc)) vars = [vars, var("facc", "flow accumulation", dtype="i32", static=.true.)]
     if (allocated(this%order%id)) vars = [vars, var("level", "order level", dtype="i32", static=.true.)]
     if (allocated(this%upstream_area)) vars = [vars, var("upstream_area", "upstream area", units="m2", dtype="f64", static=.true.)]
