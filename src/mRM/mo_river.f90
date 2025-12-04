@@ -1047,8 +1047,8 @@ contains
     do i = 1_i8, n_links
       this%up(i) = dummy2di8(1_i8, i)
     end do
-    deallocate(dummy2di8)
     !$omp end parallel do
+    deallocate(dummy2di8)
 
     nc_var = restart_nc%getVariable("down")
     allocate(this%down(this%n_nodes))
