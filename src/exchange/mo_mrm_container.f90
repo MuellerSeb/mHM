@@ -13,7 +13,7 @@
 ! history
 ! Sep 2026 - Stephan Thober: initial version using river dag
 module mo_mrm_container
-  use mo_kind, only: i4, i8, dp
+  use mo_kind, only: i2, i4, i8, dp
   use mo_nml, only: position_nml ! , close_nml
   use mo_namelists, only: open_new_nml, close_nml
   use mo_exchange_type, only: exchange_t
@@ -98,7 +98,8 @@ contains
     call message(" ... read mRM restart from file: ", file)
     restart_nc = NcDataset(trim(file), "r")
     call self%level11%from_netcdf(restart_nc, "cell_area")
-    call self%river%init_from_restart(restart_nc, self%level11)
+    self%river%grid => self%level11
+    call self%river%init_from_restart(restart_nc)
     call self%router%init_from_restart(restart_nc, self%river, self%exchange%level1, self%exchange%runoff_total%stepping, max_route_step=3600.0_dp, root_levels=rout, omp_level_thresh=omp_min)
     call restart_nc%close()
 
@@ -130,7 +131,7 @@ contains
 
   !> \brief Initialize the mrm configuration.
   subroutine mrm_config_read(self, file, output_file)
-    use mo_file, only: file_namelist_mhm, file_namelist_mhm_param 
+    use mo_file, only: file_namelist_mhm, file_namelist_mhm_param
 
     class(mrm_config_t), intent(inout) :: self
     character(*), intent(in) :: file !< file containing the namelists
@@ -142,7 +143,7 @@ contains
     integer(i4)      :: level11          ! has_value=.true.,  help="Routing grid resolution. By default: Resolution of runoff.")
     integer(i4)      :: omp_min          !`"m", has_value=.true.,  help="Minimum river level size to route in parallel with OpenMP. By default: threads * 8")
     logical          :: parallel_rout    ! "p", has_value=.false., help="Level order for parallel routing starting from river root.")
-    logical          :: read_restart     ! 
+    logical          :: read_restart     !
     logical          :: write_restart    !
     ! directories and files
     character(1024) :: scc_file               ! scc gauge locations file. Either CSV with station per line or NetCDF. By default not used.
@@ -197,7 +198,7 @@ contains
 
   ! read initial values and populate exchange
   subroutine mrm_connect(self)
-    use mo_datetime, only: datetime, timedelta, HOUR_SECONDS, DAY_HOURS, one_hour, one_day 
+    use mo_datetime, only: datetime, timedelta, HOUR_SECONDS, DAY_HOURS, one_hour, one_day
     use mo_grid, only: grid_t
     use mo_grid_io, only: var, input_dataset, output_dataset, center_timestamp, hourly, daily, monthly, yearly, time_units_delta
     use mo_river, only: river_t
@@ -211,7 +212,7 @@ contains
     class(mrm_t), target, intent(inout) :: self
     type(river_t), target :: river_l0
     type(input_dataset) :: input, in_ds
-    type(datetime) :: current_time, start_time_frame 
+    type(datetime) :: current_time, start_time_frame
     type(input_dataset) :: ds
     type(river_upscaler_t) :: upscaler
     logical                     :: rout
@@ -220,7 +221,8 @@ contains
     character(:), allocatable   :: delta
     integer(i4)                 :: write_step
     integer(i4)                 :: chunk_offset
-    integer(i4), allocatable    :: mfdir(:,:), fdir(:)
+    integer(i2), allocatable    :: fdir(:)
+    integer(i4), allocatable    :: mfdir(:,:)
     integer(i8), allocatable    :: omp_min
     real(dp), allocatable       :: mdem(:,:), dem(:), mslope(:,:), slope(:), scc_gauges(:,:)
     real(dp), pointer           :: runoff(:) => null()
@@ -231,19 +233,21 @@ contains
     call message("read data: ", trim(file))
     select case(path_ext(file))
       case(".nc")
-        call ds%init(path=file, grid=self%level0, vars=[var(name="fdir", static=.true.)], grid_init_var="fdir")
+        call ds%init(path=file, grid=self%level0, vars=[var(name="fdir", kind="i2", static=.true.)], grid_init_var="fdir")
         allocate(fdir(self%level0%ncells))
         call ds%read("fdir", fdir)
         call ds%close()
       case(".asc")
         call self%level0%from_ascii_file(file)
+        allocate(fdir(self%level0%ncells))
+        ! TODO: read data should be able to read i2 data directly
         call self%level0%read_data(file, mfdir)
-        fdir = self%level0%pack(mfdir)
+        call self%level0%pack_into(int(mfdir, i2), fdir)
         deallocate(mfdir)
       case default
         call error_message("unknown file extension (i.e. not '.asc' or '.nc'): ", path_ext(file))
     end select
-    
+
     if (.true.) then ! should only be read if celerity is not constant
       file = self%config%fdir_file
       call message("read slope: ", file)
@@ -278,7 +282,7 @@ contains
     call river_l0%calc_facc()
 
     call message("upscale river")
-  
+
     ! derive level11 grid
     self%level11 = self%level0%derive_grid(target_resolution=real(self%config%level11, dp))
     if (self%level11%has_aux_coords()) call self%level11%estimate_aux_vertices()
@@ -297,9 +301,9 @@ contains
       call upscaler%calc_celerity(gamma=self%config%gamma, slope=slope, constant_celerity=self%config%const_celerity)
       call upscaler%destroy()
     end if
-    call river_l0%destroy()
+    call river_l0%clean()
   end if
-  
+
   if (path_isfile(self%config%scc_file)) then
     self%scc_active = .true.
     allocate(scc_latlon)  ! if not isd, it is not present as optional argument
@@ -383,7 +387,7 @@ contains
         delta=delta, &
         timestamp=center_timestamp)
   end if
-  
+
   end subroutine mrm_initialize
 
   ! perform routing within time loop
@@ -392,11 +396,11 @@ contains
     class(mrm_t), target, intent(inout) :: self
     logical :: write_stamp
     call message(" ... updating mRM: ", self%exchange%time%str())
- 
+
     ! route runoff
     ! print *, self%router%input_grid%ncells
     call self%router%update(self%exchange%runoff_total%data, self%discharge)
-    
+
     ! update output
     if (self%scc_active) then
      call self%dsr%update("discharge", self%discharge)
