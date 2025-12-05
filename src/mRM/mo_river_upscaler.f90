@@ -10,7 +10,7 @@
 !! This code is released under the LGPLv3+ license \license_note
 module mo_river_upscaler
 
-  use mo_kind, only: i1, i4, i8, dp
+  use mo_kind, only: i1, i2, i4, i8, dp
   use mo_constants, only: nodata_i4
   use mo_dag, only: traversal_visit
   use mo_river, only: river_t, d8_E, d8_S, d8_W, d8_N, d8_SE, d8_SW, d8_NW, d8_NE
@@ -207,10 +207,7 @@ contains
 
     !$omp parallel do default(shared) private(i, yn, ys, ix, iy, j, yl, yu, xl, xu)
     do i = 1_i8, this%coarse_river%grid%ncells
-      yl = this%upscaler%y_lb(i) ! lower y-bound
-      yu = this%upscaler%y_ub(i) ! upper y-bound
-      xl = this%upscaler%x_lb(i) ! lower x-bound
-      xu = this%upscaler%x_ub(i) ! upper x-bound
+      call this%upscaler%coarse_bounds(i, xl, xu, yl, yu)
       ! determine north and south bound depending on y-direction
       if (this%fine_river%grid%y_direction == bottom_up) then
         yn = yu ! north y-bound is upper bound
@@ -271,27 +268,28 @@ contains
   subroutine river_upscaler_scc(this)
     implicit none
     class(river_upscaler_t), intent(inout) :: this
-    integer(i8), allocatable :: facc(:,:), all_nodes(:)
+    integer(i8), allocatable :: facc(:,:), down(:)
     integer(i4), allocatable :: scc_map(:,:)
-    logical, allocatable :: base_mask(:,:), dep_mask(:)
-    integer(i8) :: i, k, node, next, facc_max, facc_max_i
+    logical, allocatable :: base_mask(:,:)
+    integer(i8) :: i, k, node, next, facc_max, facc_max_i, n_nodes
     integer(i4) :: j, sub
     integer(i4) :: yl, yu, xl, xu ! lower and upper bounds for x and y
 
     if (.not.this%coarse_river%scc) call error_message("river_upscaler%upscale_scc: river is not a SCC river")
 
     ! coarse river attributes
-    this%coarse_river%n_nodes = count(this%has_sub, kind=i8)
-    allocate(this%coarse_river%node_cell(this%coarse_river%n_nodes))
-    allocate(this%coarse_river%area_fraction(this%coarse_river%n_nodes))
+    ! this%coarse_river%n_nodes = count(this%has_sub, kind=i8)
+    n_nodes = count(this%has_sub, kind=i8)
+    allocate(this%coarse_river%node_cell(n_nodes))
+    allocate(this%coarse_river%area_fraction(n_nodes))
     ! sub-catchment attributes
     this%sub_size = count(this%has_sub, dim=1, kind=i8)
     this%n_sub_nodes = count(this%has_sub, dim=2, kind=i4)
-    allocate(this%node_sub(this%coarse_river%n_nodes))
+    allocate(this%node_sub(n_nodes))
 
     ! find scc gauge ids
     allocate(this%scc_coarse_gauges(size(this%scc_gauges)))
-    allocate(this%is_scc_coarse_gauge(this%coarse_river%n_nodes), source=.false.)
+    allocate(this%is_scc_coarse_gauge(n_nodes), source=.false.)
     do j = 1_i4, size(this%scc_gauges)
       this%scc_coarse_gauges(j) = this%node_from_cell_sub(this%upscaler%id_map(this%scc_gauges(j)), j)
       this%is_scc_coarse_gauge(this%scc_coarse_gauges(j)) = .true.
@@ -312,23 +310,21 @@ contains
 
     ! calcuate scc fractions in parallel
     scc_map = this%fine_river%grid%unpack(this%scc_map)
-    !$omp parallel do default(shared) private(k, i)
-    do k = 1_i8, this%coarse_river%n_nodes
+    !$omp parallel do default(shared) private(k, i, yl, yu, xl, xu)
+    do k = 1_i8, n_nodes
       i = this%coarse_river%node_cell(k)
-      this%coarse_river%area_fraction(k) = sum( &
-        this%upscaler%weights(this%upscaler%x_lb(i):this%upscaler%x_ub(i),this%upscaler%y_lb(i):this%upscaler%y_ub(i)), &
-        mask=(scc_map(this%upscaler%x_lb(i):this%upscaler%x_ub(i),this%upscaler%y_lb(i):this%upscaler%y_ub(i))==this%node_sub(k)))
+      call this%upscaler%coarse_bounds(i, xl, xu, yl, yu)
+      this%coarse_river%area_fraction(k) = real(count(scc_map(xl:xu,yl:yu)==this%node_sub(k)), dp) / ((xu-xl+1_i4) * (yu-yl+1_i4))
+      ! this%coarse_river%area_fraction(k) = sum(this%upscaler%weights(xl:xu,yl:yu), mask=(scc_map(xl:xu,yl:yu)==this%node_sub(k)))
     end do
     !$omp end parallel do
     deallocate(scc_map)
 
-    call this%coarse_river%init(this%coarse_river%n_nodes)
-
     ! find outlets of of coarse grid
     facc = this%fine_river%grid%unpack(this%fine_river%facc)
     base_mask = this%fine_river%grid%unpack(this%scc_map==this%nsub)
-    allocate(this%coarse_river%is_sink(this%coarse_river%n_nodes), source=.false.)
-    allocate(this%sink_map(this%coarse_river%n_nodes), source=0_i8)
+    allocate(this%coarse_river%is_sink(n_nodes), source=.false.)
+    allocate(this%sink_map(n_nodes), source=0_i8)
     !$omp parallel do default(shared) private(j, i, k, sub, yl, yu, xl, xu, node)
     do j = 1_i4, size(this%fine_river%sinks)
       i = this%fine_river%sinks(j) ! node ID is cell ID for a D8 river
@@ -336,10 +332,7 @@ contains
       sub = this%scc_map(i) ! id of sub-catchment containing this sink
       ! in base-catchment, check if sink has max facc in respective coarse cell
       if (sub == this%nsub) then
-        yl = this%upscaler%y_lb(k) ! lower y-bound
-        yu = this%upscaler%y_ub(k) ! upper y-bound
-        xl = this%upscaler%x_lb(k) ! lower x-bound
-        xu = this%upscaler%x_ub(k) ! upper x-bound
+        call this%upscaler%coarse_bounds(k, xl, xu, yl, yu)
         ! skip if facc is not max
         if (this%fine_river%facc(i) < maxval(facc(xl:xu,yl:yu), mask=base_mask(xl:xu,yl:yu))) cycle
       end if
@@ -350,22 +343,14 @@ contains
     !$omp end parallel do
     deallocate(base_mask, facc)
 
-    ! determine sinks
-    allocate(this%coarse_river%sinks(count(this%coarse_river%is_sink)))
-    k = 0_i8
-    do i = 1_i8, this%coarse_river%n_nodes
-      if (.not.this%coarse_river%is_sink(i)) cycle
-      k = k + 1_i8
-      this%coarse_river%sinks(k) = i
-    end do
-
     ! init with 0 to indicate sinks
-    allocate(this%link_start(this%coarse_river%n_nodes), source=0_i8)
-    allocate(this%coarse_river%down(this%coarse_river%n_nodes), source=0_i8)
+    print*, "river_upscaler: determine downstream scc links"
+    allocate(this%link_start(n_nodes), source=0_i8)
+    allocate(down(n_nodes), source=0_i8)
 
     ! construct links by finding coarse down-stream
     !$omp parallel do default(shared) private(i, k, sub, next)
-    do i = 1_i8, this%coarse_river%n_nodes
+    do i = 1_i8, n_nodes
       if (this%coarse_river%is_sink(i)) cycle ! skip sinks
       sub = this%node_sub(i) ! id of sub-catchment containing this node
       if (this%is_scc_coarse_gauge(i)) then
@@ -379,24 +364,13 @@ contains
       end if
       next = this%fine_river%down(this%link_start(i))
       sub = this%scc_map(next) ! id of sub-catchment containing next node
-      this%coarse_river%down(i) = this%node_from_cell_sub(this%upscaler%id_map(next), sub)
+      down(i) = this%node_from_cell_sub(this%upscaler%id_map(next), sub)
     end do
     !$omp end parallel do
 
-    allocate(dep_mask(this%coarse_river%n_nodes))
-    all_nodes = [(i, i=1_i8,this%coarse_river%n_nodes)]
-    !$omp parallel do default(shared) private(i, dep_mask)
-    do i = 1_i8, this%coarse_river%n_nodes
-      dep_mask = this%coarse_river%down==i
-      allocate(this%coarse_river%nodes(i)%edges(count(dep_mask)))
-      this%coarse_river%nodes(i)%edges(:) = pack(all_nodes, mask=dep_mask)
-      if (this%coarse_river%down(i) > 0_i8) then
-        allocate(this%coarse_river%nodes(i)%dependents(1))
-        this%coarse_river%nodes(i)%dependents(1) = this%coarse_river%down(i)
-      end if
-    end do
-    !$omp end parallel do
-    deallocate(dep_mask, all_nodes)
+    print*, "river_upscaler: init scc branching DAG"
+    call this%coarse_river%init(down)
+    deallocate(down)
 
     ! generate cell_node_select from sub-node with highest flow accumulation
     allocate(this%coarse_river%cell_node_select(this%coarse_river%grid%ncells))
@@ -426,10 +400,11 @@ contains
     implicit none
     class(river_upscaler_t), intent(inout) :: this
     integer(i8), allocatable :: cells(:,:), facc(:,:)
-    integer(i4), allocatable :: fdir(:)
+    integer(i2), allocatable :: fdir(:)
     logical, allocatable :: leaving(:,:)
     integer(i8) :: i, k
-    integer(i4) :: dir, loc(2), j, ix, iy, yl, yu, xl, xu ! lower and upper bounds for x and y
+    integer(i2) :: dir
+    integer(i4) :: loc(2), j, ix, iy, yl, yu, xl, xu ! lower and upper bounds for x and y
     integer(i4) :: yn, ys ! north and south y-bound depending on grid y-direction
 
     if (this%coarse_river%scc) call error_message("river_upscaler%upscale_fdir: river is not a D8 river")
@@ -446,19 +421,16 @@ contains
     leaving = this%fine_river%grid%unpack(this%leaving_cells)
 
     ! find outlets of of coarse grid
-    allocate(fdir(this%coarse_river%grid%ncells), source=-1_i4) ! sinks to be determined
+    allocate(fdir(this%coarse_river%grid%ncells), source=-1_i2) ! sinks to be determined
     allocate(this%sink_map(this%coarse_river%grid%ncells), source=0_i8)
     !$omp parallel do default(shared) private(j, i, k, yl, yu, xl, xu)
     do j = 1_i4, size(this%fine_river%sinks)
       k = this%fine_river%sinks(j)
       i = this%upscaler%id_map(k) ! coarse cell ID containing sink
-      yl = this%upscaler%y_lb(i) ! lower y-bound
-      yu = this%upscaler%y_ub(i) ! upper y-bound
-      xl = this%upscaler%x_lb(i) ! lower x-bound
-      xu = this%upscaler%x_ub(i) ! upper x-bound
+      call this%upscaler%coarse_bounds(i, xl, xu, yl, yu)
       ! skip if facc is not max
       if (this%fine_river%facc(k) < maxval(facc(xl:xu,yl:yu), mask=this%fine_river%grid%mask(xl:xu,yl:yu))) cycle
-      fdir(i) = 0_i4 ! mark coarse node as sink
+      fdir(i) = 0_i2 ! mark coarse node as sink
       this%sink_map(i) = k ! store corresponding fine sink
     end do
     !$omp end parallel do
@@ -468,11 +440,8 @@ contains
     ! construct links by finding coarse down-stream
     !$omp parallel do default(shared) private(i, yl, yu, xl, xu, yn, ys, ix, iy, loc, dir)
     do i = 1_i8, this%coarse_river%grid%ncells
-      if (fdir(i)==0_i4) cycle ! skip sinks
-      yl = this%upscaler%y_lb(i) ! lower y-bound
-      yu = this%upscaler%y_ub(i) ! upper y-bound
-      xl = this%upscaler%x_lb(i) ! lower x-bound
-      xu = this%upscaler%x_ub(i) ! upper x-bound
+      if (fdir(i)==0_i2) cycle ! skip sinks
+      call this%upscaler%coarse_bounds(i, xl, xu, yl, yu)
       if (this%fine_river%grid%y_direction == bottom_up) then
         yn = yu ! north y-bound is up
         ys = yl ! south y-bound is down
