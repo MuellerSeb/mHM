@@ -37,6 +37,7 @@ module mo_input_container
     ! variables
     character(1024)  :: chunk            ! reading chunk size: off (default - 0), monthly (1), yearly (2), once (not sure what this should be)
     character(1024)  :: runoff_file
+    character(1024)  :: runoff_vname
 !    type(nml_directories_mhm_t) :: directories_mhm !< directories for mHM input files
 !    type(nml_coupling_t) :: coupling !< coupling configuration
   contains
@@ -129,8 +130,9 @@ contains
     integer(i4)     :: unit
     character(1024) :: chunk            ! reading chunk size: off (default - 0), monthly (1), yearly (2), once (not sure what this should be)
     character(1024) :: runoff_file
+    character(1024) :: runoff_vname
     
-    namelist/runoff_input/chunk, runoff_file
+    namelist/runoff_input/chunk, runoff_file, runoff_vname
 
     call message(" ... read config input: ", file)
     self%active = .true.
@@ -143,6 +145,7 @@ contains
 
   self%chunk = chunk
   self%runoff_file = runoff_file
+  self%runoff_vname = runoff_vname
 
   end subroutine input_config_read
 
@@ -153,13 +156,15 @@ contains
     logical              :: chunking
     integer(i4)          :: input_step
     character(1024)      :: file
+    character(1024)      :: vname
     type(timedelta)      :: model_step
     call message(" ... connecting input: ", self%exchange%time%str())
     ! read values
     ! <- runoff file if required
     file = self%config%runoff_file
+    vname = self%config%runoff_vname
     call message("open runoff file: ", file)
-    call self%input_runoff%init(path=file, grid=self%level1, vars=[var(name="Q", static=.false.)], grid_init_var="Q")
+    call self%input_runoff%init(path=file, grid=self%level1, vars=[var(name=vname, static=.false.)], grid_init_var=vname)
     ! model time config
     if (self%input_runoff%static) call error_message("runoff file is static.")
     if (self%input_runoff%timestep > 0_i4) model_step = one_hour() * self%input_runoff%timestep

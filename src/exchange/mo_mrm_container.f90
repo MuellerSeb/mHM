@@ -32,7 +32,7 @@ module mo_mrm_container
 
     ! main config
     character(1024)  :: out_frequency    ! default="daily", help="Output frequency: hourly, daily (default), monthly, yearly, once")
-    integer(i4)      :: level11          ! has_value=.true.,  help="Routing grid resolution. By default: Resolution of runoff.")
+    real(dp)         :: level11          ! has_value=.true.,  help="Routing grid resolution. By default: Resolution of runoff.")
     integer(i4)      :: omp_min          !`"m", has_value=.true.,  help="Minimum river level size to route in parallel with OpenMP. By default: threads * 8")
     logical          :: parallel_rout    ! "p", has_value=.false., help="Level order for parallel routing starting from river root.")
     logical          :: read_restart     ! has_value=.true., help="Read restart file.")
@@ -140,7 +140,7 @@ contains
     integer(i4)      :: unit
     ! main config
     character(1024)  :: out_frequency    ! default="daily", help="Output frequency: hourly, daily (default), monthly, yearly, once")
-    integer(i4)      :: level11          ! has_value=.true.,  help="Routing grid resolution. By default: Resolution of runoff.")
+    real(dp)         :: level11          ! has_value=.true.,  help="Routing grid resolution. By default: Resolution of runoff.")
     integer(i4)      :: omp_min          !`"m", has_value=.true.,  help="Minimum river level size to route in parallel with OpenMP. By default: threads * 8")
     logical          :: parallel_rout    ! "p", has_value=.false., help="Level order for parallel routing starting from river root.")
     logical          :: read_restart     !
