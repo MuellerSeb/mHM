@@ -17,7 +17,7 @@ module mo_input_container
   use mo_message, only: message, error_message
   use mo_datetime, only: datetime, timedelta, HOUR_SECONDS, DAY_HOURS, one_hour, one_day 
   use mo_grid, only: grid_t
-  use mo_grid_io, only: var, input_dataset
+  use mo_grid_io, only: var, input_dataset, end_timestamp
   use mo_string_utils, only: n2s => num2str
   use mo_namelists, only: nml_directories_mhm_t, nml_coupling_t
 
@@ -164,7 +164,8 @@ contains
     file = self%config%runoff_file
     vname = self%config%runoff_vname
     call message("open runoff file: ", file)
-    call self%input_runoff%init(path=file, grid=self%level1, vars=[var(name=vname, static=.false.)], grid_init_var=vname)
+    call self%input_runoff%init(path=file, grid=self%level1, vars=[var(name=vname, static=.false.)], &
+      timestamp=end_timestamp, grid_init_var=vname, tol=1.e-4_dp)
     ! model time config
     print *, 'initialized runoff'
     if (self%input_runoff%static) call error_message("runoff file is static.")
