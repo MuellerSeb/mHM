@@ -166,6 +166,7 @@ contains
     call message("open runoff file: ", file)
     call self%input_runoff%init(path=file, grid=self%level1, vars=[var(name=vname, static=.false.)], grid_init_var=vname)
     ! model time config
+    print *, 'initialized runoff'
     if (self%input_runoff%static) call error_message("runoff file is static.")
     if (self%input_runoff%timestep > 0_i4) model_step = one_hour() * self%input_runoff%timestep
     if (self%input_runoff%timestep == -1_i4) model_step = one_day()
