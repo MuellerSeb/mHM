@@ -142,9 +142,9 @@ program driver
     call message("PREPARE domain: ", trim(adjustl(n2s(id))))
     call domain%initialize(parameters%values)
     call message("RUN TIME LOOP domain: ", trim(adjustl(n2s(id))))
-    ! do while(domain%exchange%time < domain%exchange%end_time)
-    call domain%update()
-    ! end do
+    do while(domain%exchange%time < domain%exchange%end_time)
+      call domain%update()
+    end do
     call message("FINALIZE domain: ", trim(adjustl(n2s(id))))
     call domain%finalize()
   end do

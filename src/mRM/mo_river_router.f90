@@ -417,6 +417,9 @@ contains
     ! accumulate input runoff
     this%input_count = this%input_count + 1_i4
     if (this%input_count == 1_i4) then
+      ! print *, shape(input_runoff), shape(this%acc_runoff)
+      ! print *, sum(this%acc_runoff)
+      ! print *, sum(input_runoff)
       this%acc_runoff = input_runoff ! first accumulation as runoff reset
     else
       this%acc_runoff = this%acc_runoff + input_runoff ! accumulate

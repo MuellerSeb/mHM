@@ -167,7 +167,6 @@ contains
     call self%input_runoff%init(path=file, grid=self%level1, vars=[var(name=vname, static=.false.)], &
       timestamp=end_timestamp, grid_init_var=vname, tol=1.e-4_dp)
     ! model time config
-    print *, 'initialized runoff'
     if (self%input_runoff%static) call error_message("runoff file is static.")
     if (self%input_runoff%timestep > 0_i4) model_step = one_hour() * self%input_runoff%timestep
     if (self%input_runoff%timestep == -1_i4) model_step = one_day()
@@ -195,7 +194,7 @@ contains
           call error_message("Chunk not valid: ", self%config%chunk)
       end select
       call message(" ... read chunk: ", self%chunk_time_start%str(), " to ", self%chunk_time_end%str())
-      call self%input_runoff%read_chunk("Q", self%runoff_chunk, self%chunk_time_start, self%chunk_time_end)
+      call self%input_runoff%read_chunk(trim(vname), self%runoff_chunk, self%chunk_time_start, self%chunk_time_end)
     else
       call message(" ... read each input separately")
       ! allocate pointer
@@ -238,6 +237,7 @@ contains
     call message(" ... updating reading of runoff")
 
     if (self%config%chunk /= 'off') then
+      ! update chunk
       if (self%exchange%time > self%chunk_time_end) then
         self%chunk_time_start = self%chunk_time_end
         select case(self%config%chunk)
@@ -247,16 +247,24 @@ contains
             self%chunk_time_end = self%chunk_time_start%next_new_year()
         end select
         call message(" ... read new chunk: ", self%chunk_time_start%str(), " to ", self%chunk_time_end%str())
-        call self%input_runoff%read_chunk("Q", self%runoff_chunk, self%chunk_time_start, self%chunk_time_end)
-        self%chunk_offset = self%input_runoff%time_index(self%chunk_time_start)
+        call self%input_runoff%read_chunk(trim(self%config%runoff_vname), self%runoff_chunk, self%chunk_time_start, self%chunk_time_end)
+        self%chunk_offset = self%input_runoff%time_index(self%chunk_time_start) + 2_i4
+        self%exchange%runoff_total%data => self%runoff_chunk(:, self%chunk_offset - self%input_runoff%time_index(self%chunk_time_start))
       end if
-      ! update pointer if a different day
-      slice = int(self%input_runoff%time_index(self%exchange%time) - self%chunk_offset, i4) ! ST: need to put this into an integer, otherwise segfault with gfortran14
-      self%exchange%runoff_total%data => self%runoff_chunk(:, slice)
+
+      ! update slice
+      if (self%exchange%time > self%input_runoff%times(self%chunk_offset)) then
+        ! print *, 'exchange time: ', self%exchange%time
+        ! print *, 'time step:     ', self%input_runoff%times(self%chunk_offset)
+        self%chunk_offset = self%chunk_offset + 1_i4
+        ! print *, 'new slice: ', self%chunk_offset - self%input_runoff%time_index(self%chunk_time_start) 
+        self%exchange%runoff_total%data => self%runoff_chunk(:, self%chunk_offset - self%input_runoff%time_index(self%chunk_time_start)) 
+      end if
+      ! print *, self%exchange%runoff_total%data(:)
     else
-      call self%input_runoff%read("Q", self%runoff_chunk(:, 1), self%exchange%time) ! read every time-step separately
+      call self%input_runoff%read(trim(self%config%runoff_vname), self%runoff_chunk(:, 1), self%exchange%time) ! read every time-step separately
       self%exchange%runoff_total%data => self%runoff_chunk(:, 1)  
     end if
-  end subroutine
+  end subroutine input_update_mrm
 
 end module mo_input_container
