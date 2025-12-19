@@ -195,6 +195,7 @@ contains
       end select
       call message(" ... read chunk: ", self%chunk_time_start%str(), " to ", self%chunk_time_end%str())
       call self%input_runoff%read_chunk(trim(vname), self%runoff_chunk, self%chunk_time_start, self%chunk_time_end)
+      self%chunk_offset = self%input_runoff%time_index(self%chunk_time_start)
     else
       call message(" ... read each input separately")
       ! allocate pointer
@@ -248,7 +249,7 @@ contains
         end select
         call message(" ... read new chunk: ", self%chunk_time_start%str(), " to ", self%chunk_time_end%str())
         call self%input_runoff%read_chunk(trim(self%config%runoff_vname), self%runoff_chunk, self%chunk_time_start, self%chunk_time_end)
-        self%chunk_offset = self%input_runoff%time_index(self%chunk_time_start) + 2_i4
+        self%chunk_offset = self%input_runoff%time_index(self%chunk_time_start)
         self%exchange%runoff_total%data => self%runoff_chunk(:, self%chunk_offset - self%input_runoff%time_index(self%chunk_time_start))
       end if
 
