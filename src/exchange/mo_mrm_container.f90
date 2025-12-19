@@ -100,7 +100,7 @@ contains
     call self%level11%from_netcdf(restart_nc, "cell_area")
     self%river%grid => self%level11
     call self%river%init_from_restart(restart_nc)
-    call self%router%init_from_restart(restart_nc, self%river, self%exchange%level1, self%exchange%runoff_total%stepping, max_route_step=3600.0_dp, root_levels=rout, omp_level_thresh=omp_min)
+    call self%router%init_from_restart(restart_nc, self%river, self%exchange%level1, int(nint(self%exchange%step%seconds/HOUR_SECONDS), i4), max_route_step=3600.0_dp, root_levels=rout, omp_level_thresh=omp_min)
     call restart_nc%close()
 
   end subroutine mrm_read_restart
@@ -323,7 +323,7 @@ contains
     call message(" ... set minimum level size for openmp: ", n2s(omp_min))
   end if
   if (.not. self%config%read_restart) then
-    call self%router%init(self%river, self%exchange%level1, self%exchange%runoff_total%stepping, max_route_step=3600.0_dp, root_levels=rout, omp_level_thresh=omp_min) ! omp_min not present if not allocated
+    call self%router%init(self%river, self%exchange%level1, self%exchange%step%seconds/HOUR_SECONDS, max_route_step=3600.0_dp, root_levels=rout, omp_level_thresh=omp_min) ! omp_min not present if not allocated
   end if
   call message(" ... router%step: ", n2s(self%router%step))
   call message(" ... last level in parallel: ", n2s(self%router%last_parallel_level), "/", n2s(self%router%river%order%n_levels))
