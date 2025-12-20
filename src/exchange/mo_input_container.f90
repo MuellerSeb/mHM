@@ -54,7 +54,7 @@ module mo_input_container
     type(datetime) :: chunk_time_start, chunk_time_end
     ! provide runoff
     integer(i4)           :: runoff_input_step
-    integer(i4)           :: chunk_offset
+    integer(i4)           :: chunk_slice
     real(dp), allocatable :: runoff(:) ! current step
     real(dp), allocatable :: runoff_chunk(:,:)
     type(grid_t)          :: level1
@@ -195,7 +195,7 @@ contains
       end select
       call message(" ... read chunk: ", self%chunk_time_start%str(), " to ", self%chunk_time_end%str())
       call self%input_runoff%read_chunk(trim(vname), self%runoff_chunk, self%chunk_time_start, self%chunk_time_end)
-      self%chunk_offset = self%input_runoff%time_index(self%chunk_time_start)
+      self%chunk_slice = self%input_runoff%time_index(self%chunk_time_start)
     else
       call message(" ... read each input separately")
       ! allocate pointer
@@ -215,9 +215,9 @@ contains
 
     print *, 'reset chunking'
       ! if (start_time == start_time_frame) then
-      !   chunk_offset = 0_i4
+      !   chunk_slice = 0_i4
       ! else
-      !   chunk_offset = input%time_index(start_time)
+      !   chunk_slice = input%time_index(start_time)
       ! end if
 
   end subroutine input_initialize
@@ -249,17 +249,17 @@ contains
         end select
         call message(" ... read new chunk: ", self%chunk_time_start%str(), " to ", self%chunk_time_end%str())
         call self%input_runoff%read_chunk(trim(self%config%runoff_vname), self%runoff_chunk, self%chunk_time_start, self%chunk_time_end)
-        self%chunk_offset = self%input_runoff%time_index(self%chunk_time_start)
-        self%exchange%runoff_total%data => self%runoff_chunk(:, self%chunk_offset - self%input_runoff%time_index(self%chunk_time_start))
+        self%chunk_slice = self%input_runoff%time_index(self%chunk_time_start)
+        self%exchange%runoff_total%data => self%runoff_chunk(:, self%chunk_slice - self%input_runoff%time_index(self%chunk_time_start))
       end if
 
       ! update slice
-      if (self%exchange%time > self%input_runoff%times(self%chunk_offset)) then
+      if (self%exchange%time > self%input_runoff%times(self%chunk_slice)) then
         ! print *, 'exchange time: ', self%exchange%time
-        ! print *, 'time step:     ', self%input_runoff%times(self%chunk_offset)
-        self%chunk_offset = self%chunk_offset + 1_i4
-        ! print *, 'new slice: ', self%chunk_offset - self%input_runoff%time_index(self%chunk_time_start) 
-        self%exchange%runoff_total%data => self%runoff_chunk(:, self%chunk_offset - self%input_runoff%time_index(self%chunk_time_start)) 
+        ! print *, 'time step:     ', self%input_runoff%times(self%chunk_slice)
+        self%chunk_slice = self%chunk_slice + 1_i4
+        ! print *, 'new slice: ', self%chunk_slice - self%input_runoff%time_index(self%chunk_time_start) 
+        self%exchange%runoff_total%data => self%runoff_chunk(:, self%chunk_slice - self%input_runoff%time_index(self%chunk_time_start)) 
       end if
       ! print *, self%exchange%runoff_total%data(:)
     else
