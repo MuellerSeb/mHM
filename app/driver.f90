@@ -140,7 +140,7 @@ program driver
     id = selected_domains(i)
     call domains%get_domain(id, domain)
     call message("PREPARE domain: ", trim(adjustl(n2s(id))))
-    call domain%initialize(parameters%values)
+    call domain%initialize()
     call message("RUN TIME LOOP domain: ", trim(adjustl(n2s(id))))
     do while(domain%exchange%time < domain%exchange%end_time)
       call domain%update()
