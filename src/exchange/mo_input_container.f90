@@ -15,7 +15,7 @@ module mo_input_container
   use mo_list, only: list
   use mo_exchange_type, only: exchange_t
   use mo_message, only: message, error_message
-  use mo_datetime, only: datetime, timedelta, HOUR_SECONDS, DAY_HOURS, one_hour, one_day 
+  use mo_datetime, only: datetime, timedelta, HOUR_SECONDS, DAY_HOURS, one_hour, one_day
   use mo_grid, only: grid_t
   use mo_grid_io, only: var, input_dataset, end_timestamp
   use mo_string_utils, only: n2s => num2str
@@ -54,7 +54,7 @@ module mo_input_container
     type(datetime) :: chunk_time_start, chunk_time_end
     ! provide runoff
     integer(i4)           :: runoff_input_step
-    integer(i4)           :: chunk_slice
+    integer(i4)           :: runoff_offset
     real(dp), allocatable :: runoff(:) ! current step
     real(dp), allocatable :: runoff_chunk(:,:)
     type(grid_t)          :: level1
@@ -121,17 +121,17 @@ contains
   subroutine input_config_read(self, file)
     use mo_nml, only: position_nml ! , close_nml
     use mo_namelists, only: open_new_nml, close_nml
-    
+
     ! input/output variables
     class(input_config_t), target, intent(inout) :: self
     character(*), intent(in) :: file !< file containing the namelists
-    
+
     ! local variables
     integer(i4)     :: unit
     character(1024) :: chunk            ! reading chunk size: off (default - 0), monthly (1), yearly (2), once (not sure what this should be)
     character(1024) :: runoff_file
     character(1024) :: runoff_vname
-    
+
     namelist/runoff_input/chunk, runoff_file, runoff_vname
 
     call message(" ... read config input: ", file)
@@ -178,29 +178,20 @@ contains
 
     call message("Prepare input reading")
     chunking = self%config%chunk /= "off"
-    if (chunking) then
-      self%chunk_time_start = self%exchange%start_time
-      select case(self%config%chunk)
-        case("monthly")
-          call message(" ... monthly chunks")
-          self%chunk_time_end = self%chunk_time_start%next_new_month()
-        case("yearly")
-          call message(" ... yearly chunks")
-          self%chunk_time_end = self%chunk_time_start%next_new_year()
-        case("once")
-          call message(" ... load all input into memory")
-          self%chunk_time_end = self%exchange%end_time
-        case default
-          call error_message("Chunk not valid: ", self%config%chunk)
-      end select
-      call message(" ... read chunk: ", self%chunk_time_start%str(), " to ", self%chunk_time_end%str())
-      call self%input_runoff%read_chunk(trim(vname), self%runoff_chunk, self%chunk_time_start, self%chunk_time_end)
-      self%chunk_slice = self%input_runoff%time_index(self%chunk_time_start)
-    else
-      call message(" ... read each input separately")
-      ! allocate pointer
-      allocate(self%runoff_chunk(self%level1%ncells, 1), source=0.0_dp)
-    end if
+    self%chunk_time_start = self%exchange%start_time
+    select case(self%config%chunk)
+      case("off", "monthly", "yearly")
+        call message(" ... chunks: ", self%config%chunk)
+        self%chunk_time_end = self%exchange%start_time ! trigger read in update
+        allocate(self%runoff_chunk(self%level1%ncells, 1), source=0.0_dp) ! initialize with single column
+      case("once")
+        call message(" ... load all input into memory")
+        self%chunk_time_end = self%exchange%end_time
+        call self%input_runoff%read_chunk(trim(vname), self%runoff_chunk, self%chunk_time_start, self%chunk_time_end)
+        self%runoff_offset = self%input_runoff%time_index(self%chunk_time_start)
+      case default
+        call error_message("Chunk not valid: ", self%config%chunk)
+    end select
 
     ! exchange points to runoff
     self%exchange%runoff_total%data => self%runoff_chunk(:, 1)
@@ -215,9 +206,9 @@ contains
 
     print *, 'reset chunking'
       ! if (start_time == start_time_frame) then
-      !   chunk_slice = 0_i4
+      !   runoff_offset = 0_i4
       ! else
-      !   chunk_slice = input%time_index(start_time)
+      !   runoff_offset = input%time_index(start_time)
       ! end if
 
   end subroutine input_initialize
@@ -249,23 +240,14 @@ contains
         end select
         call message(" ... read new chunk: ", self%chunk_time_start%str(), " to ", self%chunk_time_end%str())
         call self%input_runoff%read_chunk(trim(self%config%runoff_vname), self%runoff_chunk, self%chunk_time_start, self%chunk_time_end)
-        self%chunk_slice = self%input_runoff%time_index(self%chunk_time_start)
-        self%exchange%runoff_total%data => self%runoff_chunk(:, self%chunk_slice - self%input_runoff%time_index(self%chunk_time_start))
+        self%runoff_offset = self%input_runoff%time_index(self%chunk_time_start)
       end if
-
-      ! update slice
-      if (self%exchange%time > self%input_runoff%times(self%chunk_slice)) then
-        ! print *, 'exchange time: ', self%exchange%time
-        ! print *, 'time step:     ', self%input_runoff%times(self%chunk_slice)
-        self%chunk_slice = self%chunk_slice + 1_i4
-        ! print *, 'new slice: ', self%chunk_slice - self%input_runoff%time_index(self%chunk_time_start) 
-        self%exchange%runoff_total%data => self%runoff_chunk(:, self%chunk_slice - self%input_runoff%time_index(self%chunk_time_start)) 
-      end if
-      ! print *, self%exchange%runoff_total%data(:)
+      self%exchange%runoff_total%data => self%runoff_chunk(:, self%input_runoff%time_index(self%exchange%time) - self%runoff_offset)
     else
       call self%input_runoff%read(trim(self%config%runoff_vname), self%runoff_chunk(:, 1), self%exchange%time) ! read every time-step separately
-      self%exchange%runoff_total%data => self%runoff_chunk(:, 1)  
+      self%exchange%runoff_total%data => self%runoff_chunk(:, 1)
     end if
+
   end subroutine input_update_mrm
 
 end module mo_input_container

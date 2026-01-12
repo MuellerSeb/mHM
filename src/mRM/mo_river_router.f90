@@ -136,8 +136,10 @@ contains
 
     !$omp parallel
     !$ this%omp_level_thresh = int(omp_get_num_threads() * 8, kind=i8)
-    !$ if (present(omp_level_thresh)) this%omp_level_thresh = omp_level_thresh
     !$omp end parallel
+    !$ if (present(omp_level_thresh)) this%omp_level_thresh = omp_level_thresh
+    !$ print*, "River router parallel: ", omp_get_num_threads()
+    !$ print*, "River router omp_level_thresh: ", this%omp_level_thresh
 
     ! determine last level to run in parallel
     if (this%river%order%n_levels == 1_i8) then
@@ -258,8 +260,10 @@ contains
 
     !$omp parallel
     !$ this%omp_level_thresh = int(omp_get_num_threads() * 8, kind=i8)
-    !$ if (present(omp_level_thresh)) this%omp_level_thresh = omp_level_thresh
     !$omp end parallel
+    !$ if (present(omp_level_thresh)) this%omp_level_thresh = omp_level_thresh
+    !$ print*, "River router parallel: ", omp_get_num_threads()
+    !$ print*, "River router omp_level_thresh: ", this%omp_level_thresh
 
     ! determine last level to run in parallel
     if (this%river%order%n_levels == 1_i8) then
