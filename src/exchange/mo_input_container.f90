@@ -17,7 +17,7 @@ module mo_input_container
   use mo_message, only: message, error_message
   use mo_datetime, only: datetime, timedelta, HOUR_SECONDS, DAY_HOURS, one_hour, one_day
   use mo_grid, only: grid_t
-  use mo_grid_io, only: var, input_dataset, end_timestamp
+  use mo_grid_io, only: var, input_dataset, end_timestamp, start_timestamp
   use mo_string_utils, only: n2s => num2str
   use mo_namelists, only: nml_directories_mhm_t, nml_coupling_t
 
@@ -173,17 +173,16 @@ contains
     if (self%input_runoff%timestep < -1_i4) call error_message("runoff file needs to have daily or hourly values.")
     self%runoff_input_step = model_step%days * DAY_HOURS + model_step%seconds / HOUR_SECONDS
     call message(" ... input step [h]: ", n2s(input_step))
-    ! call self%input_runoff%read_chunk_by_ids('Q', arr, 1_i4, 10_i4)
-    ! print *, shape(arr)
 
     call message("Prepare input reading")
     chunking = self%config%chunk /= "off"
     self%chunk_time_start = self%exchange%start_time
     select case(self%config%chunk)
-      case("off", "monthly", "yearly")
+      case("off", "daily", "monthly", "yearly")
         call message(" ... chunks: ", self%config%chunk)
         self%chunk_time_end = self%exchange%start_time ! trigger read in update
         allocate(self%runoff_chunk(self%level1%ncells, 1), source=0.0_dp) ! initialize with single column
+        self%runoff_offset = 0_i4
       case("once")
         call message(" ... load all input into memory")
         self%chunk_time_end = self%exchange%end_time
@@ -204,41 +203,34 @@ contains
     class(input_t), target, intent(inout) :: self
     call message(" ... initialize input: ", self%exchange%time%str())
 
-    print *, 'reset chunking'
-      ! if (start_time == start_time_frame) then
-      !   runoff_offset = 0_i4
-      ! else
-      !   runoff_offset = input%time_index(start_time)
-      ! end if
+    ! print *, 'reset chunking'
+    ! if (start_time == start_time_frame) then
+    !   runoff_offset = 0_i4
+    ! else
+    !   runoff_offset = input%time_index(start_time)
+    ! end if
 
   end subroutine input_initialize
 
   subroutine input_update(self)
     class(input_t), target, intent(inout) :: self
-    call message(" ... updating input: ", self%exchange%time%str())
-
-    call input_update_mrm(self)
-
-  end subroutine input_update
-
-  ! updates input for mRM
-  subroutine input_update_mrm(self)
-    class(input_t), target, intent(inout) :: self
-    integer(i4) :: slice
-
-    call message(" ... updating reading of runoff")
+    ! call message(" ... updating input: ", self%exchange%time%str())
 
     if (self%config%chunk /= 'off') then
       ! update chunk
       if (self%exchange%time > self%chunk_time_end) then
         self%chunk_time_start = self%chunk_time_end
         select case(self%config%chunk)
+          case("daily")
+            self%chunk_time_end = self%chunk_time_start%next_new_day()
           case("monthly")
             self%chunk_time_end = self%chunk_time_start%next_new_month()
           case("yearly")
             self%chunk_time_end = self%chunk_time_start%next_new_year()
         end select
+        if (self%chunk_time_end > self%exchange%end_time) self%chunk_time_end = self%exchange%end_time
         call message(" ... read new chunk: ", self%chunk_time_start%str(), " to ", self%chunk_time_end%str())
+        deallocate(self%runoff_chunk)
         call self%input_runoff%read_chunk(trim(self%config%runoff_vname), self%runoff_chunk, self%chunk_time_start, self%chunk_time_end)
         self%runoff_offset = self%input_runoff%time_index(self%chunk_time_start)
       end if
@@ -248,6 +240,6 @@ contains
       self%exchange%runoff_total%data => self%runoff_chunk(:, 1)
     end if
 
-  end subroutine input_update_mrm
+  end subroutine input_update
 
 end module mo_input_container
