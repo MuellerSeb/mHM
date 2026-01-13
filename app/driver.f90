@@ -112,10 +112,6 @@ program driver
   call message("")
   call message("CREATE PARAMETERS")
   call parameters%configure(parameter_cfg, process_cfg)
-  call parameters%print()
-  ! test output
-  print*, " ... parameter - canopyInterceptionFactor:", parameters%get("canopyInterceptionFactor")
-  print*, " ... process(2) parameters:", parameters%get_process(2_i4)
 
   ! determine number of domains
   n_domains = main_cfg%mainconfig%nDomains
