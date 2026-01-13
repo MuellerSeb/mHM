@@ -24,6 +24,7 @@ module mo_mrm_container
   use mo_grid, only: grid_t
   use mo_grid_io, only: output_dataset
   use mo_utils, only: is_close
+  use mo_string_utils, only: n2s => num2str
   use mo_netcdf, only: NcDataset
   !> \class   mrm_config_t
   !> \brief   Configuration for a single mRM process container.
@@ -71,8 +72,7 @@ module mo_mrm_container
     procedure :: connect => mrm_connect
     procedure :: initialize => mrm_initialize
     procedure :: update => mrm_update
-    procedure :: close ! don't we need a close
-    procedure :: finalize
+    procedure :: finalize => mrm_finalize
     procedure :: read_restart => mrm_read_restart
     procedure :: write_restart => mrm_write_restart
   end type mrm_t
@@ -399,7 +399,7 @@ contains
         start_time=self%exchange%start_time, &
         delta=delta, &
         timestamp=center_timestamp)
-  end if
+    end if
 
   end subroutine mrm_initialize
 
@@ -408,15 +408,14 @@ contains
     use mo_grid_io, only: hourly, daily, monthly, yearly
     class(mrm_t), target, intent(inout) :: self
     logical :: write_stamp
-    call message(" ... updating mRM: ", self%exchange%time%str())
+    ! call message(" ... updating mRM: ", self%exchange%time%str())
 
     ! route runoff
-    ! print *, self%router%input_grid%ncells
     call self%router%update(self%exchange%runoff_total%data, self%discharge)
 
     ! update output
     if (self%scc_active) then
-     call self%dsr%update("discharge", self%discharge)
+      call self%dsr%update("discharge", self%discharge)
       call self%ds_out%update("discharge", self%river%select_cell_values(self%discharge))
     else
       call self%ds_out%update("discharge", self%discharge)
@@ -441,32 +440,17 @@ contains
 
   end subroutine mrm_update
 
-  subroutine close(self)
-    class(mrm_t), intent(inout) :: self
-
-    call message("close ... mRM")
-  ! if (write_step == 0_i4) then
-  !   call ds%write(current_time)
-  !   if (node_out) call dsr%write(current_time)
-  ! end if
-  ! call ds%close()
-  ! if (node_out) call dsr%close()
-  ! call input%close()
-
-  ! ! destroy runoff pointer
-  ! if (.not.chunking) deallocate(runoff)
-  ! nullify(runoff)
-
-  end subroutine close
-
-  subroutine finalize(self)
+  subroutine mrm_finalize(self)
     class(mrm_t), intent(inout) :: self
 
     call message("finalize ... mRM")
     if (self%config%write_restart) then
       call self%write_restart(self%config%restart_file_out)
     end if
+    call message("close ... mRM")
+    call self%ds_out%close()
+    if (self%scc_active) call self%dsr%close()
 
-  end subroutine finalize
+  end subroutine mrm_finalize
 
 end module mo_mrm_container

@@ -177,7 +177,7 @@ contains
 
   subroutine mhm_update(self)
     class(mhm_t), intent(inout) :: self
-    call message(" ... updating mHM: ", self%exchange%time%str())
+    ! call message(" ... updating mHM: ", self%exchange%time%str())
   end subroutine mhm_update
 
 end module mo_mhm_container
