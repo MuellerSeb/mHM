@@ -289,6 +289,7 @@ contains
       day=self%time_config%time_periods%eval_Per(self%domain)%dEnd &
     )
     self%start_time = self%eval_start_time - timedelta(days=self%time_config%time_periods%warming_Days(self%domain))
+    self%end_time = self%end_time + timedelta(days=1_i4)  ! TODO: old behavior, should be changed in future
     self%step = timedelta(hours=self%time_config%mainconfig_mhm_mrm%timeStep)
 
     ! initialize time

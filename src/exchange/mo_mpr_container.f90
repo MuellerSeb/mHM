@@ -66,7 +66,7 @@ contains
 
   subroutine mpr_update(self)
     class(mpr_t), intent(inout) :: self
-    call message(" ... updating mpr: ", self%exchange%time%str())
+    ! call message(" ... updating mpr: ", self%exchange%time%str())
   end subroutine mpr_update
 
 end module mo_mpr_container

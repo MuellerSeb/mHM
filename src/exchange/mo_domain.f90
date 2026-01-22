@@ -144,6 +144,8 @@ contains
     if (self%mpr%config%active) call self%mpr%update()
     if (self%mhm%config%active) call self%mhm%update()
     if (self%mrm%config%active) call self%mrm%update()
+    if (self%exchange%time%is_new_year()) &
+      call message(" ... finished year: ", n2s(self%exchange%time%year - 1_i4))
   end subroutine domain_update
 
   subroutine domain_finalize(self)

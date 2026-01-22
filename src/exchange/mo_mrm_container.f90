@@ -24,6 +24,7 @@ module mo_mrm_container
   use mo_grid, only: grid_t
   use mo_grid_io, only: output_dataset
   use mo_utils, only: is_close
+  use mo_string_utils, only: n2s => num2str
   use mo_netcdf, only: NcDataset
   !> \class   mrm_config_t
   !> \brief   Configuration for a single mRM process container.
@@ -32,7 +33,7 @@ module mo_mrm_container
 
     ! main config
     character(1024)  :: out_frequency    ! default="daily", help="Output frequency: hourly, daily (default), monthly, yearly, once")
-    integer(i4)      :: level11          ! has_value=.true.,  help="Routing grid resolution. By default: Resolution of runoff.")
+    real(dp)         :: level11          ! has_value=.true.,  help="Routing grid resolution. By default: Resolution of runoff.")
     integer(i4)      :: omp_min          !`"m", has_value=.true.,  help="Minimum river level size to route in parallel with OpenMP. By default: threads * 8")
     logical          :: parallel_rout    ! "p", has_value=.false., help="Level order for parallel routing starting from river root.")
     logical          :: read_restart     ! has_value=.true., help="Read restart file.")
@@ -71,8 +72,7 @@ module mo_mrm_container
     procedure :: connect => mrm_connect
     procedure :: initialize => mrm_initialize
     procedure :: update => mrm_update
-    procedure :: close ! don't we need a close
-    procedure :: finalize
+    procedure :: finalize => mrm_finalize
     procedure :: read_restart => mrm_read_restart
     procedure :: write_restart => mrm_write_restart
   end type mrm_t
@@ -82,6 +82,7 @@ contains
   !> \brief Read restart file and populate mRM state.
   subroutine mrm_read_restart(self, file)
     use mo_string_utils, only: n2s => num2str
+    use mo_datetime, only: one_hour
     class(mrm_t), target, intent(inout) :: self
     character(*), intent(in) :: file !< restart file to read
 
@@ -96,11 +97,18 @@ contains
       call message(" ... set minimum level size for openmp: ", n2s(omp_min))
     end if
     call message(" ... read mRM restart from file: ", file)
-    restart_nc = NcDataset(trim(file), "r")
+    restart_nc = NcDataset(self%exchange%get_path(file), "r")
     call self%level11%from_netcdf(restart_nc, "cell_area")
     self%river%grid => self%level11
-    call self%river%init_from_restart(restart_nc)
-    call self%router%init_from_restart(restart_nc, self%river, self%exchange%level1, self%exchange%runoff_total%stepping, max_route_step=3600.0_dp, root_levels=rout, omp_level_thresh=omp_min)
+    call self%river%init_from_restart(restart_nc=restart_nc)
+    call self%router%init_from_restart( &
+      restart_nc       = restart_nc, &
+      river            = self%river, &
+      input_grid       = self%exchange%level1, &
+      input_step       = int(self%exchange%step/one_hour(), i4), &
+      max_route_step   = 3600.0_dp, &
+      root_levels      = rout, &
+      omp_level_thresh = omp_min)
     call restart_nc%close()
 
   end subroutine mrm_read_restart
@@ -111,7 +119,7 @@ contains
 
     type(NcDataset) :: restart_nc
 
-    restart_nc = NcDataset(trim(file), "w")
+    restart_nc = NcDataset(self%exchange%get_path(file), "w")
     call message(" ... write mRM restart to file: ", file)
     call self%river%write_restart_to_dataset(restart_nc)
     call self%router%write_restart_to_dataset(restart_nc)
@@ -140,7 +148,7 @@ contains
     integer(i4)      :: unit
     ! main config
     character(1024)  :: out_frequency    ! default="daily", help="Output frequency: hourly, daily (default), monthly, yearly, once")
-    integer(i4)      :: level11          ! has_value=.true.,  help="Routing grid resolution. By default: Resolution of runoff.")
+    real(dp)         :: level11          ! has_value=.true.,  help="Routing grid resolution. By default: Resolution of runoff.")
     integer(i4)      :: omp_min          !`"m", has_value=.true.,  help="Minimum river level size to route in parallel with OpenMP. By default: threads * 8")
     logical          :: parallel_rout    ! "p", has_value=.false., help="Level order for parallel routing starting from river root.")
     logical          :: read_restart     !
@@ -198,7 +206,7 @@ contains
 
   ! read initial values and populate exchange
   subroutine mrm_connect(self)
-    use mo_datetime, only: datetime, timedelta, HOUR_SECONDS, DAY_HOURS, one_hour, one_day
+    use mo_datetime, only: datetime, timedelta, DAY_HOURS, one_hour, one_day
     use mo_grid, only: grid_t
     use mo_grid_io, only: var, input_dataset, output_dataset, center_timestamp, hourly, daily, monthly, yearly, time_units_delta
     use mo_river, only: river_t
@@ -264,76 +272,81 @@ contains
         case default
           call error_message("unknown file extension (i.e. not '.asc' or '.nc'): ", path_ext(file))
       end select
-  end if
-
-  ! generate river
-  if (self%config%read_restart) then
-    if (.not. path_isfile(self%config%restart_file_in)) then
-      call error_message("restart file not found: ", self%config%restart_file_in)
     end if
-    call message("read river from restart file: ", self%config%restart_file_in)
-    call self%read_restart(self%config%restart_file_in)
-  else
-    call message("create river network:", n2s(self%level0%ncells))
-    call river_l0%from_fdir(fdir, self%level0)
 
-    call message("calculate facc on level0")
-    call river_l0%calc_order()
-    call river_l0%calc_facc()
-
-    call message("upscale river")
-
-    ! derive level11 grid
-    self%level11 = self%level0%derive_grid(target_resolution=real(self%config%level11, dp))
-    if (self%level11%has_aux_coords()) call self%level11%estimate_aux_vertices()
-    call message(" ... level0 ncells", n2s(self%level0%ncells))
-    call message(" ... level0 cellsize", n2s(self%level0%cellsize))
-    call message(" ... level1 ncells", n2s(self%exchange%level1%ncells))
-    call message(" ... level1 cellsize", n2s(self%exchange%level1%cellsize))
-    call message(" ... level11 ncells", n2s(self%level11%ncells))
-    call message(" ... level11 cellsize", n2s(self%level11%cellsize))
-    if (is_close(self%level11%cellsize, self%level0%cellsize)) then
-      call message(" ... use L0 river")
-      call self%river%from_fdir(fdir, self%level11)
-      call self%river%calc_celerity(gamma=self%config%gamma, slope=slope, constant_celerity=self%config%const_celerity)
+    ! generate river
+    if (self%config%read_restart) then
+      if (.not. path_isfile(self%config%restart_file_in)) then
+        call error_message("restart file not found: ", self%config%restart_file_in)
+      end if
+      call message("read river from restart file: ", self%config%restart_file_in)
+      call self%read_restart(self%config%restart_file_in)
     else
-      call upscaler%init(river_l0, self%river, self%level11, scc_gauges, scc_latlon) ! scc_gauges/scc_latlon not present if not allocated
-      call upscaler%calc_celerity(gamma=self%config%gamma, slope=slope, constant_celerity=self%config%const_celerity)
-      call upscaler%destroy()
+      call message("create river network:", n2s(self%level0%ncells))
+      call river_l0%from_fdir(fdir, self%level0)
+
+      call message("calculate facc on level0")
+      call river_l0%calc_order()
+      call river_l0%calc_facc()
+
+      call message("upscale river")
+
+      ! derive level11 grid
+      self%level11 = self%level0%derive_grid(target_resolution=real(self%config%level11, dp))
+      if (self%level11%has_aux_coords()) call self%level11%estimate_aux_vertices()
+      call message(" ... level0 ncells", n2s(self%level0%ncells))
+      call message(" ... level0 cellsize", n2s(self%level0%cellsize))
+      call message(" ... level1 ncells", n2s(self%exchange%level1%ncells))
+      call message(" ... level1 cellsize", n2s(self%exchange%level1%cellsize))
+      call message(" ... level11 ncells", n2s(self%level11%ncells))
+      call message(" ... level11 cellsize", n2s(self%level11%cellsize))
+      if (is_close(self%level11%cellsize, self%level0%cellsize)) then
+        call message(" ... use L0 river")
+        call self%river%from_fdir(fdir, self%level11)
+        call self%river%calc_celerity(gamma=self%config%gamma, slope=slope, constant_celerity=self%config%const_celerity)
+      else
+        call upscaler%init(river_l0, self%river, self%level11, scc_gauges, scc_latlon) ! scc_gauges/scc_latlon not present if not allocated
+        call upscaler%calc_celerity(gamma=self%config%gamma, slope=slope, constant_celerity=self%config%const_celerity)
+        call upscaler%destroy()
+      end if
+      call river_l0%clean()
     end if
-    call river_l0%clean()
-  end if
 
-  if (path_isfile(self%config%scc_file)) then
-    self%scc_active = .true.
-    allocate(scc_latlon)  ! if not isd, it is not present as optional argument
-    call message(" ... read scc gauges file: ", self%config%scc_file)
-    call read_scc_gauges(self%config%scc_file, scc_gauges, scc_latlon)
-    ! print*, scc_latlon
-    ! print*, scc_gauges
-  else
-    self%scc_active = .false.
-  end if
+    if (path_isfile(self%config%scc_file)) then
+      self%scc_active = .true.
+      allocate(scc_latlon)  ! if not isd, it is not present as optional argument
+      call message(" ... read scc gauges file: ", self%config%scc_file)
+      call read_scc_gauges(self%config%scc_file, scc_gauges, scc_latlon)
+      ! print*, scc_latlon
+      ! print*, scc_gauges
+    else
+      self%scc_active = .false.
+    end if
 
-  call message("initialize router")
-  rout = self%config%parallel_rout
-  if (self%config%omp_min .ge. 1_i4) then
-    allocate(omp_min)
-    omp_min = self%config%omp_min
-    call message(" ... set minimum level size for openmp: ", n2s(omp_min))
-  end if
-  if (.not. self%config%read_restart) then
-    call self%router%init(self%river, self%exchange%level1, self%exchange%runoff_total%stepping, max_route_step=3600.0_dp, root_levels=rout, omp_level_thresh=omp_min) ! omp_min not present if not allocated
-  end if
-  call message(" ... router%step: ", n2s(self%router%step))
-  call message(" ... last level in parallel: ", n2s(self%router%last_parallel_level), "/", n2s(self%router%river%order%n_levels))
+    call message("initialize router")
+    rout = self%config%parallel_rout
+    if (self%config%omp_min .ge. 1_i4) then
+      allocate(omp_min)
+      omp_min = self%config%omp_min
+      call message(" ... set minimum level size for openmp: ", n2s(omp_min))
+    end if
+    if (.not. self%config%read_restart) then
+      call self%router%init( &
+        river            = self%river, &
+        input_grid       = self%exchange%level1, &
+        input_step       = int(self%exchange%step/one_hour(), i4), &
+        max_route_step   = 3600.0_dp, &
+        root_levels      = rout, &
+        omp_level_thresh = omp_min) ! omp_min not present if not allocated
+    end if
+    call message(" ... router%step: ", n2s(self%router%step))
+    call message(" ... last level in parallel: ", n2s(self%router%last_parallel_level), "/", n2s(self%router%river%order%n_levels))
 
-  ! prepare run
-  allocate(self%discharge(self%river%n_nodes), source=0.0_dp)
+    ! prepare run
+    allocate(self%discharge(self%river%n_nodes), source=0.0_dp)
 
-  ! populate exchange type
-  self%exchange%q_mod%data => self%discharge
-
+    ! populate exchange type
+    self%exchange%q_mod%data => self%discharge
 
   end subroutine mrm_connect
 
@@ -386,7 +399,7 @@ contains
         start_time=self%exchange%start_time, &
         delta=delta, &
         timestamp=center_timestamp)
-  end if
+    end if
 
   end subroutine mrm_initialize
 
@@ -395,15 +408,14 @@ contains
     use mo_grid_io, only: hourly, daily, monthly, yearly
     class(mrm_t), target, intent(inout) :: self
     logical :: write_stamp
-    call message(" ... updating mRM: ", self%exchange%time%str())
+    ! call message(" ... updating mRM: ", self%exchange%time%str())
 
     ! route runoff
-    ! print *, self%router%input_grid%ncells
     call self%router%update(self%exchange%runoff_total%data, self%discharge)
 
     ! update output
     if (self%scc_active) then
-     call self%dsr%update("discharge", self%discharge)
+      call self%dsr%update("discharge", self%discharge)
       call self%ds_out%update("discharge", self%river%select_cell_values(self%discharge))
     else
       call self%ds_out%update("discharge", self%discharge)
@@ -423,38 +435,22 @@ contains
       case("once")
         if (self%exchange%time == self%exchange%end_time) write_stamp = .true.
     end select
-    ! print *, self%exchange%time, self%config%out_frequency, write_stamp, self%exchange%start_time, self%exchange%end_time
     if (write_stamp) call self%ds_out%write(self%exchange%time)
     if (write_stamp .and. self%scc_active) call self%dsr%write(self%exchange%time)
 
   end subroutine mrm_update
 
-  subroutine close(self)
-    class(mrm_t), intent(inout) :: self
-
-    call message("close ... mRM")
-  ! if (write_step == 0_i4) then
-  !   call ds%write(current_time)
-  !   if (node_out) call dsr%write(current_time)
-  ! end if
-  ! call ds%close()
-  ! if (node_out) call dsr%close()
-  ! call input%close()
-
-  ! ! destroy runoff pointer
-  ! if (.not.chunking) deallocate(runoff)
-  ! nullify(runoff)
-
-  end subroutine close
-
-  subroutine finalize(self)
+  subroutine mrm_finalize(self)
     class(mrm_t), intent(inout) :: self
 
     call message("finalize ... mRM")
     if (self%config%write_restart) then
       call self%write_restart(self%config%restart_file_out)
     end if
+    call message("close ... mRM")
+    call self%ds_out%close()
+    if (self%scc_active) call self%dsr%close()
 
-  end subroutine finalize
+  end subroutine mrm_finalize
 
 end module mo_mrm_container

@@ -3,6 +3,7 @@ program driver
   use mo_cli, only: cli_parser
   use mo_os, only: path_abspath, path_join, check_path_isdir
   use mo_message, only: message
+  use mo_mhm_cli, only: set_verbosity_level
   use mo_string_utils, only: n2s => num2str
   ! exchange
   use mo_domain, only: domains, selected_domains, domain_t
@@ -84,14 +85,17 @@ program driver
     repeated=.true., &
     help="Decrease verbosity level.")
 
+
   ! parse given command line arguments
   cwd = "."
   call parser%parse()
+  call set_verbosity_level(3_i4 - parser%option_read_count("quiet"))
   if (parser%option_was_read("cwd")) cwd = parser%option_value("cwd")
   cwd = path_abspath(cwd)
   call check_path_isdir(cwd, raise=.true.)
 
   call message("READ MAIN CONFIG")
+
   ! global configs
   call main_cfg%read(path_join(cwd, parser%option_value("nml")))
   call time_cfg%read(path_join(cwd, parser%option_value("nml")))
@@ -108,10 +112,6 @@ program driver
   call message("")
   call message("CREATE PARAMETERS")
   call parameters%configure(parameter_cfg, process_cfg)
-  call parameters%print()
-  ! test output
-  print*, " ... parameter - canopyInterceptionFactor:", parameters%get("canopyInterceptionFactor")
-  print*, " ... process(2) parameters:", parameters%get_process(2_i4)
 
   ! determine number of domains
   n_domains = main_cfg%mainconfig%nDomains
@@ -140,11 +140,11 @@ program driver
     id = selected_domains(i)
     call domains%get_domain(id, domain)
     call message("PREPARE domain: ", trim(adjustl(n2s(id))))
-    call domain%initialize(parameters%values)
+    call domain%initialize()
     call message("RUN TIME LOOP domain: ", trim(adjustl(n2s(id))))
-    ! do while(domain%exchange%time < domain%exchange%end_time)
-    call domain%update()
-    ! end do
+    do while(domain%exchange%time < domain%exchange%end_time)
+      call domain%update()
+    end do
     call message("FINALIZE domain: ", trim(adjustl(n2s(id))))
     call domain%finalize()
   end do

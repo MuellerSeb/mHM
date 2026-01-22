@@ -66,7 +66,7 @@ contains
 
   subroutine meteo_update(self)
     class(meteo_t), intent(inout) :: self
-    call message(" ... updating meteo: ", self%exchange%time%str())
+    ! call message(" ... updating meteo: ", self%exchange%time%str())
   end subroutine meteo_update
 
 end module mo_meteo_container

@@ -136,8 +136,10 @@ contains
 
     !$omp parallel
     !$ this%omp_level_thresh = int(omp_get_num_threads() * 8, kind=i8)
-    !$ if (present(omp_level_thresh)) this%omp_level_thresh = omp_level_thresh
     !$omp end parallel
+    !$ if (present(omp_level_thresh)) this%omp_level_thresh = omp_level_thresh
+    !$ print*, "River router parallel: ", omp_get_num_threads()
+    !$ print*, "River router omp_level_thresh: ", this%omp_level_thresh
 
     ! determine last level to run in parallel
     if (this%river%order%n_levels == 1_i8) then
@@ -258,8 +260,10 @@ contains
 
     !$omp parallel
     !$ this%omp_level_thresh = int(omp_get_num_threads() * 8, kind=i8)
-    !$ if (present(omp_level_thresh)) this%omp_level_thresh = omp_level_thresh
     !$omp end parallel
+    !$ if (present(omp_level_thresh)) this%omp_level_thresh = omp_level_thresh
+    !$ print*, "River router parallel: ", omp_get_num_threads()
+    !$ print*, "River router omp_level_thresh: ", this%omp_level_thresh
 
     ! determine last level to run in parallel
     if (this%river%order%n_levels == 1_i8) then
@@ -417,6 +421,9 @@ contains
     ! accumulate input runoff
     this%input_count = this%input_count + 1_i4
     if (this%input_count == 1_i4) then
+      ! print *, shape(input_runoff), shape(this%acc_runoff)
+      ! print *, sum(this%acc_runoff)
+      ! print *, sum(input_runoff)
       this%acc_runoff = input_runoff ! first accumulation as runoff reset
     else
       this%acc_runoff = this%acc_runoff + input_runoff ! accumulate
