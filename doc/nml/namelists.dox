@@ -1,0 +1,18 @@
+/** \page nml Namelist Reference
+
+This section provides an overview of the namelists used in mHM for model configuration.
+Each namelist is documented on a separate page, detailing its parameters and their usage.
+
+- \subpage config_project : Configuration for the overall project setup `&config_project`.
+- \subpage config_processes : Configuration for process case selection `&config_processes`.
+- \subpage config_optimize : Configuration for optimization settings `&config_optimize`.
+- \subpage config_time : Configuration for time settings `&config_time`.
+- \subpage config_input : Configuration for input data `&config_input`.
+- \subpage config_coupling : Configuration for coupling settings `&config_coupling`.
+- \subpage config_meteo : Configuration for meteorological component `&config_meteo`.
+- \subpage config_mpr : Configuration for the multiscale parameter regionalization (MPR) `&config_mpr`.
+- \subpage config_mhm : Configuration for the hydrological component `&config_mhm`.
+- \subpage config_mrm : Configuration for the routing component (mRM) `&config_mrm`.
+- \subpage config_observations : Configuration for reference observations `&config_observations`.
+
+*/
