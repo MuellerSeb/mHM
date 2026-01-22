@@ -1,0 +1,116 @@
+title: mRM configuration
+description: Configuration for the multi-scale routing model (mRM) in mHM.
+x-fortran-namelist: config_mrm
+type: object
+properties:
+  resolution:
+    type: array
+    items:
+      type: integer
+      x-fortran-kind: i4
+    x-fortran-shape: max_domains
+    x-fortran-flex-tail-dims: 1
+    title: mRM resolution
+    description: Resolution of the mRM routing grid.
+  output_path:
+    type: array
+    items:
+      type: string
+      x-fortran-len: buf
+    x-fortran-shape: max_domains
+    x-fortran-flex-tail-dims: 1
+    title: Output path
+  read_restart:
+    type: array
+    items:
+      type: boolean
+      default: false
+    x-fortran-shape: max_domains
+    title: Read restart
+  read_restart_fluxes:
+    type: array
+    items:
+      type: boolean
+      default: true
+    x-fortran-shape: max_domains
+    title: Read restart fluxes
+  restart_input_path:
+    type: array
+    items:
+      type: string
+      x-fortran-len: buf
+    x-fortran-shape: max_domains
+    x-fortran-flex-tail-dims: 1
+    title: Restart input path
+  write_restart:
+    type: array
+    items:
+      type: boolean
+      default: false
+    x-fortran-shape: max_domains
+    title: Write restart
+  restart_output_path:
+    type: array
+    items:
+      type: string
+      x-fortran-len: buf
+    x-fortran-shape: max_domains
+    x-fortran-flex-tail-dims: 1
+    title: Restart output path
+  albedo_water:
+    type: number
+    x-fortran-kind: dp
+    default: 0.15
+    title: Albedo of open water
+    description: |-
+      Albedo of open water bodies.
+      (0.15 for tilt angle between 10 and 20 degrees -> Wanders et.al. 2019)
+  pt_a_water:
+    type: number
+    x-fortran-kind: dp
+    default: 1.26
+    title: Priestley-Taylor alpha
+    description: |-
+      Priestley-Taylor alpha parameter for PET on open water.
+      (1.26 -> Gordon Bonan 2015)
+  emissivity_water:
+    type: number
+    x-fortran-kind: dp
+    default: 0.96
+    title: Emissivity of water
+    description: |-
+      Emissivity of water.
+      (0.96 -> Wanders et.al. 2019)
+  turb_heat_ex_coeff:
+    type: number
+    x-fortran-kind: dp
+    default: 20.0
+    title: Turbulent heat exchange coefficient
+    description: |-
+      Turbulent heat exchange coefficient.
+      (20.0 -> Wanders et.al. 2019)
+  max_iter:
+    type: integer
+    x-fortran-kind: i4
+    default: 50
+    title: Max number of iterations
+    description: |-
+      Maximum number of iterations for the iterative solver for river temperature.
+  delta_iter:
+    type: number
+    x-fortran-kind: dp
+    default: 0.01
+    title: Convergence criterion iteration
+    description: |-
+      Convergence criteria for iterative solver for resulting river temperature.
+      Given as difference for iteratively estimated temperature in K
+  step_iter:
+    type: number
+    x-fortran-kind: dp
+    default: 5.0
+    title: Maximal step in iteration
+    description: |-
+      Maximal step allowed in iteration for river temperature in K.
+      Used to avoid divergence of the iterative solver.
+required:
+  - resolution
