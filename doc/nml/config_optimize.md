@@ -8,24 +8,26 @@
 
 | Name | Type | Required | Info |
 | --- | --- | --- | --- |
-| `optimize` | logical | no | Enable optimization |
-| `optimize_restart` | logical | no | Restart optimization |
-| `opti_method` | integer | no | Optimization method |
-| `opti_function` | integer | no | Objective function to be optimized |
-| `iterations` | integer | no | Number of iterations |
-| `seed` | integer | no | Seed |
-| `dds_r` | real | no | DDS perturbation rate |
-| `sa_temp` | real | no | Initial Temperature |
-| `sce_ngs` | integer | no | Number of SCE Complexes |
-| `sce_npg` | integer | no | Points per SCE Complex |
-| `sce_nps` | integer | no | Points per SCE Sub-Complex |
-| `mcmc_opti` | logical | no | MCMC for optimisation |
-| `mcmc_error_params` | real array | no | Parameters of MCMC error model. |
-| `BFI_calc` | logical | no | Calculate BFI from discharge time series with the Eckhardt filter |
+| [optimize](#optimize) | logical | no | Enable optimization |
+| [optimize_restart](#optimize_restart) | logical | no | Restart optimization |
+| [opti_method](#opti_method) | integer | no | Optimization method |
+| [opti_function](#opti_function) | integer | no | Objective function to be optimized |
+| [iterations](#iterations) | integer | no | Number of iterations |
+| [seed](#seed) | integer | no | Seed |
+| [dds_r](#dds_r) | real | no | DDS perturbation rate |
+| [sa_temp](#sa_temp) | real | no | Initial Temperature |
+| [sce_ngs](#sce_ngs) | integer | no | Number of SCE Complexes |
+| [sce_npg](#sce_npg) | integer | no | Points per SCE Complex |
+| [sce_nps](#sce_nps) | integer | no | Points per SCE Sub-Complex |
+| [mcmc_opti](#mcmc_opti) | logical | no | MCMC for optimisation |
+| [mcmc_error_params](#mcmc_error_params) | real array | no | Parameters of MCMC error model. |
+| [BFI_calc](#bfi_calc) | logical | no | Calculate BFI from discharge time series with the Eckhardt filter |
 
 ## Field details
 
-### `optimize` - Enable optimization
+### optimize
+
+Enable optimization `optimize`
 
 Whether to optimize parameters.
 
@@ -34,7 +36,9 @@ Summary:
 - Required: no
 - Default: `.false.`
 
-### `optimize_restart` - Restart optimization
+### optimize_restart
+
+Restart optimization `optimize_restart`
 
 Optimization shall be restarted from ./mo_<opti_method>.restart file
 
@@ -43,7 +47,9 @@ Summary:
 - Required: no
 - Default: `.false.`
 
-### `opti_method` - Optimization method
+### opti_method
+
+Optimization method `opti_method`
 
 Optimization method.
 (0) MCMC                (requires single-objective function)
@@ -56,7 +62,9 @@ Summary:
 - Required: no
 - Default: `1`
 
-### `opti_function` - Objective function to be optimized
+### opti_function
+
+Objective function to be optimized `opti_function`
 
 Objective function to be optimized.
 (1)  SO: Q:   1.0 - NSE
@@ -102,14 +110,18 @@ Summary:
 - Required: no
 - Default: `10`
 
-### `iterations` - Number of iterations
+### iterations
+
+Number of iterations `iterations`
 
 Summary:
 - Type: `integer(i4)`
 - Required: no
 - Default: `7`
 
-### `seed` - Seed
+### seed
+
+Seed `seed`
 
 Seed of random number generator.
 Default: -9: seed is obtained from system clock).
@@ -119,7 +131,9 @@ Summary:
 - Required: no
 - Default: `1235876`
 
-### `dds_r` - DDS perturbation rate
+### dds_r
+
+DDS perturbation rate `dds_r`
 
 Perturbation rate r for DDS algorithm.
 
@@ -128,7 +142,9 @@ Summary:
 - Required: no
 - Default: `0.2`
 
-### `sa_temp` - Initial Temperature
+### sa_temp
+
+Initial Temperature `sa_temp`
 
 Initial temperature for simulated annealing algorithm.
 Default -9: determined by algorithm of Ben-Ameur (2004).
@@ -138,14 +154,18 @@ Summary:
 - Required: no
 - Default: `-9.0`
 
-### `sce_ngs` - Number of SCE Complexes
+### sce_ngs
+
+Number of SCE Complexes `sce_ngs`
 
 Summary:
 - Type: `integer(i4)`
 - Required: no
 - Default: `2`
 
-### `sce_npg` - Points per SCE Complex
+### sce_npg
+
+Points per SCE Complex `sce_npg`
 
 Points per SCE Complex.
 Default: -9 corresponds to 2n+1, with n being the number of SCE complexes.
@@ -155,7 +175,9 @@ Summary:
 - Required: no
 - Default: `-9`
 
-### `sce_nps` - Points per SCE Sub-Complex
+### sce_nps
+
+Points per SCE Sub-Complex `sce_nps`
 
 Points per SCE Sub-Complex.
 Default: -9 corresponds to n+1, with n being the number of SCE complexes.
@@ -165,7 +187,9 @@ Summary:
 - Required: no
 - Default: `-9`
 
-### `mcmc_opti` - MCMC for optimisation
+### mcmc_opti
+
+MCMC for optimisation `mcmc_opti`
 
 If .true.: use MCMC for optimisation and estimation of parameter uncertainty.
 If .false.: use MCMC for estimation of parameter uncertainty.
@@ -175,7 +199,9 @@ Summary:
 - Required: no
 - Default: `.false.`
 
-### `mcmc_error_params` - Parameters of MCMC error model.
+### mcmc_error_params
+
+Parameters of MCMC error model. `mcmc_error_params`
 
 Parameters of MCMC error model if mcmc_opti=.false.
 E.g. for opti_function=8: two parameters a and b: err = a + b*Q.
@@ -185,7 +211,9 @@ Summary:
 - Required: no
 - Default: `[0.01, 0.6]`
 
-### `BFI_calc` - Calculate BFI from discharge time series with the Eckhardt filter
+### BFI_calc
+
+Calculate BFI from discharge time series with the Eckhardt filter `BFI_calc`
 
 Calculate BFI from discharge time series with the Eckhardt filter.
 This option **requires** one gauge per domain at the outlet of the basin.

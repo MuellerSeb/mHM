@@ -10,11 +10,13 @@ Configuration for process case selection in mHM.
 
 | Name | Type | Required | Info |
 | --- | --- | --- | --- |
-| `process_case` | integer array | no | Process cases |
+| [process_case](#process_case) | integer array | no | Process cases |
 
 ## Field details
 
-### `process_case` - Process cases
+### process_case
+
+Process cases `process_case`
 
 Selection of process cases for mHM simulation.
 Index mapping for process_case(i):

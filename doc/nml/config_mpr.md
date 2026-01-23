@@ -10,21 +10,23 @@ Configuration for the multiscale parameter regionalization in mHM.
 
 | Name | Type | Required | Info |
 | --- | --- | --- | --- |
-| `soil_db_mode` | integer array | no | Soil database mode |
-| `n_horizons` | integer array | no | Number of soil horizons |
-| `tillage_depth` | integer array | no | Tillage depth |
-| `soil_depth` | integer array | no | Soil horizon depth |
-| `fracSealed_cityArea` | real array | no | Sealed fraction of city area |
-| `land_cover_path` | string array | no | Land cover path |
-| `lai_time_step` | integer array | no | LAI time step |
-| `lai_path` | string array | no | LAI path |
-| `soil_lut_path` | string array | no | Soil LUT path |
-| `geo_lut_path` | string array | no | Geology LUT path |
-| `lai_lut_path` | string array | no | LAI LUT path |
+| [soil_db_mode](#soil_db_mode) | integer array | no | Soil database mode |
+| [n_horizons](#n_horizons) | integer array | no | Number of soil horizons |
+| [tillage_depth](#tillage_depth) | integer array | no | Tillage depth |
+| [soil_depth](#soil_depth) | integer array | no | Soil horizon depth |
+| [fracSealed_cityArea](#fracsealed_cityarea) | real array | no | Sealed fraction of city area |
+| [land_cover_path](#land_cover_path) | string array | no | Land cover path |
+| [lai_time_step](#lai_time_step) | integer array | no | LAI time step |
+| [lai_path](#lai_path) | string array | no | LAI path |
+| [soil_lut_path](#soil_lut_path) | string array | no | Soil LUT path |
+| [geo_lut_path](#geo_lut_path) | string array | no | Geology LUT path |
+| [lai_lut_path](#lai_lut_path) | string array | no | LAI LUT path |
 
 ## Field details
 
-### `soil_db_mode` - Soil database mode
+### soil_db_mode
+
+Soil database mode `soil_db_mode`
 
 Flag to handle multiple soil database types; valid for all domains.
 - 0: classical mHM soil database with soil_class.asc and soil_classdefinition.txt.
@@ -39,7 +41,9 @@ Summary:
 - Default: `0`
 - Allowed values: `0`, `1`
 
-### `n_horizons` - Number of soil horizons
+### n_horizons
+
+Number of soil horizons `n_horizons`
 
 Number of soil horizons to be modeled (nSoilHorizons_mHM).
 
@@ -48,7 +52,9 @@ Summary:
 - Flexible tail dims: 1
 - Required: no
 
-### `tillage_depth` - Tillage depth
+### tillage_depth
+
+Tillage depth `tillage_depth`
 
 Soil depth down to which organic matter is possible [mm].
 
@@ -57,7 +63,9 @@ Summary:
 - Flexible tail dims: 1
 - Required: no
 
-### `soil_depth` - Soil horizon depth
+### soil_depth
+
+Soil horizon depth `soil_depth`
 
 Bottom depth of soil horizons with respect to the ground surface [mm], positive downwards.
 - if soil_db_mode = 0: provide depths for horizons 1..n-1; last horizon depth comes from the LUT.
@@ -69,7 +77,9 @@ Summary:
 - Flexible tail dims: 2
 - Required: no
 
-### `fracSealed_cityArea` - Sealed fraction of city area
+### fracSealed_cityArea
+
+Sealed fraction of city area `fracSealed_cityArea`
 
 Fraction of area within city assumed to be fully sealed [0.0-1.0].
 
@@ -78,7 +88,9 @@ Summary:
 - Flexible tail dims: 1
 - Required: no
 
-### `land_cover_path` - Land cover path
+### land_cover_path
+
+Land cover path `land_cover_path`
 
 Land cover data path (periods derived from time bounds or start time stamp assumed).
 
@@ -87,7 +99,9 @@ Summary:
 - Flexible tail dims: 1
 - Required: no
 
-### `lai_time_step` - LAI time step
+### lai_time_step
+
+LAI time step `lai_time_step`
 
 Time step for LAI input data [days]:
 - if = 1: annual cycle monthly gridded LAI values;
@@ -102,7 +116,9 @@ Summary:
 - Required: no
 - Allowed values: `-3`, `-2`, `-1`, `0`, `1`
 
-### `lai_path` - LAI path
+### lai_path
+
+LAI path `lai_path`
 
 LAI data path (if `lai_time_step` < 0 or = 1).
 
@@ -111,7 +127,9 @@ Summary:
 - Flexible tail dims: 1
 - Required: no
 
-### `soil_lut_path` - Soil LUT path
+### soil_lut_path
+
+Soil LUT path `soil_lut_path`
 
 Soil look-up table path.
 
@@ -120,7 +138,9 @@ Summary:
 - Flexible tail dims: 1
 - Required: no
 
-### `geo_lut_path` - Geology LUT path
+### geo_lut_path
+
+Geology LUT path `geo_lut_path`
 
 Geology look-up table path.
 
@@ -129,7 +149,9 @@ Summary:
 - Flexible tail dims: 1
 - Required: no
 
-### `lai_lut_path` - LAI LUT path
+### lai_lut_path
+
+LAI LUT path `lai_lut_path`
 
 LAI look-up table path.
 
@@ -147,12 +169,12 @@ Summary:
   tillage_depth(:) = 0
   soil_depth(:, :) = 0
   fracSealed_cityArea(:) = 0.0
-  land_cover_path(:) = ''
+  land_cover_path(:) = ""
   lai_time_step(:) = -3
-  lai_path(:) = ''
-  soil_lut_path(:) = ''
-  geo_lut_path(:) = ''
-  lai_lut_path(:) = ''
+  lai_path(:) = ""
+  soil_lut_path(:) = ""
+  geo_lut_path(:) = ""
+  lai_lut_path(:) = ""
 /
 ```
 
