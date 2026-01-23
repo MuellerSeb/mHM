@@ -42,38 +42,38 @@ module nml_config_input
   integer(i4), parameter, public :: chunking_default = 0_i4
   integer(i4), parameter, public :: time_stamp_location_default = 0_i4
   logical, parameter, public :: morph_latlon_default = .false.
-  character(len=buf), parameter, public :: pre_var_default = 'pre'
-  character(len=buf), parameter, public :: pet_var_default = 'pet'
-  character(len=buf), parameter, public :: temp_var_default = 'tavg'
-  character(len=buf), parameter, public :: tann_var_default = 'tann'
-  character(len=buf), parameter, public :: tmin_var_default = 'tmin'
-  character(len=buf), parameter, public :: tmax_var_default = 'tmax'
-  character(len=buf), parameter, public :: ssrd_var_default = 'ssrd'
-  character(len=buf), parameter, public :: strd_var_default = 'strd'
-  character(len=buf), parameter, public :: netrad_var_default = 'net_rad'
-  character(len=buf), parameter, public :: eabs_var_default = 'eabs'
-  character(len=buf), parameter, public :: wind_var_default = 'windspeed'
-  character(len=buf), parameter, public :: meteo_mask_var_default = 'mask'
-  character(len=buf), parameter, public :: runoff_var_default = 'runoff'
-  character(len=buf), parameter, public :: runoff_sealed_var_default = 'runoff_sealed'
-  character(len=buf), parameter, public :: interflow_fast_var_default = 'interflow_fast'
-  character(len=buf), parameter, public :: interflow_slow_var_default = 'interflow_slow'
-  character(len=buf), parameter, public :: baseflow_var_default = 'baseflow'
-  character(len=buf), parameter, public :: hydro_mask_var_default = 'mask'
-  character(len=buf), parameter, public :: dem_var_default = 'dem'
-  character(len=buf), parameter, public :: slope_var_default = 'slope'
-  character(len=buf), parameter, public :: aspect_var_default = 'aspect'
-  character(len=buf), parameter, public :: geo_class_var_default = 'geology_class'
-  character(len=buf), parameter, public :: soil_class_var_default = 'soil_class'
-  character(len=buf), parameter, public :: lai_class_var_default = 'LAI_class'
-  character(len=buf), parameter, public :: river_width_var_default = 'P_bkfl'
-  character(len=buf), parameter, public :: morph_mask_var_default = 'mask'
-  character(len=buf), parameter, public :: hydro_lat_var_default = 'lat'
-  character(len=buf), parameter, public :: hydro_lon_var_default = 'lon'
-  character(len=buf), parameter, public :: morph_lat_var_default = 'lat_l0'
-  character(len=buf), parameter, public :: morph_lon_var_default = 'lon_l0'
-  character(len=buf), parameter, public :: route_lat_var_default = 'lat_l11'
-  character(len=buf), parameter, public :: route_lon_var_default = 'lon_l11'
+  character(len=buf), parameter, public :: pre_var_default = "pre"
+  character(len=buf), parameter, public :: pet_var_default = "pet"
+  character(len=buf), parameter, public :: temp_var_default = "tavg"
+  character(len=buf), parameter, public :: tann_var_default = "tann"
+  character(len=buf), parameter, public :: tmin_var_default = "tmin"
+  character(len=buf), parameter, public :: tmax_var_default = "tmax"
+  character(len=buf), parameter, public :: ssrd_var_default = "ssrd"
+  character(len=buf), parameter, public :: strd_var_default = "strd"
+  character(len=buf), parameter, public :: netrad_var_default = "net_rad"
+  character(len=buf), parameter, public :: eabs_var_default = "eabs"
+  character(len=buf), parameter, public :: wind_var_default = "windspeed"
+  character(len=buf), parameter, public :: meteo_mask_var_default = "mask"
+  character(len=buf), parameter, public :: runoff_var_default = "runoff"
+  character(len=buf), parameter, public :: runoff_sealed_var_default = "runoff_sealed"
+  character(len=buf), parameter, public :: interflow_fast_var_default = "interflow_fast"
+  character(len=buf), parameter, public :: interflow_slow_var_default = "interflow_slow"
+  character(len=buf), parameter, public :: baseflow_var_default = "baseflow"
+  character(len=buf), parameter, public :: hydro_mask_var_default = "mask"
+  character(len=buf), parameter, public :: dem_var_default = "dem"
+  character(len=buf), parameter, public :: slope_var_default = "slope"
+  character(len=buf), parameter, public :: aspect_var_default = "aspect"
+  character(len=buf), parameter, public :: geo_class_var_default = "geology_class"
+  character(len=buf), parameter, public :: soil_class_var_default = "soil_class"
+  character(len=buf), parameter, public :: lai_class_var_default = "LAI_class"
+  character(len=buf), parameter, public :: river_width_var_default = "P_bkfl"
+  character(len=buf), parameter, public :: morph_mask_var_default = "mask"
+  character(len=buf), parameter, public :: hydro_lat_var_default = "lat"
+  character(len=buf), parameter, public :: hydro_lon_var_default = "lon"
+  character(len=buf), parameter, public :: morph_lat_var_default = "lat_l0"
+  character(len=buf), parameter, public :: morph_lon_var_default = "lon_l0"
+  character(len=buf), parameter, public :: route_lat_var_default = "lat_l11"
+  character(len=buf), parameter, public :: route_lon_var_default = "lon_l11"
 
   ! enum values
   integer(i4), parameter, public :: time_stamp_location_enum_values(3) = [0_i4, 1_i4, 2_i4]

@@ -85,6 +85,17 @@ module nml_config_coupling
   integer(i4), parameter, public :: morph_grid_ydir_enum_values(2) = [0_i4, 1_i4]
   integer(i4), parameter, public :: morph_grid_coordsys_enum_values(2) = [0_i4, 1_i4]
 
+  ! bounds values
+  integer(i4), parameter, public :: meteo_grid_nx_min = 1_i4
+  integer(i4), parameter, public :: meteo_grid_ny_min = 1_i4
+  real(dp), parameter, public :: meteo_grid_cellsize_min_excl = 0.0_dp
+  integer(i4), parameter, public :: hydro_grid_nx_min = 1_i4
+  integer(i4), parameter, public :: hydro_grid_ny_min = 1_i4
+  real(dp), parameter, public :: hydro_grid_cellsize_min_excl = 0.0_dp
+  integer(i4), parameter, public :: morph_grid_nx_min = 1_i4
+  integer(i4), parameter, public :: morph_grid_ny_min = 1_i4
+  real(dp), parameter, public :: morph_grid_cellsize_min_excl = 0.0_dp
+
   !> \class nml_config_coupling_t
   !> \brief Coupling configuration
   !> \details Coupling grid and variable settings for meteorological, hydrological, and morphology components.
@@ -249,6 +260,168 @@ contains
     end if
     in_enum = any(val == morph_grid_coordsys_enum_values)
   end function morph_grid_coordsys_in_enum
+
+  !> \brief Check whether a value is within bounds
+  elemental logical function meteo_grid_nx_in_bounds(val, allow_missing) result(in_bounds)
+    integer(i4), intent(in) :: val
+    logical, intent(in), optional :: allow_missing
+
+    if (present(allow_missing)) then
+      if (allow_missing) then
+        if (val == -huge(val)) then
+          in_bounds = .true.
+          return
+        end if
+      end if
+    end if
+
+    in_bounds = .true.
+    if (val < meteo_grid_nx_min) in_bounds = .false.
+  end function meteo_grid_nx_in_bounds
+
+  !> \brief Check whether a value is within bounds
+  elemental logical function meteo_grid_ny_in_bounds(val, allow_missing) result(in_bounds)
+    integer(i4), intent(in) :: val
+    logical, intent(in), optional :: allow_missing
+
+    if (present(allow_missing)) then
+      if (allow_missing) then
+        if (val == -huge(val)) then
+          in_bounds = .true.
+          return
+        end if
+      end if
+    end if
+
+    in_bounds = .true.
+    if (val < meteo_grid_ny_min) in_bounds = .false.
+  end function meteo_grid_ny_in_bounds
+
+  !> \brief Check whether a value is within bounds
+  elemental logical function meteo_grid_cellsize_in_bounds(val, allow_missing) result(in_bounds)
+    real(dp), intent(in) :: val
+    logical, intent(in), optional :: allow_missing
+
+    if (present(allow_missing)) then
+      if (allow_missing) then
+        if (ieee_is_nan(val)) then
+          in_bounds = .true.
+          return
+        end if
+      end if
+    end if
+
+    in_bounds = .true.
+    if (val <= meteo_grid_cellsize_min_excl) in_bounds = .false.
+  end function meteo_grid_cellsize_in_bounds
+
+  !> \brief Check whether a value is within bounds
+  elemental logical function hydro_grid_nx_in_bounds(val, allow_missing) result(in_bounds)
+    integer(i4), intent(in) :: val
+    logical, intent(in), optional :: allow_missing
+
+    if (present(allow_missing)) then
+      if (allow_missing) then
+        if (val == -huge(val)) then
+          in_bounds = .true.
+          return
+        end if
+      end if
+    end if
+
+    in_bounds = .true.
+    if (val < hydro_grid_nx_min) in_bounds = .false.
+  end function hydro_grid_nx_in_bounds
+
+  !> \brief Check whether a value is within bounds
+  elemental logical function hydro_grid_ny_in_bounds(val, allow_missing) result(in_bounds)
+    integer(i4), intent(in) :: val
+    logical, intent(in), optional :: allow_missing
+
+    if (present(allow_missing)) then
+      if (allow_missing) then
+        if (val == -huge(val)) then
+          in_bounds = .true.
+          return
+        end if
+      end if
+    end if
+
+    in_bounds = .true.
+    if (val < hydro_grid_ny_min) in_bounds = .false.
+  end function hydro_grid_ny_in_bounds
+
+  !> \brief Check whether a value is within bounds
+  elemental logical function hydro_grid_cellsize_in_bounds(val, allow_missing) result(in_bounds)
+    real(dp), intent(in) :: val
+    logical, intent(in), optional :: allow_missing
+
+    if (present(allow_missing)) then
+      if (allow_missing) then
+        if (ieee_is_nan(val)) then
+          in_bounds = .true.
+          return
+        end if
+      end if
+    end if
+
+    in_bounds = .true.
+    if (val <= hydro_grid_cellsize_min_excl) in_bounds = .false.
+  end function hydro_grid_cellsize_in_bounds
+
+  !> \brief Check whether a value is within bounds
+  elemental logical function morph_grid_nx_in_bounds(val, allow_missing) result(in_bounds)
+    integer(i4), intent(in) :: val
+    logical, intent(in), optional :: allow_missing
+
+    if (present(allow_missing)) then
+      if (allow_missing) then
+        if (val == -huge(val)) then
+          in_bounds = .true.
+          return
+        end if
+      end if
+    end if
+
+    in_bounds = .true.
+    if (val < morph_grid_nx_min) in_bounds = .false.
+  end function morph_grid_nx_in_bounds
+
+  !> \brief Check whether a value is within bounds
+  elemental logical function morph_grid_ny_in_bounds(val, allow_missing) result(in_bounds)
+    integer(i4), intent(in) :: val
+    logical, intent(in), optional :: allow_missing
+
+    if (present(allow_missing)) then
+      if (allow_missing) then
+        if (val == -huge(val)) then
+          in_bounds = .true.
+          return
+        end if
+      end if
+    end if
+
+    in_bounds = .true.
+    if (val < morph_grid_ny_min) in_bounds = .false.
+  end function morph_grid_ny_in_bounds
+
+  !> \brief Check whether a value is within bounds
+  elemental logical function morph_grid_cellsize_in_bounds(val, allow_missing) result(in_bounds)
+    real(dp), intent(in) :: val
+    logical, intent(in), optional :: allow_missing
+
+    if (present(allow_missing)) then
+      if (allow_missing) then
+        if (ieee_is_nan(val)) then
+          in_bounds = .true.
+          return
+        end if
+      end if
+    end if
+
+    in_bounds = .true.
+    if (val <= morph_grid_cellsize_min_excl) in_bounds = .false.
+  end function morph_grid_cellsize_in_bounds
 
   !> \brief Initialize defaults and sentinels for config_coupling
   integer function nml_config_coupling_init(this, errmsg) result(status)
@@ -2241,6 +2414,52 @@ contains
     if (.not. all(morph_grid_coordsys_in_enum(this%morph_grid_coordsys, allow_missing=.true.))) then
       status = NML_ERR_ENUM
       if (present(errmsg)) errmsg = "enum constraint failed: morph_grid_coordsys"
+      return
+    end if
+    ! bounds constraints
+    if (.not. all(meteo_grid_nx_in_bounds(this%meteo_grid_nx, allow_missing=.true.))) then
+      status = NML_ERR_BOUNDS
+      if (present(errmsg)) errmsg = "bounds constraint failed: meteo_grid_nx"
+      return
+    end if
+    if (.not. all(meteo_grid_ny_in_bounds(this%meteo_grid_ny, allow_missing=.true.))) then
+      status = NML_ERR_BOUNDS
+      if (present(errmsg)) errmsg = "bounds constraint failed: meteo_grid_ny"
+      return
+    end if
+    if (.not. all(meteo_grid_cellsize_in_bounds(this%meteo_grid_cellsize, allow_missing=.true.))) then
+      status = NML_ERR_BOUNDS
+      if (present(errmsg)) errmsg = "bounds constraint failed: meteo_grid_cellsize"
+      return
+    end if
+    if (.not. all(hydro_grid_nx_in_bounds(this%hydro_grid_nx, allow_missing=.true.))) then
+      status = NML_ERR_BOUNDS
+      if (present(errmsg)) errmsg = "bounds constraint failed: hydro_grid_nx"
+      return
+    end if
+    if (.not. all(hydro_grid_ny_in_bounds(this%hydro_grid_ny, allow_missing=.true.))) then
+      status = NML_ERR_BOUNDS
+      if (present(errmsg)) errmsg = "bounds constraint failed: hydro_grid_ny"
+      return
+    end if
+    if (.not. all(hydro_grid_cellsize_in_bounds(this%hydro_grid_cellsize, allow_missing=.true.))) then
+      status = NML_ERR_BOUNDS
+      if (present(errmsg)) errmsg = "bounds constraint failed: hydro_grid_cellsize"
+      return
+    end if
+    if (.not. all(morph_grid_nx_in_bounds(this%morph_grid_nx, allow_missing=.true.))) then
+      status = NML_ERR_BOUNDS
+      if (present(errmsg)) errmsg = "bounds constraint failed: morph_grid_nx"
+      return
+    end if
+    if (.not. all(morph_grid_ny_in_bounds(this%morph_grid_ny, allow_missing=.true.))) then
+      status = NML_ERR_BOUNDS
+      if (present(errmsg)) errmsg = "bounds constraint failed: morph_grid_ny"
+      return
+    end if
+    if (.not. all(morph_grid_cellsize_in_bounds(this%morph_grid_cellsize, allow_missing=.true.))) then
+      status = NML_ERR_BOUNDS
+      if (present(errmsg)) errmsg = "bounds constraint failed: morph_grid_cellsize"
       return
     end if
   end function nml_config_coupling_is_valid

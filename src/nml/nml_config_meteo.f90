@@ -40,11 +40,11 @@ module nml_config_meteo
 
   ! default values
   logical, parameter, public :: read_meteo_weights_default = .false.
-  character(len=buf), parameter, public :: pre_weights_var_default = 'pre_weights'
-  character(len=buf), parameter, public :: pet_weights_var_default = 'pet_weights'
-  character(len=buf), parameter, public :: temp_weights_var_default = 'tavg_weights'
-  character(len=buf), parameter, public :: ssrd_weights_var_default = 'ssrd_weights'
-  character(len=buf), parameter, public :: strd_weights_var_default = 'strd_weights'
+  character(len=buf), parameter, public :: pre_weights_var_default = "pre_weights"
+  character(len=buf), parameter, public :: pet_weights_var_default = "pet_weights"
+  character(len=buf), parameter, public :: temp_weights_var_default = "tavg_weights"
+  character(len=buf), parameter, public :: ssrd_weights_var_default = "ssrd_weights"
+  character(len=buf), parameter, public :: strd_weights_var_default = "strd_weights"
   logical, parameter, public :: share_frac_default = .true.
 
   !> \class nml_config_meteo_t

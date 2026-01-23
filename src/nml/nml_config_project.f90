@@ -37,13 +37,13 @@ module nml_config_project
   implicit none
 
   ! default values
-  character(len=buf), parameter, public :: project_details_default = 'mHM project'
-  character(len=buf), parameter, public :: setup_description_default = 'Model run'
-  character(len=buf), parameter, public :: simulation_type_default = 'Simulation'
-  character(len=buf), parameter, public :: Conventions_default = 'None'
-  character(len=buf), parameter, public :: contact_default = 'Developer'
-  character(len=buf), parameter, public :: mHM_details_default = 'Research unit'
-  character(len=buf), parameter, public :: history_default = 'Model run version 1'
+  character(len=buf), parameter, public :: project_details_default = "mHM project"
+  character(len=buf), parameter, public :: setup_description_default = "Model run"
+  character(len=buf), parameter, public :: simulation_type_default = "Simulation"
+  character(len=buf), parameter, public :: Conventions_default = "None"
+  character(len=buf), parameter, public :: contact_default = "Developer"
+  character(len=buf), parameter, public :: mHM_details_default = "Research unit"
+  character(len=buf), parameter, public :: history_default = "Model run version 1"
   integer(i4), parameter, public :: n_domains_default = 1_i4
   logical, parameter, public :: read_domains_from_dirs_default = .false.
 

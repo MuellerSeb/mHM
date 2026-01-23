@@ -30,14 +30,17 @@ module nml_config_mrm
     max_domains, &
     buf, &
     NML_ERR_PARTLY_SET
+  use ieee_arithmetic, only: ieee_value, ieee_quiet_nan, ieee_is_nan
   ! kind specifiers listed in the nml-tools configuration file
   use mo_kind, only: &
-    i4, &
-    dp
+    dp, &
+    i4
 
   implicit none
 
   ! default values
+  logical, parameter, public :: river_net_order_root_based_default = .false.
+  integer(i4), parameter, public :: river_net_omp_level_min_default = 0_i4
   logical, parameter, public :: read_restart_default = .false.
   logical, parameter, public :: read_restart_fluxes_default = .true.
   logical, parameter, public :: write_restart_default = .false.
@@ -49,13 +52,21 @@ module nml_config_mrm
   real(dp), parameter, public :: delta_iter_default = 0.01_dp
   real(dp), parameter, public :: step_iter_default = 5.0_dp
 
+  ! bounds values
+  real(dp), parameter, public :: resolution_min_excl = 0.0_dp
+  integer(i4), parameter, public :: river_net_omp_level_min_min = 0_i4
+
   !> \class nml_config_mrm_t
   !> \brief mRM configuration
   !> \details Configuration for the multi-scale routing model (mRM) in mHM.
   type, public :: nml_config_mrm_t
     logical :: is_configured = .false. !< whether the namelist has been configured
-    integer(i4), dimension(max_domains) :: resolution !< mRM resolution
-    character(len=buf), dimension(max_domains) :: output_path !< Output path
+    real(dp), dimension(max_domains) :: resolution !< mRM resolution (L3)
+    logical, dimension(max_domains) :: river_net_order_root_based !< Flag for root based river network ordering.
+    integer(i4), dimension(max_domains) :: river_net_omp_level_min !< Minimum level size for OpenMP parallelization.
+    character(len=buf), dimension(max_domains) :: scc_gauges_path !< Path for SCC gauges NetCDF file.
+    character(len=buf), dimension(max_domains) :: output_path !< Path for output file.
+    character(len=buf), dimension(max_domains) :: output_node_path !< Path for node based output file.
     logical, dimension(max_domains) :: read_restart !< Read restart
     logical, dimension(max_domains) :: read_restart_fluxes !< Read restart fluxes
     character(len=buf), dimension(max_domains) :: restart_input_path !< Restart input path
@@ -79,6 +90,42 @@ module nml_config_mrm
 
 contains
 
+  !> \brief Check whether a value is within bounds
+  elemental logical function resolution_in_bounds(val, allow_missing) result(in_bounds)
+    real(dp), intent(in) :: val
+    logical, intent(in), optional :: allow_missing
+
+    if (present(allow_missing)) then
+      if (allow_missing) then
+        if (ieee_is_nan(val)) then
+          in_bounds = .true.
+          return
+        end if
+      end if
+    end if
+
+    in_bounds = .true.
+    if (val <= resolution_min_excl) in_bounds = .false.
+  end function resolution_in_bounds
+
+  !> \brief Check whether a value is within bounds
+  elemental logical function river_net_omp_level_min_in_bounds(val, allow_missing) result(in_bounds)
+    integer(i4), intent(in) :: val
+    logical, intent(in), optional :: allow_missing
+
+    if (present(allow_missing)) then
+      if (allow_missing) then
+        if (val == -huge(val)) then
+          in_bounds = .true.
+          return
+        end if
+      end if
+    end if
+
+    in_bounds = .true.
+    if (val < river_net_omp_level_min_min) in_bounds = .false.
+  end function river_net_omp_level_min_in_bounds
+
   !> \brief Initialize defaults and sentinels for config_mrm
   integer function nml_config_mrm_init(this, errmsg) result(status)
     class(nml_config_mrm_t), intent(inout) :: this
@@ -89,11 +136,15 @@ contains
     this%is_configured = .false.
 
     ! sentinel values for required/optional parameters
-    this%resolution = -huge(this%resolution) ! sentinel for required integer array
+    this%resolution = ieee_value(this%resolution, ieee_quiet_nan) ! sentinel for required real array
+    this%scc_gauges_path = repeat(achar(0), len(this%scc_gauges_path)) ! sentinel for optional string array
     this%output_path = repeat(achar(0), len(this%output_path)) ! sentinel for optional string array
+    this%output_node_path = repeat(achar(0), len(this%output_node_path)) ! sentinel for optional string array
     this%restart_input_path = repeat(achar(0), len(this%restart_input_path)) ! sentinel for optional string array
     this%restart_output_path = repeat(achar(0), len(this%restart_output_path)) ! sentinel for optional string array
     ! default values
+    this%river_net_order_root_based = river_net_order_root_based_default
+    this%river_net_omp_level_min = river_net_omp_level_min_default
     this%read_restart = read_restart_default
     this%read_restart_fluxes = read_restart_fluxes_default
     this%write_restart = write_restart_default
@@ -112,8 +163,12 @@ contains
     character(len=*), intent(in) :: file !< path to namelist file
     character(len=*), intent(out), optional :: errmsg
     ! namelist variables
-    integer(i4), dimension(max_domains) :: resolution
+    real(dp), dimension(max_domains) :: resolution
+    logical, dimension(max_domains) :: river_net_order_root_based
+    integer(i4), dimension(max_domains) :: river_net_omp_level_min
+    character(len=buf), dimension(max_domains) :: scc_gauges_path
     character(len=buf), dimension(max_domains) :: output_path
+    character(len=buf), dimension(max_domains) :: output_node_path
     logical, dimension(max_domains) :: read_restart
     logical, dimension(max_domains) :: read_restart_fluxes
     character(len=buf), dimension(max_domains) :: restart_input_path
@@ -134,7 +189,11 @@ contains
 
     namelist /config_mrm/ &
       resolution, &
+      river_net_order_root_based, &
+      river_net_omp_level_min, &
+      scc_gauges_path, &
       output_path, &
+      output_node_path, &
       read_restart, &
       read_restart_fluxes, &
       restart_input_path, &
@@ -151,7 +210,11 @@ contains
     status = this%init(errmsg=errmsg)
     if (status /= NML_OK) return
     resolution = this%resolution
+    river_net_order_root_based = this%river_net_order_root_based
+    river_net_omp_level_min = this%river_net_omp_level_min
+    scc_gauges_path = this%scc_gauges_path
     output_path = this%output_path
+    output_node_path = this%output_node_path
     read_restart = this%read_restart
     read_restart_fluxes = this%read_restart_fluxes
     restart_input_path = this%restart_input_path
@@ -190,7 +253,11 @@ contains
 
     ! assign values
     this%resolution = resolution
+    this%river_net_order_root_based = river_net_order_root_based
+    this%river_net_omp_level_min = river_net_omp_level_min
+    this%scc_gauges_path = scc_gauges_path
     this%output_path = output_path
+    this%output_node_path = output_node_path
     this%read_restart = read_restart
     this%read_restart_fluxes = read_restart_fluxes
     this%restart_input_path = restart_input_path
@@ -212,7 +279,11 @@ contains
   !> \brief Set config_mrm values
   integer function nml_config_mrm_set(this, &
     resolution, &
+    river_net_order_root_based, &
+    river_net_omp_level_min, &
+    scc_gauges_path, &
     output_path, &
+    output_node_path, &
     read_restart, &
     read_restart_fluxes, &
     restart_input_path, &
@@ -229,8 +300,12 @@ contains
 
     class(nml_config_mrm_t), intent(inout) :: this
     character(len=*), intent(out), optional :: errmsg
-    integer(i4), dimension(:), intent(in) :: resolution
+    real(dp), dimension(:), intent(in) :: resolution
+    logical, dimension(:), intent(in), optional :: river_net_order_root_based
+    integer(i4), dimension(:), intent(in), optional :: river_net_omp_level_min
+    character(len=*), dimension(:), intent(in), optional :: scc_gauges_path
     character(len=*), dimension(:), intent(in), optional :: output_path
+    character(len=*), dimension(:), intent(in), optional :: output_node_path
     logical, dimension(:), intent(in), optional :: read_restart
     logical, dimension(:), intent(in), optional :: read_restart_fluxes
     character(len=*), dimension(:), intent(in), optional :: restart_input_path
@@ -260,6 +335,36 @@ contains
     ub_1 = lb_1 + size(resolution, 1) - 1
     this%resolution(lb_1:ub_1) = resolution
     ! override with provided values
+    if (present(river_net_order_root_based)) then
+      if (size(river_net_order_root_based, 1) > size(this%river_net_order_root_based, 1)) then
+        status = NML_ERR_INVALID_INDEX
+        if (present(errmsg)) errmsg = "dimension 1 exceeds bounds for 'river_net_order_root_based'"
+        return
+      end if
+      lb_1 = lbound(this%river_net_order_root_based, 1)
+      ub_1 = lb_1 + size(river_net_order_root_based, 1) - 1
+      this%river_net_order_root_based(lb_1:ub_1) = river_net_order_root_based
+    end if
+    if (present(river_net_omp_level_min)) then
+      if (size(river_net_omp_level_min, 1) > size(this%river_net_omp_level_min, 1)) then
+        status = NML_ERR_INVALID_INDEX
+        if (present(errmsg)) errmsg = "dimension 1 exceeds bounds for 'river_net_omp_level_min'"
+        return
+      end if
+      lb_1 = lbound(this%river_net_omp_level_min, 1)
+      ub_1 = lb_1 + size(river_net_omp_level_min, 1) - 1
+      this%river_net_omp_level_min(lb_1:ub_1) = river_net_omp_level_min
+    end if
+    if (present(scc_gauges_path)) then
+      if (size(scc_gauges_path, 1) > size(this%scc_gauges_path, 1)) then
+        status = NML_ERR_INVALID_INDEX
+        if (present(errmsg)) errmsg = "dimension 1 exceeds bounds for 'scc_gauges_path'"
+        return
+      end if
+      lb_1 = lbound(this%scc_gauges_path, 1)
+      ub_1 = lb_1 + size(scc_gauges_path, 1) - 1
+      this%scc_gauges_path(lb_1:ub_1) = scc_gauges_path
+    end if
     if (present(output_path)) then
       if (size(output_path, 1) > size(this%output_path, 1)) then
         status = NML_ERR_INVALID_INDEX
@@ -269,6 +374,16 @@ contains
       lb_1 = lbound(this%output_path, 1)
       ub_1 = lb_1 + size(output_path, 1) - 1
       this%output_path(lb_1:ub_1) = output_path
+    end if
+    if (present(output_node_path)) then
+      if (size(output_node_path, 1) > size(this%output_node_path, 1)) then
+        status = NML_ERR_INVALID_INDEX
+        if (present(errmsg)) errmsg = "dimension 1 exceeds bounds for 'output_node_path'"
+        return
+      end if
+      lb_1 = lbound(this%output_node_path, 1)
+      ub_1 = lb_1 + size(output_node_path, 1) - 1
+      this%output_node_path(lb_1:ub_1) = output_node_path
     end if
     if (present(read_restart)) then
       if (size(read_restart, 1) > size(this%read_restart, 1)) then
@@ -348,9 +463,32 @@ contains
         status = idx_check(idx, lbound(this%resolution), ubound(this%resolution), &
           "resolution", errmsg)
         if (status /= NML_OK) return
-        if (this%resolution(idx(1)) == -huge(this%resolution(idx(1)))) status = NML_ERR_NOT_SET
+        if (ieee_is_nan(this%resolution(idx(1)))) status = NML_ERR_NOT_SET
       else
-        if (all(this%resolution == -huge(this%resolution))) status = NML_ERR_NOT_SET
+        if (all(ieee_is_nan(this%resolution))) status = NML_ERR_NOT_SET
+      end if
+    case ("river_net_order_root_based")
+      if (present(idx)) then
+        status = idx_check(idx, lbound(this%river_net_order_root_based), ubound(this%river_net_order_root_based), &
+          "river_net_order_root_based", errmsg)
+        if (status /= NML_OK) return
+      else
+      end if
+    case ("river_net_omp_level_min")
+      if (present(idx)) then
+        status = idx_check(idx, lbound(this%river_net_omp_level_min), ubound(this%river_net_omp_level_min), &
+          "river_net_omp_level_min", errmsg)
+        if (status /= NML_OK) return
+      else
+      end if
+    case ("scc_gauges_path")
+      if (present(idx)) then
+        status = idx_check(idx, lbound(this%scc_gauges_path), ubound(this%scc_gauges_path), &
+          "scc_gauges_path", errmsg)
+        if (status /= NML_OK) return
+        if (this%scc_gauges_path(idx(1)) == repeat(achar(0), len(this%scc_gauges_path))) status = NML_ERR_NOT_SET
+      else
+        if (all(this%scc_gauges_path == repeat(achar(0), len(this%scc_gauges_path)))) status = NML_ERR_NOT_SET
       end if
     case ("output_path")
       if (present(idx)) then
@@ -360,6 +498,15 @@ contains
         if (this%output_path(idx(1)) == repeat(achar(0), len(this%output_path))) status = NML_ERR_NOT_SET
       else
         if (all(this%output_path == repeat(achar(0), len(this%output_path)))) status = NML_ERR_NOT_SET
+      end if
+    case ("output_node_path")
+      if (present(idx)) then
+        status = idx_check(idx, lbound(this%output_node_path), ubound(this%output_node_path), &
+          "output_node_path", errmsg)
+        if (status /= NML_OK) return
+        if (this%output_node_path(idx(1)) == repeat(achar(0), len(this%output_node_path))) status = NML_ERR_NOT_SET
+      else
+        if (all(this%output_node_path == repeat(achar(0), len(this%output_node_path)))) status = NML_ERR_NOT_SET
       end if
     case ("read_restart")
       if (present(idx)) then
@@ -478,7 +625,7 @@ contains
       filled(1) = 0
       do idx = ubound(this%resolution, 1), &
         lbound(this%resolution, 1), -1
-        if (.not. (this%resolution(idx) == -huge(this%resolution(idx)))) then
+        if (.not. (ieee_is_nan(this%resolution(idx)))) then
           filled(1) = idx - lbound(this%resolution, 1) + 1
           exit
         end if
@@ -486,9 +633,35 @@ contains
       if (minval(filled) > 0) then
         lb_1 = lbound(this%resolution, 1)
         ub_1 = lb_1 + filled(1) - 1
-        if (any(this%resolution(lb_1:ub_1) == -huge(this%resolution(lb_1:ub_1)))) then
+        if (any(ieee_is_nan(this%resolution(lb_1:ub_1)))) then
           status = NML_ERR_PARTLY_SET
           if (present(errmsg)) errmsg = "array partly set: resolution"
+          return
+        end if
+      end if
+    case ("scc_gauges_path")
+      if (size(filled) /= 1) then
+        status = NML_ERR_INVALID_INDEX
+        if (present(errmsg)) errmsg = "shape rank mismatch for 'scc_gauges_path'"
+        return
+      end if
+      do dim = 1, 1
+        filled(dim) = size(this%scc_gauges_path, dim)
+      end do
+      filled(1) = 0
+      do idx = ubound(this%scc_gauges_path, 1), &
+        lbound(this%scc_gauges_path, 1), -1
+        if (.not. (this%scc_gauges_path(idx) == repeat(achar(0), len(this%scc_gauges_path)))) then
+          filled(1) = idx - lbound(this%scc_gauges_path, 1) + 1
+          exit
+        end if
+      end do
+      if (minval(filled) > 0) then
+        lb_1 = lbound(this%scc_gauges_path, 1)
+        ub_1 = lb_1 + filled(1) - 1
+        if (any(this%scc_gauges_path(lb_1:ub_1) == repeat(achar(0), len(this%scc_gauges_path)))) then
+          status = NML_ERR_PARTLY_SET
+          if (present(errmsg)) errmsg = "array partly set: scc_gauges_path"
           return
         end if
       end if
@@ -515,6 +688,32 @@ contains
         if (any(this%output_path(lb_1:ub_1) == repeat(achar(0), len(this%output_path)))) then
           status = NML_ERR_PARTLY_SET
           if (present(errmsg)) errmsg = "array partly set: output_path"
+          return
+        end if
+      end if
+    case ("output_node_path")
+      if (size(filled) /= 1) then
+        status = NML_ERR_INVALID_INDEX
+        if (present(errmsg)) errmsg = "shape rank mismatch for 'output_node_path'"
+        return
+      end if
+      do dim = 1, 1
+        filled(dim) = size(this%output_node_path, dim)
+      end do
+      filled(1) = 0
+      do idx = ubound(this%output_node_path, 1), &
+        lbound(this%output_node_path, 1), -1
+        if (.not. (this%output_node_path(idx) == repeat(achar(0), len(this%output_node_path)))) then
+          filled(1) = idx - lbound(this%output_node_path, 1) + 1
+          exit
+        end if
+      end do
+      if (minval(filled) > 0) then
+        lb_1 = lbound(this%output_node_path, 1)
+        ub_1 = lb_1 + filled(1) - 1
+        if (any(this%output_node_path(lb_1:ub_1) == repeat(achar(0), len(this%output_node_path)))) then
+          status = NML_ERR_PARTLY_SET
+          if (present(errmsg)) errmsg = "array partly set: output_node_path"
           return
         end if
       end if
@@ -608,11 +807,39 @@ contains
     end if
     if (allocated(filled)) deallocate(filled)
     allocate(filled(1))
+    istat = this%filled_shape("scc_gauges_path", filled, errmsg=errmsg)
+    if (istat == NML_ERR_PARTLY_SET) then
+      status = istat
+      if (present(errmsg)) then
+        if (len_trim(errmsg) == 0) errmsg = "array partly set: scc_gauges_path"
+      end if
+      return
+    end if
+    if (istat /= NML_OK) then
+      status = istat
+      return
+    end if
+    if (allocated(filled)) deallocate(filled)
+    allocate(filled(1))
     istat = this%filled_shape("output_path", filled, errmsg=errmsg)
     if (istat == NML_ERR_PARTLY_SET) then
       status = istat
       if (present(errmsg)) then
         if (len_trim(errmsg) == 0) errmsg = "array partly set: output_path"
+      end if
+      return
+    end if
+    if (istat /= NML_OK) then
+      status = istat
+      return
+    end if
+    if (allocated(filled)) deallocate(filled)
+    allocate(filled(1))
+    istat = this%filled_shape("output_node_path", filled, errmsg=errmsg)
+    if (istat == NML_ERR_PARTLY_SET) then
+      status = istat
+      if (present(errmsg)) then
+        if (len_trim(errmsg) == 0) errmsg = "array partly set: output_node_path"
       end if
       return
     end if
@@ -646,6 +873,17 @@ contains
     end if
     if (istat /= NML_OK) then
       status = istat
+      return
+    end if
+    ! bounds constraints
+    if (.not. all(resolution_in_bounds(this%resolution, allow_missing=.true.))) then
+      status = NML_ERR_BOUNDS
+      if (present(errmsg)) errmsg = "bounds constraint failed: resolution"
+      return
+    end if
+    if (.not. all(river_net_omp_level_min_in_bounds(this%river_net_omp_level_min, allow_missing=.true.))) then
+      status = NML_ERR_BOUNDS
+      if (present(errmsg)) errmsg = "bounds constraint failed: river_net_omp_level_min"
       return
     end if
   end function nml_config_mrm_is_valid

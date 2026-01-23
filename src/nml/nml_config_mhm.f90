@@ -33,7 +33,6 @@ module nml_config_mhm
   use ieee_arithmetic, only: ieee_value, ieee_quiet_nan, ieee_is_nan
   ! kind specifiers listed in the nml-tools configuration file
   use mo_kind, only: &
-    i4, &
     dp
 
   implicit none
@@ -49,7 +48,7 @@ module nml_config_mhm
   !> \details Configuration for the mHM model setup.
   type, public :: nml_config_mhm_t
     logical :: is_configured = .false. !< whether the namelist has been configured
-    integer(i4), dimension(max_domains) :: resolution !< mHM model resolution
+    real(dp), dimension(max_domains) :: resolution !< mHM model resolution (L1)
     character(len=buf), dimension(max_domains) :: output_path !< Output path
     logical, dimension(max_domains) :: read_restart !< Read restart
     logical, dimension(max_domains) :: read_restart_fluxes !< Read restart fluxes
@@ -79,7 +78,7 @@ contains
     this%is_configured = .false.
 
     ! sentinel values for required/optional parameters
-    this%resolution = -huge(this%resolution) ! sentinel for optional integer array
+    this%resolution = ieee_value(this%resolution, ieee_quiet_nan) ! sentinel for optional real array
     this%output_path = repeat(achar(0), len(this%output_path)) ! sentinel for optional string array
     this%restart_input_path = repeat(achar(0), len(this%restart_input_path)) ! sentinel for optional string array
     this%restart_output_path = repeat(achar(0), len(this%restart_output_path)) ! sentinel for optional string array
@@ -97,7 +96,7 @@ contains
     character(len=*), intent(in) :: file !< path to namelist file
     character(len=*), intent(out), optional :: errmsg
     ! namelist variables
-    integer(i4), dimension(max_domains) :: resolution
+    real(dp), dimension(max_domains) :: resolution
     character(len=buf), dimension(max_domains) :: output_path
     logical, dimension(max_domains) :: read_restart
     logical, dimension(max_domains) :: read_restart_fluxes
@@ -189,7 +188,7 @@ contains
 
     class(nml_config_mhm_t), intent(inout) :: this
     character(len=*), intent(out), optional :: errmsg
-    integer(i4), dimension(:), intent(in), optional :: resolution
+    real(dp), dimension(:), intent(in), optional :: resolution
     character(len=*), dimension(:), intent(in), optional :: output_path
     logical, dimension(:), intent(in), optional :: read_restart
     logical, dimension(:), intent(in), optional :: read_restart_fluxes
@@ -316,9 +315,9 @@ contains
         status = idx_check(idx, lbound(this%resolution), ubound(this%resolution), &
           "resolution", errmsg)
         if (status /= NML_OK) return
-        if (this%resolution(idx(1)) == -huge(this%resolution(idx(1)))) status = NML_ERR_NOT_SET
+        if (ieee_is_nan(this%resolution(idx(1)))) status = NML_ERR_NOT_SET
       else
-        if (all(this%resolution == -huge(this%resolution))) status = NML_ERR_NOT_SET
+        if (all(ieee_is_nan(this%resolution))) status = NML_ERR_NOT_SET
       end if
     case ("output_path")
       if (present(idx)) then
@@ -421,7 +420,7 @@ contains
       filled(1) = 0
       do idx = ubound(this%resolution, 1), &
         lbound(this%resolution, 1), -1
-        if (.not. (this%resolution(idx) == -huge(this%resolution(idx)))) then
+        if (.not. (ieee_is_nan(this%resolution(idx)))) then
           filled(1) = idx - lbound(this%resolution, 1) + 1
           exit
         end if
@@ -429,7 +428,7 @@ contains
       if (minval(filled) > 0) then
         lb_1 = lbound(this%resolution, 1)
         ub_1 = lb_1 + filled(1) - 1
-        if (any(this%resolution(lb_1:ub_1) == -huge(this%resolution(lb_1:ub_1)))) then
+        if (any(ieee_is_nan(this%resolution(lb_1:ub_1)))) then
           status = NML_ERR_PARTLY_SET
           if (present(errmsg)) errmsg = "array partly set: resolution"
           return
