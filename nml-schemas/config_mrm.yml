@@ -6,12 +6,52 @@ properties:
   resolution:
     type: array
     items:
-      type: integer
-      x-fortran-kind: i4
+      type: number
+      x-fortran-kind: dp
+      exclusiveMinimum: 0.0
     x-fortran-shape: max_domains
     x-fortran-flex-tail-dims: 1
-    title: mRM resolution
-    description: Resolution of the mRM routing grid.
+    title: mRM resolution (L3)
+    description: Resolution of the mRM routing grid, level 3.
+    examples: [[0.1]]
+  river_net_order_root_based:
+    type: array
+    items:
+      type: boolean
+      default: false
+    x-fortran-shape: max_domains
+    title: Flag for root based river network ordering.
+    description: |-
+      Flag to indicate if the river network is ordered in root based order.
+      If false, the ordering is leaf based.
+      Root based ordering results in more equal distributed level sizes for parallelization.
+      Leaf based ordering has huge levels of nodes at the headwaters, which can lead to load balancing issues.
+    examples: [[true]]
+  river_net_omp_level_min:
+    type: array
+    items:
+      type: integer
+      x-fortran-kind: i4
+      default: 0
+      minimum: 0
+    x-fortran-shape: max_domains
+    title: Minimum level size for OpenMP parallelization.
+    description: |-
+      Minimum level size in the river network where OpenMP parallelization starts.
+      Levels smaller than this size are always computed serially.
+      This can be used to avoid parallelization overhead for small levels of the river network,
+      especially when ordering is leaf based.
+      By default: threads * 8 (indicated by 0)
+    examples: [[100]]
+  scc_gauges_path:
+    type: array
+    items:
+      type: string
+      x-fortran-len: buf
+    x-fortran-shape: max_domains
+    x-fortran-flex-tail-dims: 1
+    title: Path for SCC gauges NetCDF file.
+    examples: [["scc_gauges.nc"]]
   output_path:
     type: array
     items:
@@ -19,7 +59,17 @@ properties:
       x-fortran-len: buf
     x-fortran-shape: max_domains
     x-fortran-flex-tail-dims: 1
-    title: Output path
+    title: Path for output file.
+    examples: [["mrm_output.nc"]]
+  output_node_path:
+    type: array
+    items:
+      type: string
+      x-fortran-len: buf
+    x-fortran-shape: max_domains
+    x-fortran-flex-tail-dims: 1
+    title: Path for node based output file.
+    examples: [["mrm_node_output.nc"]]
   read_restart:
     type: array
     items:
@@ -42,6 +92,7 @@ properties:
     x-fortran-shape: max_domains
     x-fortran-flex-tail-dims: 1
     title: Restart input path
+    examples: [["mrm_restart_in.nc"]]
   write_restart:
     type: array
     items:
@@ -57,6 +108,7 @@ properties:
     x-fortran-shape: max_domains
     x-fortran-flex-tail-dims: 1
     title: Restart output path
+    examples: [["mrm_restart_out.nc"]]
   albedo_water:
     type: number
     x-fortran-kind: dp
