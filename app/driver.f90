@@ -39,6 +39,7 @@ program driver
 
   parser = cli_parser( &
     description="The mesoscale hydrological model - mHM v6", &
+    add_logger_options=.true., &
     add_version_option=.true., &
     version="6.0")
 
@@ -78,13 +79,6 @@ program driver
     value_name="path", &
     default="mrm_outputs.nml", &
     help="The mRM output namelist.")
-
-  call parser%add_option( &
-    name="quiet", &
-    s_name="q", &
-    repeated=.true., &
-    help="Decrease verbosity level.")
-
 
   ! parse given command line arguments
   cwd = "."
