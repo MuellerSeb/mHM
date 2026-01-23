@@ -51,6 +51,7 @@ module nml_helper
   !> \brief Shared constants for namelist dimensions
   integer, parameter, public :: max_layers = 10 !< Maximum number of layers.
   integer, parameter, public :: max_domains = 100 !< Maximum number of domains.
+  integer, parameter, public :: max_geo_units = 25 !< Maximum number of geological units.
   integer, parameter, public :: buf = 256 !< String buffer length.
 
   !> \class nml_file_t
