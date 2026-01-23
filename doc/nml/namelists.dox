@@ -58,4 +58,12 @@ They are all listed below, one page per namelist:
 - \subpage neutrons2 : Parameters for neutrons (case 2 - COSMIC) `&neutrons2`.
 - \subpage geoparameter : Parameters for geology `&geoparameter`.
 
+\section nml_outputs Output Namelists
+
+The output namelists define which model outputs are generated during simulation.
+They are all listed below, one page per namelist:
+
+- \subpage output_mhm : Output configuration for mHM `&output_mhm`.
+- \subpage output_mrm : Output configuration for mRM `&output_mrm`.
+
 */
