@@ -200,6 +200,16 @@ schema = "nml-schemas/parameter_geoparameter.yml"
 mod_path = "src/nml/nml_parameter_geoparameter.f90"
 doc_path = "doc/nml/parameter_geoparameter.md"
 
+[[namelists]]
+schema = "nml-schemas/output_mhm.yml"
+mod_path = "src/nml/nml_output_mhm.f90"
+doc_path = "doc/nml/output_mhm.md"
+
+[[namelists]]
+schema = "nml-schemas/output_mrm.yml"
+mod_path = "src/nml/nml_output_mrm.f90"
+doc_path = "doc/nml/output_mrm.md"
+
 [[templates]]
 output = "mhm-template.nml"
 schemas = [
@@ -214,6 +224,42 @@ schemas = [
   "nml-schemas/config_mhm.yml",
   "nml-schemas/config_mrm.yml",
   "nml-schemas/config_observations.yml",
+]
+doc_mode = "documented"
+value_mode = "filled"
+
+[[templates]]
+output = "mhm-para-template.nml"
+schemas = [
+  "nml-schemas/parameter_interception1.yml",
+  "nml-schemas/parameter_snow1.yml",
+  "nml-schemas/parameter_soilmoisture1.yml",
+  "nml-schemas/parameter_soilmoisture2.yml",
+  "nml-schemas/parameter_soilmoisture3.yml",
+  "nml-schemas/parameter_soilmoisture4.yml",
+  "nml-schemas/parameter_directrunoff1.yml",
+  "nml-schemas/parameter_petminus1.yml",
+  "nml-schemas/parameter_pet0.yml",
+  "nml-schemas/parameter_pet1.yml",
+  "nml-schemas/parameter_pet2.yml",
+  "nml-schemas/parameter_pet3.yml",
+  "nml-schemas/parameter_interflow1.yml",
+  "nml-schemas/parameter_percolation1.yml",
+  "nml-schemas/parameter_routing1.yml",
+  "nml-schemas/parameter_routing2.yml",
+  "nml-schemas/parameter_routing3.yml",
+  "nml-schemas/parameter_neutrons1.yml",
+  "nml-schemas/parameter_neutrons2.yml",
+  "nml-schemas/parameter_geoparameter.yml",
+]
+doc_mode = "documented"
+value_mode = "filled"
+
+[[templates]]
+output = "mhm-output-template.nml"
+schemas = [
+  "nml-schemas/output_mhm.yml",
+  "nml-schemas/output_mrm.yml",
 ]
 doc_mode = "documented"
 value_mode = "filled"
