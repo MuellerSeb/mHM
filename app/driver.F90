@@ -1,4 +1,12 @@
-!> \brief mHM next gen driver.
+!> \file    app/driver.F90
+!> \copydoc driver
+
+!> \brief mHM v6 driver.
+!> \details This is the main driver program for mHM v6. It initializes the
+!>          model, reads configurations, sets up domains, and runs the time loop.
+!> \authors Sebastian Mueller
+!> \date    Jan 2026
+#include "logging.h"
 program driver
   use mo_cli, only: cli_parser
   use mo_os, only: path_abspath, path_join, check_path_isdir
@@ -88,7 +96,7 @@ program driver
   cwd = path_abspath(cwd)
   call check_path_isdir(cwd, raise=.true.)
 
-  call message("READ MAIN CONFIG")
+  log_info(*) "READ MAIN CONFIG"
 
   ! global configs
   call main_cfg%read(path_join(cwd, parser%option_value("nml")))
@@ -103,26 +111,25 @@ program driver
   call mrm_cfg%read(path_join(cwd, parser%option_value("nml")), path_join(cwd, parser%option_value("mrm_output")))
 
   ! create parameters first
-  call message("")
-  call message("CREATE PARAMETERS")
+  log_info(*) "CREATE PARAMETERS"
+
   call parameters%configure(parameter_cfg, process_cfg)
 
   ! determine number of domains
   n_domains = main_cfg%mainconfig%nDomains
   allocate(selected_domains(n_domains))
 
-  call message("")
-  call message("CREATE domains: ", trim(n2s(n_domains)))
+  log_info(*) "CREATE domains: ", n_domains
+
   do i = 1_i4, n_domains
     selected_domains(i) = domains%add_domain() ! returns domain id
   end do
-  print*, " ... selected_domains", selected_domains
+  log_debug(*) " ... selected_domains", selected_domains
 
   ! read configs
   do i = 1_i4, size(selected_domains)
     id = selected_domains(i)
-    call message("")
-    call message("CONFIGURE domain: ", trim(adjustl(n2s(id))))
+    log_info(*) "CONFIGURE domain: ", id
     ! get domain
     call domains%get_domain(id, domain)
     call domain%configure(parameters, time_cfg, id, cwd, input_cfg, meteo_cfg, mpr_cfg, mhm_cfg, mrm_cfg)
@@ -130,16 +137,16 @@ program driver
 
   ! simple run
   do i = 1_i4, size(selected_domains)
-    call message("")
     id = selected_domains(i)
     call domains%get_domain(id, domain)
-    call message("PREPARE domain: ", trim(adjustl(n2s(id))))
+    log_info(*) "PREPARE domain: ", id
     call domain%initialize()
-    call message("RUN TIME LOOP domain: ", trim(adjustl(n2s(id))))
+    log_info(*) "RUN TIME LOOP domain: ", id
     do while(domain%exchange%time < domain%exchange%end_time)
+      log_debug(*) " Time step: ", domain%exchange%time%str()
       call domain%update()
     end do
-    call message("FINALIZE domain: ", trim(adjustl(n2s(id))))
+    log_info(*) "FINALIZE domain: ", id
     call domain%finalize()
   end do
 
