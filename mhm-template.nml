@@ -24,8 +24,28 @@
 
 ! Processes configuration
 &config_processes
-  ! Process cases
-  process_case(:) = 0
+  ! Interception process case
+  interception = 1
+  ! Snow process case
+  snow = 1
+  ! Soil moisture process case
+  soil_moisture = 1
+  ! Direct runoff process case
+  direct_runoff = 1
+  ! Potential evapotranspiration (PET) process case
+  pet = -2
+  ! Interflow process case
+  interflow = 1
+  ! Percolation process case
+  percolation = 1
+  ! Baseflow process case
+  baseflow = 1
+  ! Ground albedo of cosmic-ray neutrons process case
+  neutrons = 0
+  ! Routing process case
+  routing = 3
+  ! River temperature routing process case
+  temperature_routing = 0
 /
 
 ! Optimization configuration
