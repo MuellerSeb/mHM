@@ -37,7 +37,9 @@ module mo_domain
     type(mrm_t) :: mrm !< the mRM process container for routing related processes
     logical :: is_finished = .false. !< whether the time-loop on this domain is finished
   contains
+    procedure :: init => domain_init
     procedure :: configure => domain_configure
+    procedure :: connect => domain_connect
     procedure :: initialize => domain_initialize
     procedure :: update => domain_update
     procedure :: finalize => domain_finalize
@@ -91,35 +93,54 @@ contains
     call self%add_clone(new_key, new_domain)
   end function domain_list_add
 
-  !> \brief Configure the domain.
-  subroutine domain_configure(self, parameters, time_cfg, domain, cwd, input_cfg, meteo_cfg, mpr_cfg, mhm_cfg, mrm_cfg)
+  !> \brief Create a new domain.
+  subroutine domain_init(self, parameters, time_cfg, domain, cwd)
     ! domain is always an item of a domain_list, which stores "allocated pointers" and these implicitly have the "target" attribute
     class(domain_t), intent(inout), target :: self ! needs "target" so components can safely point to "exchange"
     type(parameters_t), intent(in) :: parameters !< configuration for the parameters
     type(time_config_t), intent(in) :: time_cfg !< configuration of the timing
     integer(i4), intent(in), optional :: domain !< domain ID of the current domain in the configuration arrays (1 by default)
     character(len=*), intent(in), optional :: cwd !< current working directory to set relative paths
+    call message(" ... setup new domain")
+    call self%exchange%init(time_cfg, parameters, domain, cwd)
+    ! set exchange pointer in components
+    self%input%exchange => self%exchange
+    self%meteo%exchange => self%exchange
+    self%mpr%exchange => self%exchange
+    self%mhm%exchange => self%exchange
+    self%mrm%exchange => self%exchange
+  end subroutine domain_init
+
+  !> \brief Configure the domain.
+  subroutine domain_configure(self, input_cfg, meteo_cfg, mpr_cfg, mhm_cfg, mrm_cfg)
+    ! domain is always an item of a domain_list, which stores "allocated pointers" and these implicitly have the "target" attribute
+    class(domain_t), intent(inout), target :: self ! needs "target" so components can safely point to "exchange"
     type(input_config_t), intent(in), optional :: input_cfg !< configuration for the input container
     type(meteo_config_t), intent(in), optional :: meteo_cfg !< configuration for the meteo container
     type(mpr_config_t), intent(in), optional :: mpr_cfg !< configuration for the mpr container
     type(mhm_config_t), intent(in), optional :: mhm_cfg !< configuration for the mhm container
     type(mrm_config_t), intent(in), optional :: mrm_cfg !< configuration for the mrm container
-
     call message(" ... configure domain")
-    call self%exchange%configure(time_cfg, parameters, domain, cwd)
-    ! configure
-    if (present(input_cfg)) call self%input%configure(input_cfg, self%exchange)
-    if (present(meteo_cfg)) call self%meteo%configure(meteo_cfg, self%exchange)
-    if (present(mpr_cfg)) call self%mpr%configure(mpr_cfg, self%exchange)
-    if (present(mhm_cfg)) call self%mhm%configure(mhm_cfg, self%exchange)
-    if (present(mrm_cfg)) call self%mrm%configure(mrm_cfg, self%exchange)
-    ! connect
+    if (present(input_cfg)) call self%input%configure(input_cfg)
+    if (present(meteo_cfg)) call self%meteo%configure(meteo_cfg)
+    if (present(mpr_cfg)) call self%mpr%configure(mpr_cfg)
+    if (present(mhm_cfg)) call self%mhm%configure(mhm_cfg)
+    if (present(mrm_cfg)) call self%mrm%configure(mrm_cfg)
+  end subroutine domain_configure
+
+  !> \brief Connect the domain components.
+  !> \details Check for dependencies and connect exchanged arrays between components after configuration.
+  subroutine domain_connect(self)
+    ! domain is always an item of a domain_list, which stores "allocated pointers" and these implicitly have the "target" attribute
+    class(domain_t), intent(inout), target :: self ! needs "target" so components can safely point to "exchange"
+
+    call message(" ... connect domain")
     if (self%input%config%active) call self%input%connect()
     if (self%meteo%config%active) call self%meteo%connect()
     if (self%mpr%config%active) call self%mpr%connect()
     if (self%mhm%config%active) call self%mhm%connect()
     if (self%mrm%config%active) call self%mrm%connect()
-  end subroutine domain_configure
+  end subroutine domain_connect
 
   !> \brief Initialize the domain and do the initial state calculations in the components.
   subroutine domain_initialize(self, parameters)

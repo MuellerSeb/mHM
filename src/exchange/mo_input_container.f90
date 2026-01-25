@@ -108,13 +108,11 @@ contains
 !  end subroutine input_config_read
 
   !> \brief Configure the Input container.
-  subroutine input_configure(self, config, exchange)
+  subroutine input_configure(self, config)
     class(input_t), target, intent(inout) :: self
     type(input_config_t), intent(in) :: config !< initialization config for Input
-    type(exchange_t), intent(in), pointer :: exchange !< exchange container of the domain
     call message(" ... configure input")
     self%config = config
-    self%exchange => exchange
   end subroutine input_configure
 
   !> \brief Initialize the input configuration.

@@ -156,13 +156,11 @@ contains
   end subroutine mhm_config_read
 
   !> \brief Configure the mHM process container.
-  subroutine mhm_configure(self, config, exchange)
+  subroutine mhm_configure(self, config)
     class(mhm_t), intent(inout) :: self
     type(mhm_config_t), intent(in) :: config !< initialization config for mHM
-    type(exchange_t), intent(in), pointer :: exchange !< exchange container of the domain
     call message(" ... configure mhm")
     self%config = config
-    self%exchange => exchange
   end subroutine mhm_configure
 
   subroutine mhm_connect(self)

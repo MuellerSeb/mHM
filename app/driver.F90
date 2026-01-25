@@ -8,6 +8,7 @@
 !> \date    Jan 2026
 #include "logging.h"
 program driver
+  use mo_logging
   use mo_cli, only: cli_parser
   use mo_os, only: path_abspath, path_join, check_path_isdir
   use mo_message, only: message
@@ -89,9 +90,13 @@ program driver
     help="The mRM output namelist.")
 
   ! parse given command line arguments
-  cwd = "."
   call parser%parse()
   call set_verbosity_level(3_i4 - parser%option_read_count("quiet"))
+
+  ! get current working directory
+  ! we don't change the process working directory, but use cwd for all relative paths
+  ! we store the CWD in the exchange type later and use the "get_path" method to get paths
+  cwd = "."
   if (parser%option_was_read("cwd")) cwd = parser%option_value("cwd")
   cwd = path_abspath(cwd)
   call check_path_isdir(cwd, raise=.true.)
@@ -110,9 +115,8 @@ program driver
   call mhm_cfg%read(path_join(cwd, parser%option_value("nml")), path_join(cwd, parser%option_value("mhm_output")))
   call mrm_cfg%read(path_join(cwd, parser%option_value("nml")), path_join(cwd, parser%option_value("mrm_output")))
 
-  ! create parameters first
   log_info(*) "CREATE PARAMETERS"
-
+  ! create parameters first
   call parameters%configure(parameter_cfg, process_cfg)
 
   ! determine number of domains
@@ -121,9 +125,16 @@ program driver
 
   log_info(*) "CREATE domains: ", n_domains
 
+  ! create domain-list
+  ! we use a linked list to be able to dynamically add domains
+  ! These domains are stored as allocated pointers, which have implicitly the "target" attribute
+  ! so components can safely point to "exchange" of their domain
   do i = 1_i4, n_domains
+    ! returns the list key (domain id) which can be used to get the domain later
+    ! prepared for MPI runs with multiple domains
     selected_domains(i) = domains%add_domain() ! returns domain id
   end do
+
   log_debug(*) " ... selected_domains", selected_domains
 
   ! read configs
@@ -132,7 +143,12 @@ program driver
     log_info(*) "CONFIGURE domain: ", id
     ! get domain
     call domains%get_domain(id, domain)
-    call domain%configure(parameters, time_cfg, id, cwd, input_cfg, meteo_cfg, mpr_cfg, mhm_cfg, mrm_cfg)
+    ! create new domain and its exchange
+    call domain%init(parameters, time_cfg, id, cwd)
+    ! configure domain components
+    call domain%configure(input_cfg, meteo_cfg, mpr_cfg, mhm_cfg, mrm_cfg)
+    ! check for connections and dependencies
+    call domain%connect()
   end do
 
   ! simple run

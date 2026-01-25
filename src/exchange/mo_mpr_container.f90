@@ -37,13 +37,11 @@ module mo_mpr_container
 contains
 
   !> \brief Configure the MPR process container.
-  subroutine mpr_configure(self, config, exchange)
+  subroutine mpr_configure(self, config)
     class(mpr_t), intent(inout) :: self
     type(mpr_config_t), intent(in) :: config !< initialization config for MPR
-    type(exchange_t), intent(in), pointer :: exchange !< exchange container of the domain
     call message(" ... configure mpr")
     self%config = config
-    self%exchange => exchange
   end subroutine mpr_configure
 
   !> \brief Initialize the mpr configuration.

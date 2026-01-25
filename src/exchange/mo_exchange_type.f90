@@ -241,7 +241,7 @@ module mo_exchange_type
     type(var_dp) :: riverhead           !< simulated riverhead [m] on level l0
 
   contains
-    procedure, public  :: configure => exchange_configure
+    procedure, public  :: init => exchange_init
     procedure, public  :: get_grid => exchange_get_grid
     procedure, public  :: has_grid => exchange_has_grid
     procedure, public :: get_meta => exchange_get_var_meta
@@ -261,8 +261,8 @@ module mo_exchange_type
 
 contains
 
-  !> \brief Configure the exchange type
-  subroutine exchange_configure(self, time_cfg, parameters, domain, cwd)
+  !> \brief Initialize the exchange type
+  subroutine exchange_init(self, time_cfg, parameters, domain, cwd)
     use mo_os, only: path_abspath, check_path_isdir
     class(exchange_t), intent(inout) :: self
     type(time_config_t), intent(in) :: time_cfg !< time configuration
@@ -400,7 +400,7 @@ contains
 
     ! groundwater (level0)
     self%riverhead         =   var_dp(grid=l0,  name="riverhead",        units="m",                 long_name="simulated riverhead")
-  end subroutine exchange_configure
+  end subroutine exchange_init
 
   !> \brief get the grid specifications for the selected level
   subroutine exchange_get_grid(self, selector, grid)

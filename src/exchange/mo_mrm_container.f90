@@ -128,13 +128,11 @@ contains
   end subroutine mrm_write_restart
 
   !> \brief Configure the mRM process container.
-  subroutine mrm_configure(self, config, exchange)
+  subroutine mrm_configure(self, config)
     class(mrm_t), intent(inout) :: self
     type(mrm_config_t), intent(in) :: config !< initialization config for mRM
-    type(exchange_t), intent(in), pointer :: exchange !< exchange container of the domain
     call message(" ... configure mrm")
     self%config = config
-    self%exchange => exchange
   end subroutine mrm_configure
 
   !> \brief Initialize the mrm configuration.

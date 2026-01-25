@@ -45,13 +45,11 @@ contains
   end subroutine meteo_config_read
 
   !> \brief Configure the Meteorology process container.
-  subroutine meteo_configure(self, config, exchange)
+  subroutine meteo_configure(self, config)
     class(meteo_t), intent(inout) :: self
     type(meteo_config_t), intent(in) :: config !< initialization config for Meteorology
-    type(exchange_t), intent(in), pointer :: exchange !< exchange container of the domain
     call message(" ... configure meteo")
     self%config = config
-    self%exchange => exchange
   end subroutine meteo_configure
 
   subroutine meteo_connect(self)
