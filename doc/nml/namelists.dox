@@ -44,8 +44,8 @@ They are all listed below, one page per namelist:
 - \subpage soilmoisture3 : Parameters for soil moisture (case 3) `&soilmoisture3`.
 - \subpage soilmoisture4 : Parameters for soil moisture (case 4) `&soilmoisture4`.
 - \subpage directrunoff1 : Parameters for direct runoff (case 1) `&directRunoff1`.
-- \subpage petminus1 : Parameters for PET (case -1 - LAI correction) `&PETminus1`.
-- \subpage pet0 : Parameters for PET (case 0 - aspect correction) `&PET0`.
+- \subpage petm2 : Parameters for PET (case -2 - aspect correction) `&PETm2`.
+- \subpage petm1 : Parameters for PET (case -1 - LAI correction) `&PETm1`.
 - \subpage pet1 : Parameters for PET (case 1 - Hargreaves-Samani) `&PET1`.
 - \subpage pet2 : Parameters for PET (case 2 - Priestley-Taylor) `&PET2`.
 - \subpage pet3 : Parameters for PET (case 3 - Penman-Monteith) `&PET3`.

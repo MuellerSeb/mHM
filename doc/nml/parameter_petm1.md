@@ -1,10 +1,10 @@
-# PET - Case -1 {#petminus1}
+# PET - Case -1 {#petm1}
 
 [TOC]
 
 Parameters for PET (case -1 - LAI correction).
 
-**Namelist**: `petminus1`
+**Namelist**: `petm1`
 
 ## Fields
 
@@ -66,7 +66,7 @@ Summary:
 ## Example
 
 ```fortran
-&petminus1
+&petm1
   PET_a_forest(:) = 0.3, 1.3, 0.3, 1.0, 1.0
   PET_a_impervious(:) = 0.3, 1.3, 0.8, 1.0, 1.0
   PET_a_pervious(:) = 0.3, 1.3, 1.3, 1.0, 1.0

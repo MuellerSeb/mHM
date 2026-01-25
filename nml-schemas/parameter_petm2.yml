@@ -1,6 +1,6 @@
-title: PET - Case 0
-description: Parameters for PET (case 0 - aspect correction).
-x-fortran-namelist: pet0
+title: PET - Case -2
+description: Parameters for PET (case -2 - aspect correction).
+x-fortran-namelist: petm2
 type: object
 properties:
   minCorrectionFactorPET:

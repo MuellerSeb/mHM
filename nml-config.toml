@@ -136,14 +136,14 @@ mod_path = "src/nml/nml_parameter_directrunoff1.f90"
 doc_path = "doc/nml/parameter_directrunoff1.md"
 
 [[namelists]]
-schema = "nml-schemas/parameter_petminus1.yml"
-mod_path = "src/nml/nml_parameter_petminus1.f90"
-doc_path = "doc/nml/parameter_petminus1.md"
+schema = "nml-schemas/parameter_petm2.yml"
+mod_path = "src/nml/nml_parameter_petm2.f90"
+doc_path = "doc/nml/parameter_petm2.md"
 
 [[namelists]]
-schema = "nml-schemas/parameter_pet0.yml"
-mod_path = "src/nml/nml_parameter_pet0.f90"
-doc_path = "doc/nml/parameter_pet0.md"
+schema = "nml-schemas/parameter_petm1.yml"
+mod_path = "src/nml/nml_parameter_petm1.f90"
+doc_path = "doc/nml/parameter_petm1.md"
 
 [[namelists]]
 schema = "nml-schemas/parameter_pet1.yml"
@@ -238,8 +238,8 @@ schemas = [
   "nml-schemas/parameter_soilmoisture3.yml",
   "nml-schemas/parameter_soilmoisture4.yml",
   "nml-schemas/parameter_directrunoff1.yml",
-  "nml-schemas/parameter_petminus1.yml",
-  "nml-schemas/parameter_pet0.yml",
+  "nml-schemas/parameter_petm2.yml",
+  "nml-schemas/parameter_petm1.yml",
   "nml-schemas/parameter_pet1.yml",
   "nml-schemas/parameter_pet2.yml",
   "nml-schemas/parameter_pet3.yml",

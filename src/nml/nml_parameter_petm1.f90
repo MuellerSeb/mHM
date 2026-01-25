@@ -1,5 +1,5 @@
-!> \file nml_parameter_petminus1.f90
-!> \copydoc nml_petminus1
+!> \file nml_parameter_petm1.f90
+!> \copydoc nml_petm1
 
 !> \brief PET - Case -1
 !> \details Parameters for PET (case -1 - LAI correction).
@@ -9,7 +9,7 @@
 !> \copyright Copyright 2005-\today, the mHM Developers, Luis Samaniego, Sabine Attinger: All rights reserved.
 !! mHM is released under the LGPLv3+ license \license_note
 !> \ingroup f_namelists
-module nml_petminus1
+module nml_petm1
   use nml_helper, only: &
     nml_file_t, &
     nml_line_buffer, &
@@ -35,10 +35,10 @@ module nml_petminus1
 
   implicit none
 
-  !> \class nml_petminus1_t
+  !> \class nml_petm1_t
   !> \brief PET - Case -1
   !> \details Parameters for PET (case -1 - LAI correction).
-  type, public :: nml_petminus1_t
+  type, public :: nml_petm1_t
     logical :: is_configured = .false. !< whether the namelist has been configured
     real(dp), dimension(5) :: PET_a_forest !< Potential evapotranspiration forest
     real(dp), dimension(5) :: PET_a_impervious !< Potential evapotranspiration impervious
@@ -46,18 +46,18 @@ module nml_petminus1
     real(dp), dimension(5) :: PET_b !< Potential evapotranspiration b
     real(dp), dimension(5) :: PET_c !< Potential evapotranspiration c
   contains
-    procedure :: init => nml_petminus1_init
-    procedure :: from_file => nml_petminus1_from_file
-    procedure :: set => nml_petminus1_set
-    procedure :: is_set => nml_petminus1_is_set
-    procedure :: is_valid => nml_petminus1_is_valid
-  end type nml_petminus1_t
+    procedure :: init => nml_petm1_init
+    procedure :: from_file => nml_petm1_from_file
+    procedure :: set => nml_petm1_set
+    procedure :: is_set => nml_petm1_is_set
+    procedure :: is_valid => nml_petm1_is_valid
+  end type nml_petm1_t
 
 contains
 
-  !> \brief Initialize defaults and sentinels for petminus1
-  integer function nml_petminus1_init(this, errmsg) result(status)
-    class(nml_petminus1_t), intent(inout) :: this
+  !> \brief Initialize defaults and sentinels for petm1
+  integer function nml_petm1_init(this, errmsg) result(status)
+    class(nml_petm1_t), intent(inout) :: this
     character(len=*), intent(out), optional :: errmsg
 
     status = NML_OK
@@ -70,11 +70,11 @@ contains
     this%PET_a_pervious = ieee_value(this%PET_a_pervious, ieee_quiet_nan) ! sentinel for required real array
     this%PET_b = ieee_value(this%PET_b, ieee_quiet_nan) ! sentinel for required real array
     this%PET_c = ieee_value(this%PET_c, ieee_quiet_nan) ! sentinel for required real array
-  end function nml_petminus1_init
+  end function nml_petm1_init
 
-  !> \brief Read petminus1 namelist from file
-  integer function nml_petminus1_from_file(this, file, errmsg) result(status)
-    class(nml_petminus1_t), intent(inout) :: this
+  !> \brief Read petm1 namelist from file
+  integer function nml_petm1_from_file(this, file, errmsg) result(status)
+    class(nml_petm1_t), intent(inout) :: this
     character(len=*), intent(in) :: file !< path to namelist file
     character(len=*), intent(out), optional :: errmsg
     ! namelist variables
@@ -89,7 +89,7 @@ contains
     integer :: close_status
     character(len=nml_line_buffer) :: iomsg
 
-    namelist /petminus1/ &
+    namelist /petm1/ &
       PET_a_forest, &
       PET_a_impervious, &
       PET_a_pervious, &
@@ -107,14 +107,14 @@ contains
     status = nml%open(file, errmsg=errmsg)
     if (status /= NML_OK) return
 
-    status = nml%find("petminus1", errmsg=errmsg)
+    status = nml%find("petm1", errmsg=errmsg)
     if (status /= NML_OK) then
       close_status = nml%close()
       return
     end if
 
     ! read namelist
-    read(nml%unit, nml=petminus1, iostat=iostat, iomsg=iomsg)
+    read(nml%unit, nml=petm1, iostat=iostat, iomsg=iomsg)
     if (iostat /= 0) then
       status = NML_ERR_READ
       if (present(errmsg)) errmsg = trim(iomsg)
@@ -137,10 +137,10 @@ contains
     ! mark as configured
     this%is_configured = .true.
     status = NML_OK
-  end function nml_petminus1_from_file
+  end function nml_petm1_from_file
 
-  !> \brief Set petminus1 values
-  integer function nml_petminus1_set(this, &
+  !> \brief Set petm1 values
+  integer function nml_petm1_set(this, &
     PET_a_forest, &
     PET_a_impervious, &
     PET_a_pervious, &
@@ -148,7 +148,7 @@ contains
     PET_c, &
     errmsg) result(status)
 
-    class(nml_petminus1_t), intent(inout) :: this
+    class(nml_petm1_t), intent(inout) :: this
     character(len=*), intent(out), optional :: errmsg
     real(dp), dimension(5), intent(in) :: PET_a_forest
     real(dp), dimension(5), intent(in) :: PET_a_impervious
@@ -169,11 +169,11 @@ contains
     ! mark as configured
     this%is_configured = .true.
     status = NML_OK
-  end function nml_petminus1_set
+  end function nml_petm1_set
 
   !> \brief Check whether a namelist value was set
-  integer function nml_petminus1_is_set(this, name, idx, errmsg) result(status)
-    class(nml_petminus1_t), intent(in) :: this
+  integer function nml_petm1_is_set(this, name, idx, errmsg) result(status)
+    class(nml_petm1_t), intent(in) :: this
     character(len=*), intent(in) :: name
     integer, intent(in), optional :: idx(:)
     character(len=*), intent(out), optional :: errmsg
@@ -233,11 +233,11 @@ contains
     if (status == NML_ERR_NOT_SET .and. present(errmsg)) then
       if (len_trim(errmsg) == 0) errmsg = "field not set: " // trim(name)
     end if
-  end function nml_petminus1_is_set
+  end function nml_petm1_is_set
 
   !> \brief Validate required values and constraints
-  integer function nml_petminus1_is_valid(this, errmsg) result(status)
-    class(nml_petminus1_t), intent(in) :: this
+  integer function nml_petm1_is_valid(this, errmsg) result(status)
+    class(nml_petm1_t), intent(in) :: this
     character(len=*), intent(out), optional :: errmsg
     integer :: istat
 
@@ -295,6 +295,6 @@ contains
       if (present(errmsg)) errmsg = "array partly set: PET_c"
       return
     end if
-  end function nml_petminus1_is_valid
+  end function nml_petm1_is_valid
 
-end module nml_petminus1
+end module nml_petm1
