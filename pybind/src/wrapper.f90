@@ -959,3 +959,38 @@ contains
     end select
   end subroutine meteo
 end module set
+
+!> \brief   Python wrapper module to control a mHM domain.
+!> \date    Jan 2026
+!> \copyright Copyright 2005-\today, the mHM Developers, Luis Samaniego, Sabine Attinger: All rights reserved.
+!! mHM is released under the LGPLv3+ license \license_note
+!> \ingroup mhm
+module domain
+  use mo_kind, only : i4, dp
+  use iso_c_binding, only : c_ptr, c_loc, c_intptr_t, c_f_pointer
+  use mo_domain, only : domain_t
+  implicit none
+contains
+
+  !> \brief Allocate a new domain_t object and return an opaque handle.
+  subroutine allocate_domain(handle)
+    integer(c_intptr_t), intent(out) :: handle
+    type(domain_t), pointer :: obj
+    type(c_ptr) :: p
+    allocate(obj)
+    p = c_loc(obj)
+    ! handle is now an integer holding an opaque pointer to a domain_t object
+    handle = transfer(p, handle)
+  end subroutine allocate_domain
+
+  !> \brief Deallocate a domain_t object given its opaque handle.
+  subroutine deallocate_domain(handle)
+    integer(c_intptr_t), intent(in) :: handle
+    type(domain_t), pointer :: obj
+    type(c_ptr) :: p
+    p = transfer(handle, p)
+    call c_f_pointer(p, obj)
+    if (associated(obj)) deallocate(obj)
+  end subroutine deallocate_domain
+
+end module domain
