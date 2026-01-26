@@ -201,6 +201,11 @@ mod_path = "src/nml/nml_parameter_geoparameter.f90"
 doc_path = "doc/nml/parameter_geoparameter.md"
 
 [[namelists]]
+schema = "nml-schemas/parameter_rivertemp1.yml"
+mod_path = "src/nml/nml_parameter_rivertemp1.f90"
+doc_path = "doc/nml/parameter_rivertemp1.md"
+
+[[namelists]]
 schema = "nml-schemas/output_mhm.yml"
 mod_path = "src/nml/nml_output_mhm.f90"
 doc_path = "doc/nml/output_mhm.md"
@@ -251,6 +256,7 @@ schemas = [
   "nml-schemas/parameter_neutrons1.yml",
   "nml-schemas/parameter_neutrons2.yml",
   "nml-schemas/parameter_geoparameter.yml",
+  "nml-schemas/parameter_rivertemp1.yml",
 ]
 doc_mode = "documented"
 value_mode = "filled"

@@ -21,13 +21,6 @@ Configuration for the multi-scale routing model (mRM) in mHM.
 | [restart_input_path](#restart_input_path) | string array | no | Restart input path |
 | [write_restart](#write_restart) | logical array | no | Write restart |
 | [restart_output_path](#restart_output_path) | string array | no | Restart output path |
-| [albedo_water](#albedo_water) | real | no | Albedo of open water |
-| [pt_a_water](#pt_a_water) | real | no | Priestley-Taylor alpha |
-| [emissivity_water](#emissivity_water) | real | no | Emissivity of water |
-| [turb_heat_ex_coeff](#turb_heat_ex_coeff) | real | no | Turbulent heat exchange coefficient |
-| [max_iter](#max_iter) | integer | no | Max number of iterations |
-| [delta_iter](#delta_iter) | real | no | Convergence criterion iteration |
-| [step_iter](#step_iter) | real | no | Maximal step in iteration |
 
 ## Field details
 
@@ -153,89 +146,6 @@ Summary:
 - Required: no
 - Examples: `["mrm_restart_out.nc"]`
 
-### albedo_water
-
-Albedo of open water `albedo_water`
-
-Albedo of open water bodies.
-(0.15 for tilt angle between 10 and 20 degrees -> Wanders et.al. 2019)
-
-Summary:
-- Type: `real(dp)`
-- Required: no
-- Default: `0.15`
-
-### pt_a_water
-
-Priestley-Taylor alpha `pt_a_water`
-
-Priestley-Taylor alpha parameter for PET on open water.
-(1.26 -> Gordon Bonan 2015)
-
-Summary:
-- Type: `real(dp)`
-- Required: no
-- Default: `1.26`
-
-### emissivity_water
-
-Emissivity of water `emissivity_water`
-
-Emissivity of water.
-(0.96 -> Wanders et.al. 2019)
-
-Summary:
-- Type: `real(dp)`
-- Required: no
-- Default: `0.96`
-
-### turb_heat_ex_coeff
-
-Turbulent heat exchange coefficient `turb_heat_ex_coeff`
-
-Turbulent heat exchange coefficient.
-(20.0 -> Wanders et.al. 2019)
-
-Summary:
-- Type: `real(dp)`
-- Required: no
-- Default: `20.0`
-
-### max_iter
-
-Max number of iterations `max_iter`
-
-Maximum number of iterations for the iterative solver for river temperature.
-
-Summary:
-- Type: `integer(i4)`
-- Required: no
-- Default: `50`
-
-### delta_iter
-
-Convergence criterion iteration `delta_iter`
-
-Convergence criteria for iterative solver for resulting river temperature.
-Given as difference for iteratively estimated temperature in K
-
-Summary:
-- Type: `real(dp)`
-- Required: no
-- Default: `0.01`
-
-### step_iter
-
-Maximal step in iteration `step_iter`
-
-Maximal step allowed in iteration for river temperature in K.
-Used to avoid divergence of the iterative solver.
-
-Summary:
-- Type: `real(dp)`
-- Required: no
-- Default: `5.0`
-
 ## Example
 
 ```fortran
@@ -251,13 +161,6 @@ Summary:
   restart_input_path(:) = "mrm_restart_in.nc"
   write_restart(:) = .false.
   restart_output_path(:) = "mrm_restart_out.nc"
-  albedo_water = 0.15
-  pt_a_water = 1.26
-  emissivity_water = 0.96
-  turb_heat_ex_coeff = 20.0
-  max_iter = 50
-  delta_iter = 0.01
-  step_iter = 5.0
 /
 ```
 

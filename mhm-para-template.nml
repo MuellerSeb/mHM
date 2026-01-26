@@ -351,3 +351,15 @@
   ! Geological parameters
   GeoParam(:, 1) = 1.0, 1000.0, 100.0, 1.0, 1.0
 /
+
+! River Temperature - Case 1
+&rivertemp1
+  ! Albedo of open water [-]
+  albedo_water(:) = 0.03, 0.2, 0.15, 0.0, 1.0
+  ! Priestley-Taylor coefficient for open water [-]
+  pt_a_water(:) = 1.2, 2.0, 1.26, 0.0, 1.0
+  ! Emissivity of open water [-]
+  emissivity_water(:) = 0.95, 0.99, 0.96, 0.0, 1.0
+  ! Turbulent heat exchange coefficient for open water [W m-2 K-1]
+  turb_heat_ex_coeff(:) = 10.0, 50.0, 20.0, 0.0, 1.0
+/

@@ -44,13 +44,6 @@ module nml_config_mrm
   logical, parameter, public :: read_restart_default = .false.
   logical, parameter, public :: read_restart_fluxes_default = .true.
   logical, parameter, public :: write_restart_default = .false.
-  real(dp), parameter, public :: albedo_water_default = 0.15_dp
-  real(dp), parameter, public :: pt_a_water_default = 1.26_dp
-  real(dp), parameter, public :: emissivity_water_default = 0.96_dp
-  real(dp), parameter, public :: turb_heat_ex_coeff_default = 20.0_dp
-  integer(i4), parameter, public :: max_iter_default = 50_i4
-  real(dp), parameter, public :: delta_iter_default = 0.01_dp
-  real(dp), parameter, public :: step_iter_default = 5.0_dp
 
   ! bounds values
   real(dp), parameter, public :: resolution_min_excl = 0.0_dp
@@ -72,13 +65,6 @@ module nml_config_mrm
     character(len=buf), dimension(max_domains) :: restart_input_path !< Restart input path
     logical, dimension(max_domains) :: write_restart !< Write restart
     character(len=buf), dimension(max_domains) :: restart_output_path !< Restart output path
-    real(dp) :: albedo_water !< Albedo of open water
-    real(dp) :: pt_a_water !< Priestley-Taylor alpha
-    real(dp) :: emissivity_water !< Emissivity of water
-    real(dp) :: turb_heat_ex_coeff !< Turbulent heat exchange coefficient
-    integer(i4) :: max_iter !< Max number of iterations
-    real(dp) :: delta_iter !< Convergence criterion iteration
-    real(dp) :: step_iter !< Maximal step in iteration
   contains
     procedure :: init => nml_config_mrm_init
     procedure :: from_file => nml_config_mrm_from_file
@@ -148,13 +134,6 @@ contains
     this%read_restart = read_restart_default
     this%read_restart_fluxes = read_restart_fluxes_default
     this%write_restart = write_restart_default
-    this%albedo_water = albedo_water_default
-    this%pt_a_water = pt_a_water_default
-    this%emissivity_water = emissivity_water_default
-    this%turb_heat_ex_coeff = turb_heat_ex_coeff_default
-    this%max_iter = max_iter_default
-    this%delta_iter = delta_iter_default
-    this%step_iter = step_iter_default
   end function nml_config_mrm_init
 
   !> \brief Read config_mrm namelist from file
@@ -174,13 +153,6 @@ contains
     character(len=buf), dimension(max_domains) :: restart_input_path
     logical, dimension(max_domains) :: write_restart
     character(len=buf), dimension(max_domains) :: restart_output_path
-    real(dp) :: albedo_water
-    real(dp) :: pt_a_water
-    real(dp) :: emissivity_water
-    real(dp) :: turb_heat_ex_coeff
-    integer(i4) :: max_iter
-    real(dp) :: delta_iter
-    real(dp) :: step_iter
     ! locals
     type(nml_file_t) :: nml
     integer :: iostat
@@ -198,14 +170,7 @@ contains
       read_restart_fluxes, &
       restart_input_path, &
       write_restart, &
-      restart_output_path, &
-      albedo_water, &
-      pt_a_water, &
-      emissivity_water, &
-      turb_heat_ex_coeff, &
-      max_iter, &
-      delta_iter, &
-      step_iter
+      restart_output_path
 
     status = this%init(errmsg=errmsg)
     if (status /= NML_OK) return
@@ -220,13 +185,6 @@ contains
     restart_input_path = this%restart_input_path
     write_restart = this%write_restart
     restart_output_path = this%restart_output_path
-    albedo_water = this%albedo_water
-    pt_a_water = this%pt_a_water
-    emissivity_water = this%emissivity_water
-    turb_heat_ex_coeff = this%turb_heat_ex_coeff
-    max_iter = this%max_iter
-    delta_iter = this%delta_iter
-    step_iter = this%step_iter
 
     status = nml%open(file, errmsg=errmsg)
     if (status /= NML_OK) return
@@ -263,13 +221,6 @@ contains
     this%restart_input_path = restart_input_path
     this%write_restart = write_restart
     this%restart_output_path = restart_output_path
-    this%albedo_water = albedo_water
-    this%pt_a_water = pt_a_water
-    this%emissivity_water = emissivity_water
-    this%turb_heat_ex_coeff = turb_heat_ex_coeff
-    this%max_iter = max_iter
-    this%delta_iter = delta_iter
-    this%step_iter = step_iter
 
     ! mark as configured
     this%is_configured = .true.
@@ -289,13 +240,6 @@ contains
     restart_input_path, &
     write_restart, &
     restart_output_path, &
-    albedo_water, &
-    pt_a_water, &
-    emissivity_water, &
-    turb_heat_ex_coeff, &
-    max_iter, &
-    delta_iter, &
-    step_iter, &
     errmsg) result(status)
 
     class(nml_config_mrm_t), intent(inout) :: this
@@ -311,13 +255,6 @@ contains
     character(len=*), dimension(:), intent(in), optional :: restart_input_path
     logical, dimension(:), intent(in), optional :: write_restart
     character(len=*), dimension(:), intent(in), optional :: restart_output_path
-    real(dp), intent(in), optional :: albedo_water
-    real(dp), intent(in), optional :: pt_a_water
-    real(dp), intent(in), optional :: emissivity_water
-    real(dp), intent(in), optional :: turb_heat_ex_coeff
-    integer(i4), intent(in), optional :: max_iter
-    real(dp), intent(in), optional :: delta_iter
-    real(dp), intent(in), optional :: step_iter
     integer :: &
       lb_1, &
       ub_1
@@ -435,13 +372,6 @@ contains
       ub_1 = lb_1 + size(restart_output_path, 1) - 1
       this%restart_output_path(lb_1:ub_1) = restart_output_path
     end if
-    if (present(albedo_water)) this%albedo_water = albedo_water
-    if (present(pt_a_water)) this%pt_a_water = pt_a_water
-    if (present(emissivity_water)) this%emissivity_water = emissivity_water
-    if (present(turb_heat_ex_coeff)) this%turb_heat_ex_coeff = turb_heat_ex_coeff
-    if (present(max_iter)) this%max_iter = max_iter
-    if (present(delta_iter)) this%delta_iter = delta_iter
-    if (present(step_iter)) this%step_iter = step_iter
 
     ! mark as configured
     this%is_configured = .true.
@@ -546,48 +476,6 @@ contains
         if (this%restart_output_path(idx(1)) == repeat(achar(0), len(this%restart_output_path))) status = NML_ERR_NOT_SET
       else
         if (all(this%restart_output_path == repeat(achar(0), len(this%restart_output_path)))) status = NML_ERR_NOT_SET
-      end if
-    case ("albedo_water")
-      if (present(idx)) then
-        status = NML_ERR_INVALID_INDEX
-        if (present(errmsg)) errmsg = "index not supported for 'albedo_water'"
-        return
-      end if
-    case ("pt_a_water")
-      if (present(idx)) then
-        status = NML_ERR_INVALID_INDEX
-        if (present(errmsg)) errmsg = "index not supported for 'pt_a_water'"
-        return
-      end if
-    case ("emissivity_water")
-      if (present(idx)) then
-        status = NML_ERR_INVALID_INDEX
-        if (present(errmsg)) errmsg = "index not supported for 'emissivity_water'"
-        return
-      end if
-    case ("turb_heat_ex_coeff")
-      if (present(idx)) then
-        status = NML_ERR_INVALID_INDEX
-        if (present(errmsg)) errmsg = "index not supported for 'turb_heat_ex_coeff'"
-        return
-      end if
-    case ("max_iter")
-      if (present(idx)) then
-        status = NML_ERR_INVALID_INDEX
-        if (present(errmsg)) errmsg = "index not supported for 'max_iter'"
-        return
-      end if
-    case ("delta_iter")
-      if (present(idx)) then
-        status = NML_ERR_INVALID_INDEX
-        if (present(errmsg)) errmsg = "index not supported for 'delta_iter'"
-        return
-      end if
-    case ("step_iter")
-      if (present(idx)) then
-        status = NML_ERR_INVALID_INDEX
-        if (present(errmsg)) errmsg = "index not supported for 'step_iter'"
-        return
       end if
     case default
       status = NML_ERR_INVALID_NAME

@@ -57,6 +57,7 @@ They are all listed below, one page per namelist:
 - \subpage neutrons1 : Parameters for neutrons (case 1 - Desilets) `&neutrons1`.
 - \subpage neutrons2 : Parameters for neutrons (case 2 - COSMIC) `&neutrons2`.
 - \subpage geoparameter : Parameters for geology `&geoparameter`.
+- \subpage rivertemp1 : Parameters for river temperature (case 1) `&rivertemp1`.
 
 \section nml_outputs Output Namelists
 

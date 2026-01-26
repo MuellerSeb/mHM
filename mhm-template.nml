@@ -440,20 +440,6 @@
   write_restart(:) = .false.
   ! Restart output path
   restart_output_path(:) = "mrm_restart_out.nc"
-  ! Albedo of open water
-  albedo_water = 0.15
-  ! Priestley-Taylor alpha
-  pt_a_water = 1.26
-  ! Emissivity of water
-  emissivity_water = 0.96
-  ! Turbulent heat exchange coefficient
-  turb_heat_ex_coeff = 20.0
-  ! Max number of iterations
-  max_iter = 50
-  ! Convergence criterion iteration
-  delta_iter = 0.01
-  ! Maximal step in iteration
-  step_iter = 5.0
 /
 
 ! Observations configuration
