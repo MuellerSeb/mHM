@@ -219,6 +219,22 @@ properties:
     x-fortran-shape: max_domains
     x-fortran-flex-tail-dims: 1
     title: Aspect input
+  fdir_path:
+    type: array
+    items:
+      type: string
+      x-fortran-len: buf
+    x-fortran-shape: max_domains
+    x-fortran-flex-tail-dims: 1
+    title: Flow direction input
+  facc_path:
+    type: array
+    items:
+      type: string
+      x-fortran-len: buf
+    x-fortran-shape: max_domains
+    x-fortran-flex-tail-dims: 1
+    title: Flow accumulation input
   geo_class_path:
     type: array
     items:
@@ -435,6 +451,22 @@ properties:
       default: aspect
     x-fortran-shape: max_domains
     title: Aspect variable name
+  fdir_var:
+    type: array
+    items:
+      type: string
+      x-fortran-len: buf
+      default: fdir
+    x-fortran-shape: max_domains
+    title: Flow direction variable name
+  facc_var:
+    type: array
+    items:
+      type: string
+      x-fortran-len: buf
+      default: facc
+    x-fortran-shape: max_domains
+    title: Flow accumulation variable name
   geo_class_var:
     type: array
     items:

@@ -148,6 +148,10 @@
   slope_path(:) = ""
   ! Aspect input
   aspect_path(:) = ""
+  ! Flow direction input
+  fdir_path(:) = ""
+  ! Flow accumulation input
+  facc_path(:) = ""
   ! Geology class input
   geo_class_path(:) = ""
   ! Soil class input
@@ -202,6 +206,10 @@
   slope_var(:) = "slope"
   ! Aspect variable name
   aspect_var(:) = "aspect"
+  ! Flow direction variable name
+  fdir_var(:) = "fdir"
+  ! Flow accumulation variable name
+  facc_var(:) = "facc"
   ! Geology class variable name
   geo_class_var(:) = "geology_class"
   ! Soil class variable name

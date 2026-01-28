@@ -63,6 +63,8 @@ module nml_config_input
   character(len=buf), parameter, public :: dem_var_default = "dem"
   character(len=buf), parameter, public :: slope_var_default = "slope"
   character(len=buf), parameter, public :: aspect_var_default = "aspect"
+  character(len=buf), parameter, public :: fdir_var_default = "fdir"
+  character(len=buf), parameter, public :: facc_var_default = "facc"
   character(len=buf), parameter, public :: geo_class_var_default = "geology_class"
   character(len=buf), parameter, public :: soil_class_var_default = "soil_class"
   character(len=buf), parameter, public :: lai_class_var_default = "LAI_class"
@@ -113,6 +115,8 @@ module nml_config_input
     character(len=buf), dimension(max_domains) :: dem_path !< DEM input
     character(len=buf), dimension(max_domains) :: slope_path !< Slope input
     character(len=buf), dimension(max_domains) :: aspect_path !< Aspect input
+    character(len=buf), dimension(max_domains) :: fdir_path !< Flow direction input
+    character(len=buf), dimension(max_domains) :: facc_path !< Flow accumulation input
     character(len=buf), dimension(max_domains) :: geo_class_path !< Geology class input
     character(len=buf), dimension(max_domains) :: soil_class_path !< Soil class input
     character(len=buf), dimension(max_domains) :: soil_horizon_class_path !< Soil horizon class input
@@ -140,6 +144,8 @@ module nml_config_input
     character(len=buf), dimension(max_domains) :: dem_var !< DEM variable name
     character(len=buf), dimension(max_domains) :: slope_var !< Slope variable name
     character(len=buf), dimension(max_domains) :: aspect_var !< Aspect variable name
+    character(len=buf), dimension(max_domains) :: fdir_var !< Flow direction variable name
+    character(len=buf), dimension(max_domains) :: facc_var !< Flow accumulation variable name
     character(len=buf), dimension(max_domains) :: geo_class_var !< Geology class variable name
     character(len=buf), dimension(max_domains) :: soil_class_var !< Soil class variable name
     character(len=buf), dimension(max_domains) :: lai_class_var !< LAI class variable name
@@ -228,6 +234,8 @@ contains
     this%dem_path = repeat(achar(0), len(this%dem_path)) ! sentinel for optional string array
     this%slope_path = repeat(achar(0), len(this%slope_path)) ! sentinel for optional string array
     this%aspect_path = repeat(achar(0), len(this%aspect_path)) ! sentinel for optional string array
+    this%fdir_path = repeat(achar(0), len(this%fdir_path)) ! sentinel for optional string array
+    this%facc_path = repeat(achar(0), len(this%facc_path)) ! sentinel for optional string array
     this%geo_class_path = repeat(achar(0), len(this%geo_class_path)) ! sentinel for optional string array
     this%soil_class_path = repeat(achar(0), len(this%soil_class_path)) ! sentinel for optional string array
     this%soil_horizon_class_path = repeat(achar(0), len(this%soil_horizon_class_path)) ! sentinel for optional string array
@@ -259,6 +267,8 @@ contains
     this%dem_var = dem_var_default
     this%slope_var = slope_var_default
     this%aspect_var = aspect_var_default
+    this%fdir_var = fdir_var_default
+    this%facc_var = facc_var_default
     this%geo_class_var = geo_class_var_default
     this%soil_class_var = soil_class_var_default
     this%lai_class_var = lai_class_var_default
@@ -303,6 +313,8 @@ contains
     character(len=buf), dimension(max_domains) :: dem_path
     character(len=buf), dimension(max_domains) :: slope_path
     character(len=buf), dimension(max_domains) :: aspect_path
+    character(len=buf), dimension(max_domains) :: fdir_path
+    character(len=buf), dimension(max_domains) :: facc_path
     character(len=buf), dimension(max_domains) :: geo_class_path
     character(len=buf), dimension(max_domains) :: soil_class_path
     character(len=buf), dimension(max_domains) :: soil_horizon_class_path
@@ -330,6 +342,8 @@ contains
     character(len=buf), dimension(max_domains) :: dem_var
     character(len=buf), dimension(max_domains) :: slope_var
     character(len=buf), dimension(max_domains) :: aspect_var
+    character(len=buf), dimension(max_domains) :: fdir_var
+    character(len=buf), dimension(max_domains) :: facc_var
     character(len=buf), dimension(max_domains) :: geo_class_var
     character(len=buf), dimension(max_domains) :: soil_class_var
     character(len=buf), dimension(max_domains) :: lai_class_var
@@ -373,6 +387,8 @@ contains
       dem_path, &
       slope_path, &
       aspect_path, &
+      fdir_path, &
+      facc_path, &
       geo_class_path, &
       soil_class_path, &
       soil_horizon_class_path, &
@@ -400,6 +416,8 @@ contains
       dem_var, &
       slope_var, &
       aspect_var, &
+      fdir_var, &
+      facc_var, &
       geo_class_var, &
       soil_class_var, &
       lai_class_var, &
@@ -439,6 +457,8 @@ contains
     dem_path = this%dem_path
     slope_path = this%slope_path
     aspect_path = this%aspect_path
+    fdir_path = this%fdir_path
+    facc_path = this%facc_path
     geo_class_path = this%geo_class_path
     soil_class_path = this%soil_class_path
     soil_horizon_class_path = this%soil_horizon_class_path
@@ -466,6 +486,8 @@ contains
     dem_var = this%dem_var
     slope_var = this%slope_var
     aspect_var = this%aspect_var
+    fdir_var = this%fdir_var
+    facc_var = this%facc_var
     geo_class_var = this%geo_class_var
     soil_class_var = this%soil_class_var
     lai_class_var = this%lai_class_var
@@ -527,6 +549,8 @@ contains
     this%dem_path = dem_path
     this%slope_path = slope_path
     this%aspect_path = aspect_path
+    this%fdir_path = fdir_path
+    this%facc_path = facc_path
     this%geo_class_path = geo_class_path
     this%soil_class_path = soil_class_path
     this%soil_horizon_class_path = soil_horizon_class_path
@@ -554,6 +578,8 @@ contains
     this%dem_var = dem_var
     this%slope_var = slope_var
     this%aspect_var = aspect_var
+    this%fdir_var = fdir_var
+    this%facc_var = facc_var
     this%geo_class_var = geo_class_var
     this%soil_class_var = soil_class_var
     this%lai_class_var = lai_class_var
@@ -598,6 +624,8 @@ contains
     dem_path, &
     slope_path, &
     aspect_path, &
+    fdir_path, &
+    facc_path, &
     geo_class_path, &
     soil_class_path, &
     soil_horizon_class_path, &
@@ -625,6 +653,8 @@ contains
     dem_var, &
     slope_var, &
     aspect_var, &
+    fdir_var, &
+    facc_var, &
     geo_class_var, &
     soil_class_var, &
     lai_class_var, &
@@ -665,6 +695,8 @@ contains
     character(len=*), dimension(:), intent(in), optional :: dem_path
     character(len=*), dimension(:), intent(in), optional :: slope_path
     character(len=*), dimension(:), intent(in), optional :: aspect_path
+    character(len=*), dimension(:), intent(in), optional :: fdir_path
+    character(len=*), dimension(:), intent(in), optional :: facc_path
     character(len=*), dimension(:), intent(in), optional :: geo_class_path
     character(len=*), dimension(:), intent(in), optional :: soil_class_path
     character(len=*), dimension(:), intent(in), optional :: soil_horizon_class_path
@@ -692,6 +724,8 @@ contains
     character(len=*), dimension(:), intent(in), optional :: dem_var
     character(len=*), dimension(:), intent(in), optional :: slope_var
     character(len=*), dimension(:), intent(in), optional :: aspect_var
+    character(len=*), dimension(:), intent(in), optional :: fdir_var
+    character(len=*), dimension(:), intent(in), optional :: facc_var
     character(len=*), dimension(:), intent(in), optional :: geo_class_var
     character(len=*), dimension(:), intent(in), optional :: soil_class_var
     character(len=*), dimension(:), intent(in), optional :: lai_class_var
@@ -962,6 +996,26 @@ contains
       ub_1 = lb_1 + size(aspect_path, 1) - 1
       this%aspect_path(lb_1:ub_1) = aspect_path
     end if
+    if (present(fdir_path)) then
+      if (size(fdir_path, 1) > size(this%fdir_path, 1)) then
+        status = NML_ERR_INVALID_INDEX
+        if (present(errmsg)) errmsg = "dimension 1 exceeds bounds for 'fdir_path'"
+        return
+      end if
+      lb_1 = lbound(this%fdir_path, 1)
+      ub_1 = lb_1 + size(fdir_path, 1) - 1
+      this%fdir_path(lb_1:ub_1) = fdir_path
+    end if
+    if (present(facc_path)) then
+      if (size(facc_path, 1) > size(this%facc_path, 1)) then
+        status = NML_ERR_INVALID_INDEX
+        if (present(errmsg)) errmsg = "dimension 1 exceeds bounds for 'facc_path'"
+        return
+      end if
+      lb_1 = lbound(this%facc_path, 1)
+      ub_1 = lb_1 + size(facc_path, 1) - 1
+      this%facc_path(lb_1:ub_1) = facc_path
+    end if
     if (present(geo_class_path)) then
       if (size(geo_class_path, 1) > size(this%geo_class_path, 1)) then
         status = NML_ERR_INVALID_INDEX
@@ -1231,6 +1285,26 @@ contains
       lb_1 = lbound(this%aspect_var, 1)
       ub_1 = lb_1 + size(aspect_var, 1) - 1
       this%aspect_var(lb_1:ub_1) = aspect_var
+    end if
+    if (present(fdir_var)) then
+      if (size(fdir_var, 1) > size(this%fdir_var, 1)) then
+        status = NML_ERR_INVALID_INDEX
+        if (present(errmsg)) errmsg = "dimension 1 exceeds bounds for 'fdir_var'"
+        return
+      end if
+      lb_1 = lbound(this%fdir_var, 1)
+      ub_1 = lb_1 + size(fdir_var, 1) - 1
+      this%fdir_var(lb_1:ub_1) = fdir_var
+    end if
+    if (present(facc_var)) then
+      if (size(facc_var, 1) > size(this%facc_var, 1)) then
+        status = NML_ERR_INVALID_INDEX
+        if (present(errmsg)) errmsg = "dimension 1 exceeds bounds for 'facc_var'"
+        return
+      end if
+      lb_1 = lbound(this%facc_var, 1)
+      ub_1 = lb_1 + size(facc_var, 1) - 1
+      this%facc_var(lb_1:ub_1) = facc_var
     end if
     if (present(geo_class_var)) then
       if (size(geo_class_var, 1) > size(this%geo_class_var, 1)) then
@@ -1577,6 +1651,24 @@ contains
       else
         if (all(this%aspect_path == repeat(achar(0), len(this%aspect_path)))) status = NML_ERR_NOT_SET
       end if
+    case ("fdir_path")
+      if (present(idx)) then
+        status = idx_check(idx, lbound(this%fdir_path), ubound(this%fdir_path), &
+          "fdir_path", errmsg)
+        if (status /= NML_OK) return
+        if (this%fdir_path(idx(1)) == repeat(achar(0), len(this%fdir_path))) status = NML_ERR_NOT_SET
+      else
+        if (all(this%fdir_path == repeat(achar(0), len(this%fdir_path)))) status = NML_ERR_NOT_SET
+      end if
+    case ("facc_path")
+      if (present(idx)) then
+        status = idx_check(idx, lbound(this%facc_path), ubound(this%facc_path), &
+          "facc_path", errmsg)
+        if (status /= NML_OK) return
+        if (this%facc_path(idx(1)) == repeat(achar(0), len(this%facc_path))) status = NML_ERR_NOT_SET
+      else
+        if (all(this%facc_path == repeat(achar(0), len(this%facc_path)))) status = NML_ERR_NOT_SET
+      end if
     case ("geo_class_path")
       if (present(idx)) then
         status = idx_check(idx, lbound(this%geo_class_path), ubound(this%geo_class_path), &
@@ -1775,6 +1867,20 @@ contains
       if (present(idx)) then
         status = idx_check(idx, lbound(this%aspect_var), ubound(this%aspect_var), &
           "aspect_var", errmsg)
+        if (status /= NML_OK) return
+      else
+      end if
+    case ("fdir_var")
+      if (present(idx)) then
+        status = idx_check(idx, lbound(this%fdir_var), ubound(this%fdir_var), &
+          "fdir_var", errmsg)
+        if (status /= NML_OK) return
+      else
+      end if
+    case ("facc_var")
+      if (present(idx)) then
+        status = idx_check(idx, lbound(this%facc_var), ubound(this%facc_var), &
+          "facc_var", errmsg)
         if (status /= NML_OK) return
       else
       end if
@@ -2451,6 +2557,58 @@ contains
           return
         end if
       end if
+    case ("fdir_path")
+      if (size(filled) /= 1) then
+        status = NML_ERR_INVALID_INDEX
+        if (present(errmsg)) errmsg = "shape rank mismatch for 'fdir_path'"
+        return
+      end if
+      do dim = 1, 1
+        filled(dim) = size(this%fdir_path, dim)
+      end do
+      filled(1) = 0
+      do idx = ubound(this%fdir_path, 1), &
+        lbound(this%fdir_path, 1), -1
+        if (.not. (this%fdir_path(idx) == repeat(achar(0), len(this%fdir_path)))) then
+          filled(1) = idx - lbound(this%fdir_path, 1) + 1
+          exit
+        end if
+      end do
+      if (minval(filled) > 0) then
+        lb_1 = lbound(this%fdir_path, 1)
+        ub_1 = lb_1 + filled(1) - 1
+        if (any(this%fdir_path(lb_1:ub_1) == repeat(achar(0), len(this%fdir_path)))) then
+          status = NML_ERR_PARTLY_SET
+          if (present(errmsg)) errmsg = "array partly set: fdir_path"
+          return
+        end if
+      end if
+    case ("facc_path")
+      if (size(filled) /= 1) then
+        status = NML_ERR_INVALID_INDEX
+        if (present(errmsg)) errmsg = "shape rank mismatch for 'facc_path'"
+        return
+      end if
+      do dim = 1, 1
+        filled(dim) = size(this%facc_path, dim)
+      end do
+      filled(1) = 0
+      do idx = ubound(this%facc_path, 1), &
+        lbound(this%facc_path, 1), -1
+        if (.not. (this%facc_path(idx) == repeat(achar(0), len(this%facc_path)))) then
+          filled(1) = idx - lbound(this%facc_path, 1) + 1
+          exit
+        end if
+      end do
+      if (minval(filled) > 0) then
+        lb_1 = lbound(this%facc_path, 1)
+        ub_1 = lb_1 + filled(1) - 1
+        if (any(this%facc_path(lb_1:ub_1) == repeat(achar(0), len(this%facc_path)))) then
+          status = NML_ERR_PARTLY_SET
+          if (present(errmsg)) errmsg = "array partly set: facc_path"
+          return
+        end if
+      end if
     case ("geo_class_path")
       if (size(filled) /= 1) then
         status = NML_ERR_INVALID_INDEX
@@ -2925,6 +3083,34 @@ contains
       status = istat
       if (present(errmsg)) then
         if (len_trim(errmsg) == 0) errmsg = "array partly set: aspect_path"
+      end if
+      return
+    end if
+    if (istat /= NML_OK) then
+      status = istat
+      return
+    end if
+    if (allocated(filled)) deallocate(filled)
+    allocate(filled(1))
+    istat = this%filled_shape("fdir_path", filled, errmsg=errmsg)
+    if (istat == NML_ERR_PARTLY_SET) then
+      status = istat
+      if (present(errmsg)) then
+        if (len_trim(errmsg) == 0) errmsg = "array partly set: fdir_path"
+      end if
+      return
+    end if
+    if (istat /= NML_OK) then
+      status = istat
+      return
+    end if
+    if (allocated(filled)) deallocate(filled)
+    allocate(filled(1))
+    istat = this%filled_shape("facc_path", filled, errmsg=errmsg)
+    if (istat == NML_ERR_PARTLY_SET) then
+      status = istat
+      if (present(errmsg)) then
+        if (len_trim(errmsg) == 0) errmsg = "array partly set: facc_path"
       end if
       return
     end if
