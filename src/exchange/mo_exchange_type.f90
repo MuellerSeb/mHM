@@ -26,10 +26,9 @@ module mo_exchange_type
   use mo_string_utils, only: n2s=>num2str
   use mo_main_config, only: parameters_t
   use mo_utils, only: optval
-
-  use mo_namelists, only: &
-    nml_mainconfig_mhm_mrm_t, &
-    nml_time_periods_t
+  use nml_config_time, only: nml_config_time_t
+  use nml_config_project, only: nml_config_project_t
+  use nml_helper, only: NML_OK
 
   implicit none
   private
@@ -43,16 +42,6 @@ module mo_exchange_type
   integer(i4), public, parameter :: l2 = 2_i4      !< level2 - meteorology
   integer(i4), public, parameter :: l3 = 3_i4      !< level3 - routing
   !!@}
-
-  !> \class   time_config_t
-  !> \brief   Configuration for time periods.
-  type, public :: time_config_t
-    character(:), allocatable :: file          !< mhm namelist file
-    type(nml_mainconfig_mhm_mrm_t) :: mainconfig_mhm_mrm !< mainconfig_mhm_mrm configuration containing time step
-    type(nml_time_periods_t) :: time_periods !< time_periods configuration
-  contains
-    procedure :: read => time_config_read
-  end type time_config_t
 
   !> \class   variable_abc
   !> \brief   Abstract base class for a variable in the exchange type.
@@ -107,16 +96,17 @@ module mo_exchange_type
   !> \class   exchange_t
   !> \brief   Class for dynamically exchanging variables in mHM.
   type, public :: exchange_t
-    integer(i4) :: step_count           !< current time step
-    type(datetime) :: time              !< time-stamp for the current time step
-    type(datetime) :: start_time        !< start time of simulation
-    type(datetime) :: eval_start_time   !< start time of evaluation
-    type(datetime) :: end_time          !< end time of simulation
-    type(timedelta) :: step             !< time step of the simulation
-    type(time_config_t) :: time_config  !< time configuration
-    type(parameters_t) :: parameters    !< parameters container
-    integer(i4) :: domain               !< Number of this domain
-    character(:), allocatable :: cwd    !< current working directory to set relative paths
+    integer(i4) :: step_count               !< current time step
+    type(datetime) :: time                  !< time-stamp for the current time step
+    type(datetime) :: start_time            !< start time of simulation
+    type(datetime) :: eval_start_time       !< start time of evaluation
+    type(datetime) :: end_time              !< end time of simulation
+    type(timedelta) :: step                 !< time step of the simulation
+    type(nml_config_time_t) :: time_config  !< time configuration
+    type(nml_config_project_t) :: project   !< project configuration
+    type(parameters_t) :: parameters        !< parameters container
+    integer(i4) :: domain                   !< Number of this domain
+    character(:), allocatable :: cwd        !< current working directory to set relative paths
 
     ! grids
     type(grid_t), pointer :: level0 => null() !< level0 grid of the morphology
@@ -156,6 +146,8 @@ module mo_exchange_type
     type(var_dp) :: dem                 !< elevation [m] on level l0 (static)
     type(var_dp) :: slope               !< slope [%] on level l0 (static)
     type(var_dp) :: aspect              !< aspect [degree] on level l0 (static)
+    type(var_i4) :: fdir                !< flow direction [1] on level l0 (static)
+    type(var_i4) :: facc                !< flow accumulation [1] on level l0 (static)
 
     ! hydrology (level1)
     ! canopy
@@ -262,35 +254,66 @@ module mo_exchange_type
 contains
 
   !> \brief Initialize the exchange type
-  subroutine exchange_init(self, time_cfg, parameters, domain, cwd)
+  subroutine exchange_init(self, meta_file, main_file, para_file, domain, cwd)
     use mo_os, only: path_abspath, check_path_isdir
     class(exchange_t), intent(inout) :: self
-    type(time_config_t), intent(in) :: time_cfg !< time configuration
-    type(parameters_t), intent(in) :: parameters !< parameters container
+    character(*), intent(in), optional :: meta_file !< file containing the metadata namelists (project, processes)
+    character(*), intent(in), optional :: main_file !< file containing the main namelists (time)
+    character(*), intent(in), optional :: para_file !< file containing the parameter namelists
     integer(i4), intent(in), optional :: domain !< domain ID of the current domain in the configuration arrays (1 by default)
     character(len=*), intent(in), optional :: cwd !< current working directory to set relative paths
-
+    integer(i4) :: id(1), share_id
+    character(1024) :: errmsg
+    character(:), allocatable :: path
+    integer :: status
     call message(" ... configure exchange")
-    self%time_config = time_cfg
-    self%parameters = parameters
+
     self%domain = optval(domain, 1_i4) ! 1 by default for single domain initialization
     self%cwd = path_abspath(optval(cwd, "."))
     call check_path_isdir(self%cwd, raise=.true.)
 
+    if (present(meta_file)) then
+      ! meta configuration uses absolute path internally
+      call message(" ... read project attributes: ", meta_file)
+      status = self%project%from_file(file=meta_file, errmsg=errmsg)
+      if (status /= NML_OK) call error_message("Error reading project config from: ", meta_file, ", with error: ", trim(errmsg))
+    end if
+    if (.not.self%project%is_configured) call error_message("Project configuration not set.")
+    status = self%project%is_valid(errmsg=errmsg)
+    if (status /= NML_OK) call error_message("Project config not valid. Error: ", trim(errmsg))
+
+    if (present(main_file)) then
+      path = self%get_path(main_file) ! get absolute path relative to cwd
+      call message(" ... read time config: ", path)
+      status = self%time_config%from_file(file=path, errmsg=errmsg)
+      if (status /= NML_OK) call error_message("Error reading time config from: ", path, ", with error: ", trim(errmsg))
+    end if
+    if (.not.self%time_config%is_configured) call error_message("Time configuration not set.")
+    status = self%time_config%is_valid(errmsg=errmsg)
+    if (status /= NML_OK) call error_message("Time config not valid. Error: ", trim(errmsg))
+
+    ! parameters are created redundantly for each exchange instance
+    ! but this simplifies the code structure
+    call self%parameters%configure(meta_file=meta_file, para_file=para_file)
+
     ! time settings
-    self%eval_start_time = datetime( &
-      year=self%time_config%time_periods%eval_Per(self%domain)%yStart, &
-      month=self%time_config%time_periods%eval_Per(self%domain)%mStart, &
-      day=self%time_config%time_periods%eval_Per(self%domain)%dStart &
-    )
-    self%end_time = datetime( &
-      year=self%time_config%time_periods%eval_Per(self%domain)%yEnd, &
-      month=self%time_config%time_periods%eval_Per(self%domain)%mEnd, &
-      day=self%time_config%time_periods%eval_Per(self%domain)%dEnd &
-    )
-    self%start_time = self%eval_start_time - timedelta(days=self%time_config%time_periods%warming_Days(self%domain))
-    self%end_time = self%end_time + timedelta(days=1_i4)  ! TODO: old behavior, should be changed in future
-    self%step = timedelta(hours=self%time_config%mainconfig_mhm_mrm%timeStep)
+    id(1) = self%domain
+    if (self%time_config%share_time_period) id(1) = 1_i4
+    status = self%time_config%is_set("sim_start", idx=id, errmsg=errmsg)
+    if (status /= NML_OK) call error_message("Simulation start time input error: ", trim(errmsg))
+    self%start_time = datetime(self%time_config%sim_start(id(1))) ! from string
+
+    status = self%time_config%is_set("sim_end", idx=id, errmsg=errmsg)
+    if (status /= NML_OK) call error_message("Simulation end time input error: ", trim(errmsg))
+    self%end_time = datetime(self%time_config%sim_end(id(1))) ! from string
+
+    status = self%time_config%is_set("eval_start", idx=id, errmsg=errmsg)
+    if (status /= NML_OK) call error_message("Evaluation start time input error: ", trim(errmsg))
+    self%eval_start_time = datetime(self%time_config%eval_start(id(1))) ! from string
+
+    id(1) = self%domain
+    if (self%time_config%share_time_step) id(1) = 1_i4
+    self%step = timedelta(hours=self%time_config%time_step(id(1)))
 
     ! initialize time
     self%step_count = 0_i4
@@ -321,6 +344,8 @@ contains
     self%dem    = var_dp(static=.true., grid=l0, name="dem",    units="m",      long_name="elevation", standard_name="height_above_mean_sea_level")
     self%slope  = var_dp(static=.true., grid=l0, name="slope",  units="%",      long_name="slope", standard_name="ground_slope_angle")
     self%aspect = var_dp(static=.true., grid=l0, name="aspect", units="degree", long_name="aspect", standard_name="ground_slope_direction")
+    self%fdir   = var_i4(static=.true., grid=l0, name="fdir",   units="1",      long_name="flow direction")
+    self%facc   = var_i4(static=.true., grid=l0, name="facc",   units="1",      long_name="flow accumulation")
 
     ! hydrology (level1)
     ! canopy
@@ -490,6 +515,10 @@ contains
         var_pnt => self%slope
       case("aspect")
         var_pnt => self%aspect
+      case("fdir")
+        var_pnt => self%fdir
+      case("facc")
+        var_pnt => self%facc
       ! hydrology (level1)
       ! canopy
       case("interception")
@@ -838,15 +867,5 @@ contains
     character(:), allocatable :: norm_path !< formatted path
     norm_path = path_normpath(path_join(self%cwd, path, file))
   end function exchange_get_path
-
-  !> \brief Read time configuration.
-  subroutine time_config_read(self, file)
-    class(time_config_t), intent(inout) :: self
-    character(*), intent(in) :: file !< file containing the namelists
-    call message(" ... read config time: ", file)
-    self%file = file
-    call self%mainconfig_mhm_mrm%read(file)
-    call self%time_periods%read(file)
-  end subroutine time_config_read
 
 end module mo_exchange_type

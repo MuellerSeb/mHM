@@ -13,17 +13,17 @@ module mo_domain
   use mo_list, only: list
   use mo_kind, only: i4, dp
   use mo_message, only: message, error_message
-  use mo_exchange_type, only: exchange_t, time_config_t
+  use mo_exchange_type, only: exchange_t
   use mo_string_utils, only: n2s=>num2str
   use mo_datetime, only: datetime, timedelta
   ! config
   use mo_main_config, only: parameters_t
   ! containers
-  use mo_input_container, only: input_t, input_config_t
-  use mo_meteo_container, only: meteo_t, meteo_config_t
-  use mo_mpr_container, only: mpr_t, mpr_config_t
-  use mo_mhm_container, only: mhm_t, mhm_config_t
-  use mo_mrm_container, only: mrm_t, mrm_config_t
+  use mo_input_container, only: input_t
+  use mo_meteo_container, only: meteo_t
+  use mo_mpr_container, only: mpr_t
+  use mo_mhm_container, only: mhm_t
+  use mo_mrm_container, only: mrm_t
 
   !> \class   domain_t
   !> \brief   Class for a single mHM domain.
@@ -94,15 +94,16 @@ contains
   end function domain_list_add
 
   !> \brief Create a new domain.
-  subroutine domain_init(self, parameters, time_cfg, domain, cwd)
+  subroutine domain_init(self, meta_file, main_file, para_file, domain, cwd)
     ! domain is always an item of a domain_list, which stores "allocated pointers" and these implicitly have the "target" attribute
     class(domain_t), intent(inout), target :: self ! needs "target" so components can safely point to "exchange"
-    type(parameters_t), intent(in) :: parameters !< configuration for the parameters
-    type(time_config_t), intent(in) :: time_cfg !< configuration of the timing
+    character(*), intent(in), optional :: meta_file !< file containing the metadata namelists
+    character(*), intent(in), optional :: main_file !< file containing the main namelists
+    character(*), intent(in), optional :: para_file !< file containing the parameter namelists
     integer(i4), intent(in), optional :: domain !< domain ID of the current domain in the configuration arrays (1 by default)
     character(len=*), intent(in), optional :: cwd !< current working directory to set relative paths
     call message(" ... setup new domain")
-    call self%exchange%init(time_cfg, parameters, domain, cwd)
+    call self%exchange%init(meta_file, main_file, para_file, domain, cwd)
     ! set exchange pointer in components
     self%input%exchange => self%exchange
     self%meteo%exchange => self%exchange
@@ -112,20 +113,16 @@ contains
   end subroutine domain_init
 
   !> \brief Configure the domain.
-  subroutine domain_configure(self, input_cfg, meteo_cfg, mpr_cfg, mhm_cfg, mrm_cfg)
+  subroutine domain_configure(self, file)
     ! domain is always an item of a domain_list, which stores "allocated pointers" and these implicitly have the "target" attribute
     class(domain_t), intent(inout), target :: self ! needs "target" so components can safely point to "exchange"
-    type(input_config_t), intent(in), optional :: input_cfg !< configuration for the input container
-    type(meteo_config_t), intent(in), optional :: meteo_cfg !< configuration for the meteo container
-    type(mpr_config_t), intent(in), optional :: mpr_cfg !< configuration for the mpr container
-    type(mhm_config_t), intent(in), optional :: mhm_cfg !< configuration for the mhm container
-    type(mrm_config_t), intent(in), optional :: mrm_cfg !< configuration for the mrm container
+    character(*), intent(in), optional :: file !< file containing the namelists
     call message(" ... configure domain")
-    if (present(input_cfg)) call self%input%configure(input_cfg)
-    if (present(meteo_cfg)) call self%meteo%configure(meteo_cfg)
-    if (present(mpr_cfg)) call self%mpr%configure(mpr_cfg)
-    if (present(mhm_cfg)) call self%mhm%configure(mhm_cfg)
-    if (present(mrm_cfg)) call self%mrm%configure(mrm_cfg)
+    call self%input%configure(file)
+    if (self%exchange%parameters%meteo_active()) call self%meteo%configure(file)
+    if (self%exchange%parameters%mhm_active()) call self%mpr%configure(file)
+    if (self%exchange%parameters%mhm_active()) call self%mhm%configure(file)
+    if (self%exchange%parameters%mrm_active()) call self%mrm%configure(file)
   end subroutine domain_configure
 
   !> \brief Connect the domain components.
@@ -133,13 +130,12 @@ contains
   subroutine domain_connect(self)
     ! domain is always an item of a domain_list, which stores "allocated pointers" and these implicitly have the "target" attribute
     class(domain_t), intent(inout), target :: self ! needs "target" so components can safely point to "exchange"
-
     call message(" ... connect domain")
-    if (self%input%config%active) call self%input%connect()
-    if (self%meteo%config%active) call self%meteo%connect()
-    if (self%mpr%config%active) call self%mpr%connect()
-    if (self%mhm%config%active) call self%mhm%connect()
-    if (self%mrm%config%active) call self%mrm%connect()
+    call self%input%connect()
+    if (self%exchange%parameters%meteo_active()) call self%meteo%connect()
+    if (self%exchange%parameters%mhm_active()) call self%mpr%connect()
+    if (self%exchange%parameters%mhm_active()) call self%mhm%connect()
+    if (self%exchange%parameters%mrm_active()) call self%mrm%connect()
   end subroutine domain_connect
 
   !> \brief Initialize the domain and do the initial state calculations in the components.
@@ -149,22 +145,22 @@ contains
     real(dp), dimension(:), optional, intent(in) :: parameters
     call message(" ... initialize domain")
     call self%exchange%parameters%set(parameters)
-    if (self%input%config%active) call self%input%initialize()
-    if (self%meteo%config%active) call self%meteo%initialize()
-    if (self%mpr%config%active) call self%mpr%initialize()
-    if (self%mhm%config%active) call self%mhm%initialize()
-    if (self%mrm%config%active) call self%mrm%initialize()
+    call self%input%initialize()
+    if (self%exchange%parameters%meteo_active()) call self%meteo%initialize()
+    if (self%exchange%parameters%mhm_active()) call self%mpr%initialize()
+    if (self%exchange%parameters%mhm_active()) call self%mhm%initialize()
+    if (self%exchange%parameters%mrm_active()) call self%mrm%initialize()
   end subroutine domain_initialize
 
   subroutine domain_update(self)
     class(domain_t), intent(inout) :: self
     call self%exchange%time%add(self%exchange%step)
     self%exchange%step_count = self%exchange%step_count + 1_i4
-    if (self%input%config%active) call self%input%update()
-    if (self%meteo%config%active) call self%meteo%update()
-    if (self%mpr%config%active) call self%mpr%update()
-    if (self%mhm%config%active) call self%mhm%update()
-    if (self%mrm%config%active) call self%mrm%update()
+    call self%input%update()
+    if (self%exchange%parameters%meteo_active()) call self%meteo%update()
+    if (self%exchange%parameters%mhm_active()) call self%mpr%update()
+    if (self%exchange%parameters%mhm_active()) call self%mhm%update()
+    if (self%exchange%parameters%mrm_active()) call self%mrm%update()
     if (self%exchange%time%is_new_year()) &
       call message(" ... finished year: ", n2s(self%exchange%time%year - 1_i4))
   end subroutine domain_update
@@ -172,7 +168,7 @@ contains
   subroutine domain_finalize(self)
     class(domain_t), intent(inout) :: self
     call message(" ... finalizing domain")
-    if (self%mrm%config%active) call self%mrm%finalize()
+    if (self%exchange%parameters%mrm_active()) call self%mrm%finalize()
   end subroutine domain_finalize
 
 end module mo_domain
