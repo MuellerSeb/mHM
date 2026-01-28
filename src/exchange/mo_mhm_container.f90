@@ -10,50 +10,18 @@
 !! mHM is released under the LGPLv3+ license \license_note
 !> \ingroup f_exchange
 module mo_mhm_container
-  use mo_namelists, only: &
-    nml_project_description_t, &
-    nml_mainconfig_t, &
-    nml_lcover_t, &
-    nml_directories_general_t, &
-    nml_processselection_t, &
-    nml_mainconfig_mhm_mrm_t, &
-    nml_time_periods_t, &
-    nml_optimization_t, &
-    nml_optional_data_t, &
-    nml_baseflow_config_t, &
-    nml_panevapo_t, &
-    nml_nloutputresults_t
   use mo_kind, only: i4, dp
   use mo_constants, only : yearmonths
   use mo_mhm_constants, only : noutflxstate
   use mo_optimization_types, only : optidata
   use mo_exchange_type, only: exchange_t
   use mo_message, only: message, error_message
-
-  !> \class   mhm_config_t
-  !> \brief   Configuration for a single mHM process container.
-  type, public :: mhm_config_t
-    logical :: active = .false. !< flag to activate the mHM process container
-    type(nml_project_description_t) :: project_description !< project_description configuration
-    type(nml_mainconfig_t) :: mainconfig !< mainconfig configuration
-    type(nml_lcover_t) :: lcover !< lcover configuration
-    type(nml_directories_general_t) :: directories_general !< directories_general configuration
-    type(nml_processselection_t) :: processselection !< processselection configuration
-    type(nml_mainconfig_mhm_mrm_t) :: mainconfig_mhm_mrm !< mainconfig_mhm_mrm configuration
-    type(nml_time_periods_t) :: time_periods !< time_periods configuration
-    type(nml_optimization_t) :: optimization !< optimization configuration
-    type(nml_optional_data_t) :: optional_data !< optional_data configuration
-    type(nml_baseflow_config_t) :: baseflow_config !< baseflow_config configuration
-    type(nml_panevapo_t) :: panevapo !< panevapo configuration
-    type(nml_nloutputresults_t) :: nloutputresults !< nloutputresults configuration
-  contains
-    procedure :: read => mhm_config_read
-  end type mhm_config_t
+  use nml_config_mhm, only: nml_config_mhm_t, NML_OK
 
   !> \class   mhm_t
   !> \brief   Class for a single mHM process container.
   type, public :: mhm_t
-    type(mhm_config_t) :: config !< configuration of the mHM process container
+    type(nml_config_mhm_t) :: config !< configuration of the mHM process container
     type(exchange_t), pointer :: exchange => null() !< exchange container of the domain
     ! DEFINE OUTPUTS
     integer(i4) :: output_deflate_level   !< deflate level in nc files
@@ -133,34 +101,23 @@ module mo_mhm_container
 
 contains
 
-  !> \brief Initialize the mHM process container.
-  subroutine mhm_config_read(self, file, output_file)
-    class(mhm_config_t), intent(inout) :: self
-    character(*), intent(in) :: file !< file containing the namelists
-    character(*), intent(in) :: output_file !< file containing the output namelist
-    call message(" ... read config mHM: ", file, ", ", output_file)
-    self%active = .true.
-    call self%project_description%read(file)
-    call self%mainconfig%read(file)
-    call self%lcover%read(file)
-    call self%directories_general%read(file)
-    call self%processselection%read(file)
-    call self%mainconfig_mhm_mrm%read(file)
-    call self%time_periods%read(file)
-    call self%optimization%read(file)
-    call self%optional_data%read(file)
-    call self%baseflow_config%read(file)
-    call self%panevapo%read(file)
-    ! output defined in mhm_outputs.nml
-    call self%nloutputresults%read(output_file)
-  end subroutine mhm_config_read
-
   !> \brief Configure the mHM process container.
-  subroutine mhm_configure(self, config)
+  subroutine mhm_configure(self, file)
     class(mhm_t), intent(inout) :: self
-    type(mhm_config_t), intent(in) :: config !< initialization config for mHM
+    character(*), intent(in), optional :: file !< file containing the namelists
+    character(1024) :: errmsg
+    character(:), allocatable :: path
+    integer :: status
     call message(" ... configure mhm")
-    self%config = config
+    if (present(file)) then
+      path = self%exchange%get_path(file) ! get absolute path relative to cwd
+      call message(" ... read mHM config: ", path)
+      status = self%config%from_file(file=path, errmsg=errmsg)
+      if (status /= NML_OK) call error_message("Error reading mHM config from: ", path, ", with error: ", trim(errmsg))
+    end if
+    if (.not.self%config%is_configured) call error_message("mHM configuration not set.")
+    status = self%config%is_valid(errmsg=errmsg)
+    if (status /= NML_OK) call error_message("mHM config not valid. Error: ", trim(errmsg))
   end subroutine mhm_configure
 
   subroutine mhm_connect(self)

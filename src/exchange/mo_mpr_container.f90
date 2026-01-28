@@ -13,19 +13,12 @@ module mo_mpr_container
   use mo_kind, only: i4
   use mo_exchange_type, only: exchange_t
   use mo_message, only: message, error_message
-
-  !> \class   mpr_config_t
-  !> \brief   Configuration for a single MPR process container.
-  type, public :: mpr_config_t
-    logical :: active = .false. !< flag to activate the MPR process container
-  contains
-    procedure :: read => mpr_config_read
-  end type mpr_config_t
+  use nml_config_mpr, only: nml_config_mpr_t, NML_OK
 
   !> \class   mpr_t
   !> \brief   Class for a single MPR process container.
   type, public :: mpr_t
-    type(mpr_config_t) :: config !< configuration of the MPR process container
+    type(nml_config_mpr_t) :: config !< configuration of the MPR process container
     type(exchange_t), pointer :: exchange => null() !< exchange container of the domain
   contains
     procedure :: configure => mpr_configure
@@ -37,20 +30,23 @@ module mo_mpr_container
 contains
 
   !> \brief Configure the MPR process container.
-  subroutine mpr_configure(self, config)
+  subroutine mpr_configure(self, file)
     class(mpr_t), intent(inout) :: self
-    type(mpr_config_t), intent(in) :: config !< initialization config for MPR
+    character(*), intent(in), optional :: file !< file containing the namelists
+    character(1024) :: errmsg
+    character(:), allocatable :: path
+    integer :: status
     call message(" ... configure mpr")
-    self%config = config
+    if (present(file)) then
+      path = self%exchange%get_path(file) ! get absolute path relative to cwd
+      call message(" ... read MPR config: ", path)
+      status = self%config%from_file(file=path, errmsg=errmsg)
+      if (status /= NML_OK) call error_message("Error reading MPR config from: ", path, ", with error: ", trim(errmsg))
+    end if
+    if (.not.self%config%is_configured) call error_message("MPR configuration not set.")
+    status = self%config%is_valid(errmsg=errmsg)
+    if (status /= NML_OK) call error_message("MPR config not valid. Error: ", trim(errmsg))
   end subroutine mpr_configure
-
-  !> \brief Initialize the mpr configuration.
-  subroutine mpr_config_read(self, file)
-    class(mpr_config_t), intent(inout) :: self
-    character(*), intent(in) :: file !< file containing the namelists
-    call message(" ... read config mpr: ", file)
-    self%active = .true.
-  end subroutine mpr_config_read
 
   subroutine mpr_connect(self)
     class(mpr_t), intent(inout) :: self
