@@ -11,87 +11,43 @@ program driver
   use mo_logging
   use mo_cli, only: cli_parser
   use mo_os, only: path_abspath, path_join, check_path_isdir
-  use mo_message, only: message
+  use mo_message, only: message, error_message
   use mo_mhm_cli, only: set_verbosity_level
   use mo_string_utils, only: n2s => num2str
-  ! exchange
   use mo_domain, only: domains, selected_domains, domain_t
   use mo_kind, only: i4
-  use mo_main_config, only: parameter_config_t, process_config_t, main_config_t, parameters_t
-  use mo_exchange_type, only: time_config_t
-  ! containers
-  use mo_input_container, only: input_config_t
-  use mo_meteo_container, only: meteo_config_t
-  use mo_mpr_container, only: mpr_config_t
-  use mo_mhm_container, only: mhm_config_t
-  use mo_mrm_container, only: mrm_config_t
+  use nml_config_project, only: nml_config_project_t, NML_OK
 
+  logical :: from_dirs
   integer(i4) :: n_domains, i, id
   character(len=:), allocatable :: cwd
   type(domain_t), pointer :: domain
-
   ! global configs
-  type(main_config_t) :: main_cfg
-  type(parameter_config_t) :: parameter_cfg
-  type(process_config_t) :: process_cfg
-  type(parameters_t) :: parameters
-  type(time_config_t) :: time_cfg
-  ! container configs
-  type(input_config_t) :: input_cfg
-  type(meteo_config_t) :: meteo_cfg
-  type(mpr_config_t) :: mpr_cfg
-  type(mhm_config_t) :: mhm_cfg
-  type(mrm_config_t) :: mrm_cfg
-
+  type(nml_config_project_t) :: project
   ! command line interface parser
   type(cli_parser) :: parser
 
-  parser = cli_parser( &
-    description="The mesoscale hydrological model - mHM v6", &
-    add_logger_options=.true., &
-    add_version_option=.true., &
-    version="6.0")
+  character(:), allocatable :: meta_file, main_file, para_file, out_file
+  character(1024) :: errmsg
+  integer :: status
 
-  call parser%add_option( &
-    name="cwd", &
-    blank=.true., &
-    help="The desired working directory (optional).")
+  parser = cli_parser(description="The mesoscale hydrological model - mHM v6", &
+    add_logger_options=.true., add_version_option=.true., version="6.0")
 
-  call parser%add_option( &
-    name="nml", &
-    s_name="n", &
-    has_value=.true., &
-    value_name="path", &
-    default="mhm.nml", &
-    help="The mHM configuration namelist.")
+  call parser%add_option(name="nml", s_name="n", has_value=.true., &
+    value_name="path", default="mhm.nml", help="The mHM configuration namelist.")
 
-  call parser%add_option( &
-    name="parameter", &
-    s_name="p", &
-    has_value=.true., &
-    value_name="path", &
-    default="mhm_parameter.nml", &
-    help="The mHM parameter namelist.")
+  call parser%add_option(name="parameter", s_name="p", has_value=.true., &
+    value_name="path", default="mhm_parameter.nml", help="The mHM parameter namelist.")
 
-  call parser%add_option( &
-    name="mhm_output", &
-    s_name="o", &
-    has_value=.true., &
-    value_name="path", &
-    default="mhm_outputs.nml", &
-    help="The mHM output namelist.")
+  call parser%add_option(name="output", s_name="o", has_value=.true., &
+    value_name="path", default="outputs.nml", help="The mHM output namelist.")
 
-  call parser%add_option( &
-    name="mrm_output", &
-    s_name="r", &
-    has_value=.true., &
-    value_name="path", &
-    default="mrm_outputs.nml", &
-    help="The mRM output namelist.")
+  call parser%add_option(name="cwd", blank=.true., help="The desired working directory (optional).")
 
   ! parse given command line arguments
   call parser%parse()
-  call set_verbosity_level(3_i4 - parser%option_read_count("quiet"))
+  call set_verbosity_level(3_i4 - parser%option_read_count("quiet")) ! TODO: when switching to logging, not needed anymore
 
   ! get current working directory
   ! we don't change the process working directory, but use cwd for all relative paths
@@ -104,23 +60,19 @@ program driver
   log_info(*) "READ MAIN CONFIG"
 
   ! global configs
-  call main_cfg%read(path_join(cwd, parser%option_value("nml")))
-  call time_cfg%read(path_join(cwd, parser%option_value("nml")))
-  call process_cfg%read(path_join(cwd, parser%option_value("nml")))
-  call parameter_cfg%read(path_join(cwd, parser%option_value("parameter")))
-  ! container configs
-  call input_cfg%read(path_join(cwd, parser%option_value("nml")))
-  call meteo_cfg%read(path_join(cwd, parser%option_value("nml")))
-  call mpr_cfg%read(path_join(cwd, parser%option_value("nml")))
-  call mhm_cfg%read(path_join(cwd, parser%option_value("nml")), path_join(cwd, parser%option_value("mhm_output")))
-  call mrm_cfg%read(path_join(cwd, parser%option_value("nml")), path_join(cwd, parser%option_value("mrm_output")))
-
-  log_info(*) "CREATE PARAMETERS"
-  ! create parameters first
-  call parameters%configure(parameter_cfg, process_cfg)
+  meta_file = path_join(cwd, parser%option_value("nml"))
+  para_file = path_join(cwd, parser%option_value("parameter"))
+  out_file  = path_join(cwd, parser%option_value("output"))
+  status = project%from_file(file=meta_file, errmsg=errmsg)
+  if (status /= NML_OK) call error_message("Error reading config_project from: ", meta_file, ", with error: ", trim(errmsg))
+  status = project%is_valid(errmsg=errmsg)
+  if (status /= NML_OK) call error_message("Project config not valid. Error: ", trim(errmsg))
 
   ! determine number of domains
-  n_domains = main_cfg%mainconfig%nDomains
+  n_domains = project%n_domains
+  from_dirs = project%read_domains_from_dirs
+  main_file = meta_file
+  if (from_dirs) main_file = "mhm.nml" ! default main file name in each domain directory
   allocate(selected_domains(n_domains))
 
   log_info(*) "CREATE domains: ", n_domains
@@ -143,10 +95,12 @@ program driver
     log_info(*) "CONFIGURE domain: ", id
     ! get domain
     call domains%get_domain(id, domain)
+    ! id either from list or 1 if from dirs (always take domain 1 in each sub-dir)
+    if (from_dirs) id = 1_i4
     ! create new domain and its exchange
-    call domain%init(parameters, time_cfg, id, cwd)
+    call domain%init(meta_file, main_file, para_file, id, cwd)
     ! configure domain components
-    call domain%configure(input_cfg, meteo_cfg, mpr_cfg, mhm_cfg, mrm_cfg)
+    call domain%configure(main_file)
     ! check for connections and dependencies
     call domain%connect()
   end do
@@ -157,7 +111,7 @@ program driver
     call domains%get_domain(id, domain)
     log_info(*) "PREPARE domain: ", id
     call domain%initialize()
-    log_info(*) "RUN TIME LOOP domain: ", id
+    log_info(*) "RUN TIME LOOP"
     do while(domain%exchange%time < domain%exchange%end_time)
       log_debug(*) " Time step: ", domain%exchange%time%str()
       call domain%update()
