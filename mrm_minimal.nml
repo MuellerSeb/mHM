@@ -1,0 +1,29 @@
+! Project configuration
+&config_project
+  n_domains = 1
+/
+
+! Processes configuration
+&config_processes
+  routing = 2
+/
+
+! Time configuration
+&config_time
+  sim_start(:) = "1990"       ! "1990-01-01 00:00"
+  eval_start(:) = "1990"      ! "1990-01-01 00:00"
+  sim_end(:) = "1994"         ! "1994-01-01 00:00"
+/
+
+! Input configuration
+&config_input
+  runoff_path(:) = "src/tests/files/runoff.nc"
+  fdir_path(:) = "src/tests/files/input.nc"
+  runoff_var(:) = "Q"
+/
+
+! mRM configuration
+&config_mrm
+  resolution(:) = 12000.0
+  output_path(:) = "mrm_output.nc"
+/
