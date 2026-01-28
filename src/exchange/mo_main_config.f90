@@ -14,45 +14,37 @@ module mo_main_config
   use mo_common_constants, only: nprocesses
   use mo_message, only: message, error_message
   use mo_string_utils, only: n2s => num2str
-  use mo_namelists, only: &
-    ! mhm.nml
-    nml_mainconfig_t, &
-    nml_processselection_t, &
-    ! parameters.nml
-    nml_interception1_t, &
-    nml_snow1_t, &
-    nml_soilmoisture1_t, &
-    nml_soilmoisture2_t, &
-    nml_soilmoisture3_t, &
-    nml_soilmoisture4_t, &
-    nml_directrunoff1_t, &
-    nml_PETminus1_t, &
-    nml_PET0_t, &
-    nml_PET1_t, &
-    nml_PET2_t, &
-    nml_PET3_t, &
-    nml_interflow1_t, &
-    nml_percolation1_t, &
-    nml_routing1_t, &
-    nml_routing2_t, &
-    nml_routing3_t, &
-    nml_neutrons1_t, &
-    nml_neutrons2_t, &
-    nml_geoparameter_t
-
-  !> \class   main_config_t
-  !> \brief   Main configuration.
-  type, public :: main_config_t
-    character(:), allocatable :: file    !< mhm namelist file
-    type(nml_mainconfig_t) :: mainconfig !< mainconfig configuration
-  contains
-    procedure :: read => main_config_read
-  end type main_config_t
+  use nml_helper, only: NML_OK
+  ! mhm.nml
+  use nml_config_project, only: nml_config_project_t
+  use nml_config_processes, only: nml_config_processes_t
+  ! parameters.nml
+  use nml_interception1, only: nml_interception1_t
+  use nml_snow1, only: nml_snow1_t
+  use nml_soilmoisture1, only: nml_soilmoisture1_t
+  use nml_soilmoisture2, only: nml_soilmoisture2_t
+  use nml_soilmoisture3, only: nml_soilmoisture3_t
+  use nml_soilmoisture4, only: nml_soilmoisture4_t
+  use nml_directrunoff1, only: nml_directrunoff1_t
+  use nml_PETm1, only: nml_PETm1_t
+  use nml_PETm2, only: nml_PETm2_t
+  use nml_PET1, only: nml_PET1_t
+  use nml_PET2, only: nml_PET2_t
+  use nml_PET3, only: nml_PET3_t
+  use nml_interflow1, only: nml_interflow1_t
+  use nml_percolation1, only: nml_percolation1_t
+  use nml_routing1, only: nml_routing1_t
+  use nml_routing2, only: nml_routing2_t
+  use nml_routing3, only: nml_routing3_t
+  use nml_neutrons1, only: nml_neutrons1_t
+  use nml_neutrons2, only: nml_neutrons2_t
+  use nml_rivertemp1, only: nml_rivertemp1_t
+  use nml_geoparameter, only: nml_geoparameter_t
 
   !> \class   parameter_config_t
   !> \brief   Configuration for all parameters.
   type, public :: parameter_config_t
-    character(:), allocatable :: file          !< parameter namelist file
+    type(nml_config_processes_t) :: processes !< configuration of the processes
     type(nml_interception1_t) :: interception1 !< interception1 configuration
     type(nml_snow1_t) :: snow1 !< snow1 configuration
     type(nml_soilmoisture1_t) :: soilmoisture1 !< soilmoisture1 configuration
@@ -60,8 +52,8 @@ module mo_main_config
     type(nml_soilmoisture3_t) :: soilmoisture3 !< soilmoisture3 configuration
     type(nml_soilmoisture4_t) :: soilmoisture4 !< soilmoisture4 configuration
     type(nml_directrunoff1_t) :: directrunoff1 !< directrunoff1 configuration
-    type(nml_PETminus1_t) :: PETminus1 !< PETminus1 configuration
-    type(nml_PET0_t) :: PET0 !< PET0 configuration
+    type(nml_PETm1_t) :: PETm1 !< PETm1 configuration
+    type(nml_PETm2_t) :: PETm2 !< PETm2 configuration
     type(nml_PET1_t) :: PET1 !< PET1 configuration
     type(nml_PET2_t) :: PET2 !< PET2 configuration
     type(nml_PET3_t) :: PET3 !< PET3 configuration
@@ -72,25 +64,17 @@ module mo_main_config
     type(nml_routing3_t) :: routing3 !< routing3 configuration
     type(nml_neutrons1_t) :: neutrons1 !< neutrons1 configuration
     type(nml_neutrons2_t) :: neutrons2 !< neutrons2 configuration
+    type(nml_rivertemp1_t) :: rivertemp1 !< rivertemp1 configuration
     type(nml_geoparameter_t) :: geoparameter !< geoparameter configuration
   contains
-    procedure :: read => parameter_config_read
+    procedure :: read_parameter => parameter_config_read_parameter
+    procedure :: read_processes => parameter_config_read_processes
   end type parameter_config_t
-
-  !> \class   process_config_t
-  !> \brief   Configuration for all processes.
-  type, public :: process_config_t
-    character(:), allocatable :: file          !< mhm namelist file
-    type(nml_processselection_t) :: processselection !< processselection configuration
-  contains
-    procedure :: read => process_config_read
-  end type process_config_t
 
   !> \class   parameters_t
   !> \brief   Class for parameters and processes configuration.
   type, public :: parameters_t
-    type(parameter_config_t) :: config !< configuration of the mRM process container
-    type(process_config_t) :: process_config !< configuration of the mRM process container
+    type(parameter_config_t) :: config !< configuration of the parameters
     !> Info about which process runs in which option and number of parameters necessary for this option
     !! - col1: process switch
     !! - col2: number of parameters for process case
@@ -115,71 +99,292 @@ module mo_main_config
     procedure :: get => parameters_get
     procedure :: get_process => parameters_get_process
     procedure :: print => parameters_print
+    procedure :: mhm_active => parameters_mhm_active
+    procedure :: meteo_active => parameters_meteo_active
+    procedure :: mrm_active => parameters_mrm_active
   end type parameters_t
 
 contains
 
-  !> \brief Read main configuration.
-  subroutine main_config_read(self, file)
-    class(main_config_t), intent(inout) :: self
-    character(*), intent(in) :: file !< file containing the namelists
-    call message(" ... read config main: ", file)
-    self%file = file
-    call self%mainconfig%read(file)
-  end subroutine main_config_read
+  !> \brief Check if mHM processes are active.
+  logical function parameters_mhm_active(self)
+    class(parameters_t), intent(in) :: self
+    parameters_mhm_active = &
+      (self%process_matrix(1, 1) /= 0_i4) .or. &
+      (self%process_matrix(2, 1) /= 0_i4) .or. &
+      (self%process_matrix(3, 1) /= 0_i4) .or. &
+      (self%process_matrix(5, 1) /= 0_i4) .or. &
+      (self%process_matrix(6, 1) /= 0_i4) .or. &
+      (self%process_matrix(7, 1) /= 0_i4) .or. &
+      (self%process_matrix(9, 1) /= 0_i4) .or. &
+      (self%process_matrix(10, 1) /= 0_i4)
+  end function parameters_mhm_active
+
+  !> \brief Check if meteo processes are active.
+  logical function parameters_meteo_active(self)
+    class(parameters_t), intent(in) :: self
+    parameters_meteo_active = self%mhm_active() .or. (self%process_matrix(4, 1) /= 0_i4)
+  end function parameters_meteo_active
+
+  !> \brief Check if mRM processes are active.
+  logical function parameters_mrm_active(self)
+    class(parameters_t), intent(in) :: self
+    parameters_mrm_active = (self%process_matrix(8, 1) /= 0_i4) .or. (self%process_matrix(11, 1) /= 0_i4)
+  end function parameters_mrm_active
+
+  !> \brief Read processes configuration.
+  subroutine parameter_config_read_processes(self, file)
+    class(parameter_config_t), intent(inout) :: self
+    character(*), intent(in) :: file !< file containing the main namelists
+    character(1024) :: errmsg
+    integer :: status
+    call message(" ... read config processes: ", file)
+    status = self%processes%from_file(file=file, errmsg=errmsg)
+    if (status /= NML_OK) call error_message("Error reading processes from: ", file, ", with error: ", trim(errmsg))
+  end subroutine parameter_config_read_processes
 
   !> \brief Read parameter configuration.
-  subroutine parameter_config_read(self, file)
+  subroutine parameter_config_read_parameter(self, file)
     class(parameter_config_t), intent(inout) :: self
-    character(*), intent(in) :: file !< file containing the namelists
+    character(*), intent(in) :: file !< file containing the parameter namelists
+    character(1024) :: errmsg
+    integer :: status
     call message(" ... read config parameter: ", file)
-    ! all parameter namelists have a "status" attribute to indicate if the namelist was present
-    self%file = file
-    call self%interception1%read(file)
-    call self%snow1%read(file)
-    call self%soilmoisture1%read(file)
-    call self%soilmoisture2%read(file)
-    call self%soilmoisture3%read(file)
-    call self%soilmoisture4%read(file)
-    call self%directrunoff1%read(file)
-    call self%PETminus1%read(file)
-    call self%PET0%read(file)
-    call self%PET1%read(file)
-    call self%PET2%read(file)
-    call self%PET3%read(file)
-    call self%interflow1%read(file)
-    call self%percolation1%read(file)
-    call self%routing1%read(file)
-    call self%routing2%read(file)
-    call self%routing3%read(file)
-    call self%neutrons1%read(file)
-    call self%neutrons2%read(file)
-    call self%geoparameter%read(file)
-  end subroutine parameter_config_read
 
-  !> \brief Read process configuration.
-  subroutine process_config_read(self, file)
-    class(process_config_t), intent(inout) :: self
-    character(*), intent(in) :: file !< file containing the namelists
-    call message(" ... read config process: ", file)
-    self%file = file
-    call self%processselection%read(file)
-  end subroutine process_config_read
+    select case (self%processes%interception)
+      case (1_i4)
+        status = self%interception1%from_file(file=file, errmsg=errmsg)
+        if (status /= NML_OK) call error_message("Error reading interception1 from: ", file, ", with error: ", trim(errmsg))
+    end select
+
+    select case (self%processes%snow)
+      case (1_i4)
+        status = self%snow1%from_file(file=file, errmsg=errmsg)
+        if (status /= NML_OK) call error_message("Error reading snow1 from: ", file, ", with error: ", trim(errmsg))
+    end select
+
+    select case (self%processes%soil_moisture)
+      case (1_i4)
+        status = self%soilmoisture1%from_file(file=file, errmsg=errmsg)
+        if (status /= NML_OK) call error_message("Error reading soilmoisture1 from: ", file, ", with error: ", trim(errmsg))
+      case (2_i4)
+        status = self%soilmoisture2%from_file(file=file, errmsg=errmsg)
+        if (status /= NML_OK) call error_message("Error reading soilmoisture2 from: ", file, ", with error: ", trim(errmsg))
+      case (3_i4)
+        status = self%soilmoisture3%from_file(file=file, errmsg=errmsg)
+        if (status /= NML_OK) call error_message("Error reading soilmoisture3 from: ", file, ", with error: ", trim(errmsg))
+      case (4_i4)
+        status = self%soilmoisture4%from_file(file=file, errmsg=errmsg)
+        if (status /= NML_OK) call error_message("Error reading soilmoisture4 from: ", file, ", with error: ", trim(errmsg))
+    end select
+
+    select case (self%processes%direct_runoff)
+      case (1_i4)
+        status = self%directrunoff1%from_file(file=file, errmsg=errmsg)
+        if (status /= NML_OK) call error_message("Error reading directrunoff1 from: ", file, ", with error: ", trim(errmsg))
+    end select
+
+    select case (self%processes%pet)
+      case (-2_i4)
+        status = self%PETm2%from_file(file=file, errmsg=errmsg)
+        if (status /= NML_OK) call error_message("Error reading PETm2 from: ", file, ", with error: ", trim(errmsg))
+      case (-1_i4)
+        status = self%PETm1%from_file(file=file, errmsg=errmsg)
+        if (status /= NML_OK) call error_message("Error reading PETm1 from: ", file, ", with error: ", trim(errmsg))
+      case (1_i4)
+        status = self%PET1%from_file(file=file, errmsg=errmsg)
+        if (status /= NML_OK) call error_message("Error reading PET1 from: ", file, ", with error: ", trim(errmsg))
+      case (2_i4)
+        status = self%PET2%from_file(file=file, errmsg=errmsg)
+        if (status /= NML_OK) call error_message("Error reading PET2 from: ", file, ", with error: ", trim(errmsg))
+      case (3_i4)
+        status = self%PET3%from_file(file=file, errmsg=errmsg)
+        if (status /= NML_OK) call error_message("Error reading PET3 from: ", file, ", with error: ", trim(errmsg))
+    end select
+
+    select case (self%processes%interflow)
+      case (1_i4)
+        status = self%interflow1%from_file(file=file, errmsg=errmsg)
+        if (status /= NML_OK) call error_message("Error reading interflow1 from: ", file, ", with error: ", trim(errmsg))
+    end select
+
+    select case (self%processes%percolation)
+      case (1_i4)
+        status = self%percolation1%from_file(file=file, errmsg=errmsg)
+        if (status /= NML_OK) call error_message("Error reading percolation1 from: ", file, ", with error: ", trim(errmsg))
+    end select
+
+    select case (self%processes%baseflow)
+      case (1_i4)
+        status = self%geoparameter%from_file(file=file, errmsg=errmsg)
+        if (status /= NML_OK) call error_message("Error reading geoparameter from: ", file, ", with error: ", trim(errmsg))
+    end select
+
+    select case (self%processes%neutrons)
+      case (1_i4)
+        status = self%neutrons1%from_file(file=file, errmsg=errmsg)
+        if (status /= NML_OK) call error_message("Error reading neutrons1 from: ", file, ", with error: ", trim(errmsg))
+      case (2_i4)
+        status = self%neutrons2%from_file(file=file, errmsg=errmsg)
+        if (status /= NML_OK) call error_message("Error reading neutrons2 from: ", file, ", with error: ", trim(errmsg))
+    end select
+
+    select case (self%processes%routing)
+      case (1_i4)
+        status = self%routing1%from_file(file=file, errmsg=errmsg)
+        if (status /= NML_OK) call error_message("Error reading routing1 from: ", file, ", with error: ", trim(errmsg))
+      case (2_i4)
+        status = self%routing2%from_file(file=file, errmsg=errmsg)
+        if (status /= NML_OK) call error_message("Error reading routing2 from: ", file, ", with error: ", trim(errmsg))
+      case (3_i4)
+        status = self%routing3%from_file(file=file, errmsg=errmsg)
+        if (status /= NML_OK) call error_message("Error reading routing3 from: ", file, ", with error: ", trim(errmsg))
+    end select
+
+    select case (self%processes%temperature_routing)
+      case (1_i4)
+        status = self%rivertemp1%from_file(file=file, errmsg=errmsg)
+        if (status /= NML_OK) call error_message("Error reading rivertemp1 from: ", file, ", with error: ", trim(errmsg))
+    end select
+
+  end subroutine parameter_config_read_parameter
 
   !> \brief Configure the mRM process container.
-  subroutine parameters_configure(self, parameter_cfg, process_cfg)
+  subroutine parameters_configure(self, meta_file, para_file)
     class(parameters_t), intent(inout) :: self
-    type(parameter_config_t), intent(in) :: parameter_cfg !< parameters configuration
-    type(process_config_t), intent(in) :: process_cfg !< process configuration
+    character(*), intent(in), optional :: meta_file !< file containing the processes namelists
+    character(*), intent(in), optional :: para_file !< file containing the parameter namelists
+    character(1024) :: errmsg
+    integer :: status
     call message(" ... configure parameters")
-    self%config = parameter_cfg
-    self%process_config = process_cfg
+    if (present(meta_file)) call self%config%read_processes(file=meta_file)
+    status = self%config%processes%is_valid(errmsg=errmsg)
+    if (status /= NML_OK) call error_message("Processes configuration not valid. Error: ", trim(errmsg))
+
+    if (present(para_file)) call self%config%read_parameter(file=para_file)
+    select case (self%config%processes%interception)
+      case (1_i4)
+        if (.not.self%config%interception1%is_configured) call error_message("Interception parameters not set.")
+        status = self%config%interception1%is_valid(errmsg=errmsg)
+        if (status /= NML_OK) call error_message("Interception1 configuration not valid. Error: ", trim(errmsg))
+    end select
+
+    select case (self%config%processes%snow)
+      case (1_i4)
+        if (.not.self%config%snow1%is_configured) call error_message("Snow parameters not set.")
+        status = self%config%snow1%is_valid(errmsg=errmsg)
+        if (status /= NML_OK) call error_message("Snow1 configuration not valid. Error: ", trim(errmsg))
+    end select
+
+    select case (self%config%processes%soil_moisture)
+      case (1_i4)
+        if (.not.self%config%soilmoisture1%is_configured) call error_message("Soilmoisture parameters not set.")
+        status = self%config%soilmoisture1%is_valid(errmsg=errmsg)
+        if (status /= NML_OK) call error_message("Soilmoisture1 configuration not valid. Error: ", trim(errmsg))
+      case (2_i4)
+        if (.not.self%config%soilmoisture2%is_configured) call error_message("Soilmoisture parameters not set.")
+        status = self%config%soilmoisture2%is_valid(errmsg=errmsg)
+        if (status /= NML_OK) call error_message("Soilmoisture2 configuration not valid. Error: ", trim(errmsg))
+      case (3_i4)
+        if (.not.self%config%soilmoisture3%is_configured) call error_message("Soilmoisture parameters not set.")
+        status = self%config%soilmoisture3%is_valid(errmsg=errmsg)
+        if (status /= NML_OK) call error_message("Soilmoisture3 configuration not valid. Error: ", trim(errmsg))
+      case (4_i4)
+        if (.not.self%config%soilmoisture4%is_configured) call error_message("Soilmoisture parameters not set.")
+        status = self%config%soilmoisture4%is_valid(errmsg=errmsg)
+        if (status /= NML_OK) call error_message("Soilmoisture4 configuration not valid. Error: ", trim(errmsg))
+    end select
+
+    select case (self%config%processes%direct_runoff)
+      case (1_i4)
+        if (.not.self%config%directrunoff1%is_configured) call error_message("Direct runoff parameters not set.")
+        status = self%config%directrunoff1%is_valid(errmsg=errmsg)
+        if (status /= NML_OK) call error_message("Directrunoff1 configuration not valid. Error: ", trim(errmsg))
+    end select
+
+    select case (self%config%processes%pet)
+      case (-2_i4)
+        if (.not.self%config%PETm2%is_configured) call error_message("PET parameters not set.")
+        status = self%config%PETm2%is_valid(errmsg=errmsg)
+        if (status /= NML_OK) call error_message("PETm2 configuration not valid. Error: ", trim(errmsg))
+      case (-1_i4)
+        if (.not.self%config%PETm1%is_configured) call error_message("PET parameters not set.")
+        status = self%config%PETm1%is_valid(errmsg=errmsg)
+        if (status /= NML_OK) call error_message("PETm1 configuration not valid. Error: ", trim(errmsg))
+      case (1_i4)
+        if (.not.self%config%PET1%is_configured) call error_message("PET parameters not set.")
+        status = self%config%PET1%is_valid(errmsg=errmsg)
+        if (status /= NML_OK) call error_message("PET1 configuration not valid. Error: ", trim(errmsg))
+      case (2_i4)
+        if (.not.self%config%PET2%is_configured) call error_message("PET parameters not set.")
+        status = self%config%PET2%is_valid(errmsg=errmsg)
+        if (status /= NML_OK) call error_message("PET2 configuration not valid. Error: ", trim(errmsg))
+      case (3_i4)
+        if (.not.self%config%PET3%is_configured) call error_message("PET parameters not set.")
+        status = self%config%PET3%is_valid(errmsg=errmsg)
+        if (status /= NML_OK) call error_message("PET3 configuration not valid. Error: ", trim(errmsg))
+    end select
+
+    select case (self%config%processes%interflow)
+      case (1_i4)
+        if (.not.self%config%interflow1%is_configured) call error_message("Interflow parameters not set.")
+        status = self%config%interflow1%is_valid(errmsg=errmsg)
+        if (status /= NML_OK) call error_message("Interflow1 configuration not valid. Error: ", trim(errmsg))
+    end select
+
+    select case (self%config%processes%percolation)
+      case (1_i4)
+        if (.not.self%config%percolation1%is_configured) call error_message("Percolation parameters not set.")
+        status = self%config%percolation1%is_valid(errmsg=errmsg)
+        if (status /= NML_OK) call error_message("Percolation1 configuration not valid. Error: ", trim(errmsg))
+    end select
+
+    select case (self%config%processes%baseflow)
+      case (1_i4)
+        if (.not.self%config%geoparameter%is_configured) call error_message("Geoparameter parameters not set.")
+        status = self%config%geoparameter%is_valid(errmsg=errmsg)
+        if (status /= NML_OK) call error_message("Geoparameter configuration not valid. Error: ", trim(errmsg))
+    end select
+
+    select case (self%config%processes%neutrons)
+      case (1_i4)
+        if (.not.self%config%neutrons1%is_configured) call error_message("Neutrons parameters not set.")
+        status = self%config%neutrons1%is_valid(errmsg=errmsg)
+        if (status /= NML_OK) call error_message("Neutrons1 configuration not valid. Error: ", trim(errmsg))
+      case (2_i4)
+        if (.not.self%config%neutrons2%is_configured) call error_message("Neutrons parameters not set.")
+        status = self%config%neutrons2%is_valid(errmsg=errmsg)
+        if (status /= NML_OK) call error_message("Neutrons2 configuration not valid. Error: ", trim(errmsg))
+    end select
+
+    select case (self%config%processes%routing)
+      case (1_i4)
+        if (.not.self%config%routing1%is_configured) call error_message("Routing parameters not set.")
+        status = self%config%routing1%is_valid(errmsg=errmsg)
+        if (status /= NML_OK) call error_message("Routing1 configuration not valid. Error: ", trim(errmsg))
+      case (2_i4)
+        if (.not.self%config%routing2%is_configured) call error_message("Routing parameters not set.")
+        status = self%config%routing2%is_valid(errmsg=errmsg)
+        if (status /= NML_OK) call error_message("Routing2 configuration not valid. Error: ", trim(errmsg))
+      case (3_i4)
+        if (.not.self%config%routing3%is_configured) call error_message("Routing parameters not set.")
+        status = self%config%routing3%is_valid(errmsg=errmsg)
+        if (status /= NML_OK) call error_message("Routing3 configuration not valid. Error: ", trim(errmsg))
+    end select
+
+    select case (self%config%processes%temperature_routing)
+      case (1_i4)
+        if (.not.self%config%rivertemp1%is_configured) call error_message("River temperature parameters not set.")
+        status = self%config%rivertemp1%is_valid(errmsg=errmsg)
+        if (status /= NML_OK) call error_message("Rivertemp1 configuration not valid. Error: ", trim(errmsg))
+    end select
+
     call self%initialize()
   end subroutine parameters_configure
 
-  !>       \brief Configure parameters
-  !>       \authors Stephan Thober
-  !>       \date Aug 2015
+  !> \brief Configure parameters
+  !> \authors Stephan Thober
+  !> \date Aug 2015
   ! Modifications:
   ! Stephan Thober  Sep 2015 - removed stop condition when routing resolution is smaller than hydrologic resolution
   ! Stephan Thober  Oct 2015 - added NLoutputResults namelist, fileLatLon to directories_general namelist, and readLatLon flag
@@ -197,8 +402,10 @@ contains
     class(parameters_t), intent(inout) :: self
 
     character(256) :: geo_name
-    real(dp), dimension(maxGeoUnit, nColPars) :: GeoParam
-    integer(i4) :: ii, shp(2)
+    real(dp), dimension(nColPars,maxGeoUnit) :: GeoParam
+    integer(i4) :: ii, shp(2), shp_geo(2)
+    character(1024) :: errmsg
+    integer :: status
 
     shp = [1_i4, ncolpars] ! shape of a parameter matrix slice
 
@@ -209,14 +416,26 @@ contains
 
     call message(" ... configure processes and parameters")
     self%process_matrix = 0_i4
-    self%process_matrix(:, 1) = self%process_config%processselection%processcase
+    self%process_matrix(1, 1) = self%config%processes%interception
+    self%process_matrix(2, 1) = self%config%processes%snow
+    self%process_matrix(3, 1) = self%config%processes%soil_moisture
+    self%process_matrix(4, 1) = self%config%processes%direct_runoff
+    self%process_matrix(5, 1) = self%config%processes%pet
+    self%process_matrix(6, 1) = self%config%processes%interflow
+    self%process_matrix(7, 1) = self%config%processes%percolation
+    self%process_matrix(8, 1) = self%config%processes%routing
+    self%process_matrix(9, 1) = self%config%processes%baseflow
+    self%process_matrix(10, 1) = self%config%processes%neutrons
+    self%process_matrix(11, 1) = self%config%processes%temperature_routing
 
     ! Process 1 - interception
     select case (self%process_matrix(1, 1))
-      ! 1 - maximum Interception
+      case(0)
+        ! 0 - no interception process selected
+        call message('***SELECTION: interception process is deactivated!')
+        self%process_matrix(1, 3) = 0_i4
       case(1)
-        if (self%config%interception1%nml_status /= 0_i4) call error_message("'interception1' namelist not found.")
-
+        ! 1 - maximum Interception
         self%process_matrix(1, 2) = 1_i4
         self%process_matrix(1, 3) = 1_i4
         call append(self%definition, reshape(self%config%interception1%canopyInterceptionFactor, shp))
@@ -226,19 +445,17 @@ contains
 
         ! check if parameter are in range
         if (.not. in_bound(self%definition)) &
-          call error_message('***ERROR: parameter in namelist "interception1" out of bound in ', self%config%file)
-
-      case DEFAULT
-        call error_message('***ERROR: Process description for process "interception" does not exist!')
-        stop
+          call error_message('***ERROR: parameter in namelist "interception1" out of bound.')
     end select
 
     ! Process 2 - snow
     select case (self%process_matrix(2, 1))
-      ! 1 - degree-day approach
+      case(0)
+        ! 0 - no snow process selected
+        call message('***SELECTION: snow process is deactivated!')
+        self%process_matrix(2, 3) = sum(self%process_matrix(1 : 2, 2))
       case(1)
-        if (self%config%snow1%nml_status /= 0_i4) call error_message("'snow1' namelist not found.")
-
+        ! 1 - degree-day approach
         self%process_matrix(2, 2) = 8_i4
         self%process_matrix(2, 3) = sum(self%process_matrix(1 : 2, 2))
         call append(self%definition, reshape(self%config%snow1%snowTreshholdTemperature, shp))
@@ -262,19 +479,17 @@ contains
 
         ! check if parameter are in range
         if (.not. in_bound(self%definition)) &
-          call error_message('***ERROR: parameter in namelist "snow1" out of bound in ', self%config%file)
-
-      case DEFAULT
-        call error_message('***ERROR: Process description for process "snow" does not exist!')
+          call error_message('***ERROR: parameter in namelist "snow1" out of bound.')
     end select
 
     ! Process 3 - soilmoisture
     select case (self%process_matrix(3, 1))
-
-        ! 1 - Feddes equation for PET reduction, bucket approach, Brooks-Corey like
+      case(0)
+        ! 0 - no soil moisture process selected
+        call message('***SELECTION: soil moisture is deactivated!')
+        self%process_matrix(3, 3) = sum(self%process_matrix(1 : 3, 2))
       case(1)
-        if (self%config%soilmoisture1%nml_status /= 0_i4) call error_message("'soilmoisture1' namelist not found.")
-
+        ! 1 - Feddes equation for PET reduction, bucket approach, Brooks-Corey like
         self%process_matrix(3, 2) = 17_i4
         self%process_matrix(3, 3) = sum(self%process_matrix(1 : 3, 2))
         call append(self%definition, reshape(self%config%soilmoisture1%orgMatterContent_forest, shp))
@@ -316,12 +531,10 @@ contains
 
         ! check if parameter are in range
         if (.not. in_bound(self%definition)) &
-          call error_message('***ERROR: parameter in namelist "soilmoisture1" out of bound in ', self%config%file)
+          call error_message('***ERROR: parameter in namelist "soilmoisture1" out of bound.')
 
         ! 2- Jarvis equation for PET reduction, bucket approach, Brooks-Corey like
       case(2)
-        if (self%config%soilmoisture2%nml_status /= 0_i4) call error_message("'soilmoisture2' namelist not found.")
-
         self%process_matrix(3, 2) = 18_i4
         self%process_matrix(3, 3) = sum(self%process_matrix(1 : 3, 2))
         call append(self%definition, reshape(self%config%soilmoisture2%orgMatterContent_forest, shp))
@@ -365,12 +578,10 @@ contains
 
         ! check if parameter are in range
         if (.not. in_bound(self%definition)) &
-          call error_message('***ERROR: parameter in namelist "soilmoisture2" out of bound in ', self%config%file)
+          call error_message('***ERROR: parameter in namelist "soilmoisture2" out of bound.')
 
         ! 3- Jarvis equation for ET reduction and FC dependency on root fraction coefficient
       case(3)
-        if (self%config%soilmoisture3%nml_status /= 0_i4) call error_message("'soilmoisture3' namelist not found.")
-
         self%process_matrix(3, 2) = 22_i4
         self%process_matrix(3, 3) = sum(self%process_matrix(1 : 3, 2))
         call append(self%definition, reshape(self%config%soilmoisture3%orgMatterContent_forest, shp))
@@ -422,12 +633,10 @@ contains
 
         ! check if parameter are in range
         if (.not. in_bound(self%definition)) &
-          call error_message('***ERROR: parameter in namelist "soilmoisture3" out of bound in ', self%config%file)
+          call error_message('***ERROR: parameter in namelist "soilmoisture3" out of bound.')
 
         ! 4- Feddes equation for ET reduction and FC dependency on root fraction coefficient
       case(4)
-        if (self%config%soilmoisture4%nml_status /= 0_i4) call error_message("'soilmoisture4' namelist not found.")
-
         self%process_matrix(3, 2) = 21_i4
         self%process_matrix(3, 3) = sum(self%process_matrix(1 : 3, 2))
         call append(self%definition, reshape(self%config%soilmoisture4%orgMatterContent_forest, shp))
@@ -477,18 +686,17 @@ contains
 
         ! check if parameter are in range
         if (.not. in_bound(self%definition)) &
-          call error_message('***ERROR: parameter in namelist "soilmoisture4" out of bound in ', self%config%file)
-
-      case DEFAULT
-        call error_message('***ERROR: Process description for process "soilmoisture" does not exist!')
+          call error_message('***ERROR: parameter in namelist "soilmoisture4" out of bound.')
     end select
 
     ! Process 4 - sealed area directRunoff
     select case (self%process_matrix(4, 1))
-      ! 1 - bucket exceedance approach
+      case(0)
+        ! 0 - no direct runoff process selected
+        call message('***SELECTION: direct runoff is deactivated!')
+        self%process_matrix(4, 3) = sum(self%process_matrix(1 : 4, 2))
       case(1)
-        if (self%config%directrunoff1%nml_status /= 0_i4) call error_message("'directrunoff1' namelist not found.")
-
+        ! 1 - bucket exceedance approach
         self%process_matrix(4, 2) = 1_i4
         self%process_matrix(4, 3) = sum(self%process_matrix(1 : 4, 2))
         call append(self%definition, reshape(self%config%directrunoff1%imperviousStorageCapacity, shp))
@@ -497,24 +705,22 @@ contains
 
         ! check if parameter are in range
         if (.not. in_bound(self%definition)) &
-          call error_message('***ERROR: parameter in namelist "directRunoff1" out of bound in ', self%config%file)
-
-      case DEFAULT
-        call error_message('***ERROR: Process description for process "directRunoff" does not exist!')
+          call error_message('***ERROR: parameter in namelist "directRunoff1" out of bound.')
     end select
 
     ! Process 5 - potential evapotranspiration (PET)
     select case (self%process_matrix(5, 1))
-      case(-1) ! 0 - PET is input, correct PET by LAI
-        if (self%config%petminus1%nml_status /= 0_i4) call error_message("'petminus1' namelist not found.")
-
+      case(0) ! 0 - no PET process selected
+        call message('***SELECTION: PET is deactivated!')
+        self%process_matrix(5, 3) = sum(self%process_matrix(1 : 5, 2))
+      case(-1) ! -1 - PET is input, correct PET by LAI
         self%process_matrix(5, 2) = 5_i4
         self%process_matrix(5, 3) = sum(self%process_matrix(1 : 5, 2))
-        call append(self%definition, reshape(self%config%petminus1%PET_a_forest, shp))
-        call append(self%definition, reshape(self%config%petminus1%PET_a_impervious, shp))
-        call append(self%definition, reshape(self%config%petminus1%PET_a_pervious, shp))
-        call append(self%definition, reshape(self%config%petminus1%PET_b, shp))
-        call append(self%definition, reshape(self%config%petminus1%PET_c, shp))
+        call append(self%definition, reshape(self%config%petm1%PET_a_forest, shp))
+        call append(self%definition, reshape(self%config%petm1%PET_a_impervious, shp))
+        call append(self%definition, reshape(self%config%petm1%PET_a_pervious, shp))
+        call append(self%definition, reshape(self%config%petm1%PET_b, shp))
+        call append(self%definition, reshape(self%config%petm1%PET_c, shp))
 
         call append(self%names, [ &
                 'PET_a_forest     ', &
@@ -525,16 +731,14 @@ contains
 
         ! check if parameter are in range
         if (.not. in_bound(self%definition)) &
-          call error_message('***ERROR: parameter in namelist "PETminus1" out of bound  n ', self%config%file)
+          call error_message('***ERROR: parameter in namelist "PETm1" out of bound.')
 
-      case(0) ! 0 - PET is input, correct PET by aspect
-        if (self%config%pet0%nml_status /= 0_i4) call error_message("'pet0' namelist not found.")
-
+      case(-2) ! -2 - PET is input, correct PET by aspect
         self%process_matrix(5, 2) = 3_i4
         self%process_matrix(5, 3) = sum(self%process_matrix(1 : 5, 2))
-        call append(self%definition, reshape(self%config%pet0%minCorrectionFactorPET, shp))
-        call append(self%definition, reshape(self%config%pet0%maxCorrectionFactorPET, shp))
-        call append(self%definition, reshape(self%config%pet0%aspectTresholdPET, shp))
+        call append(self%definition, reshape(self%config%petm2%minCorrectionFactorPET, shp))
+        call append(self%definition, reshape(self%config%petm2%maxCorrectionFactorPET, shp))
+        call append(self%definition, reshape(self%config%petm2%aspectTresholdPET, shp))
 
         call append(self%names, [ &
                 'minCorrectionFactorPET ', &
@@ -543,11 +747,9 @@ contains
 
         ! check if parameter are in range
         if (.not. in_bound(self%definition)) &
-          call error_message('***ERROR: parameter in namelist "PET0" out of bound in ', self%config%file)
+          call error_message('***ERROR: parameter in namelist "PETm2" out of bound.')
 
       case(1) ! 1 - Hargreaves-Samani method (HarSam) - additional input needed: Tmin, Tmax
-        if (self%config%pet1%nml_status /= 0_i4) call error_message("'pet1' namelist not found.")
-
         self%process_matrix(5, 2) = 4_i4
         self%process_matrix(5, 3) = sum(self%process_matrix(1 : 5, 2))
         call append(self%definition, reshape(self%config%pet1%minCorrectionFactorPET, shp))
@@ -562,11 +764,9 @@ contains
 
         ! check if parameter are in range
         if (.not. in_bound(self%definition)) &
-          call error_message('***ERROR: parameter in namelist "PET1" out of bound in ', self%config%file)
+          call error_message('***ERROR: parameter in namelist "PET1" out of bound.')
 
       case(2) ! 2 - Priestley-Taylor method (PrieTay) - additional input needed: net_rad
-        if (self%config%pet2%nml_status /= 0_i4) call error_message("'pet2' namelist not found.")
-
         self%process_matrix(5, 2) = 2_i4
         self%process_matrix(5, 3) = sum(self%process_matrix(1 : 5, 2))
         call append(self%definition, reshape(self%config%pet2%PriestleyTaylorCoeff, shp))
@@ -577,11 +777,9 @@ contains
 
         ! check if parameter are in range
         if (.not. in_bound(self%definition)) &
-          call error_message('***ERROR: parameter in namelist "PET2" out of bound in ', self%config%file)
+          call error_message('***ERROR: parameter in namelist "PET2" out of bound.')
 
       case(3) ! 3 - Penman-Monteith method - additional input needed: net_rad, abs. vapour pressue, windspeed
-        if (self%config%pet3%nml_status /= 0_i4) call error_message("'pet3' namelist not found.")
-
         self%process_matrix(5, 2) = 7_i4
         self%process_matrix(5, 3) = sum(self%process_matrix(1 : 5, 2))
 
@@ -604,18 +802,17 @@ contains
 
         ! check if parameter are in range
         if (.not. in_bound(self%definition)) &
-          call error_message('***ERROR: parameter in namelist "PET3" out of bound in ', self%config%file)
-
-      case DEFAULT
-        call error_message('***ERROR: Process description for process "actualET" does not exist!')
+          call error_message('***ERROR: parameter in namelist "PET3" out of bound.')
     end select
 
     ! Process 6 - interflow
     select case (self%process_matrix(6, 1))
-      ! 1 - parallel soil reservoir approach
+      case(0)
+        ! 0 - deactivated
+        call message('***SELECTION: Interflow is deactivated!')
+        self%process_matrix(6, 3) = sum(self%process_matrix(1 : 6, 2))
       case(1)
-        if (self%config%interflow1%nml_status /= 0_i4) call error_message("'interflow1' namelist not found.")
-
+        ! 1 - parallel soil reservoir approach
         self%process_matrix(6, 2) = 5_i4
         self%process_matrix(6, 3) = sum(self%process_matrix(1 : 6, 2))
         call append(self%definition, reshape(self%config%interflow1%interflowStorageCapacityFactor, shp))
@@ -633,18 +830,17 @@ contains
 
         ! check if parameter are in range
         if (.not. in_bound(self%definition)) &
-          call error_message('***ERROR: parameter in namelist "interflow1" out of bound in ', self%config%file)
-
-      case DEFAULT
-        call error_message('***ERROR: Process description for process "interflow" does not exist!')
+          call error_message('***ERROR: parameter in namelist "interflow1" out of bound.')
     end select
 
     ! Process 7 - percolation
     select case (self%process_matrix(7, 1))
-      ! 1 - GW layer is assumed as bucket
+      case(0)
+        ! 0 - deactivated
+        call message('***SELECTION: Percolation is deativated!')
+        self%process_matrix(7, 3) = sum(self%process_matrix(1 : 7, 2))
       case(1)
-        if (self%config%percolation1%nml_status /= 0_i4) call error_message("'percolation1' namelist not found.")
-
+        ! 1 - GW layer is assumed as bucket
         self%process_matrix(7, 2) = 3_i4
         self%process_matrix(7, 3) = sum(self%process_matrix(1 : 7, 2))
         call append(self%definition, reshape(self%config%percolation1%rechargeCoefficient, shp))
@@ -658,24 +854,17 @@ contains
 
         ! check if parameter are in range
         if (.not. in_bound(self%definition)) &
-          call error_message('***ERROR: parameter in namelist "percolation1" out of bound in ', self%config%file)
-
-      case DEFAULT
-        call error_message('***ERROR: Process description for process "percolation" does not exist!')
+          call error_message('***ERROR: parameter in namelist "percolation1" out of bound.')
     end select
 
     ! Process 8 - routing
     select case (self%process_matrix(8, 1))
       case(0)
         ! 0 - deactivated
-        call message()
-        call message('***CAUTION: Routing is deativated! ')
-
-        self%process_matrix(8, 2) = 0_i4
+        call message('***SELECTION: Routing is deactivated!')
         self%process_matrix(8, 3) = sum(self%process_matrix(1 : 8, 2))
       case(1)
         ! 1 - Muskingum approach
-        if (self%config%routing1%nml_status /= 0_i4) call error_message("'routing1' namelist not found.")
         self%process_matrix(8, 2) = 5_i4
         self%process_matrix(8, 3) = sum(self%process_matrix(1 : 8, 2))
 
@@ -693,103 +882,78 @@ contains
                 'muskingumAttenuation_riverSlope'])
         ! check if parameter are in range
         if (.not. in_bound(self%definition)) &
-          call error_message('***ERROR: parameter in namelist "routing1" out of bound in ', self%config%file)
+          call error_message('***ERROR: parameter in namelist "routing1" out of bound.')
       case(2)
-        if (self%config%routing2%nml_status /= 0_i4) call error_message("'routing2' namelist not found.")
         self%process_matrix(8, 2) = 1_i4
         self%process_matrix(8, 3) = sum(self%process_matrix(1 : 8, 2))
         call append(self%definition, reshape(self%config%routing2%streamflow_celerity, shp))
         call append(self%names, ['streamflow_celerity'])
         ! check if parameter are in range
         if (.not. in_bound(self%definition)) &
-          call error_message('***ERROR: parameter in namelist "routing1" out of bound in ', self%config%file)
+          call error_message('***ERROR: parameter in namelist "routing2" out of bound.')
       case(3)
-        if (self%config%routing3%nml_status /= 0_i4) call error_message("'routing3' namelist not found.")
         self%process_matrix(8, 2) = 1_i4
         self%process_matrix(8, 3) = sum(self%process_matrix(1 : 8, 2))
         call append(self%definition, reshape(self%config%routing3%slope_factor, shp))
         call append(self%names, ['slope_factor'])
         ! check if parameter are in range
         if (.not. in_bound(self%definition)) &
-          call error_message('***ERROR: parameter in namelist "routing1" out of bound in ', self%config%file)
-      case DEFAULT
-        call error_message('***ERROR: Process description for process "routing" does not exist!')
+          call error_message('***ERROR: parameter in namelist "routing3" out of bound.')
     end select
 
-    !===============================================================
-    ! Geological formations
-    !===============================================================
     ! Process 9 - geoparameter
     select case (self%process_matrix(9, 1))
+      case(0)
+        ! 0 - deactivated
+        call message('***SELECTION: Baseflow is deactivated!')
+        self%process_matrix(9, 3) = sum(self%process_matrix(1 : 9, 2))
       case(1)
         ! read in global parameters (NOT REGIONALIZED, i.e. these are <beta> and not <gamma>) for each geological formation used
-        if (self%config%geoparameter%nml_status /= 0_i4) call error_message("'geoparameter' namelist not found.")
         GeoParam = self%config%geoparameter%GeoParam
-
-        ! search number of geological parameters
-        do ii = 1, size(GeoParam, 1) ! no while loop to avoid risk of endless loop
-          if (EQ(GeoParam(ii, 1), nodata_dp)) then
-            self%nGeoUnits = ii - 1
-            exit
-          end if
-        end do
+        status = self%config%geoparameter%filled_shape(name="GeoParam", filled=shp_geo, errmsg=errmsg)
+        if (status /= 0_i4) &
+          call error_message('***ERROR: GeoParam shape in namelist "geoparameter" is incorrect: ', trim(errmsg))
+        self%nGeoUnits = shp_geo(2)
 
         ! for geology parameters
         self%process_matrix(9, 2) = self%nGeoUnits
         self%process_matrix(9, 3) = sum(self%process_matrix(1 : 9, 2))
 
-        call append(self%definition, GeoParam(1 : self%nGeoUnits, :))
+        call append(self%definition, transpose(GeoParam(:, 1_i4:self%nGeoUnits)))
 
         ! create names
         do ii = 1, self%nGeoUnits
-          geo_name = 'GeoParam(' // trim(adjustl(n2s(ii))) // ',:)'
+          geo_name = 'GeoParam(' // trim(adjustl(n2s(ii))) // ')'
           call append(self%names, [ trim(geo_name) ])
         end do
 
         ! check if parameter are in range
         if (.not. in_bound(self%definition)) &
-          call error_message('***ERROR: parameter in namelist "geoparameter" out of bound in ', self%config%file)
-
-      case DEFAULT
-        call error_message('***ERROR: Process description for process "geoparameter" does not exist!')
+          call error_message('***ERROR: parameter in namelist "geoparameter" out of bound.')
     end select
 
-    !===============================================================
-    ! NEUTRON COUNT
-    !===============================================================
     ! Process 10 - neutrons
-    !   0 - deactivated
-    !   1 - inverse N0 based on Desilets et al. 2010
-    !   2 - COSMIC forward operator by Shuttlworth et al. 2013
     select case (self%process_matrix(10, 1))
       case(0)
         ! 0 - deactivated
-        call message()
-        call message('***SELECTION: Neutron count routine is deativated! ')
-
+        call message('***SELECTION: Neutron count routine is deativated!')
+        self%process_matrix(10, 3) = sum(self%process_matrix(1 : 10, 2))
       case(1)
         ! 1 - inverse N0 based on Desilets et al. 2010
-        if (self%config%neutrons1%nml_status /= 0_i4) call error_message("'neutrons1' namelist not found.")
-
         self%process_matrix(10,2) = 3_i4
         self%process_matrix(10,3) = sum(self%process_matrix(1:10, 2))
         call append(self%definition, reshape(self%config%neutrons1%Desilets_N0,  shp))
         call append(self%definition, reshape(self%config%neutrons1%Desilets_LW0, shp))
         call append(self%definition, reshape(self%config%neutrons1%Desilets_LW1, shp))
-
         call append(self%names, [  &
                 'Desilets_N0   ', &
                 'Desilets_LW0  ', &
                 'Desilets_LW1  '])
-
         ! check if parameter are in range
         if (.not. in_bound(self%definition)) &
-          call error_message('***ERROR: parameter in namelist "neutrons1" out of bound in ', self%config%file)
-
+          call error_message('***ERROR: parameter in namelist "neutrons1" out of bound.')
       case(2)
-        ! 2 - COSMIC version
-        if (self%config%neutrons2%nml_status /= 0_i4) call error_message("'neutrons2' namelist not found.")
-
+        ! 2 - COSMIC forward operator by Shuttlworth et al. 2013
         self%process_matrix(10,2) = 9_i4
         self%process_matrix(10,3) = sum(self%process_matrix(1:10, 2))
         call append(self%definition, reshape(self%config%neutrons2%COSMIC_N0,     shp))
@@ -801,7 +965,6 @@ contains
         call append(self%definition, reshape(self%config%neutrons2%COSMIC_L31,    shp))
         call append(self%definition, reshape(self%config%neutrons2%COSMIC_LW0,    shp))
         call append(self%definition, reshape(self%config%neutrons2%COSMIC_LW1,    shp))
-
         call append(self%names, [  &
                 'COSMIC_N0     ', &
                 'COSMIC_N1     ', &
@@ -814,10 +977,31 @@ contains
                 'COSMIC_LW1    '])
         ! check if parameter are in range
         if (.not. in_bound(self%definition)) &
-          call error_message('***ERROR: parameter in namelist "neutrons2" out of bound in ', self%config%file)
+          call error_message('***ERROR: parameter in namelist "neutrons2" out of bound.')
+    end select
 
-      case DEFAULT
-        call error_message('***ERROR: Process description for process "NEUTRON count" does not exist!')
+    ! Process 11 - rivertemp
+    select case (self%process_matrix(11, 1))
+      case(0)
+        ! 0 - deactivated
+        call message('***SELECTION: River temperature routine is deativated!')
+        self%process_matrix(11, 3) = sum(self%process_matrix(1 : 11, 2))
+      case(1)
+        ! 1 - rivertemp1
+        self%process_matrix(11,2) = 4_i4
+        self%process_matrix(11,3) = sum(self%process_matrix(1:11, 2))
+        call append(self%definition, reshape(self%config%rivertemp1%albedo_water,       shp))
+        call append(self%definition, reshape(self%config%rivertemp1%pt_a_water,         shp))
+        call append(self%definition, reshape(self%config%rivertemp1%emissivity_water,   shp))
+        call append(self%definition, reshape(self%config%rivertemp1%turb_heat_ex_coeff, shp))
+        call append(self%names, [  &
+                'albedo_water      ', &
+                'pt_a_water        ', &
+                'emissivity_water  ', &
+                'turb_heat_ex_coeff'])
+        ! check if parameter are in range
+        if (.not. in_bound(self%definition)) &
+          call error_message('***ERROR: parameter in namelist "rivertemp1" out of bound.')
     end select
 
     ! set default values
