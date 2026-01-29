@@ -13,7 +13,6 @@ module mo_domain
   use mo_logging
   use mo_list, only: list
   use mo_kind, only: i4, dp
-  use mo_message, only: message, error_message
   use mo_exchange_type, only: exchange_t
   use mo_string_utils, only: n2s=>num2str
   use mo_datetime, only: datetime, timedelta
@@ -72,10 +71,12 @@ contains
         type is (domain_t)
           domain => p
         class default
-          call error_message("Domain '", n2s(key), "' not a domain type.")
+          log_fatal(*) "Domain '", key, "' not a domain type."
+          error stop
       end select
     else
-      call error_message("Domain '", n2s(key), "' not present.")
+      log_fatal(*) "Domain '", key, "' not present."
+      error stop
     end if
   end subroutine domain_list_get
 
@@ -103,7 +104,7 @@ contains
     character(*), intent(in), optional :: para_file !< file containing the parameter namelists
     integer(i4), intent(in), optional :: domain !< domain ID of the current domain in the configuration arrays (1 by default)
     character(len=*), intent(in), optional :: cwd !< current working directory to set relative paths
-    call message(" ... setup new domain")
+    log_info(*) "... setup new domain"
     call self%exchange%init(meta_file, main_file, para_file, domain, cwd)
     ! set exchange pointer in components
     self%input%exchange => self%exchange
@@ -118,7 +119,7 @@ contains
     ! domain is always an item of a domain_list, which stores "allocated pointers" and these implicitly have the "target" attribute
     class(domain_t), intent(inout), target :: self ! needs "target" so components can safely point to "exchange"
     character(*), intent(in), optional :: file !< file containing the namelists
-    call message(" ... configure domain")
+    log_info(*) "... configure domain"
     call self%input%configure(file)
     if (self%exchange%parameters%meteo_active()) call self%meteo%configure(file)
     if (self%exchange%parameters%mhm_active()) call self%mpr%configure(file)
@@ -131,7 +132,7 @@ contains
   subroutine domain_connect(self)
     ! domain is always an item of a domain_list, which stores "allocated pointers" and these implicitly have the "target" attribute
     class(domain_t), intent(inout), target :: self ! needs "target" so components can safely point to "exchange"
-    call message(" ... connect domain")
+    log_info(*) "... connect domain components"
     call self%input%connect()
     if (self%exchange%parameters%meteo_active()) call self%meteo%connect()
     if (self%exchange%parameters%mhm_active()) call self%mpr%connect()
@@ -145,7 +146,7 @@ contains
     class(domain_t), intent(inout), target :: self
     !> a set of global parameter (gamma) to run mHM, DIMENSION [no. of global_Parameters]
     real(dp), dimension(:), optional, intent(in) :: parameters
-    call message(" ... initialize domain")
+    log_info(*) "... initialize domain"
     call self%exchange%parameters%set(parameters)
     call self%input%initialize()
     if (self%exchange%parameters%meteo_active()) call self%meteo%initialize()
@@ -165,15 +166,17 @@ contains
     if (self%exchange%parameters%mhm_active()) call self%mpr%update()
     if (self%exchange%parameters%mhm_active()) call self%mhm%update()
     if (self%exchange%parameters%mrm_active()) call self%mrm%update()
-    if (self%exchange%time%is_new_year()) &
-      call message(" ... finished year: ", n2s(self%exchange%time%year - 1_i4))
+    log_debug(*) " Time step: ", self%exchange%time%str()
+    if (self%exchange%time%is_new_year()) then
+      log_info(*) "... finished year  : ", self%exchange%time%year - 1_i4
+    end if
   end subroutine domain_update
 
   !> \brief Finalize the domain and its components after the simulation.
   subroutine domain_finalize(self)
     ! domain is always an item of a domain_list, which stores "allocated pointers" and these implicitly have the "target" attribute
     class(domain_t), intent(inout), target :: self
-    call message(" ... finalizing domain")
+    log_info(*) "... finalize domain"
     call self%input%finalize()
     if (self%exchange%parameters%meteo_active()) call self%meteo%finalize()
     if (self%exchange%parameters%mhm_active()) call self%mpr%finalize()
