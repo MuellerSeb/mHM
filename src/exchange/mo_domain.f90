@@ -1,6 +1,5 @@
 !> \file    mo_domain.f90
-!> \brief   \copybrief mo_domain
-!> \details \copydetails mo_domain
+!> \copydoc mo_domain
 
 !> \brief   Module for a domain container.
 !> \version 0.1
@@ -140,7 +139,8 @@ contains
 
   !> \brief Initialize the domain and do the initial state calculations in the components.
   subroutine domain_initialize(self, parameters)
-    class(domain_t), intent(inout) :: self
+    ! domain is always an item of a domain_list, which stores "allocated pointers" and these implicitly have the "target" attribute
+    class(domain_t), intent(inout), target :: self
     !> a set of global parameter (gamma) to run mHM, DIMENSION [no. of global_Parameters]
     real(dp), dimension(:), optional, intent(in) :: parameters
     call message(" ... initialize domain")
@@ -152,8 +152,10 @@ contains
     if (self%exchange%parameters%mrm_active()) call self%mrm%initialize()
   end subroutine domain_initialize
 
+  !> \brief Update the domain for the current time step.
   subroutine domain_update(self)
-    class(domain_t), intent(inout) :: self
+    ! domain is always an item of a domain_list, which stores "allocated pointers" and these implicitly have the "target" attribute
+    class(domain_t), intent(inout), target :: self
     call self%exchange%time%add(self%exchange%step)
     self%exchange%step_count = self%exchange%step_count + 1_i4
     call self%input%update()
@@ -165,9 +167,15 @@ contains
       call message(" ... finished year: ", n2s(self%exchange%time%year - 1_i4))
   end subroutine domain_update
 
+  !> \brief Finalize the domain and its components after the simulation.
   subroutine domain_finalize(self)
-    class(domain_t), intent(inout) :: self
+    ! domain is always an item of a domain_list, which stores "allocated pointers" and these implicitly have the "target" attribute
+    class(domain_t), intent(inout), target :: self
     call message(" ... finalizing domain")
+    call self%input%finalize()
+    if (self%exchange%parameters%meteo_active()) call self%meteo%finalize()
+    if (self%exchange%parameters%mhm_active()) call self%mpr%finalize()
+    if (self%exchange%parameters%mhm_active()) call self%mhm%finalize()
     if (self%exchange%parameters%mrm_active()) call self%mrm%finalize()
   end subroutine domain_finalize
 

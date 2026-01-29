@@ -1,17 +1,16 @@
 !> \file    mo_mrm_container.f90
-!> \brief   \copybrief mo_mrm_container
-!> \details \copydetails mo_mrm_container
+!> \copydoc mo_mrm_container
 
 !> \brief   Module for a mHM process container.
 !> \version 0.1
+!> \changelog
+!! - Stephan Thober Sep 2026
+!!   - initial version using river dag
 !> \authors Sebastian Mueller, Stephan Thober
 !> \date    Aug 2025
 !> \copyright Copyright 2005-\today, the mHM Developers, Luis Samaniego, Sabine Attinger: All rights reserved.
 !! mHM is released under the LGPLv3+ license \license_note
 !> \ingroup f_exchange
-!
-! history
-! Sep 2026 - Stephan Thober: initial version using river dag
 module mo_mrm_container
   use mo_kind, only: i2, i4, i8, dp
   use mo_nml, only: position_nml ! , close_nml
@@ -104,7 +103,7 @@ contains
 
   !> \brief Configure the mRM process container.
   subroutine mrm_configure(self, file)
-    class(mrm_t), intent(inout) :: self
+    class(mrm_t), intent(inout), target :: self
     character(*), intent(in), optional :: file !< file containing the namelists
     character(1024) :: errmsg
     character(:), allocatable :: path
@@ -162,7 +161,7 @@ contains
 
     call message(" ... connecting mrm: ", self%exchange%time%str())
 
-    ! store domain id
+    ! get domain id
     id(1) = self%exchange%domain
 
     case = self%exchange%parameters%config%processes%routing
@@ -173,10 +172,10 @@ contains
     self%exchange%fdir%required = .true.
     self%exchange%slope%required = .not.const_celerity
 
-    if (.not.self%exchange%runoff_total%provided) call error_message("mRM: runoff_total not provided.")
-    if (.not.self%exchange%fdir%provided) call error_message("mRM: fdir not provided.")
-    if (.not.const_celerity) then
-      if (.not.self%exchange%slope%provided) call error_message("mRM: slope not provided, but required for variable celerity.")
+    if (.not.self%exchange%runoff_total%provided) call error_message("mRM: runoff_total not provided (need mHM or runoff input).")
+    if (.not.self%exchange%fdir%provided) call error_message("mRM: fdir not provided (check input settings).")
+    if (.not.const_celerity .and. .not.self%exchange%slope%provided) then
+      call error_message("mRM: slope not provided, but required for variable celerity (routing case 3).")
     end if
 
     gamma = self%exchange%parameters%get_process(8_i4)  ! routing still process 8
@@ -275,7 +274,7 @@ contains
     allocate(self%discharge(self%river%n_nodes), source=0.0_dp)
 
     ! populate exchange type
-    self%exchange%q_mod%data => self%discharge
+    self%exchange%discharge%data => self%discharge
 
   end subroutine mrm_connect
 
@@ -373,7 +372,7 @@ contains
   end subroutine mrm_update
 
   subroutine mrm_finalize(self)
-    class(mrm_t), intent(inout) :: self
+    class(mrm_t), intent(inout), target :: self
 
     call message("finalize ... mRM")
     ! if (self%config%write_restart) then

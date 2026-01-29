@@ -126,6 +126,7 @@ module mo_input_container
     procedure :: connect => input_connect
     procedure :: initialize => input_initialize
     procedure :: update => input_update
+    procedure :: finalize => input_finalize
   end type input_t
 
 contains
@@ -668,5 +669,12 @@ contains
     class(input_t), target, intent(inout) :: self
     call self%runoff%update(self%exchange%runoff_total%data, self%exchange%time, self%chunking, self%exchange%end_time)
   end subroutine input_update
+
+  subroutine input_finalize(self)
+    class(input_t), target, intent(inout) :: self
+    call message(" ... finalize input")
+    ! close datasets
+    if (self%runoff%provided) call self%runoff%ds%close()
+  end subroutine input_finalize
 
 end module mo_input_container

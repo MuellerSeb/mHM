@@ -1,6 +1,5 @@
 !> \file    mo_meteo_container.f90
-!> \brief   \copybrief mo_meteo_container
-!> \details \copydetails mo_meteo_container
+!> \copydoc mo_meteo_container
 
 !> \brief   Module for a meteo process container.
 !> \version 0.1
@@ -25,13 +24,14 @@ module mo_meteo_container
     procedure :: connect => meteo_connect
     procedure :: initialize => meteo_initialize
     procedure :: update => meteo_update
+    procedure :: finalize => meteo_finalize
   end type meteo_t
 
 contains
 
   !> \brief Configure the Meteorology process container.
   subroutine meteo_configure(self, file)
-    class(meteo_t), intent(inout) :: self
+    class(meteo_t), intent(inout), target :: self
     character(*), intent(in), optional :: file !< file containing the namelists
     character(1024) :: errmsg
     character(:), allocatable :: path
@@ -48,19 +48,28 @@ contains
     if (status /= NML_OK) call error_message("Meteo config not valid. Error: ", trim(errmsg))
   end subroutine meteo_configure
 
+  !> \brief Connect the Meteorology process container with other components.
   subroutine meteo_connect(self)
-    class(meteo_t), intent(inout) :: self
+    class(meteo_t), intent(inout), target :: self
     call message(" ... connecting meteo: ", self%exchange%time%str())
   end subroutine meteo_connect
 
+  !> \brief Initialize the Meteorology process container for the simulation.
   subroutine meteo_initialize(self)
-    class(meteo_t), intent(inout) :: self
+    class(meteo_t), intent(inout), target :: self
     call message(" ... initialize meteo: ", self%exchange%time%str())
   end subroutine meteo_initialize
 
+  !> \brief Update the Meteorology process container for the current time step.
   subroutine meteo_update(self)
-    class(meteo_t), intent(inout) :: self
+    class(meteo_t), intent(inout), target :: self
     call message(" ... updating meteo: ", self%exchange%time%str())
   end subroutine meteo_update
+
+  !> \brief Finalize the Meteorology process container after the simulation.
+  subroutine meteo_finalize(self)
+    class(meteo_t), intent(inout), target :: self
+    call message(" ... finalize meteo: ", self%exchange%time%str())
+  end subroutine meteo_finalize
 
 end module mo_meteo_container

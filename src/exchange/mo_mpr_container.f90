@@ -1,6 +1,5 @@
 !> \file    mo_mpr_container.f90
-!> \brief   \copybrief mo_mpr_container
-!> \details \copydetails mo_mpr_container
+!> \copydoc mo_mpr_container
 
 !> \brief   Module for a mpr process container.
 !> \version 0.1
@@ -25,13 +24,14 @@ module mo_mpr_container
     procedure :: connect => mpr_connect
     procedure :: initialize => mpr_initialize
     procedure :: update => mpr_update
+    procedure :: finalize => mpr_finalize
   end type mpr_t
 
 contains
 
   !> \brief Configure the MPR process container.
   subroutine mpr_configure(self, file)
-    class(mpr_t), intent(inout) :: self
+    class(mpr_t), intent(inout), target :: self
     character(*), intent(in), optional :: file !< file containing the namelists
     character(1024) :: errmsg
     character(:), allocatable :: path
@@ -48,19 +48,27 @@ contains
     if (status /= NML_OK) call error_message("MPR config not valid. Error: ", trim(errmsg))
   end subroutine mpr_configure
 
+  !> \brief Connect the MPR process container with other components.
   subroutine mpr_connect(self)
-    class(mpr_t), intent(inout) :: self
+    class(mpr_t), intent(inout), target :: self
     call message(" ... connecting mpr: ", self%exchange%time%str())
   end subroutine mpr_connect
 
+  !> \brief Initialize the MPR process container for the simulation.
   subroutine mpr_initialize(self)
-    class(mpr_t), intent(inout) :: self
+    class(mpr_t), intent(inout), target :: self
     call message(" ... initialize mpr: ", self%exchange%time%str())
   end subroutine mpr_initialize
 
+  !> \brief Update the MPR process container for the current time step.
   subroutine mpr_update(self)
-    class(mpr_t), intent(inout) :: self
-    ! call message(" ... updating mpr: ", self%exchange%time%str())
+    class(mpr_t), intent(inout), target :: self
+    call message(" ... updating mpr: ", self%exchange%time%str())
   end subroutine mpr_update
 
+  !> \brief Finalize the MPR process container after the simulation.
+  subroutine mpr_finalize(self)
+    class(mpr_t), intent(inout), target :: self
+    call message(" ... finalize mpr: ", self%exchange%time%str())
+  end subroutine mpr_finalize
 end module mo_mpr_container
