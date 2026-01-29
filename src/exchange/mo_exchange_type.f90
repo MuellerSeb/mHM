@@ -1,14 +1,12 @@
 !> \dir exchange
-!> \brief \copybrief f_exchange
-!> \details \copydetails f_exchange
+!> \copydoc f_exchange
 
 !> \defgroup   f_exchange exchange - Fortran modules
 !> \brief      Modules to deal with data exchange between mHM components.
 !> \details    This module provides different types to enable the data exchange between components.
 
 !> \file    mo_exchange_type.f90
-!> \brief   \copybrief mo_exchange_type
-!> \details \copydetails mo_exchange_type
+!> \copydoc mo_exchange_type
 
 !> \brief   Module to provide the exchange type.
 !> \version 0.1
@@ -223,10 +221,10 @@ module mo_exchange_type
     type(var2d_dp) :: cosmic_l3         !< cosmic L3 parameter [g cm-2] on level l1
 
     ! routing (level3)
-    type(var_dp) :: q_out               !< accumulated runoff [m3 s-1] on level L3
-    type(var_dp) :: q_mod               !< modelled discharge [m3 s-1] on level L3
-    type(var_dp) :: e_out               !< accumulated source energy [W] on level L3
-    type(var_dp) :: e_mod               !< modelled routed energy [W] on level L3
+    ! type(var_dp) :: q_out               !< accumulated runoff [m3 s-1] on level L3
+    ! type(var_dp) :: e_out               !< accumulated source energy [W] on level L3
+    type(var_dp) :: discharge           !< modelled discharge [m3 s-1] on level L3
+    type(var_dp) :: energy_flux         !< modelled routed energy [W] on level L3
     type(var_dp) :: river_temp          !< simulated river temperature [degC] on level L3
 
     ! groundwater (level0)
@@ -417,10 +415,10 @@ contains
     self%cosmic_l3         = var2d_dp(grid=l1, name="cosmic_l3",         units="g cm-2",            long_name="cosmic L3 parameter")
 
     ! routing (level3)
-    self%q_out             =   var_dp(grid=l3, name="q_out",            units="m3 s-1",            long_name="accumulated runoff")
-    self%q_mod             =   var_dp(grid=l3, name="q_mod",            units="m3 s-1",            long_name="modelled discharge")
-    self%e_out             =   var_dp(grid=l3, name="e_out",            units="W",                 long_name="accumulated source energy")
-    self%e_mod             =   var_dp(grid=l3, name="e_mod",            units="W",                 long_name="modelled routed energy")
+    ! self%q_out             =   var_dp(grid=l3, name="q_out",            units="m3 s-1",            long_name="accumulated runoff")
+    ! self%e_out             =   var_dp(grid=l3, name="e_out",            units="W",                 long_name="accumulated source energy")
+    self%discharge         =   var_dp(grid=l3, name="discharge",        units="m3 s-1",            long_name="modelled discharge", standard_name="outgoing_water_volume_transport_along_river_channel")
+    self%energy_flux       =   var_dp(grid=l3, name="e_mod",            units="W",                 long_name="modelled routed energy")
     self%river_temp        =   var_dp(grid=l3, name="river_temp",       units="degC",              long_name="simulated river temperature")
 
     ! groundwater (level0)
@@ -646,14 +644,14 @@ contains
       case("cosmic_l3")
         var_pnt => self%cosmic_l3
       ! routing (level3)
-      case("q_out")
-        var_pnt => self%q_out
-      case("q_mod")
-        var_pnt => self%q_mod
-      case("e_out")
-        var_pnt => self%e_out
-      case("e_mod")
-        var_pnt => self%e_mod
+      ! case("q_out")
+      !   var_pnt => self%q_out
+      ! case("e_out")
+      !   var_pnt => self%e_out
+      case("discharge")
+        var_pnt => self%discharge
+      case("energy_flux")
+        var_pnt => self%energy_flux
       case("river_temp")
         var_pnt => self%river_temp
       ! groundwater (level0)
