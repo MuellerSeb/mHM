@@ -23,36 +23,14 @@ module mo_mhm_container
   type, public :: mhm_t
     type(nml_config_mhm_t) :: config !< configuration of the mHM process container
     type(exchange_t), pointer :: exchange => null() !< exchange container of the domain
-    ! DEFINE OUTPUTS
-    integer(i4) :: output_deflate_level   !< deflate level in nc files
-    integer(i4) :: output_time_reference  !< time reference point location in output nc files
-    logical :: output_double_precision    !< output precision in nc files
-    integer(i4) :: timeStep_model_outputs !< timestep for writing model outputs
-    logical, dimension(nOutFlxState) :: outputFlxState !< Define model outputs see "mhm_outputs.nml"
     ! soil moisture
     real(dp), public, dimension(:, :), allocatable :: L1_sm !< [-] soil moisture input for optimization
-    logical, public, dimension(:, :), allocatable :: L1_sm_mask !< [-] mask for valid data in L1_sm
+    logical,  public, dimension(:, :), allocatable :: L1_sm_mask !< [-] mask for valid data in L1_sm
     ! neutrons
     real(dp), public, dimension(:, :), allocatable :: L1_neutronsdata !< [cph] ground albedo neutrons input
-    logical, public, dimension(:, :), allocatable :: L1_neutronsdata_mask !< [cph] mask for valid data in L1_neutrons
+    logical,  public, dimension(:, :), allocatable :: L1_neutronsdata_mask !< [cph] mask for valid data in L1_neutronsdata
     ! soil moisture
     integer(i4) :: nSoilHorizons_sm_input ! No. of mhm soil horizons equivalent to sm input
-
-    ! OPTIMIZATION STUFF
-    type(optidata), public, dimension(:), allocatable :: L1_smObs
-    ! neutrons
-    type(optidata), public, dimension(:), allocatable :: L1_neutronsObs
-    ! evapotranspiration
-    type(optidata), public, dimension(:), allocatable :: L1_etObs
-    ! tws
-    type(optidata), public, dimension(:), allocatable :: L1_twsaObs !< this stores L1_tws, the mask, the directory of the
-                                                              !< observerd data, and the
-                                                              !< timestepInput of the simulated data
-                                                              ! ToDo: add unit
-    logical, public                             :: BFI_calc     !< calculate observed BFI from gauges with Eckhardt filter
-    real(dp), public, dimension(:), allocatable :: BFI_obs      !< given base-flow index per domain
-    real(dp), public, dimension(:), allocatable :: BFI_qBF_sum  !< q2 weighted sum for each domain
-    real(dp), public, dimension(:), allocatable :: BFI_qT_sum   !< q2 weighted sum for each domain
 
     ! State variables
     ! dim1 = number grid cells L1
@@ -89,7 +67,7 @@ module mo_mhm_container
     real(dp), public, dimension(:), allocatable :: L1_baseflow     !< [mm TS-1] Baseflow
     real(dp), public, dimension(:), allocatable :: L1_total_runoff !< [m3 TS-1] Generated runoff
 
-    real(dp), public, dimension(int(YearMonths, i4)) :: evap_coeff     !< [-] Evap. coef. for free-water surfaces
+    real(dp), public, dimension(int(YearMonths, i4)) :: evap_coeff        !< [-] Evap. coef. for free-water surfaces
     real(dp), public, dimension(:), allocatable :: neutron_integral_AFast !< pre-calculated integrand for vertical projection of isotropic neutron flux
 
   contains
@@ -97,13 +75,14 @@ module mo_mhm_container
     procedure :: connect => mhm_connect
     procedure :: initialize => mhm_initialize
     procedure :: update => mhm_update
+    procedure :: finalize => mhm_finalize
   end type mhm_t
 
 contains
 
   !> \brief Configure the mHM process container.
   subroutine mhm_configure(self, file)
-    class(mhm_t), intent(inout) :: self
+    class(mhm_t), intent(inout), target :: self
     character(*), intent(in), optional :: file !< file containing the namelists
     character(1024) :: errmsg
     character(:), allocatable :: path
@@ -120,19 +99,27 @@ contains
     if (status /= NML_OK) call error_message("mHM config not valid. Error: ", trim(errmsg))
   end subroutine mhm_configure
 
+  !> \brief Connect the mHM process container with other components.
   subroutine mhm_connect(self)
-    class(mhm_t), intent(inout) :: self
+    class(mhm_t), intent(inout), target :: self
     call message(" ... connecting mHM: ", self%exchange%time%str())
   end subroutine mhm_connect
 
+  !> \brief Initialize the mHM process container for the simulation.
   subroutine mhm_initialize(self)
-    class(mhm_t), intent(inout) :: self
+    class(mhm_t), intent(inout), target :: self
     call message(" ... initialize mHM: ", self%exchange%time%str())
   end subroutine mhm_initialize
 
+  !> \brief Update the mHM process container for the current time step.
   subroutine mhm_update(self)
-    class(mhm_t), intent(inout) :: self
-    ! call message(" ... updating mHM: ", self%exchange%time%str())
+    class(mhm_t), intent(inout), target :: self
+    call message(" ... updating mHM: ", self%exchange%time%str())
   end subroutine mhm_update
 
+  !> \brief Finalize the mHM process container after the simulation.
+  subroutine mhm_finalize(self)
+    class(mhm_t), intent(inout), target :: self
+    call message(" ... finalize mHM: ", self%exchange%time%str())
+  end subroutine mhm_finalize
 end module mo_mhm_container
