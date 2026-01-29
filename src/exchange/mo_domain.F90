@@ -1,4 +1,4 @@
-!> \file    mo_domain.f90
+!> \file    mo_domain.F90
 !> \copydoc mo_domain
 
 !> \brief   Module for a domain container.
@@ -8,7 +8,9 @@
 !> \copyright Copyright 2005-\today, the mHM Developers, Luis Samaniego, Sabine Attinger: All rights reserved.
 !! mHM is released under the LGPLv3+ license \license_note
 !> \ingroup f_exchange
+#include "logging.h"
 module mo_domain
+  use mo_logging
   use mo_list, only: list
   use mo_kind, only: i4, dp
   use mo_message, only: message, error_message
@@ -51,7 +53,7 @@ module mo_domain
   contains
     procedure :: get_domain => domain_list_get
     procedure :: add_domain => domain_list_add
-  end type
+  end type domain_list
 
   type(domain_list), public :: domains
   integer(i4), allocatable, public :: selected_domains(:)
