@@ -9,7 +9,9 @@
 !> \copyright Copyright 2005-\today, the mHM Developers, Luis Samaniego, Sabine Attinger: All rights reserved.
 !! mHM is released under the LGPLv3+ license \license_note
 !> \ingroup f_exchange
+#include "logging.h"
 module mo_main_config
+  use mo_logging
   use mo_kind, only: i4, dp
   use mo_common_constants, only: nprocesses
   use mo_message, only: message, error_message
@@ -138,9 +140,12 @@ contains
     character(*), intent(in) :: file !< file containing the main namelists
     character(1024) :: errmsg
     integer :: status
-    call message(" ... read config processes: ", file)
+    call log_info(*) " Read config processes: ", file
     status = self%processes%from_file(file=file, errmsg=errmsg)
-    if (status /= NML_OK) call error_message("Error reading processes from: ", file, ", with error: ", trim(errmsg))
+    if (status /= NML_OK) then
+      log_fatal(*) "Error reading processes from: ", file, ", with error: ", trim(errmsg)
+      error stop 1
+    end if
   end subroutine parameter_config_read_processes
 
   !> \brief Read parameter configuration.
@@ -149,102 +154,165 @@ contains
     character(*), intent(in) :: file !< file containing the parameter namelists
     character(1024) :: errmsg
     integer :: status
-    call message(" ... read config parameter: ", file)
+    call log_info(*) " Read config parameter: ", file
 
     select case (self%processes%interception)
       case (1_i4)
         status = self%interception1%from_file(file=file, errmsg=errmsg)
-        if (status /= NML_OK) call error_message("Error reading interception1 from: ", file, ", with error: ", trim(errmsg))
+        if (status /= NML_OK) then
+          log_fatal(*) "Error reading interception1 from: ", file, ", with error: ", trim(errmsg)
+          error stop 1
+        end if
     end select
 
     select case (self%processes%snow)
       case (1_i4)
         status = self%snow1%from_file(file=file, errmsg=errmsg)
-        if (status /= NML_OK) call error_message("Error reading snow1 from: ", file, ", with error: ", trim(errmsg))
+        if (status /= NML_OK) then
+          log_fatal(*) "Error reading snow1 from: ", file, ", with error: ", trim(errmsg)
+          error stop 1
+        end if
     end select
 
     select case (self%processes%soil_moisture)
       case (1_i4)
         status = self%soilmoisture1%from_file(file=file, errmsg=errmsg)
-        if (status /= NML_OK) call error_message("Error reading soilmoisture1 from: ", file, ", with error: ", trim(errmsg))
+        if (status /= NML_OK) then
+          log_fatal(*) "Error reading soilmoisture1 from: ", file, ", with error: ", trim(errmsg)
+          error stop 1
+        end if
       case (2_i4)
         status = self%soilmoisture2%from_file(file=file, errmsg=errmsg)
-        if (status /= NML_OK) call error_message("Error reading soilmoisture2 from: ", file, ", with error: ", trim(errmsg))
+        if (status /= NML_OK) then
+          log_fatal(*) "Error reading soilmoisture2 from: ", file, ", with error: ", trim(errmsg)
+          error stop 1
+        end if
       case (3_i4)
         status = self%soilmoisture3%from_file(file=file, errmsg=errmsg)
-        if (status /= NML_OK) call error_message("Error reading soilmoisture3 from: ", file, ", with error: ", trim(errmsg))
+        if (status /= NML_OK) then
+          log_fatal(*) "Error reading soilmoisture3 from: ", file, ", with error: ", trim(errmsg)
+          error stop 1
+        end if
       case (4_i4)
         status = self%soilmoisture4%from_file(file=file, errmsg=errmsg)
-        if (status /= NML_OK) call error_message("Error reading soilmoisture4 from: ", file, ", with error: ", trim(errmsg))
+        if (status /= NML_OK) then
+          log_fatal(*) "Error reading soilmoisture4 from: ", file, ", with error: ", trim(errmsg)
+          error stop 1
+        end if
     end select
 
     select case (self%processes%direct_runoff)
       case (1_i4)
         status = self%directrunoff1%from_file(file=file, errmsg=errmsg)
-        if (status /= NML_OK) call error_message("Error reading directrunoff1 from: ", file, ", with error: ", trim(errmsg))
+        if (status /= NML_OK) then
+          log_fatal(*) "Error reading directrunoff1 from: ", file, ", with error: ", trim(errmsg)
+          error stop 1
+        end if
     end select
 
     select case (self%processes%pet)
       case (-2_i4)
         status = self%PETm2%from_file(file=file, errmsg=errmsg)
-        if (status /= NML_OK) call error_message("Error reading PETm2 from: ", file, ", with error: ", trim(errmsg))
+        if (status /= NML_OK) then
+          log_fatal(*) "Error reading PETm2 from: ", file, ", with error: ", trim(errmsg)
+          error stop 1
+        end if
       case (-1_i4)
         status = self%PETm1%from_file(file=file, errmsg=errmsg)
-        if (status /= NML_OK) call error_message("Error reading PETm1 from: ", file, ", with error: ", trim(errmsg))
+        if (status /= NML_OK) then
+          log_fatal(*) "Error reading PETm1 from: ", file, ", with error: ", trim(errmsg)
+          error stop 1
+        end if
       case (1_i4)
         status = self%PET1%from_file(file=file, errmsg=errmsg)
-        if (status /= NML_OK) call error_message("Error reading PET1 from: ", file, ", with error: ", trim(errmsg))
+        if (status /= NML_OK) then
+          log_fatal(*) "Error reading PET1 from: ", file, ", with error: ", trim(errmsg)
+          error stop 1
+        end if
       case (2_i4)
         status = self%PET2%from_file(file=file, errmsg=errmsg)
-        if (status /= NML_OK) call error_message("Error reading PET2 from: ", file, ", with error: ", trim(errmsg))
+        if (status /= NML_OK) then
+          log_fatal(*) "Error reading PET2 from: ", file, ", with error: ", trim(errmsg)
+          error stop 1
+        end if
       case (3_i4)
         status = self%PET3%from_file(file=file, errmsg=errmsg)
-        if (status /= NML_OK) call error_message("Error reading PET3 from: ", file, ", with error: ", trim(errmsg))
+        if (status /= NML_OK) then
+          log_fatal(*) "Error reading PET3 from: ", file, ", with error: ", trim(errmsg)
+          error stop 1
+        end if
     end select
 
     select case (self%processes%interflow)
       case (1_i4)
         status = self%interflow1%from_file(file=file, errmsg=errmsg)
-        if (status /= NML_OK) call error_message("Error reading interflow1 from: ", file, ", with error: ", trim(errmsg))
+        if (status /= NML_OK) then
+          log_fatal(*) "Error reading interflow1 from: ", file, ", with error: ", trim(errmsg)
+          error stop 1
+        end if
     end select
 
     select case (self%processes%percolation)
       case (1_i4)
         status = self%percolation1%from_file(file=file, errmsg=errmsg)
-        if (status /= NML_OK) call error_message("Error reading percolation1 from: ", file, ", with error: ", trim(errmsg))
+        if (status /= NML_OK) then
+          log_fatal(*) "Error reading percolation1 from: ", file, ", with error: ", trim(errmsg)
+          error stop 1
+        end if
     end select
 
     select case (self%processes%baseflow)
       case (1_i4)
         status = self%geoparameter%from_file(file=file, errmsg=errmsg)
-        if (status /= NML_OK) call error_message("Error reading geoparameter from: ", file, ", with error: ", trim(errmsg))
+        if (status /= NML_OK) then
+          log_fatal(*) "Error reading geoparameter from: ", file, ", with error: ", trim(errmsg)
+          error stop 1
+        end if
     end select
 
     select case (self%processes%neutrons)
       case (1_i4)
         status = self%neutrons1%from_file(file=file, errmsg=errmsg)
-        if (status /= NML_OK) call error_message("Error reading neutrons1 from: ", file, ", with error: ", trim(errmsg))
+        if (status /= NML_OK) then
+          log_fatal(*) "Error reading neutrons1 from: ", file, ", with error: ", trim(errmsg)
+          error stop 1
+        end if
       case (2_i4)
         status = self%neutrons2%from_file(file=file, errmsg=errmsg)
-        if (status /= NML_OK) call error_message("Error reading neutrons2 from: ", file, ", with error: ", trim(errmsg))
+        if (status /= NML_OK) then
+          log_fatal(*) "Error reading neutrons2 from: ", file, ", with error: ", trim(errmsg)
+          error stop 1
+        end if
     end select
 
     select case (self%processes%routing)
       case (1_i4)
         status = self%routing1%from_file(file=file, errmsg=errmsg)
-        if (status /= NML_OK) call error_message("Error reading routing1 from: ", file, ", with error: ", trim(errmsg))
+        if (status /= NML_OK) then
+          log_fatal(*) "Error reading routing1 from: ", file, ", with error: ", trim(errmsg)
+          error stop 1
+        end if
       case (2_i4)
         status = self%routing2%from_file(file=file, errmsg=errmsg)
-        if (status /= NML_OK) call error_message("Error reading routing2 from: ", file, ", with error: ", trim(errmsg))
+        if (status /= NML_OK) then
+          log_fatal(*) "Error reading routing2 from: ", file, ", with error: ", trim(errmsg)
+          error stop 1
+        end if
       case (3_i4)
         status = self%routing3%from_file(file=file, errmsg=errmsg)
-        if (status /= NML_OK) call error_message("Error reading routing3 from: ", file, ", with error: ", trim(errmsg))
+        if (status /= NML_OK) then
+          log_fatal(*) "Error reading routing3 from: ", file, ", with error: ", trim(errmsg)
+          error stop 1
+        end if
     end select
 
     select case (self%processes%temperature_routing)
       case (1_i4)
         status = self%rivertemp1%from_file(file=file, errmsg=errmsg)
-        if (status /= NML_OK) call error_message("Error reading rivertemp1 from: ", file, ", with error: ", trim(errmsg))
+        if (status /= NML_OK) then
+          log_fatal(*) "Error reading rivertemp1 from: ", file, ", with error: ", trim(errmsg)
+          error stop 1
+        end if
     end select
 
   end subroutine parameter_config_read_parameter
@@ -256,127 +324,256 @@ contains
     character(*), intent(in), optional :: para_file !< file containing the parameter namelists
     character(1024) :: errmsg
     integer :: status
-    call message(" ... configure parameters")
+    call log_info(*) " Configure parameters"
     if (present(meta_file)) call self%config%read_processes(file=meta_file)
     status = self%config%processes%is_valid(errmsg=errmsg)
-    if (status /= NML_OK) call error_message("Processes configuration not valid. Error: ", trim(errmsg))
+    if (status /= NML_OK) then
+      log_fatal(*) "Processes configuration not valid: ", trim(errmsg)
+      error stop
+    end if
 
     if (present(para_file)) call self%config%read_parameter(file=para_file)
     select case (self%config%processes%interception)
       case (1_i4)
-        if (.not.self%config%interception1%is_configured) call error_message("Interception parameters not set.")
+        if (.not.self%config%interception1%is_configured) then
+          log_fatal(*) "Interception parameters not set."
+          error stop 1
+        end if
         status = self%config%interception1%is_valid(errmsg=errmsg)
-        if (status /= NML_OK) call error_message("Interception1 configuration not valid. Error: ", trim(errmsg))
+        if (status /= NML_OK) then
+          log_fatal(*) "Interception1 configuration not valid: ", trim(errmsg)
+          error stop 1
+        end if
     end select
 
     select case (self%config%processes%snow)
       case (1_i4)
-        if (.not.self%config%snow1%is_configured) call error_message("Snow parameters not set.")
+        if (.not.self%config%snow1%is_configured) then
+          log_fatal(*) "Snow parameters not set."
+          error stop 1
+        end if
         status = self%config%snow1%is_valid(errmsg=errmsg)
-        if (status /= NML_OK) call error_message("Snow1 configuration not valid. Error: ", trim(errmsg))
+        if (status /= NML_OK) then
+          log_fatal(*) "Snow1 configuration not valid: ", trim(errmsg)
+          error stop 1
+        end if
     end select
 
     select case (self%config%processes%soil_moisture)
       case (1_i4)
-        if (.not.self%config%soilmoisture1%is_configured) call error_message("Soilmoisture parameters not set.")
+        if (.not.self%config%soilmoisture1%is_configured) then
+          log_fatal(*) "Soilmoisture parameters not set."
+          error stop 1
+        end if
         status = self%config%soilmoisture1%is_valid(errmsg=errmsg)
-        if (status /= NML_OK) call error_message("Soilmoisture1 configuration not valid. Error: ", trim(errmsg))
+        if (status /= NML_OK) then
+          log_fatal(*) "Soilmoisture1 configuration not valid: ", trim(errmsg)
+          error stop 1
+        end if
       case (2_i4)
-        if (.not.self%config%soilmoisture2%is_configured) call error_message("Soilmoisture parameters not set.")
+        if (.not.self%config%soilmoisture2%is_configured) then
+          log_fatal(*) "Soilmoisture parameters not set."
+          error stop 1
+        end if
         status = self%config%soilmoisture2%is_valid(errmsg=errmsg)
-        if (status /= NML_OK) call error_message("Soilmoisture2 configuration not valid. Error: ", trim(errmsg))
+        if (status /= NML_OK) then
+          log_fatal(*) "Soilmoisture2 configuration not valid: ", trim(errmsg)
+          error stop 1
+        end if
       case (3_i4)
-        if (.not.self%config%soilmoisture3%is_configured) call error_message("Soilmoisture parameters not set.")
+        if (.not.self%config%soilmoisture3%is_configured) then
+          log_fatal(*) "Soilmoisture parameters not set."
+          error stop 1
+        end if
         status = self%config%soilmoisture3%is_valid(errmsg=errmsg)
-        if (status /= NML_OK) call error_message("Soilmoisture3 configuration not valid. Error: ", trim(errmsg))
+        if (status /= NML_OK) then
+          log_fatal(*) "Soilmoisture3 configuration not valid: ", trim(errmsg)
+          error stop 1
+        end if
       case (4_i4)
-        if (.not.self%config%soilmoisture4%is_configured) call error_message("Soilmoisture parameters not set.")
+        if (.not.self%config%soilmoisture4%is_configured) then
+          log_fatal(*) "Soilmoisture parameters not set."
+          error stop 1
+        end if
         status = self%config%soilmoisture4%is_valid(errmsg=errmsg)
-        if (status /= NML_OK) call error_message("Soilmoisture4 configuration not valid. Error: ", trim(errmsg))
+        if (status /= NML_OK) then
+          log_fatal(*) "Soilmoisture4 configuration not valid: ", trim(errmsg)
+          error stop 1
+        end if
     end select
 
     select case (self%config%processes%direct_runoff)
       case (1_i4)
-        if (.not.self%config%directrunoff1%is_configured) call error_message("Direct runoff parameters not set.")
+        if (.not.self%config%directrunoff1%is_configured) then
+          log_fatal(*) "Direct runoff parameters not set."
+          error stop 1
+        end if
         status = self%config%directrunoff1%is_valid(errmsg=errmsg)
-        if (status /= NML_OK) call error_message("Directrunoff1 configuration not valid. Error: ", trim(errmsg))
+        if (status /= NML_OK) then
+          log_fatal(*) "Directrunoff1 configuration not valid: ", trim(errmsg)
+          error stop 1
+        end if
     end select
 
     select case (self%config%processes%pet)
       case (-2_i4)
-        if (.not.self%config%PETm2%is_configured) call error_message("PET parameters not set.")
+        if (.not.self%config%PETm2%is_configured) then
+          log_fatal(*) "PET parameters not set."
+          error stop 1
+        end if
         status = self%config%PETm2%is_valid(errmsg=errmsg)
-        if (status /= NML_OK) call error_message("PETm2 configuration not valid. Error: ", trim(errmsg))
+        if (status /= NML_OK) then
+          log_fatal(*) "PETm2 configuration not valid: ", trim(errmsg)
+          error stop 1
+        end if
       case (-1_i4)
-        if (.not.self%config%PETm1%is_configured) call error_message("PET parameters not set.")
+        if (.not.self%config%PETm1%is_configured) then
+          log_fatal(*) "PET parameters not set."
+          error stop 1
+        end if
         status = self%config%PETm1%is_valid(errmsg=errmsg)
-        if (status /= NML_OK) call error_message("PETm1 configuration not valid. Error: ", trim(errmsg))
+        if (status /= NML_OK) then
+          log_fatal(*) "PETm1 configuration not valid: ", trim(errmsg)
+          error stop 1
+        end if
       case (1_i4)
-        if (.not.self%config%PET1%is_configured) call error_message("PET parameters not set.")
+        if (.not.self%config%PET1%is_configured) then
+          log_fatal(*) "PET parameters not set."
+          error stop 1
+        end if
         status = self%config%PET1%is_valid(errmsg=errmsg)
-        if (status /= NML_OK) call error_message("PET1 configuration not valid. Error: ", trim(errmsg))
+        if (status /= NML_OK) then
+          log_fatal(*) "PET1 configuration not valid: ", trim(errmsg)
+          error stop 1
+        end if
       case (2_i4)
-        if (.not.self%config%PET2%is_configured) call error_message("PET parameters not set.")
+        if (.not.self%config%PET2%is_configured) then
+          log_fatal(*) "PET parameters not set."
+          error stop 1
+        end if
         status = self%config%PET2%is_valid(errmsg=errmsg)
-        if (status /= NML_OK) call error_message("PET2 configuration not valid. Error: ", trim(errmsg))
+        if (status /= NML_OK) then
+          log_fatal(*) "PET2 configuration not valid: ", trim(errmsg)
+          error stop 1
+        end if
       case (3_i4)
-        if (.not.self%config%PET3%is_configured) call error_message("PET parameters not set.")
+        if (.not.self%config%PET3%is_configured) then
+          log_fatal(*) "PET parameters not set."
+          error stop 1
+        end if
         status = self%config%PET3%is_valid(errmsg=errmsg)
-        if (status /= NML_OK) call error_message("PET3 configuration not valid. Error: ", trim(errmsg))
+        if (status /= NML_OK) then
+          log_fatal(*) "PET3 configuration not valid: ", trim(errmsg)
+          error stop 1
+        end if
     end select
 
     select case (self%config%processes%interflow)
       case (1_i4)
-        if (.not.self%config%interflow1%is_configured) call error_message("Interflow parameters not set.")
+        if (.not.self%config%interflow1%is_configured) then
+          log_fatal(*) "Interflow parameters not set."
+          error stop 1
+        end if
         status = self%config%interflow1%is_valid(errmsg=errmsg)
-        if (status /= NML_OK) call error_message("Interflow1 configuration not valid. Error: ", trim(errmsg))
+        if (status /= NML_OK) then
+          log_fatal(*) "Interflow1 configuration not valid: ", trim(errmsg)
+          error stop 1
+        end if
     end select
 
     select case (self%config%processes%percolation)
       case (1_i4)
-        if (.not.self%config%percolation1%is_configured) call error_message("Percolation parameters not set.")
+        if (.not.self%config%percolation1%is_configured) then
+          log_fatal(*) "Percolation parameters not set."
+          error stop 1
+        end if
         status = self%config%percolation1%is_valid(errmsg=errmsg)
-        if (status /= NML_OK) call error_message("Percolation1 configuration not valid. Error: ", trim(errmsg))
+        if (status /= NML_OK) then
+          log_fatal(*) "Percolation1 configuration not valid: ", trim(errmsg)
+          error stop 1
+        end if
     end select
 
     select case (self%config%processes%baseflow)
       case (1_i4)
-        if (.not.self%config%geoparameter%is_configured) call error_message("Geoparameter parameters not set.")
+        if (.not.self%config%geoparameter%is_configured) then
+          log_fatal(*) "Geoparameter parameters not set."
+          error stop 1
+        end if
         status = self%config%geoparameter%is_valid(errmsg=errmsg)
-        if (status /= NML_OK) call error_message("Geoparameter configuration not valid. Error: ", trim(errmsg))
+        if (status /= NML_OK) then
+          log_fatal(*) "Geoparameter configuration not valid: ", trim(errmsg)
+          error stop 1
+        end if
     end select
 
     select case (self%config%processes%neutrons)
       case (1_i4)
-        if (.not.self%config%neutrons1%is_configured) call error_message("Neutrons parameters not set.")
+        if (.not.self%config%neutrons1%is_configured) then
+          log_fatal(*) "Neutrons parameters not set."
+          error stop 1
+        end if
         status = self%config%neutrons1%is_valid(errmsg=errmsg)
-        if (status /= NML_OK) call error_message("Neutrons1 configuration not valid. Error: ", trim(errmsg))
+        if (status /= NML_OK) then
+          log_fatal(*) "Neutrons1 configuration not valid: ", trim(errmsg)
+          error stop 1
+        end if
       case (2_i4)
-        if (.not.self%config%neutrons2%is_configured) call error_message("Neutrons parameters not set.")
+        if (.not.self%config%neutrons2%is_configured) then
+          log_fatal(*) "Neutrons parameters not set."
+          error stop 1
+        end if
         status = self%config%neutrons2%is_valid(errmsg=errmsg)
-        if (status /= NML_OK) call error_message("Neutrons2 configuration not valid. Error: ", trim(errmsg))
+        if (status /= NML_OK) then
+          log_fatal(*) "Neutrons2 configuration not valid: ", trim(errmsg)
+          error stop 1
+        end if
     end select
 
     select case (self%config%processes%routing)
       case (1_i4)
-        if (.not.self%config%routing1%is_configured) call error_message("Routing parameters not set.")
+        if (.not.self%config%routing1%is_configured) then
+          log_fatal(*) "Routing parameters not set."
+          error stop 1
+        end if
         status = self%config%routing1%is_valid(errmsg=errmsg)
-        if (status /= NML_OK) call error_message("Routing1 configuration not valid. Error: ", trim(errmsg))
+        if (status /= NML_OK) then
+          log_fatal(*) "Routing1 configuration not valid: ", trim(errmsg)
+          error stop 1
+        end if
       case (2_i4)
-        if (.not.self%config%routing2%is_configured) call error_message("Routing parameters not set.")
+        if (.not.self%config%routing2%is_configured) then
+          log_fatal(*) "Routing parameters not set."
+          error stop 1
+        end if
         status = self%config%routing2%is_valid(errmsg=errmsg)
-        if (status /= NML_OK) call error_message("Routing2 configuration not valid. Error: ", trim(errmsg))
+        if (status /= NML_OK) then
+          log_fatal(*) "Routing2 configuration not valid: ", trim(errmsg)
+          error stop 1
+        end if
       case (3_i4)
-        if (.not.self%config%routing3%is_configured) call error_message("Routing parameters not set.")
+        if (.not.self%config%routing3%is_configured) then
+          log_fatal(*) "Routing parameters not set."
+          error stop 1
+        end if
         status = self%config%routing3%is_valid(errmsg=errmsg)
-        if (status /= NML_OK) call error_message("Routing3 configuration not valid. Error: ", trim(errmsg))
+        if (status /= NML_OK) then
+          log_fatal(*) "Routing3 configuration not valid: ", trim(errmsg)
+          error stop 1
+        end if
     end select
 
     select case (self%config%processes%temperature_routing)
       case (1_i4)
-        if (.not.self%config%rivertemp1%is_configured) call error_message("River temperature parameters not set.")
+        if (.not.self%config%rivertemp1%is_configured) then
+          log_fatal(*) "River temperature parameters not set."
+          error stop 1
+        end if
         status = self%config%rivertemp1%is_valid(errmsg=errmsg)
-        if (status /= NML_OK) call error_message("Rivertemp1 configuration not valid. Error: ", trim(errmsg))
+        if (status /= NML_OK) then
+          log_fatal(*) "Rivertemp1 configuration not valid: ", trim(errmsg)
+          error stop 1
+        end if
     end select
 
     call self%initialize()
@@ -414,7 +611,7 @@ contains
     !===============================================================
     ! decide which parameters to read depending on specified processes
 
-    call message(" ... configure processes and parameters")
+    call log_info(*) "Set processes and parameters"
     self%process_matrix = 0_i4
     self%process_matrix(1, 1) = self%config%processes%interception
     self%process_matrix(2, 1) = self%config%processes%snow
@@ -432,7 +629,7 @@ contains
     select case (self%process_matrix(1, 1))
       case(0)
         ! 0 - no interception process selected
-        call message('***SELECTION: interception process is deactivated!')
+        call log_debug(*) "SELECTION: interception process is deactivated!"
         self%process_matrix(1, 3) = 0_i4
       case(1)
         ! 1 - maximum Interception
@@ -444,15 +641,17 @@ contains
                 'canopyInterceptionFactor'])
 
         ! check if parameter are in range
-        if (.not. in_bound(self%definition)) &
-          call error_message('***ERROR: parameter in namelist "interception1" out of bound.')
+        if (.not. in_bound(self%definition)) then
+          log_fatal(*) 'Parameter in namelist "interception1" out of bound.'
+          error stop 1
+        end if
     end select
 
     ! Process 2 - snow
     select case (self%process_matrix(2, 1))
       case(0)
         ! 0 - no snow process selected
-        call message('***SELECTION: snow process is deactivated!')
+        call log_debug(*) "SELECTION: snow process is deactivated!"
         self%process_matrix(2, 3) = sum(self%process_matrix(1 : 2, 2))
       case(1)
         ! 1 - degree-day approach
@@ -478,15 +677,17 @@ contains
                 'maxDegreeDayFactor_pervious    '])
 
         ! check if parameter are in range
-        if (.not. in_bound(self%definition)) &
-          call error_message('***ERROR: parameter in namelist "snow1" out of bound.')
+        if (.not. in_bound(self%definition)) then
+          log_fatal(*) 'Parameter in namelist "snow1" out of bound.'
+          error stop 1
+        end if
     end select
 
     ! Process 3 - soilmoisture
     select case (self%process_matrix(3, 1))
       case(0)
         ! 0 - no soil moisture process selected
-        call message('***SELECTION: soil moisture is deactivated!')
+        call log_debug(*) "SELECTION: soil moisture is deactivated!"
         self%process_matrix(3, 3) = sum(self%process_matrix(1 : 3, 2))
       case(1)
         ! 1 - Feddes equation for PET reduction, bucket approach, Brooks-Corey like
@@ -530,8 +731,10 @@ contains
                 'infiltrationShapeFactor           '])
 
         ! check if parameter are in range
-        if (.not. in_bound(self%definition)) &
-          call error_message('***ERROR: parameter in namelist "soilmoisture1" out of bound.')
+        if (.not. in_bound(self%definition)) then
+          log_fatal(*) 'Parameter in namelist "soilmoisture1" out of bound.'
+          error stop 1
+        end if
 
         ! 2- Jarvis equation for PET reduction, bucket approach, Brooks-Corey like
       case(2)
@@ -577,8 +780,10 @@ contains
                 'jarvis_sm_threshold_c1            '])
 
         ! check if parameter are in range
-        if (.not. in_bound(self%definition)) &
-          call error_message('***ERROR: parameter in namelist "soilmoisture2" out of bound.')
+        if (.not. in_bound(self%definition)) then
+          log_fatal(*) 'Parameter in namelist "soilmoisture2" out of bound.'
+          error stop 1
+        end if
 
         ! 3- Jarvis equation for ET reduction and FC dependency on root fraction coefficient
       case(3)
@@ -632,8 +837,10 @@ contains
                 'jarvis_sm_threshold_c1            '])
 
         ! check if parameter are in range
-        if (.not. in_bound(self%definition)) &
-          call error_message('***ERROR: parameter in namelist "soilmoisture3" out of bound.')
+        if (.not. in_bound(self%definition)) then
+          log_fatal(*) 'Parameter in namelist "soilmoisture3" out of bound.'
+          error stop 1
+        end if
 
         ! 4- Feddes equation for ET reduction and FC dependency on root fraction coefficient
       case(4)
@@ -685,15 +892,17 @@ contains
                 'FCdelta_glob                      '])
 
         ! check if parameter are in range
-        if (.not. in_bound(self%definition)) &
-          call error_message('***ERROR: parameter in namelist "soilmoisture4" out of bound.')
+        if (.not. in_bound(self%definition)) then
+          log_fatal(*) 'Parameter in namelist "soilmoisture4" out of bound.'
+          error stop 1
+        end if
     end select
 
     ! Process 4 - sealed area directRunoff
     select case (self%process_matrix(4, 1))
       case(0)
         ! 0 - no direct runoff process selected
-        call message('***SELECTION: direct runoff is deactivated!')
+        log_debug(*) "SELECTION: direct runoff is deactivated!"
         self%process_matrix(4, 3) = sum(self%process_matrix(1 : 4, 2))
       case(1)
         ! 1 - bucket exceedance approach
@@ -704,14 +913,16 @@ contains
         call append(self%names, ['imperviousStorageCapacity'])
 
         ! check if parameter are in range
-        if (.not. in_bound(self%definition)) &
-          call error_message('***ERROR: parameter in namelist "directRunoff1" out of bound.')
+        if (.not. in_bound(self%definition)) then
+          log_fatal(*) 'Parameter in namelist "directRunoff1" out of bound.'
+          error stop 1
+        end if
     end select
 
     ! Process 5 - potential evapotranspiration (PET)
     select case (self%process_matrix(5, 1))
       case(0) ! 0 - no PET process selected
-        call message('***SELECTION: PET is deactivated!')
+        call log_debug(*) "SELECTION: PET is deactivated!"
         self%process_matrix(5, 3) = sum(self%process_matrix(1 : 5, 2))
       case(-1) ! -1 - PET is input, correct PET by LAI
         self%process_matrix(5, 2) = 5_i4
@@ -730,8 +941,10 @@ contains
                 'PET_c            '])
 
         ! check if parameter are in range
-        if (.not. in_bound(self%definition)) &
-          call error_message('***ERROR: parameter in namelist "PETm1" out of bound.')
+        if (.not. in_bound(self%definition)) then
+          log_fatal(*) 'Parameter in namelist "PETm1" out of bound.'
+          error stop 1
+        end if
 
       case(-2) ! -2 - PET is input, correct PET by aspect
         self%process_matrix(5, 2) = 3_i4
@@ -746,8 +959,10 @@ contains
                 'aspectTresholdPET      '])
 
         ! check if parameter are in range
-        if (.not. in_bound(self%definition)) &
-          call error_message('***ERROR: parameter in namelist "PETm2" out of bound.')
+        if (.not. in_bound(self%definition)) then
+          log_fatal(*) 'Parameter in namelist "PETm2" out of bound.'
+          error stop 1
+        end if
 
       case(1) ! 1 - Hargreaves-Samani method (HarSam) - additional input needed: Tmin, Tmax
         self%process_matrix(5, 2) = 4_i4
@@ -763,8 +978,10 @@ contains
                 'HargreavesSamaniCoeff '])
 
         ! check if parameter are in range
-        if (.not. in_bound(self%definition)) &
-          call error_message('***ERROR: parameter in namelist "PET1" out of bound.')
+        if (.not. in_bound(self%definition)) then
+          log_fatal(*) 'Parameter in namelist "PET1" out of bound.'
+          error stop 1
+        end if
 
       case(2) ! 2 - Priestley-Taylor method (PrieTay) - additional input needed: net_rad
         self%process_matrix(5, 2) = 2_i4
@@ -776,8 +993,10 @@ contains
                 'PriestleyTaylorLAIcorr'])
 
         ! check if parameter are in range
-        if (.not. in_bound(self%definition)) &
-          call error_message('***ERROR: parameter in namelist "PET2" out of bound.')
+        if (.not. in_bound(self%definition)) then
+          log_fatal(*) 'Parameter in namelist "PET2" out of bound.'
+          error stop 1
+        end if
 
       case(3) ! 3 - Penman-Monteith method - additional input needed: net_rad, abs. vapour pressue, windspeed
         self%process_matrix(5, 2) = 7_i4
@@ -801,15 +1020,17 @@ contains
                 'stomatal_resistance           '])
 
         ! check if parameter are in range
-        if (.not. in_bound(self%definition)) &
-          call error_message('***ERROR: parameter in namelist "PET3" out of bound.')
+        if (.not. in_bound(self%definition)) then
+          log_fatal(*) 'Parameter in namelist "PET3" out of bound.'
+          error stop 1
+        end if
     end select
 
     ! Process 6 - interflow
     select case (self%process_matrix(6, 1))
       case(0)
         ! 0 - deactivated
-        call message('***SELECTION: Interflow is deactivated!')
+        call log_debug(*) "SELECTION: Interflow is deactivated!"
         self%process_matrix(6, 3) = sum(self%process_matrix(1 : 6, 2))
       case(1)
         ! 1 - parallel soil reservoir approach
@@ -829,15 +1050,17 @@ contains
                 'exponentSlowInterflow         '])
 
         ! check if parameter are in range
-        if (.not. in_bound(self%definition)) &
-          call error_message('***ERROR: parameter in namelist "interflow1" out of bound.')
+        if (.not. in_bound(self%definition)) then
+          log_fatal(*) 'Parameter in namelist "interflow1" out of bound.'
+          error stop 1
+        end if
     end select
 
     ! Process 7 - percolation
     select case (self%process_matrix(7, 1))
       case(0)
         ! 0 - deactivated
-        call message('***SELECTION: Percolation is deativated!')
+         call log_debug(*) "SELECTION: Percolation is deativated!"
         self%process_matrix(7, 3) = sum(self%process_matrix(1 : 7, 2))
       case(1)
         ! 1 - GW layer is assumed as bucket
@@ -853,15 +1076,17 @@ contains
                 'gain_loss_GWreservoir_karstic'])
 
         ! check if parameter are in range
-        if (.not. in_bound(self%definition)) &
-          call error_message('***ERROR: parameter in namelist "percolation1" out of bound.')
+        if (.not. in_bound(self%definition)) then
+          log_fatal(*) 'Parameter in namelist "percolation1" out of bound.'
+          error stop 1
+        end if
     end select
 
     ! Process 8 - routing
     select case (self%process_matrix(8, 1))
       case(0)
         ! 0 - deactivated
-        call message('***SELECTION: Routing is deactivated!')
+         call log_debug(*) "SELECTION: Routing is deactivated!"
         self%process_matrix(8, 3) = sum(self%process_matrix(1 : 8, 2))
       case(1)
         ! 1 - Muskingum approach
@@ -881,38 +1106,46 @@ contains
                 'muskingumTravelTime_impervious ', &
                 'muskingumAttenuation_riverSlope'])
         ! check if parameter are in range
-        if (.not. in_bound(self%definition)) &
-          call error_message('***ERROR: parameter in namelist "routing1" out of bound.')
+        if (.not. in_bound(self%definition)) then
+          log_fatal(*) 'Parameter in namelist "routing1" out of bound.'
+          error stop 1
+        end if
       case(2)
         self%process_matrix(8, 2) = 1_i4
         self%process_matrix(8, 3) = sum(self%process_matrix(1 : 8, 2))
         call append(self%definition, reshape(self%config%routing2%streamflow_celerity, shp))
         call append(self%names, ['streamflow_celerity'])
         ! check if parameter are in range
-        if (.not. in_bound(self%definition)) &
-          call error_message('***ERROR: parameter in namelist "routing2" out of bound.')
+        if (.not. in_bound(self%definition)) then
+          log_fatal(*) 'Parameter in namelist "routing2" out of bound.'
+          error stop 1
+        end if
       case(3)
         self%process_matrix(8, 2) = 1_i4
         self%process_matrix(8, 3) = sum(self%process_matrix(1 : 8, 2))
         call append(self%definition, reshape(self%config%routing3%slope_factor, shp))
         call append(self%names, ['slope_factor'])
         ! check if parameter are in range
-        if (.not. in_bound(self%definition)) &
-          call error_message('***ERROR: parameter in namelist "routing3" out of bound.')
+        if (.not. in_bound(self%definition)) then
+          log_fatal(*) 'Parameter in namelist "routing3" out of bound.'
+          error stop 1
+        end if
     end select
 
     ! Process 9 - geoparameter
     select case (self%process_matrix(9, 1))
       case(0)
         ! 0 - deactivated
-        call message('***SELECTION: Baseflow is deactivated!')
+        call log_debug(*) "SELECTION: Baseflow is deactivated!"
         self%process_matrix(9, 3) = sum(self%process_matrix(1 : 9, 2))
       case(1)
         ! read in global parameters (NOT REGIONALIZED, i.e. these are <beta> and not <gamma>) for each geological formation used
         GeoParam = self%config%geoparameter%GeoParam
         status = self%config%geoparameter%filled_shape(name="GeoParam", filled=shp_geo, errmsg=errmsg)
-        if (status /= 0_i4) &
-          call error_message('***ERROR: GeoParam shape in namelist "geoparameter" is incorrect: ', trim(errmsg))
+        if (status /= 0_i4) then
+          log_fatal(*) 'GeoParam shape in namelist "geoparameter" is incorrect: ', trim(errmsg)
+          error stop 1
+        end if
         self%nGeoUnits = shp_geo(2)
 
         ! for geology parameters
@@ -928,15 +1161,17 @@ contains
         end do
 
         ! check if parameter are in range
-        if (.not. in_bound(self%definition)) &
-          call error_message('***ERROR: parameter in namelist "geoparameter" out of bound.')
+        if (.not. in_bound(self%definition)) then
+          log_fatal(*) 'Parameter in namelist "geoparameter" out of bound.'
+          error stop 1
+        end if
     end select
 
     ! Process 10 - neutrons
     select case (self%process_matrix(10, 1))
       case(0)
         ! 0 - deactivated
-        call message('***SELECTION: Neutron count routine is deativated!')
+        call log_debug(*) "SELECTION: Neutron count routine is deativated!"
         self%process_matrix(10, 3) = sum(self%process_matrix(1 : 10, 2))
       case(1)
         ! 1 - inverse N0 based on Desilets et al. 2010
@@ -950,8 +1185,10 @@ contains
                 'Desilets_LW0  ', &
                 'Desilets_LW1  '])
         ! check if parameter are in range
-        if (.not. in_bound(self%definition)) &
-          call error_message('***ERROR: parameter in namelist "neutrons1" out of bound.')
+        if (.not. in_bound(self%definition)) then
+          log_fatal(*) 'Parameter in namelist "neutrons1" out of bound.'
+          error stop 1
+        end if
       case(2)
         ! 2 - COSMIC forward operator by Shuttlworth et al. 2013
         self%process_matrix(10,2) = 9_i4
@@ -976,15 +1213,17 @@ contains
                 'COSMIC_LW0    ', &
                 'COSMIC_LW1    '])
         ! check if parameter are in range
-        if (.not. in_bound(self%definition)) &
-          call error_message('***ERROR: parameter in namelist "neutrons2" out of bound.')
+        if (.not. in_bound(self%definition)) then
+          log_fatal(*) 'Parameter in namelist "neutrons2" out of bound.'
+          error stop 1
+        end if
     end select
 
     ! Process 11 - rivertemp
     select case (self%process_matrix(11, 1))
       case(0)
         ! 0 - deactivated
-        call message('***SELECTION: River temperature routine is deativated!')
+        call log_debug(*) "SELECTION: River temperature routine is deativated!"
         self%process_matrix(11, 3) = sum(self%process_matrix(1 : 11, 2))
       case(1)
         ! 1 - rivertemp1
@@ -1000,8 +1239,10 @@ contains
                 'emissivity_water  ', &
                 'turb_heat_ex_coeff'])
         ! check if parameter are in range
-        if (.not. in_bound(self%definition)) &
-          call error_message('***ERROR: parameter in namelist "rivertemp1" out of bound.')
+        if (.not. in_bound(self%definition)) then
+          log_fatal(*) 'Parameter in namelist "rivertemp1" out of bound.'
+          error stop 1
+        end if
     end select
 
     ! set default values
@@ -1014,7 +1255,10 @@ contains
     class(parameters_t), intent(inout) :: self
     real(dp), dimension(:), optional, intent(in) :: parameters !< parameter values
     if (present(parameters)) then
-      if (size(parameters) /= size(self%definition, dim=1)) call error_message("parameters%set: wrong number of parameters")
+      if (size(parameters) /= size(self%definition, dim=1)) then
+        log_fatal(*) "parameters%set: wrong number of parameters"
+        error stop 1
+      end if
       self%values = parameters
     else
       self%values = self%definition(:, 3) ! default parameters from configuration
@@ -1032,7 +1276,8 @@ contains
         return
       end if
     end do
-    call error_message("parameters%get: parameter '", trim(name), "' not present.")
+    log_fatal(*) "parameters%get: parameter '", trim(name), "' not present."
+    error stop 1
   end function parameters_get
 
   !> get parameter array for selected process
@@ -1040,7 +1285,10 @@ contains
     class(parameters_t), intent(in) :: self
     integer(i4), intent(in) ::  id !< process id
     real(dp), allocatable :: array(:) !< resulting parameter array for selected process
-    if (id < 1_i4 .or. id >= size(self%process_matrix, dim=1)) call error_message("parameters%get_process: id out of bounds.")
+    if (id < 1_i4 .or. id >= size(self%process_matrix, dim=1)) then
+      log_fatal(*) "parameters%get_process: process id '", n2s(id), "' out of bounds."
+      error stop 1
+    end if
     if (self%process_matrix(id, 3_i4) == 0_i4) then
       allocate(array(0)) ! no parameters defined for this process
       return
@@ -1053,7 +1301,7 @@ contains
     class(parameters_t), intent(inout) :: self
     integer(i4) :: i
     do i = 1_i4, size(self%names)
-      call message(self%names(i)(1:35), n2s(self%values(i)))
+      log_text(*) self%names(i)(1:35), n2s(self%values(i))
     end do
   end subroutine parameters_print
 

@@ -9,12 +9,12 @@
 !> \copyright Copyright 2005-\today, the mHM Developers, Luis Samaniego, Sabine Attinger: All rights reserved.
 !! mHM is released under the LGPLv3+ license \license_note
 !> \ingroup f_exchange
+#include "logging.h"
 module mo_input_container
-
+  use mo_logging
   use mo_kind, only: i4, dp
   use mo_list, only: list
   use mo_exchange_type, only: exchange_t
-  use mo_message, only: message, error_message
   use mo_datetime, only: datetime, timedelta, HOUR_SECONDS, DAY_HOURS, one_hour, one_day
   use mo_grid, only: grid_t
   use mo_grid_io, only: var, input_dataset, end_timestamp, start_timestamp, no_time, daily, monthly, yearly, varying
@@ -22,6 +22,8 @@ module mo_input_container
   use nml_config_input, only: nml_config_input_t
   use nml_config_coupling, only: nml_config_coupling_t
   use nml_helper, only: NML_OK
+
+  character(len=*), parameter :: s = "input" !< module scope for logging
 
   !> \class   input_var_abc
   !> \brief   Abstract Base Class for a single input variable.
@@ -156,7 +158,10 @@ contains
       case(0_i4) ! flag for reading all at once
         chunk_time_end = end_time ! read once until end time
       case default
-        if (chunking < 1_i4) call error_message("Input: Chunk not valid: ", n2s(chunking))
+        if (chunking < 1_i4) then
+          log_fatal(*) "Input: Chunk not valid: ", n2s(chunking)
+          error stop 1
+        end if
         chunk_time_end = chunk_time_start + timedelta(hours=chunking)
       end select
     if (chunk_time_end > end_time) chunk_time_end = end_time
@@ -198,9 +203,13 @@ contains
     is_coupled = self%coupled
     ! if (is_coupled) then
     !   if (self%static) then
-    !     if (.not.allocated(self%cache)) call error_message("Coupled static input variable not initialized: ", trim(self%name))
+    !     if (.not.allocated(self%cache)) then
+    !       log_fatal(*) "Coupled static input variable not initialized: ", trim(self%name)
+    !       error stop 1
+    !     end if
     !   else if (time <= self%chunk_time_start .or. time > self%chunk_time_end) then
-    !     call error_message("Coupled input variable time out of valid bounds: ", trim(self%name))
+    !     log_fatal(*) "Coupled input variable time out of valid bounds: ", trim(self%name)
+    !     error stop 1
     !   end if
     ! end if
   end function input_var_check_couple_status
@@ -227,7 +236,7 @@ contains
       ! update chunk
       if (time > self%chunk_time_end) then
         call update_time_frame(self%chunk_time_start, self%chunk_time_end, chunking, end_time)
-        ! call message(" ... read new chunk: ", self%chunk_time_start%str(), " to ", self%chunk_time_end%str())
+        scope_debug(s,*) "Read new chunk for '", self%name, "': ", self%chunk_time_start%str(), " to ", self%chunk_time_end%str()
         nullify(exchange_var)
         if (allocated(self%cache)) deallocate(self%cache)
         call self%ds%read_chunk(self%var_id, self%cache, self%chunk_time_start, self%chunk_time_end)
@@ -265,7 +274,7 @@ contains
       ! update chunk
       if (time > self%chunk_time_end) then
         call update_time_frame(self%chunk_time_start, self%chunk_time_end, chunking, end_time)
-        ! call message(" ... read new chunk: ", self%chunk_time_start%str(), " to ", self%chunk_time_end%str())
+        scope_debug(s,*) "Read new chunk for '", self%name, "': ", self%chunk_time_start%str(), " to ", self%chunk_time_end%str()
         nullify(exchange_var)
         if (allocated(self%cache)) deallocate(self%cache)
         call self%ds%read_chunk(self%var_id, self%cache, self%chunk_time_start, self%chunk_time_end)
@@ -303,7 +312,7 @@ contains
       ! update chunk
       if (time > self%chunk_time_end) then
         call update_time_frame(self%chunk_time_start, self%chunk_time_end, chunking, end_time)
-        ! call message(" ... read new chunk: ", self%chunk_time_start%str(), " to ", self%chunk_time_end%str())
+        scope_debug(s,*) "Read new chunk for '", self%name, "': ", self%chunk_time_start%str(), " to ", self%chunk_time_end%str()
         nullify(exchange_var)
         if (allocated(self%cache)) deallocate(self%cache)
         call self%ds%read_chunk_layered(self%var_id, self%cache, self%chunk_time_start, self%chunk_time_end)
@@ -341,7 +350,7 @@ contains
       ! update chunk
       if (time > self%chunk_time_end) then
         call update_time_frame(self%chunk_time_start, self%chunk_time_end, chunking, end_time)
-        ! call message(" ... read new chunk: ", self%chunk_time_start%str(), " to ", self%chunk_time_end%str())
+        scope_debug(s,*) "Read new chunk for '", self%name, "': ", self%chunk_time_start%str(), " to ", self%chunk_time_end%str()
         nullify(exchange_var)
         if (allocated(self%cache)) deallocate(self%cache)
         call self%ds%read_chunk_layered(self%var_id, self%cache, self%chunk_time_start, self%chunk_time_end)
@@ -468,8 +477,11 @@ contains
     character(*), intent(in) :: file !< file containing the namelists
     character(1024) :: errmsg
     integer :: status
+    scope_info(s,*) "Read input configuration from file: ", trim(file)
     status = self%input%from_file(file=file, errmsg=errmsg)
-    if (status /= NML_OK) call error_message("Error reading input configuration from file: ", file, ", with error: ", trim(errmsg))
+    if (status /= NML_OK) then
+      log_fatal(*) "Input: Error reading input configuration from file: ", trim(file), ", with error: ", trim(errmsg)
+    end if
     ! TODO: read coupling configuration
   end subroutine input_config_read
 
@@ -483,11 +495,17 @@ contains
     integer :: status
     character(1024) :: errmsg
     integer(i4) :: id(1)
-    call message(" ... configure input")
+    scope_info(s,*) "Configure input"
     if (present(file)) call self%config%read(file)
-    if (.not.self%config%input%is_configured) call error_message("Input configuration not set.")
+    if (.not.self%config%input%is_configured) then
+      log_fatal(*) "Input configuration not set."
+      error stop 1
+    end if
     status = self%config%input%is_valid(errmsg=errmsg)
-    if (status /= NML_OK) call error_message("Input configuration not valid. Error: ", trim(errmsg))
+    if (status /= NML_OK) then
+      log_fatal(*) "Input configuration not valid: ", trim(errmsg)
+      error stop 1
+    end if
 
     ! initialize general inputs settings
     id(1) = self%exchange%domain ! domain ID to read correct namelist entries
@@ -565,13 +583,14 @@ contains
     class(input_t), target, intent(inout) :: self
     logical :: init_grid
     integer(i4) :: ts
-    call message(" ... connecting input: ", self%exchange%time%str())
+    scope_info(s,*) "Connect input"
     ts = self%time_stamp_location
 
     ! morph mask
     if (self%morph_mask%coupled) then
       ! TODO: init grid from coupling namelist if needed
-      call error_message("Input: morph mask is coupled... not yet implemented")
+      log_error(*) "Input: morph mask is coupled... not yet implemented"
+      error stop 1
     else if (self%morph_mask%provided) then
       init_grid = need_grid(self%tgt_level0, self%exchange%level0) ! associate grid if not yet done
       call self%morph_mask%open_dataset(kind="i4", timestamp=ts, grid=self%exchange%level0, init_grid=init_grid)
@@ -582,7 +601,8 @@ contains
     ! DEM
     if (self%dem%coupled) then
       ! TODO: init grid from coupling namelist if needed
-      call error_message("Input: DEM is coupled... not yet implemented")
+      log_error(*) "Input: DEM is coupled... not yet implemented"
+      error stop 1
     else if (self%dem%provided) then
       init_grid = need_grid(self%tgt_level0, self%exchange%level0) ! associate grid if not yet done
       call self%dem%open_dataset(kind="dp", timestamp=ts, grid=self%exchange%level0, init_grid=init_grid)
@@ -593,7 +613,8 @@ contains
     ! slope
     if (self%slope%coupled) then
       ! TODO: init grid from coupling namelist if needed
-      call error_message("Input: slope is coupled... not yet implemented")
+      log_error(*) "Input: slope is coupled... not yet implemented"
+      error stop 1
     else if (self%slope%provided) then
       init_grid = need_grid(self%tgt_level0, self%exchange%level0) ! associate grid if not yet done
       call self%slope%open_dataset(kind="dp", timestamp=ts, grid=self%exchange%level0, init_grid=init_grid)
@@ -604,7 +625,8 @@ contains
     ! aspect
     if (self%aspect%coupled) then
       ! TODO: init grid from coupling namelist if needed
-      call error_message("Input: aspect is coupled... not yet implemented")
+      log_error(*) "Input: aspect is coupled... not yet implemented"
+      error stop 1
     else if (self%aspect%provided) then
       init_grid = need_grid(self%tgt_level0, self%exchange%level0) ! associate grid if not yet done
       call self%aspect%open_dataset(kind="dp", timestamp=ts, grid=self%exchange%level0, init_grid=init_grid)
@@ -615,7 +637,8 @@ contains
     ! flow direction
     if (self%fdir%coupled) then
       ! TODO: init grid from coupling namelist if needed
-      call error_message("Input: flow direction is coupled... not yet implemented")
+      log_error(*) "Input: flow direction is coupled... not yet implemented"
+      error stop 1
     else if (self%fdir%provided) then
       init_grid = need_grid(self%tgt_level0, self%exchange%level0) ! associate grid if not yet done
       call self%fdir%open_dataset(kind="i4", timestamp=ts, grid=self%exchange%level0, init_grid=init_grid)
@@ -626,7 +649,8 @@ contains
     ! flow accumulation
     if (self%facc%coupled) then
       ! TODO: init grid from coupling namelist if needed
-      call error_message("Input: flow accumulation is coupled... not yet implemented")
+      log_error(*) "Input: flow accumulation is coupled... not yet implemented"
+      error stop 1
     else if (self%facc%provided) then
       init_grid = need_grid(self%tgt_level0, self%exchange%level0) ! associate grid if not yet done
       call self%facc%open_dataset(kind="i4", timestamp=ts, grid=self%exchange%level0, init_grid=init_grid)
@@ -636,8 +660,9 @@ contains
 
     ! hydro mask
     if (self%hydro_mask%coupled) then
-        ! TODO: init grid from coupling namelist if needed
-      call error_message("Input: hydro mask is coupled... not yet implemented")
+      ! TODO: init grid from coupling namelist if needed
+      log_error(*) "Input: hydro mask is coupled... not yet implemented"
+      error stop 1
     else if (self%hydro_mask%provided) then
       init_grid = need_grid(self%tgt_level1, self%exchange%level1) ! associate grid if not yet done
       call self%hydro_mask%open_dataset(kind="i4", timestamp=ts, grid=self%exchange%level1, init_grid=init_grid)
@@ -647,8 +672,9 @@ contains
 
     ! runoff
     if (self%runoff%coupled) then
-        ! TODO: init grid from coupling namelist if needed
-      call error_message("Input: runoff is coupled... not yet implemented")
+      ! TODO: init grid from coupling namelist if needed
+      log_error(*) "Input: runoff is coupled... not yet implemented"
+      error stop 1
     else if (self%runoff%provided) then
       init_grid = need_grid(self%tgt_level1, self%exchange%level1) ! associate grid if not yet done
       call self%runoff%open_dataset(kind="dp", timestamp=ts, grid=self%exchange%level1, init_grid=init_grid)
@@ -659,7 +685,7 @@ contains
   !> \details Prepare chunked reading if needed.
   subroutine input_initialize(self)
     class(input_t), target, intent(inout) :: self
-    call message(" ... initialize input: ", self%exchange%time%str())
+    scope_info(s,*) "Initialize input"
     ! TODO: warn if not required but provided
     self%runoff%provided = self%exchange%runoff_total%required ! only provide if required
     call self%runoff%reset_time(self%chunking, self%exchange%start_time)
@@ -672,7 +698,7 @@ contains
 
   subroutine input_finalize(self)
     class(input_t), target, intent(inout) :: self
-    call message(" ... finalize input")
+    scope_info(s,*) "Finalize input"
     ! close datasets
     if (self%runoff%provided) call self%runoff%ds%close()
   end subroutine input_finalize
