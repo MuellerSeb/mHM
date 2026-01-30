@@ -11,13 +11,14 @@ program driver
   use mo_logging
   use mo_cli, only: cli_parser
   use mo_os, only: path_abspath, path_join, check_path_isdir
-  use mo_message, only: message, error_message
+  use mo_message, only: use_log
   use mo_mhm_cli, only: set_verbosity_level
   use mo_string_utils, only: n2s => num2str
   use mo_domain, only: domains, selected_domains, domain_t
   use mo_kind, only: i4
   use nml_config_project, only: nml_config_project_t, NML_OK
 
+  integer :: unit
   logical :: from_dirs
   integer(i4) :: n_domains, i, id
   character(len=:), allocatable :: cwd
@@ -31,8 +32,11 @@ program driver
   character(1024) :: errmsg
   integer :: status
 
-  parser = cli_parser(description="The mesoscale hydrological model - mHM v6", &
+  parser = cli_parser(prog="mhm", description="The mesoscale hydrological model - mHM v6", &
     add_logger_options=.true., add_version_option=.true., version="6.0")
+
+  call parser%add_option(name='log-file', has_value=.true., required=.false., &
+    value_name="path", help='Write to log file.')
 
   call parser%add_option(name="nml", s_name="n", has_value=.true., &
     value_name="path", default="mhm.nml", help="The mHM configuration namelist.")
@@ -47,6 +51,16 @@ program driver
 
   ! parse given command line arguments
   call parser%parse()
+
+  use_log = .true. ! enable logging in message module (after parsing for clean help-messages)
+
+  if (parser%option_was_read('log-file')) then
+    open(newunit=unit, file=parser%option_value('log-file'), status='replace', action='write')
+    ! redirect log units to the opened file
+    log_unit = unit
+    log_unit_error = unit
+  end if
+
   call set_verbosity_level(3_i4 - parser%option_read_count("quiet")) ! TODO: when switching to logging, not needed anymore
 
   call startup_message()
@@ -82,7 +96,7 @@ program driver
   if (from_dirs) main_file = "mhm.nml" ! default main file name in each domain directory
   allocate(selected_domains(n_domains))
 
-  log_info(*) "CREATE domains: ", n_domains
+  log_info(*) "CREATE DOMAINS: ", n_domains
 
   ! create domain-list
   ! we use a linked list to be able to dynamically add domains
@@ -94,7 +108,7 @@ program driver
     selected_domains(i) = domains%add_domain() ! returns domain id
   end do
 
-  log_debug(*) "selected_domains", selected_domains
+  log_debug(*) "Selected domains", selected_domains
 
   ! read configs
   do i = 1_i4, size(selected_domains)

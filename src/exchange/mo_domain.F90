@@ -166,7 +166,7 @@ contains
     if (self%exchange%parameters%mhm_active()) call self%mpr%update()
     if (self%exchange%parameters%mhm_active()) call self%mhm%update()
     if (self%exchange%parameters%mrm_active()) call self%mrm%update()
-    log_debug(*) " Time step: ", self%exchange%time%str()
+    log_trace(*) "Time step: ", self%exchange%time%str()
     if (self%exchange%time%is_new_year()) then
       log_info(*) "... finished year  : ", self%exchange%time%year - 1_i4
     end if

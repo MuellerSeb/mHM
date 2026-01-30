@@ -122,7 +122,7 @@ contains
   !> \brief Update the mHM process container for the current time step.
   subroutine mhm_update(self)
     class(mhm_t), intent(inout), target :: self
-    log_debug(*) "Update mhm"
+    log_trace(*) "Update mhm"
   end subroutine mhm_update
 
   !> \brief Finalize the mHM process container after the simulation.

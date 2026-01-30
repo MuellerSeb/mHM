@@ -74,7 +74,7 @@ contains
   !> \brief Update the Meteorology process container for the current time step.
   subroutine meteo_update(self)
     class(meteo_t), intent(inout), target :: self
-    log_debug(*) "Update meteo"
+    log_trace(*) "Update meteo"
   end subroutine meteo_update
 
   !> \brief Finalize the Meteorology process container after the simulation.

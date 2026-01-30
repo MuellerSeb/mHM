@@ -140,7 +140,7 @@ contains
     character(*), intent(in) :: file !< file containing the main namelists
     character(1024) :: errmsg
     integer :: status
-    log_info(*) " Read config processes: ", file
+    log_info(*) "Read config processes: ", file
     status = self%processes%from_file(file=file, errmsg=errmsg)
     if (status /= NML_OK) then
       log_fatal(*) "Error reading processes from: ", file, ", with error: ", trim(errmsg)
@@ -154,7 +154,7 @@ contains
     character(*), intent(in) :: file !< file containing the parameter namelists
     character(1024) :: errmsg
     integer :: status
-    log_info(*) " Read config parameter: ", file
+    log_info(*) "Read config parameter: ", file
 
     select case (self%processes%interception)
       case (1_i4)
@@ -324,7 +324,7 @@ contains
     character(*), intent(in), optional :: para_file !< file containing the parameter namelists
     character(1024) :: errmsg
     integer :: status
-    log_info(*) " Configure parameters"
+    log_info(*) "Configure parameters"
     if (present(meta_file)) call self%config%read_processes(file=meta_file)
     status = self%config%processes%is_valid(errmsg=errmsg)
     if (status /= NML_OK) then

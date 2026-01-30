@@ -477,10 +477,11 @@ contains
     character(*), intent(in) :: file !< file containing the namelists
     character(1024) :: errmsg
     integer :: status
-    scope_info(s,*) "Read input configuration from file: ", trim(file)
+    log_info(*) "Read input configuration from file: ", trim(file)
     status = self%input%from_file(file=file, errmsg=errmsg)
     if (status /= NML_OK) then
       log_fatal(*) "Input: Error reading input configuration from file: ", trim(file), ", with error: ", trim(errmsg)
+      error stop 1
     end if
     ! TODO: read coupling configuration
   end subroutine input_config_read
@@ -495,7 +496,7 @@ contains
     integer :: status
     character(1024) :: errmsg
     integer(i4) :: id(1)
-    scope_info(s,*) "Configure input"
+    log_info(*) "Configure Input"
     if (present(file)) call self%config%read(file)
     if (.not.self%config%input%is_configured) then
       log_fatal(*) "Input configuration not set."
@@ -583,14 +584,14 @@ contains
     class(input_t), target, intent(inout) :: self
     logical :: init_grid
     integer(i4) :: ts
-    scope_info(s,*) "Connect input"
+    log_info(*) "Connect Input"
     ts = self%time_stamp_location
 
     ! morph mask
     if (self%morph_mask%coupled) then
       ! TODO: init grid from coupling namelist if needed
       log_error(*) "Input: morph mask is coupled... not yet implemented"
-      error stop 1
+      stop 1
     else if (self%morph_mask%provided) then
       init_grid = need_grid(self%tgt_level0, self%exchange%level0) ! associate grid if not yet done
       call self%morph_mask%open_dataset(kind="i4", timestamp=ts, grid=self%exchange%level0, init_grid=init_grid)
@@ -602,7 +603,7 @@ contains
     if (self%dem%coupled) then
       ! TODO: init grid from coupling namelist if needed
       log_error(*) "Input: DEM is coupled... not yet implemented"
-      error stop 1
+      stop 1
     else if (self%dem%provided) then
       init_grid = need_grid(self%tgt_level0, self%exchange%level0) ! associate grid if not yet done
       call self%dem%open_dataset(kind="dp", timestamp=ts, grid=self%exchange%level0, init_grid=init_grid)
@@ -614,7 +615,7 @@ contains
     if (self%slope%coupled) then
       ! TODO: init grid from coupling namelist if needed
       log_error(*) "Input: slope is coupled... not yet implemented"
-      error stop 1
+      stop 1
     else if (self%slope%provided) then
       init_grid = need_grid(self%tgt_level0, self%exchange%level0) ! associate grid if not yet done
       call self%slope%open_dataset(kind="dp", timestamp=ts, grid=self%exchange%level0, init_grid=init_grid)
@@ -626,7 +627,7 @@ contains
     if (self%aspect%coupled) then
       ! TODO: init grid from coupling namelist if needed
       log_error(*) "Input: aspect is coupled... not yet implemented"
-      error stop 1
+      stop 1
     else if (self%aspect%provided) then
       init_grid = need_grid(self%tgt_level0, self%exchange%level0) ! associate grid if not yet done
       call self%aspect%open_dataset(kind="dp", timestamp=ts, grid=self%exchange%level0, init_grid=init_grid)
@@ -638,7 +639,7 @@ contains
     if (self%fdir%coupled) then
       ! TODO: init grid from coupling namelist if needed
       log_error(*) "Input: flow direction is coupled... not yet implemented"
-      error stop 1
+      stop 1
     else if (self%fdir%provided) then
       init_grid = need_grid(self%tgt_level0, self%exchange%level0) ! associate grid if not yet done
       call self%fdir%open_dataset(kind="i4", timestamp=ts, grid=self%exchange%level0, init_grid=init_grid)
@@ -650,7 +651,7 @@ contains
     if (self%facc%coupled) then
       ! TODO: init grid from coupling namelist if needed
       log_error(*) "Input: flow accumulation is coupled... not yet implemented"
-      error stop 1
+      stop 1
     else if (self%facc%provided) then
       init_grid = need_grid(self%tgt_level0, self%exchange%level0) ! associate grid if not yet done
       call self%facc%open_dataset(kind="i4", timestamp=ts, grid=self%exchange%level0, init_grid=init_grid)
@@ -662,7 +663,7 @@ contains
     if (self%hydro_mask%coupled) then
       ! TODO: init grid from coupling namelist if needed
       log_error(*) "Input: hydro mask is coupled... not yet implemented"
-      error stop 1
+      stop 1
     else if (self%hydro_mask%provided) then
       init_grid = need_grid(self%tgt_level1, self%exchange%level1) ! associate grid if not yet done
       call self%hydro_mask%open_dataset(kind="i4", timestamp=ts, grid=self%exchange%level1, init_grid=init_grid)
@@ -674,7 +675,7 @@ contains
     if (self%runoff%coupled) then
       ! TODO: init grid from coupling namelist if needed
       log_error(*) "Input: runoff is coupled... not yet implemented"
-      error stop 1
+      stop 1
     else if (self%runoff%provided) then
       init_grid = need_grid(self%tgt_level1, self%exchange%level1) ! associate grid if not yet done
       call self%runoff%open_dataset(kind="dp", timestamp=ts, grid=self%exchange%level1, init_grid=init_grid)
@@ -685,7 +686,7 @@ contains
   !> \details Prepare chunked reading if needed.
   subroutine input_initialize(self)
     class(input_t), target, intent(inout) :: self
-    scope_info(s,*) "Initialize input"
+    log_info(*) "Initialize Input"
     ! TODO: warn if not required but provided
     self%runoff%provided = self%exchange%runoff_total%required ! only provide if required
     call self%runoff%reset_time(self%chunking, self%exchange%start_time)
@@ -693,12 +694,13 @@ contains
 
   subroutine input_update(self)
     class(input_t), target, intent(inout) :: self
+    log_trace(*) "Update Input"
     call self%runoff%update(self%exchange%runoff_total%data, self%exchange%time, self%chunking, self%exchange%end_time)
   end subroutine input_update
 
   subroutine input_finalize(self)
     class(input_t), target, intent(inout) :: self
-    scope_info(s,*) "Finalize input"
+    log_info(*) "Finalize Input"
     ! close datasets
     if (self%runoff%provided) call self%runoff%ds%close()
   end subroutine input_finalize

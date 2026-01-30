@@ -74,7 +74,7 @@ contains
   !> \brief Update the MPR process container for the current time step.
   subroutine mpr_update(self)
     class(mpr_t), intent(inout), target :: self
-    log_debug(*) "Update MPR"
+    log_trace(*) "Update MPR"
   end subroutine mpr_update
 
   !> \brief Finalize the MPR process container after the simulation.
