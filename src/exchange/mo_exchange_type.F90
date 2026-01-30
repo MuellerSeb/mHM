@@ -15,12 +15,12 @@
 !> \copyright Copyright 2005-\today, the mHM Developers, Luis Samaniego, Sabine Attinger: All rights reserved.
 !! mHM is released under the LGPLv3+ license \license_note
 !> \ingroup f_exchange
+#include "logging.h"
 module mo_exchange_type
-  ! use mo_common_types, only: grid_t  => grid
+  use mo_logging
   use mo_grid, only: grid_t
   use mo_datetime, only: datetime, timedelta
   use mo_kind, only: dp, i4
-  use mo_message, only: message, error_message
   use mo_string_utils, only: n2s=>num2str
   use mo_main_config, only: parameters_t
   use mo_utils, only: optval
@@ -264,7 +264,7 @@ contains
     character(1024) :: errmsg
     character(:), allocatable :: path
     integer :: status
-    call message(" ... configure exchange")
+    log_info(*) "Configure exchange."
 
     self%domain = optval(domain, 1_i4) ! 1 by default for single domain initialization
     self%cwd = path_abspath(optval(cwd, "."))
@@ -272,23 +272,41 @@ contains
 
     if (present(meta_file)) then
       ! meta configuration uses absolute path internally
-      call message(" ... read project attributes: ", meta_file)
+      log_info(*) "Read project attributes: ", meta_file
       status = self%project%from_file(file=meta_file, errmsg=errmsg)
-      if (status /= NML_OK) call error_message("Error reading project config from: ", meta_file, ", with error: ", trim(errmsg))
+      if (status /= NML_OK) then
+        log_fatal(*) "Error reading project config: ", trim(errmsg)
+        error stop 1
+      end if
     end if
-    if (.not.self%project%is_configured) call error_message("Project configuration not set.")
+    if (.not.self%project%is_configured) then
+      log_fatal(*) "Project config not set."
+      error stop 1
+    end if
     status = self%project%is_valid(errmsg=errmsg)
-    if (status /= NML_OK) call error_message("Project config not valid. Error: ", trim(errmsg))
+    if (status /= NML_OK) then
+      log_fatal(*) "Project config not valid: ", trim(errmsg)
+      error stop 1
+    end if
 
     if (present(main_file)) then
       path = self%get_path(main_file) ! get absolute path relative to cwd
-      call message(" ... read time config: ", path)
+      log_info(*) "Read time config: ", path
       status = self%time_config%from_file(file=path, errmsg=errmsg)
-      if (status /= NML_OK) call error_message("Error reading time config from: ", path, ", with error: ", trim(errmsg))
+      if (status /= NML_OK) then
+        log_fatal(*) "Error reading time config: ", trim(errmsg)
+        error stop 1
+      end if
     end if
-    if (.not.self%time_config%is_configured) call error_message("Time configuration not set.")
+    if (.not.self%time_config%is_configured) then
+      log_fatal(*) "Time config not set."
+      error stop 1
+    end if
     status = self%time_config%is_valid(errmsg=errmsg)
-    if (status /= NML_OK) call error_message("Time config not valid. Error: ", trim(errmsg))
+    if (status /= NML_OK) then
+      log_fatal(*) "Time config not valid: ", trim(errmsg)
+      error stop 1
+    end if
 
     ! parameters are created redundantly for each exchange instance
     ! but this simplifies the code structure
@@ -298,15 +316,24 @@ contains
     id(1) = self%domain
     if (self%time_config%share_time_period) id(1) = 1_i4
     status = self%time_config%is_set("sim_start", idx=id, errmsg=errmsg)
-    if (status /= NML_OK) call error_message("Simulation start time input error: ", trim(errmsg))
+    if (status /= NML_OK) then
+      log_fatal(*) "Simulation start time input error: ", trim(errmsg)
+      error stop 1
+    end if
     self%start_time = datetime(self%time_config%sim_start(id(1))) ! from string
 
     status = self%time_config%is_set("sim_end", idx=id, errmsg=errmsg)
-    if (status /= NML_OK) call error_message("Simulation end time input error: ", trim(errmsg))
+    if (status /= NML_OK) then
+      log_fatal(*) "Simulation end time input error: ", trim(errmsg)
+      error stop 1
+    end if
     self%end_time = datetime(self%time_config%sim_end(id(1))) ! from string
 
     status = self%time_config%is_set("eval_start", idx=id, errmsg=errmsg)
-    if (status /= NML_OK) call error_message("Evaluation start time input error: ", trim(errmsg))
+    if (status /= NML_OK) then
+      log_fatal(*) "Evaluation start time input error: ", trim(errmsg)
+      error stop 1
+    end if
     self%eval_start_time = datetime(self%time_config%eval_start(id(1))) ! from string
 
     id(1) = self%domain
@@ -443,7 +470,8 @@ contains
       case(l3)
         grid => self%level3
       case default
-        call error_message("exchange%get_grid: unknown grid selector '", n2s(selector), "'.")
+        log_fatal(*) "exchange%get_grid: unknown grid selector '", n2s(selector), "'."
+        error stop 1
     end select
   end subroutine exchange_get_grid
 
@@ -658,7 +686,8 @@ contains
       case("riverhead")
         var_pnt => self%riverhead
       case default
-        call error_message("exchange%get_var: variable '", var, "' not available.")
+        log_fatal(*) "exchange%get_var: variable '", var, "' not available."
+        error stop 1
     end select
   end subroutine exchange_get_var_class
 
@@ -702,7 +731,8 @@ contains
       class is (var_dp)
         data => tmp%data
       class default
-        call error_message("exchange%get_var: variable data of '", var, "' not 1D real(dp).")
+        log_fatal(*) "exchange%get_var: variable data of '", var, "' not 1D real(dp)."
+        error stop 1
     end select
   end subroutine exchange_get_data_1d_dp
 
@@ -718,7 +748,8 @@ contains
       class is (var_i4)
         data => tmp%data
       class default
-        call error_message("exchange%get_var: variable data of '", var, "' not 1D integer(i4).")
+        log_fatal(*) "exchange%get_var: variable data of '", var, "' not 1D integer(i4)."
+        error stop 1
     end select
   end subroutine exchange_get_data_1d_i4
 
@@ -734,7 +765,8 @@ contains
       class is (var_lg)
         data => tmp%data
       class default
-        call error_message("exchange%get_var: variable data of '", var, "' not 1D logical.")
+        log_fatal(*) "exchange%get_var: variable data of '", var, "' not 1D logical."
+        error stop 1
     end select
   end subroutine exchange_get_data_1d_lg
 
@@ -750,7 +782,8 @@ contains
       class is (var2d_dp)
         data => tmp%data
       class default
-        call error_message("exchange%get_var: variable data of '", var, "' not 2D real(dp).")
+        log_fatal(*) "exchange%get_var: variable data of '", var, "' not 2D real(dp)."
+        error stop 1
     end select
   end subroutine exchange_get_data_2d_dp
 
@@ -766,7 +799,8 @@ contains
       class is (var2d_i4)
         data => tmp%data
       class default
-        call error_message("exchange%get_var: variable data of '", var, "' not 2D integer(i4).")
+        log_fatal(*) "exchange%get_var: variable data of '", var, "' not 2D integer(i4)."
+        error stop 1
     end select
   end subroutine exchange_get_data_2d_i4
 
@@ -782,7 +816,8 @@ contains
       class is (var2d_lg)
         data => tmp%data
       class default
-        call error_message("exchange%get_var: variable data of '", var, "' not 2D logical.")
+        log_fatal(*) "exchange%get_var: variable data of '", var, "' not 2D logical."
+        error stop 1
     end select
   end subroutine exchange_get_data_2d_lg
 
@@ -800,24 +835,28 @@ contains
           type is (real(dp))
             tmp%data => data
           class default
-            call error_message("exchange%get_var: variable data of '", var, "' is of type real(dp).")
+            log_fatal(*) "exchange%get_var: variable data of '", var, "' is of type real(dp)."
+            error stop 1
         end select
       class is (var_i4)
         select type (data)
           type is (integer(i4))
             tmp%data => data
           class default
-            call error_message("exchange%get_var: variable data of '", var, "' is of type integer(i4).")
+            log_fatal(*) "exchange%get_var: variable data of '", var, "' is of type integer(i4)."
+            error stop 1
         end select
       class is (var_lg)
         select type (data)
           type is (logical)
             tmp%data => data
           class default
-            call error_message("exchange%get_var: variable data of '", var, "' is of type logical.")
+            log_fatal(*) "exchange%get_var: variable data of '", var, "' is of type logical."
+            error stop 1
         end select
       class default
-        call error_message("exchange%get_var: variable data of '", var, "' not one dimensional.")
+        log_fatal(*) "exchange%get_var: variable data of '", var, "' not one dimensional."
+        error stop 1
     end select
   end subroutine exchange_set_data_1d
 
@@ -835,24 +874,28 @@ contains
           type is (real(dp))
             tmp%data => data
           class default
-            call error_message("exchange%get_var: variable data of '", var, "' is of type real(dp).")
+            log_fatal(*) "exchange%get_var: variable data of '", var, "' is of type real(dp)."
+            error stop 1
         end select
       class is (var2d_i4)
         select type (data)
           type is (integer(i4))
             tmp%data => data
           class default
-            call error_message("exchange%get_var: variable data of '", var, "' is of type integer(i4).")
+            log_fatal(*) "exchange%get_var: variable data of '", var, "' is of type integer(i4)."
+            error stop 1
         end select
       class is (var2d_lg)
         select type (data)
           type is (logical)
             tmp%data => data
           class default
-            call error_message("exchange%get_var: variable data of '", var, "' is of type logical.")
+            log_fatal(*) "exchange%get_var: variable data of '", var, "' is of type logical."
+            error stop 1
         end select
       class default
-        call error_message("exchange%get_var: variable data of '", var, "' not two dimensional.")
+        log_fatal(*) "exchange%get_var: variable data of '", var, "' not two dimensional."
+        error stop 1
     end select
   end subroutine exchange_set_data_2d
 
