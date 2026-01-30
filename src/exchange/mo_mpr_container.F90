@@ -8,7 +8,9 @@
 !> \copyright Copyright 2005-\today, the mHM Developers, Luis Samaniego, Sabine Attinger: All rights reserved.
 !! mHM is released under the LGPLv3+ license \license_note
 !> \ingroup f_exchange
+#include "logging.h"
 module mo_mpr_container
+  use mo_logging
   use mo_kind, only: i4
   use mo_exchange_type, only: exchange_t
   use mo_message, only: message, error_message
@@ -36,39 +38,48 @@ contains
     character(1024) :: errmsg
     character(:), allocatable :: path
     integer :: status
-    call message(" ... configure mpr")
+    log_info(*) "Configure MPR"
     if (present(file)) then
       path = self%exchange%get_path(file) ! get absolute path relative to cwd
-      call message(" ... read MPR config: ", path)
+      log_info(*) "Read MPR config: ", path
       status = self%config%from_file(file=path, errmsg=errmsg)
-      if (status /= NML_OK) call error_message("Error reading MPR config from: ", path, ", with error: ", trim(errmsg))
+      if (status /= NML_OK) then
+        log_fatal(*) "Error reading MPR config: ", trim(errmsg)
+        error stop 1
+      end if
     end if
-    if (.not.self%config%is_configured) call error_message("MPR configuration not set.")
+    if (.not.self%config%is_configured) then
+      log_fatal(*) "MPR config not set."
+      error stop 1
+    end if
     status = self%config%is_valid(errmsg=errmsg)
-    if (status /= NML_OK) call error_message("MPR config not valid. Error: ", trim(errmsg))
+    if (status /= NML_OK) then
+      log_fatal(*) "MPR config not valid: ", trim(errmsg)
+      error stop 1
+    end if
   end subroutine mpr_configure
 
   !> \brief Connect the MPR process container with other components.
   subroutine mpr_connect(self)
     class(mpr_t), intent(inout), target :: self
-    call message(" ... connecting mpr: ", self%exchange%time%str())
+    log_info(*) "Connect MPR"
   end subroutine mpr_connect
 
   !> \brief Initialize the MPR process container for the simulation.
   subroutine mpr_initialize(self)
     class(mpr_t), intent(inout), target :: self
-    call message(" ... initialize mpr: ", self%exchange%time%str())
+    log_info(*) "Initialize MPR"
   end subroutine mpr_initialize
 
   !> \brief Update the MPR process container for the current time step.
   subroutine mpr_update(self)
     class(mpr_t), intent(inout), target :: self
-    call message(" ... updating mpr: ", self%exchange%time%str())
+    log_debug(*) "Update MPR"
   end subroutine mpr_update
 
   !> \brief Finalize the MPR process container after the simulation.
   subroutine mpr_finalize(self)
     class(mpr_t), intent(inout), target :: self
-    call message(" ... finalize mpr: ", self%exchange%time%str())
+    log_info(*) "Finalize MPR"
   end subroutine mpr_finalize
 end module mo_mpr_container

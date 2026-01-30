@@ -9,7 +9,9 @@
 !> \copyright Copyright 2005-\today, the mHM Developers, Luis Samaniego, Sabine Attinger: All rights reserved.
 !! mHM is released under the LGPLv3+ license \license_note
 !> \ingroup f_exchange
+#include "logging.h"
 module mo_mhm_container
+  use mo_logging
   use mo_kind, only: i4, dp
   use mo_constants, only : yearmonths
   use mo_mhm_constants, only : noutflxstate
@@ -87,39 +89,45 @@ contains
     character(1024) :: errmsg
     character(:), allocatable :: path
     integer :: status
-    call message(" ... configure mhm")
+    log_info(*) "Configure mhm"
     if (present(file)) then
       path = self%exchange%get_path(file) ! get absolute path relative to cwd
-      call message(" ... read mHM config: ", path)
+      log_info(*) "Read mhm config: ", path
       status = self%config%from_file(file=path, errmsg=errmsg)
-      if (status /= NML_OK) call error_message("Error reading mHM config from: ", path, ", with error: ", trim(errmsg))
+      if (status /= NML_OK) then
+        log_fatal(*) "Error reading mHM config: ", trim(errmsg)
+        error stop 1
+      end if
     end if
     if (.not.self%config%is_configured) call error_message("mHM configuration not set.")
     status = self%config%is_valid(errmsg=errmsg)
-    if (status /= NML_OK) call error_message("mHM config not valid. Error: ", trim(errmsg))
+    if (status /= NML_OK) then
+      log_fatal(*) "mHM config not valid: ", trim(errmsg)
+      error stop 1
+    end if
   end subroutine mhm_configure
 
   !> \brief Connect the mHM process container with other components.
   subroutine mhm_connect(self)
     class(mhm_t), intent(inout), target :: self
-    call message(" ... connecting mHM: ", self%exchange%time%str())
+    log_info(*) "Connect mhm"
   end subroutine mhm_connect
 
   !> \brief Initialize the mHM process container for the simulation.
   subroutine mhm_initialize(self)
     class(mhm_t), intent(inout), target :: self
-    call message(" ... initialize mHM: ", self%exchange%time%str())
+    log_info(*) "Initialize mhm"
   end subroutine mhm_initialize
 
   !> \brief Update the mHM process container for the current time step.
   subroutine mhm_update(self)
     class(mhm_t), intent(inout), target :: self
-    call message(" ... updating mHM: ", self%exchange%time%str())
+    log_debug(*) "Update mhm"
   end subroutine mhm_update
 
   !> \brief Finalize the mHM process container after the simulation.
   subroutine mhm_finalize(self)
     class(mhm_t), intent(inout), target :: self
-    call message(" ... finalize mHM: ", self%exchange%time%str())
+    log_info(*) "Finalize mhm"
   end subroutine mhm_finalize
 end module mo_mhm_container
