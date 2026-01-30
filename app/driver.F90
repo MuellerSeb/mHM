@@ -49,6 +49,8 @@ program driver
   call parser%parse()
   call set_verbosity_level(3_i4 - parser%option_read_count("quiet")) ! TODO: when switching to logging, not needed anymore
 
+  call startup_message()
+
   ! get current working directory
   ! we don't change the process working directory, but use cwd for all relative paths
   ! we store the CWD in the exchange type later and use the "get_path" method to get paths
@@ -57,16 +59,21 @@ program driver
   cwd = path_abspath(cwd)
   call check_path_isdir(cwd, raise=.true.)
 
-  log_info(*) "READ MAIN CONFIG"
-
   ! global configs
   meta_file = path_join(cwd, parser%option_value("nml"))
   para_file = path_join(cwd, parser%option_value("parameter"))
   out_file  = path_join(cwd, parser%option_value("output"))
+  log_info(*) "READ MAIN CONFIG: ", meta_file
   status = project%from_file(file=meta_file, errmsg=errmsg)
-  if (status /= NML_OK) call error_message("Error reading config_project from: ", meta_file, ", with error: ", trim(errmsg))
+  if (status /= NML_OK) then
+    log_fatal(*) "Error reading config_project: ", trim(errmsg)
+    error stop 1
+  end if
   status = project%is_valid(errmsg=errmsg)
-  if (status /= NML_OK) call error_message("Project config not valid. Error: ", trim(errmsg))
+  if (status /= NML_OK) then
+    log_fatal(*) "Invalid config_project: ", trim(errmsg)
+    error stop 1
+  end if
 
   ! determine number of domains
   n_domains = project%n_domains
@@ -87,12 +94,12 @@ program driver
     selected_domains(i) = domains%add_domain() ! returns domain id
   end do
 
-  log_debug(*) " ... selected_domains", selected_domains
+  log_debug(*) "selected_domains", selected_domains
 
   ! read configs
   do i = 1_i4, size(selected_domains)
     id = selected_domains(i)
-    log_info(*) "CONFIGURE domain: ", id
+    log_info(*) "CONFIGURE DOMAIN: ", id
     ! get domain
     call domains%get_domain(id, domain)
     ! id either from list or 1 if from dirs (always take domain 1 in each sub-dir)
@@ -109,15 +116,37 @@ program driver
   do i = 1_i4, size(selected_domains)
     id = selected_domains(i)
     call domains%get_domain(id, domain)
-    log_info(*) "PREPARE domain: ", id
+    log_info(*) "PREPARE DOMAIN: ", id
     call domain%initialize()
     log_info(*) "RUN TIME LOOP"
     do while(domain%exchange%time < domain%exchange%end_time)
-      log_debug(*) " Time step: ", domain%exchange%time%str()
       call domain%update()
     end do
-    log_info(*) "FINALIZE domain: ", id
+    log_info(*) "FINALIZE DOMAIN: ", id
     call domain%finalize()
   end do
 
+contains
+  subroutine startup_message()
+    use mo_file, only: version, version_date
+    log_text(*) ".----------------------------------------------------------------------."
+    log_text(*) "|                                                                      |"
+    log_text(*) "|                  /MM   /MM /MM      /MM                   /MMMMMM    |"
+    log_text(*) "|                 | MM  | MM| MMM    /MMM                  /MM__  MM   |"
+    log_text(*) "|    /MMMMMM/MMMM | MM  | MM| MMMM  /MMMM       /MM    /MM| MM  \__/   |"
+    log_text(*) "|   | MM_  MM_  MM| MMMMMMMM| MM MM/MM MM      |  MM  /MM/| MMMMMMM    |"
+    log_text(*) "|   | MM \ MM \ MM| MM__  MM| MM  MMM| MM       \  MM/MM/ | MM__  MM   |"
+    log_text(*) "|   | MM | MM | MM| MM  | MM| MM\  M | MM        \  MMM/  | MM  \ MM   |"
+    log_text(*) "|   | MM | MM | MM| MM  | MM| MM \/  | MM         \  M/   |  MMMMMM/   |"
+    log_text(*) "|   |__/ |__/ |__/|__/  |__/|__/     |__/          \_/     \______/    |"
+    log_text(*) "|                                                                      |"
+    log_text(*) "|                               mHM-UFZ                                |"
+    log_text(*) "|                     MULTISCALE HYDROLOGIC MODEL                      |"
+    log_text(*) "|                                                                      |"
+    log_text(*) "|                      Version: " // trim(version)      // repeat(" ", 39-len_trim(version))      // "|"
+    log_text(*) "|                      Date:    " // trim(version_date) // repeat(" ", 39-len_trim(version_date)) // "|"
+    log_text(*) "|                                                                      |"
+    log_text(*) "|                Originally by L. Samaniego & R. Kumar                 |"
+    log_text(*) "'----------------------------------------------------------------------'"
+  end subroutine startup_message
 end program driver
