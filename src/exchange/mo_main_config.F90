@@ -140,7 +140,7 @@ contains
     character(*), intent(in) :: file !< file containing the main namelists
     character(1024) :: errmsg
     integer :: status
-    call log_info(*) " Read config processes: ", file
+    log_info(*) " Read config processes: ", file
     status = self%processes%from_file(file=file, errmsg=errmsg)
     if (status /= NML_OK) then
       log_fatal(*) "Error reading processes from: ", file, ", with error: ", trim(errmsg)
@@ -154,7 +154,7 @@ contains
     character(*), intent(in) :: file !< file containing the parameter namelists
     character(1024) :: errmsg
     integer :: status
-    call log_info(*) " Read config parameter: ", file
+    log_info(*) " Read config parameter: ", file
 
     select case (self%processes%interception)
       case (1_i4)
@@ -324,7 +324,7 @@ contains
     character(*), intent(in), optional :: para_file !< file containing the parameter namelists
     character(1024) :: errmsg
     integer :: status
-    call log_info(*) " Configure parameters"
+    log_info(*) " Configure parameters"
     if (present(meta_file)) call self%config%read_processes(file=meta_file)
     status = self%config%processes%is_valid(errmsg=errmsg)
     if (status /= NML_OK) then
@@ -611,7 +611,7 @@ contains
     !===============================================================
     ! decide which parameters to read depending on specified processes
 
-    call log_info(*) "Set processes and parameters"
+    log_info(*) "Set processes and parameters"
     self%process_matrix = 0_i4
     self%process_matrix(1, 1) = self%config%processes%interception
     self%process_matrix(2, 1) = self%config%processes%snow
@@ -629,7 +629,7 @@ contains
     select case (self%process_matrix(1, 1))
       case(0)
         ! 0 - no interception process selected
-        call log_debug(*) "SELECTION: interception process is deactivated!"
+        log_debug(*) "SELECTION: interception process is deactivated!"
         self%process_matrix(1, 3) = 0_i4
       case(1)
         ! 1 - maximum Interception
@@ -651,7 +651,7 @@ contains
     select case (self%process_matrix(2, 1))
       case(0)
         ! 0 - no snow process selected
-        call log_debug(*) "SELECTION: snow process is deactivated!"
+        log_debug(*) "SELECTION: snow process is deactivated!"
         self%process_matrix(2, 3) = sum(self%process_matrix(1 : 2, 2))
       case(1)
         ! 1 - degree-day approach
@@ -687,7 +687,7 @@ contains
     select case (self%process_matrix(3, 1))
       case(0)
         ! 0 - no soil moisture process selected
-        call log_debug(*) "SELECTION: soil moisture is deactivated!"
+        log_debug(*) "SELECTION: soil moisture is deactivated!"
         self%process_matrix(3, 3) = sum(self%process_matrix(1 : 3, 2))
       case(1)
         ! 1 - Feddes equation for PET reduction, bucket approach, Brooks-Corey like
@@ -922,7 +922,7 @@ contains
     ! Process 5 - potential evapotranspiration (PET)
     select case (self%process_matrix(5, 1))
       case(0) ! 0 - no PET process selected
-        call log_debug(*) "SELECTION: PET is deactivated!"
+        log_debug(*) "SELECTION: PET is deactivated!"
         self%process_matrix(5, 3) = sum(self%process_matrix(1 : 5, 2))
       case(-1) ! -1 - PET is input, correct PET by LAI
         self%process_matrix(5, 2) = 5_i4
@@ -1030,7 +1030,7 @@ contains
     select case (self%process_matrix(6, 1))
       case(0)
         ! 0 - deactivated
-        call log_debug(*) "SELECTION: Interflow is deactivated!"
+        log_debug(*) "SELECTION: Interflow is deactivated!"
         self%process_matrix(6, 3) = sum(self%process_matrix(1 : 6, 2))
       case(1)
         ! 1 - parallel soil reservoir approach
@@ -1060,7 +1060,7 @@ contains
     select case (self%process_matrix(7, 1))
       case(0)
         ! 0 - deactivated
-         call log_debug(*) "SELECTION: Percolation is deativated!"
+         log_debug(*) "SELECTION: Percolation is deativated!"
         self%process_matrix(7, 3) = sum(self%process_matrix(1 : 7, 2))
       case(1)
         ! 1 - GW layer is assumed as bucket
@@ -1086,7 +1086,7 @@ contains
     select case (self%process_matrix(8, 1))
       case(0)
         ! 0 - deactivated
-         call log_debug(*) "SELECTION: Routing is deactivated!"
+         log_debug(*) "SELECTION: Routing is deactivated!"
         self%process_matrix(8, 3) = sum(self%process_matrix(1 : 8, 2))
       case(1)
         ! 1 - Muskingum approach
@@ -1136,7 +1136,7 @@ contains
     select case (self%process_matrix(9, 1))
       case(0)
         ! 0 - deactivated
-        call log_debug(*) "SELECTION: Baseflow is deactivated!"
+        log_debug(*) "SELECTION: Baseflow is deactivated!"
         self%process_matrix(9, 3) = sum(self%process_matrix(1 : 9, 2))
       case(1)
         ! read in global parameters (NOT REGIONALIZED, i.e. these are <beta> and not <gamma>) for each geological formation used
@@ -1171,7 +1171,7 @@ contains
     select case (self%process_matrix(10, 1))
       case(0)
         ! 0 - deactivated
-        call log_debug(*) "SELECTION: Neutron count routine is deativated!"
+        log_debug(*) "SELECTION: Neutron count routine is deativated!"
         self%process_matrix(10, 3) = sum(self%process_matrix(1 : 10, 2))
       case(1)
         ! 1 - inverse N0 based on Desilets et al. 2010
@@ -1223,7 +1223,7 @@ contains
     select case (self%process_matrix(11, 1))
       case(0)
         ! 0 - deactivated
-        call log_debug(*) "SELECTION: River temperature routine is deativated!"
+        log_debug(*) "SELECTION: River temperature routine is deativated!"
         self%process_matrix(11, 3) = sum(self%process_matrix(1 : 11, 2))
       case(1)
         ! 1 - rivertemp1
