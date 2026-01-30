@@ -11,7 +11,9 @@
 !> \copyright Copyright 2005-\today, the mHM Developers, Luis Samaniego, Sabine Attinger: All rights reserved.
 !! mHM is released under the LGPLv3+ license \license_note
 !> \ingroup f_exchange
+#include "logging.h"
 module mo_mrm_container
+  use mo_logging
   use mo_kind, only: i2, i4, i8, dp
   use mo_nml, only: position_nml ! , close_nml
   use mo_exchange_type, only: exchange_t
@@ -25,6 +27,8 @@ module mo_mrm_container
   use mo_string_utils, only: n2s => num2str
   use mo_netcdf, only: NcDataset
   use nml_config_mrm, only: nml_config_mrm_t, NML_OK
+
+  character(len=*), parameter :: s = "mrm" !< logging scope
 
   !> \class   mrm_t
   !> \brief   Class for a single mRM process container.
@@ -62,7 +66,8 @@ contains
     integer(i8), allocatable :: omp_min
     logical :: rout
 
-    call error_message("mRM restart from file not yet implemented.")
+    log_error(*) "mRM restart from file not yet implemented."
+    stop 1
 
     ! rout = self%config%parallel_rout
     ! if (self%config%omp_min .ge. 1_i4) then
@@ -93,8 +98,8 @@ contains
 
     type(NcDataset) :: restart_nc
 
+    log_info(*) "Write mRM restart to file: ", file
     restart_nc = NcDataset(self%exchange%get_path(file), "w")
-    call message(" ... write mRM restart to file: ", file)
     call self%river%write_restart_to_dataset(restart_nc)
     call self%router%write_restart_to_dataset(restart_nc)
     call restart_nc%close()
@@ -108,16 +113,25 @@ contains
     character(1024) :: errmsg
     character(:), allocatable :: path
     integer :: status
-    call message(" ... configure mrm")
+    log_info(*) "Configure mRM"
     if (present(file)) then
       path = self%exchange%get_path(file) ! get absolute path relative to cwd
-      call message(" ... read mRM config: ", path)
+      log_info(*) "Read mRM config: ", path
       status = self%config%from_file(file=path, errmsg=errmsg)
-      if (status /= NML_OK) call error_message("Error reading mRM config from: ", path, ", with error: ", trim(errmsg))
+      if (status /= NML_OK) then
+        log_fatal(*) "Error reading mRM config: ", trim(errmsg)
+        error stop 1
+      end if
     end if
-    if (.not.self%config%is_configured) call error_message("mRM configuration not set.")
+    if (.not.self%config%is_configured) then
+      log_fatal(*) "mRM configuration not set."
+      error stop 1
+    end if
     status = self%config%is_valid(errmsg=errmsg)
-    if (status /= NML_OK) call error_message("mRM config not valid. Error: ", trim(errmsg))
+    if (status /= NML_OK) then
+      log_fatal(*) "mRM config not valid: ", trim(errmsg)
+      error stop 1
+    end if
   end subroutine mrm_configure
 
   ! read initial values and populate exchange
@@ -159,68 +173,91 @@ contains
     integer :: status
     character(1024) :: errmsg
 
-    call message(" ... connecting mrm: ", self%exchange%time%str())
+    log_info(*) "Connect mRM"
 
     ! get domain id
     id(1) = self%exchange%domain
 
     case = self%exchange%parameters%config%processes%routing
-    if (case == 1_i4) call error_message("mRM: process 'routing' set to 1, which is not implemented.")
+    select case (case)
+      ! case (1_i4)
+      !   log_info(*) "mRM routing case 1: constant celerity"
+      case (2_i4)
+        log_info(*) "mRM routing case 2: constant celerity"
+      case (3_i4)
+        log_info(*) "mRM routing case 3: variable celerity based on slope"
+      case default
+        log_fatal(*) "mRM routing case ", n2s(case), " not implemented."
+        error stop 1
+    end select
     const_celerity = case == 2_i4
 
     self%exchange%runoff_total%required = .true.
     self%exchange%fdir%required = .true.
     self%exchange%slope%required = .not.const_celerity
 
-    if (.not.self%exchange%runoff_total%provided) call error_message("mRM: runoff_total not provided (need mHM or runoff input).")
-    if (.not.self%exchange%fdir%provided) call error_message("mRM: fdir not provided (check input settings).")
+    if (.not.self%exchange%runoff_total%provided) then
+      log_fatal(*) "mRM: runoff_total not provided (check input/mHM settings)."
+      error stop 1
+    end if
+    if (.not.self%exchange%fdir%provided) then
+      log_fatal(*) "mRM: fdir not provided (check input settings)."
+      error stop 1
+    end if
     if (.not.const_celerity .and. .not.self%exchange%slope%provided) then
-      call error_message("mRM: slope not provided, but required for variable celerity (routing case 3).")
+      log_fatal(*) "mRM: slope not provided, but required for variable celerity (routing case 3)."
+      error stop 1
     end if
 
     gamma = self%exchange%parameters%get_process(8_i4)  ! routing still process 8
 
     ! generate river
     if (self%config%read_restart(id(1))) then
-      call error_message("mRM restart from file not yet implemented.")
+      log_error(*) "mRM restart from file not yet implemented."
+      stop 1
       ! status = self%config%is_set("restart_input_path", idx=id, errmsg=errmsg)
       ! if (status /= NML_OK) call error_message("mRM restart input path not set for domain ", n2s(id(1)), ". Error: ", trim(errmsg))
       ! restart_in = self%exchange%get_path(self%config%restart_input_path(id(1)))
       ! call message("read river from restart file: ", restart_in)
       ! call self%read_restart(restart_in)
     else
-      call message("create river network:", n2s(self%exchange%level0%ncells))
+      scope_info(s,*) "create river network:", n2s(self%exchange%level0%ncells)
       ! TODO: make fdir i2
       call river_l0%from_fdir(int(self%exchange%fdir%data, i2), self%exchange%level0)
 
-      call message("calculate facc on level0")
+      scope_info(s,*) "calculate facc on level0"
       call river_l0%calc_order()
       call river_l0%calc_facc()
 
-      call message("upscale river")
+      scope_info(s,*) "upscale river"
 
       ! derive level11 grid
       status = self%config%is_set("resolution", idx=id, errmsg=errmsg)
-      if (status /= NML_OK) call error_message("mRM resolution not set for domain ", n2s(id(1)), ". Error: ", trim(errmsg))
+      if (status /= NML_OK) then
+        log_fatal(*) "mRM resolution not set for domain ", n2s(id(1)), ". Error: ", trim(errmsg)
+        error stop 1
+      end if
       self%level11 = self%exchange%level0%derive_grid(target_resolution=self%config%resolution(id(1)))
       self%exchange%level3 => self%level11  ! make level11 available as level3 in exchange container
 
       status = self%config%is_set("output_path", errmsg=errmsg)
-      if (status /= NML_OK) call error_message("mRM output_path not set for domain ", n2s(id(1)), ". Error: ", trim(errmsg))
+      if (status /= NML_OK) then
+        log_fatal(*) "mRM output path not set for domain ", n2s(id(1)), ". Error: ", trim(errmsg)
+        error stop 1
+      end if
 
       self%output_path = self%exchange%get_path(self%config%output_path(id(1))) ! resolve relative path
 
       ! if (self%level11%has_aux_coords()) call self%level11%estimate_aux_vertices()
-      call message(" ... level0 ncells", n2s(self%exchange%level0%ncells))
-      call message(" ... level0 cellsize", n2s(self%exchange%level0%cellsize))
-      call message(" ... level1 ncells", n2s(self%exchange%level1%ncells))
-      call message(" ... level1 cellsize", n2s(self%exchange%level1%cellsize))
-      call message(" ... level11 ncells", n2s(self%level11%ncells))
-      call message(" ... level11 cellsize", n2s(self%level11%cellsize))
-
+      scope_debug(s,*) "level0 ncells", n2s(self%exchange%level0%ncells)
+      scope_debug(s,*) "level0 cellsize", n2s(self%exchange%level0%cellsize)
+      scope_debug(s,*) "level1 ncells", n2s(self%exchange%level1%ncells)
+      scope_debug(s,*) "level1 cellsize", n2s(self%exchange%level1%cellsize)
+      scope_debug(s,*) "level11 ncells", n2s(self%level11%ncells)
+      scope_debug(s,*) "level11 cellsize", n2s(self%level11%cellsize)
       ! TODO: the upscaler should handle also the case of no upscaling (level0 == level11)
       if (is_close(self%level11%cellsize, self%exchange%level0%cellsize)) then
-        call message(" ... use L0 river")
+        scope_debug(s,*) "use L0 river"
         call self%river%from_fdir(fdir, self%level11)
         if (const_celerity) then
           call self%river%calc_celerity(gamma=gamma(1), constant_celerity=const_celerity)
@@ -251,7 +288,7 @@ contains
     !   self%scc_active = .false.
     ! end if
 
-    call message("initialize router")
+    scope_info(s,*) "initialize router"
     ! rout = self%config%parallel_rout
     ! if (self%config%omp_min .ge. 1_i4) then
     !   allocate(omp_min)
@@ -267,8 +304,8 @@ contains
       ! root_levels      = rout, &
       ! omp_level_thresh = omp_min) ! omp_min not present if not allocated
     ! end if
-    call message(" ... router%step: ", n2s(self%router%step))
-    call message(" ... last level in parallel: ", n2s(self%router%last_parallel_level), "/", n2s(self%router%river%order%n_levels))
+    scope_debug(s,*) "router%step: ", n2s(self%router%step)
+    scope_debug(s,*) "last level in parallel: ", n2s(self%router%last_parallel_level), "/", n2s(self%router%river%order%n_levels)
 
     ! prepare run
     allocate(self%discharge(self%river%n_nodes), source=0.0_dp)
@@ -285,12 +322,12 @@ contains
     integer(i4)                         :: write_step
     character(:), allocatable           :: delta
     type(var), allocatable              :: vars(:)
-    call message(" ... initialize mrm: ", self%exchange%time%str())
+    log_info(*) "Initialize mRM"
 
     ! should be moved here from connect call self%router%init()
 
     ! create output
-    call message("create output file: ", self%output_path)
+    log_info(*) "Create output file: " // self%output_path
     write_step = daily
     ! select case(self%config%out_frequency)
     !   case("hourly")
@@ -337,6 +374,7 @@ contains
     use mo_grid_io, only: hourly, daily, monthly, yearly
     class(mrm_t), target, intent(inout) :: self
     logical :: write_stamp
+    log_trace(*) "Update mRM"
     ! call message(" ... updating mRM: ", self%exchange%time%str())
 
     ! route runoff
@@ -373,12 +411,11 @@ contains
 
   subroutine mrm_finalize(self)
     class(mrm_t), intent(inout), target :: self
-
-    call message("finalize ... mRM")
+    log_info(*) "Finalize mRM"
     ! if (self%config%write_restart) then
     !   call self%write_restart(self%config%restart_file_out)
     ! end if
-    call message("close ... mRM")
+    log_info(*) "Close mRM output file: ", self%output_path
     call self%ds_out%close()
     ! if (self%scc_active) call self%dsr%close()
 
