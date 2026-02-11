@@ -10,9 +10,10 @@ Configuration for the multi-scale routing model (mRM) in mHM.
 
 | Name | Type | Required | Info |
 | --- | --- | --- | --- |
-| [resolution](#resolution) | real array | yes | mRM resolution (L3) |
+| [resolution](#resolution) | real array | no | mRM resolution (L3) |
 | [river_net_order_root_based](#river_net_order_root_based) | logical array | no | Flag for root based river network ordering. |
 | [river_net_omp_level_min](#river_net_omp_level_min) | integer array | no | Minimum level size for OpenMP parallelization. |
+| [max_route_step](#max_route_step) | integer array | no | Maximum routing time step in seconds. |
 | [scc_gauges_path](#scc_gauges_path) | string array | no | Path for SCC gauges NetCDF file. |
 | [output_path](#output_path) | string array | no | Path for output file. |
 | [output_node_path](#output_node_path) | string array | no | Path for node based output file. |
@@ -33,7 +34,7 @@ Resolution of the mRM routing grid, level 3.
 Summary:
 - Type: `real(dp), dimension(max_domains)`
 - Flexible tail dims: 1
-- Required: yes
+- Required: no
 - Minimum: `> 0.0`
 - Examples: `[0.1]`
 
@@ -60,14 +61,38 @@ Minimum level size in the river network where OpenMP parallelization starts.
 Levels smaller than this size are always computed serially.
 This can be used to avoid parallelization overhead for small levels of the river network,
 especially when ordering is leaf based.
-By default: threads * 8 (indicated by 0)
+
+Special values are:
+- -1 : lets the model choose a default based on the number of threads.
+-  1 : forces parallelization on all levels.
+-  0 : disables parallelization.
+By default: threads * 8 (indicated by -1)
 
 Summary:
 - Type: `integer(i4), dimension(max_domains)`
 - Required: no
-- Default: `0`
-- Minimum: `>= 0`
+- Default: `-1`
+- Minimum: `>= -1`
 - Examples: `[100]`
+
+### max_route_step
+
+Maximum routing time step in seconds. `max_route_step`
+
+Maximum allowed time step for the routing model in seconds.
+This parameter can be used to limit the time step in case of very large CFL time steps
+due to very low flow velocities.
+This is useful in coupling scenarios to match the time step of other models.
+If routing time step is smaller than the model time step, multiple routing steps are performed per model time step.
+Valid values range from 1 minute (60s) to 1 day (86400s).
+Value needs to be a divisor of 3600 or a multiple of 3600 and a divisor of 86400.
+
+Summary:
+- Type: `integer(i4), dimension(max_domains)`
+- Required: no
+- Default: `86400`
+- Allowed values: `60`, `120`, `180`, `240`, `300`, `360`, `600`, `720`, `900`, `1200`, `1800`, `3600`, `7200`, `10800`, `14400`, `21600`, `28800`, `43200`, `86400`
+- Examples: `[3600]`
 
 ### scc_gauges_path
 
@@ -153,6 +178,7 @@ Summary:
   resolution(:) = 0.1
   river_net_order_root_based(:) = .true.
   river_net_omp_level_min(:) = 100
+  max_route_step(:) = 3600
   scc_gauges_path(:) = "scc_gauges.nc"
   output_path(:) = "mrm_output.nc"
   output_node_path(:) = "mrm_node_output.nc"

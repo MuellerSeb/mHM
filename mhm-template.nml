@@ -432,6 +432,8 @@
   river_net_order_root_based(:) = .true.
   ! Minimum level size for OpenMP parallelization.
   river_net_omp_level_min(:) = 100
+  ! Maximum routing time step in seconds.
+  max_route_step(:) = 3600
   ! Path for SCC gauges NetCDF file.
   scc_gauges_path(:) = "scc_gauges.nc"
   ! Path for output file.
