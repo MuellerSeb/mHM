@@ -14,7 +14,7 @@ module mo_river
   use mo_dag, only: branching, order_t, traversal_visit
   use mo_grid, only: grid_t, bottom_up, cartesian, dist_latlon
   use mo_grid_io, only: var, output_dataset
-  use mo_message, only: error_message
+  use mo_message, only: error_message, message
   use mo_utils, only: optval
   use mo_netcdf, only: NcDataset, NcDimension, NcVariable
   use mo_constants, only: nodata_i1, nodata_i2, nodata_i4, nodata_i8, nodata_dp
@@ -811,7 +811,7 @@ contains
     deallocate(dummy2d)
 
     ! down
-    print*, "writing down to restart file"
+    call message("writing down to restart file")
     nc_var = nc%setVariable("down", "i64", [node_dim])
     call nc_var%setAttribute("long_name", "downstream cell")
     call nc_var%setFillValue(nodata_i8)
@@ -819,7 +819,7 @@ contains
     call nc_var%setData(this%down)
 
     ! sinks
-    print*, "writing sinks to restart file"
+    call message("writing sinks to restart file")
     nc_var = nc%setVariable("sinks", "i64", [sink_dim])
     call nc_var%setAttribute("long_name", "sinks")
     call nc_var%setFillValue(nodata_i8)
@@ -827,7 +827,7 @@ contains
     call nc_var%setData(this%sinks)
 
     ! n_up
-    print*, "writing n_up to restart file"
+    call message("writing n_up to restart file")
     nc_var = nc%setVariable("n_up", "i64", [node_dim])
     call nc_var%setAttribute("long_name", "number of upstream nodes")
     call nc_var%setFillValue(nodata_i8)
@@ -835,7 +835,7 @@ contains
     call nc_var%setData(this%n_up)
 
     ! off_up
-    print*, "writing off_up to restart file"
+    call message("writing off_up to restart file")
     nc_var = nc%setVariable("off_up", "i64", [node_dim])
     call nc_var%setAttribute("long_name", "offset to upstream nodes")
     call nc_var%setFillValue(nodata_i8)
@@ -873,7 +873,7 @@ contains
 
     ! fdir
     if ( allocated(this%fdir) ) then
-      print*, "writing fdir to restart file"
+      call message("writing fdir to restart file")
       nc_var = nc%setVariable("fdir", "i16", [xdim, ydim], shuffle=.true.)
       call nc_var%setAttribute("long_name", "flow direction")
       call nc_var%setFillValue(nodata_i2)
@@ -886,7 +886,7 @@ contains
 
     ! facc
     if ( allocated(this%facc) ) then
-      print*, "writing facc to restart file"
+      call message("writing facc to restart file")
       nc_var = nc%setVariable("facc", "i32", [node_dim])
       call nc_var%setAttribute("long_name", "flow accumulation")
       call nc_var%setFillValue(nodata_i4)
@@ -896,7 +896,7 @@ contains
 
     ! upstream_area
     if ( allocated(this%upstream_area) ) then
-      print*, "writing upstream_area to restart file"
+      call message("writing upstream_area to restart file")
       nc_var = nc%setVariable("upstream_area", "f64", [node_dim])
       call nc_var%setAttribute("long_name", "upstream area")
       call nc_var%setFillValue(nodata_dp)
@@ -906,7 +906,7 @@ contains
 
     ! link_length
     if ( allocated(this%link_length) ) then
-      print*, "writing link_length to restart file"
+      call message("writing link_length to restart file")
       nc_var = nc%setVariable("link_length", "f64", [node_dim])
       call nc_var%setAttribute("long_name", "link length")
       call nc_var%setFillValue(nodata_dp)
@@ -916,7 +916,7 @@ contains
 
     ! link_slope
     if ( allocated(this%link_slope) ) then
-      print*, "writing link_slope to restart file"
+      call message("writing link_slope to restart file")
       nc_var = nc%setVariable("link_slope", "f64", [node_dim])
       call nc_var%setAttribute("long_name", "average slope of link")
       call nc_var%setFillValue(nodata_dp)
@@ -926,7 +926,7 @@ contains
 
     ! celerity
     if ( allocated(this%celerity) ) then
-      print*, "writing celerity to restart file"
+      call message("writing celerity to restart file")
       nc_var = nc%setVariable("celerity", "f64", [node_dim])
       call nc_var%setAttribute("long_name", "streamflow celerity")
       call nc_var%setFillValue(nodata_dp)
@@ -943,7 +943,7 @@ contains
 
     ! node_cell
     if ( allocated(this%node_cell) ) then
-      print*, "writing node_cell to restart file"
+      call message("writing node_cell to restart file")
       nc_var = nc%setVariable("node_cell", "i64", [node_dim])
       call nc_var%setAttribute("long_name", "map node to grid cell")
       call nc_var%setFillValue(nodata_i8)
@@ -953,7 +953,7 @@ contains
 
     ! cell_node_select
     if ( allocated(this%cell_node_select) ) then
-      print*, "writing cell_node_select to restart file"
+      call message("writing cell_node_select to restart file")
       nc_var = nc%setVariable("cell_node_select", "i64", [xdim, ydim], shuffle=.true.)
       call nc_var%setAttribute("long_name", "cell node select")
       call nc_var%setFillValue(nodata_i8)
@@ -966,7 +966,7 @@ contains
 
     ! area_fraction
     if ( allocated(this%area_fraction) ) then
-      print*, "writing area_fraction to restart file"
+      call message("writing area_fraction to restart file")
       nc_var = nc%setVariable("area_fraction", "f64", [node_dim])
       call nc_var%setAttribute("long_name", "area fraction for each node in cell")
       call nc_var%setFillValue(nodata_dp)

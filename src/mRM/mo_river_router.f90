@@ -17,7 +17,7 @@ module mo_river_router
   use mo_river, only: river_t
   use mo_grid, only: grid_t, bottom_up, cartesian
   use mo_grid_scaler, only: scaler_t, up_sum, down_nearest, down_scaling
-  use mo_message, only: error_message
+  use mo_message, only: error_message, warn_message, message
   use mo_datetime, only: HOUR_SECONDS
   use mo_netcdf, only: NcDataset, NcVariable, NcDimension
 
@@ -281,7 +281,7 @@ contains
       var = nc%getVariable("nu1")
       call var%readInto(this%nu1)
     else
-      print*, "nu1 not found in restart file, cannot initialize river router from restart without nu1."
+      call warn_message("nu1 not found in restart file, cannot initialize river router from restart without nu1.")
       error stop 1
     end if
 
@@ -290,7 +290,7 @@ contains
       var = nc%getVariable("nu2")
       call var%readInto(this%nu2)
     else
-      print*, "nu2 not found in restart file, cannot initialize river router from restart without nu2."
+      call warn_message("nu2 not found in restart file, cannot initialize river router from restart without nu2.")
       error stop 1
     end if
 
@@ -299,13 +299,13 @@ contains
       var = nc%getVariable("route_step")
       call var%readInto(this%step)
     else
-      print*, "route_step not found in restart file, cannot initialize river router from restart without route_step."
+      call warn_message("route_step not found in restart file, cannot initialize river router from restart without route_step.")
       error stop 1
     end if
 
     if (present(max_route_step)) then
       if (this%step > max_route_step) then
-        print*, "Routing step in restart file (", this%step, "s) is larger than specified max_route_step (", max_route_step, "s)."
+        call warn_message("Routing step in restart file (", n2s(this%step), "s) is larger than specified max_route_step (", n2s(max_route_step), "s).")
         error stop 1
       end if
     end if
@@ -354,7 +354,7 @@ contains
 
     ! write discharge
     if ( allocated(this%discharge) ) then
-      print*, "writing discharge to restart_file"
+      call message("writing discharge to restart_file")
       nc_var = nc%setVariable("discharge", "f64", [node_dim])
       call nc_var%setAttribute("long_name", "discharge")
       call nc_var%setAttribute("units", "m3 s-1")
@@ -365,7 +365,7 @@ contains
 
     ! write previous_discharge
     if ( allocated(this%previous_discharge) ) then
-      print*, "writing previous_discharge to restart_file"
+      call message("writing previous_discharge to restart_file")
       nc_var = nc%setVariable("previous_discharge", "f64", [node_dim])
       call nc_var%setAttribute("long_name", "previous_discharge")
       call nc_var%setAttribute("units", "m3 s-1")
@@ -376,7 +376,7 @@ contains
 
     ! write tributary
     if ( allocated(this%tributary) ) then
-      print*, "writing tributary to restart_file"
+      call message("writing tributary to restart_file")
       nc_var = nc%setVariable("tributary", "f64", [node_dim])
       call nc_var%setAttribute("long_name", "tributary")
       call nc_var%setAttribute("units", "m3 s-1")
@@ -387,7 +387,7 @@ contains
 
     ! write previous_tributary
     if ( allocated(this%previous_tributary) ) then
-      print*, "writing previous_tributary to restart_file"
+      call message("writing previous_tributary to restart_file")
       nc_var = nc%setVariable("previous_tributary", "f64", [node_dim])
       call nc_var%setAttribute("long_name", "previous_tributary")
       call nc_var%setAttribute("units", "m3 s-1")
@@ -398,7 +398,7 @@ contains
 
     ! write muskingum parameter nu1
     if ( allocated(this%nu1) ) then
-      print*, "writing nu1 to restart_file"
+      call message("writing nu1 to restart_file")
       nc_var = nc%setVariable("nu1", "f64", [node_dim])
       call nc_var%setAttribute("long_name", "muskingum parameter nu1")
       call nc_var%setAttribute("units", "1")
@@ -409,7 +409,7 @@ contains
 
     ! write muskingum parameter nu2
     if ( allocated(this%nu2) ) then
-      print*, "writing nu2 to restart_file"
+      call message("writing nu2 to restart_file")
       nc_var = nc%setVariable("nu2", "f64", [node_dim])
       call nc_var%setAttribute("long_name", "muskingum parameter nu2")
       call nc_var%setAttribute("units", "1")
@@ -492,8 +492,8 @@ contains
     ! check if levels are sorted in size (only true for leave based ordering)
     if (all(level_size(:this%river%order%n_levels-1_i8) >= level_size(2_i8:))) then
       if (optval(root_levels, .false.)) then
-        print*, "River levels were requested as distance from graph roots, but level sizes are sorted in descending order."
-        print*, "This is unexpected, maybe your restart file has inconsistent ordering compared to namelist settings."
+        call warn_message("River levels were requested as distance from graph roots, but level sizes are sorted in descending order.")
+        call warn_message("This is unexpected, maybe your restart file has inconsistent ordering compared to namelist settings.")
       end if
       if (this%omp_level_thresh > 0_i8) then
         do i = 1_i8, this%river%order%n_levels

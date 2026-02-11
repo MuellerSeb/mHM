@@ -16,7 +16,7 @@ module mo_river_upscaler
   use mo_river, only: river_t, d8_E, d8_S, d8_W, d8_N, d8_SE, d8_SW, d8_NW, d8_NE
   use mo_grid, only: grid_t, bottom_up, cartesian
   use mo_grid_scaler, only: scaler_t, down_scaling
-  use mo_message, only: error_message
+  use mo_message, only: error_message, message
   use mo_utils, only: optval
 
   implicit none
@@ -344,7 +344,7 @@ contains
     deallocate(base_mask, facc)
 
     ! init with 0 to indicate sinks
-    print*, "river_upscaler: determine downstream scc links"
+    call message("river_upscaler: determine downstream scc links")
     allocate(this%link_start(n_nodes), source=0_i8)
     allocate(down(n_nodes), source=0_i8)
 
@@ -368,7 +368,7 @@ contains
     end do
     !$omp end parallel do
 
-    print*, "river_upscaler: init scc branching DAG"
+    call message("river_upscaler: init scc branching DAG")
     call this%coarse_river%init(down)
     deallocate(down)
 
