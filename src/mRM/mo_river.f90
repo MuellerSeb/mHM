@@ -616,8 +616,8 @@ contains
     class(river_t), intent(inout) :: this
     real(dp), intent(in) :: gamma !< model parameter: c_i = gamma * sqrt(s_i) or c = gamma
     logical, optional, intent(in) :: constant_celerity !< whether celerity is assumed constant: c = gamma (default: .false.)
-    real(dp), optional, intent(in) :: slope(this%n_nodes) !< [%] river slope, will be stored in link_slope if provided
-    logical, optional, intent(in) :: mask(this%n_nodes) !< mask for slope smoothing (may come from upscaled river network)
+    real(dp), optional, intent(in) :: slope(:) !< [%] river slope, will be stored in link_slope if provided
+    logical, optional, intent(in) :: mask(:) !< mask for slope smoothing (may come from upscaled river network)
     real(dp), allocatable :: smooth_slope(:)
     logical :: smoothing
 
