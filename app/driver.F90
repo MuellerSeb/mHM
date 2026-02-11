@@ -121,7 +121,7 @@ program driver
     ! create new domain and its exchange
     call domain%init(meta_file, main_file, para_file, id, cwd)
     ! configure domain components
-    call domain%configure(main_file)
+    call domain%configure(main_file, out_file)
     ! check for connections and dependencies
     call domain%connect()
   end do

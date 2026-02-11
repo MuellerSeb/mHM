@@ -115,16 +115,17 @@ contains
   end subroutine domain_init
 
   !> \brief Configure the domain.
-  subroutine domain_configure(self, file)
+  subroutine domain_configure(self, file, out_file)
     ! domain is always an item of a domain_list, which stores "allocated pointers" and these implicitly have the "target" attribute
     class(domain_t), intent(inout), target :: self ! needs "target" so components can safely point to "exchange"
     character(*), intent(in), optional :: file !< file containing the namelists
+    character(*), intent(in), optional :: out_file !< file containing the output namelists
     log_info(*) "... configure domain"
     call self%input%configure(file)
     if (self%exchange%parameters%meteo_active()) call self%meteo%configure(file)
     if (self%exchange%parameters%mhm_active()) call self%mpr%configure(file)
     if (self%exchange%parameters%mhm_active()) call self%mhm%configure(file)
-    if (self%exchange%parameters%mrm_active()) call self%mrm%configure(file)
+    if (self%exchange%parameters%mrm_active()) call self%mrm%configure(file, out_file)
   end subroutine domain_configure
 
   !> \brief Connect the domain components.
