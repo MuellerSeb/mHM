@@ -38,7 +38,7 @@ module nml_output_mrm
   integer(i4), parameter, public :: output_deflate_level_default = 6_i4
   logical, parameter, public :: output_double_precision_default = .false.
   integer(i4), parameter, public :: output_time_reference_default = 2_i4
-  integer(i4), parameter, public :: output_frequency_default = -2_i4
+  integer(i4), parameter, public :: output_frequency_default = -1_i4
   logical, parameter, public :: out_qrouted_default = .false.
   logical, parameter, public :: out_rivtemp_default = .false.
 

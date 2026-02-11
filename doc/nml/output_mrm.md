@@ -61,7 +61,7 @@ Summary:
 Output time step `output_frequency`
 
 switch to control write out frequency of the gridded model outputs below
-- if >0 : after each <timeStep_model_outputs> time steps
+- if >0 : after every 'n' time steps
 - if 0 : only at end of run
 - if -1 : daily
 - if -2 : monthly
@@ -70,7 +70,7 @@ switch to control write out frequency of the gridded model outputs below
 Summary:
 - Type: `integer(i4)`
 - Required: no
-- Default: `-2`
+- Default: `-1`
 - Minimum: `>= -3`
 
 ### out_Qrouted
@@ -83,6 +83,7 @@ Summary:
 - Type: `logical`
 - Required: no
 - Default: `.false.`
+- Examples: `.true.`
 
 ### out_RivTemp
 
@@ -94,6 +95,7 @@ Summary:
 - Type: `logical`
 - Required: no
 - Default: `.false.`
+- Examples: `.true.`
 
 ## Example
 
@@ -102,9 +104,9 @@ Summary:
   output_deflate_level = 6
   output_double_precision = .false.
   output_time_reference = 2
-  output_frequency = -2
-  out_Qrouted = .false.
-  out_RivTemp = .false.
+  output_frequency = -1
+  out_Qrouted = .true.
+  out_RivTemp = .true.
 /
 ```
 

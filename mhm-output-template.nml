@@ -61,9 +61,9 @@
   ! Output time reference
   output_time_reference = 2
   ! Output time step
-  output_frequency = -2
+  output_frequency = -1
   ! Routed Streamflow
-  out_Qrouted = .false.
+  out_Qrouted = .true.
   ! Routed Temperature
-  out_RivTemp = .false.
+  out_RivTemp = .true.
 /
