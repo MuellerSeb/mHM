@@ -592,7 +592,6 @@ contains
     use mo_append, only : append
     use mo_common_constants, only : nColPars
     use mo_mpr_constants, only : maxGeoUnit
-    use mo_constants, only : nodata_dp
     use mo_utils, only : EQ
 
     implicit none
