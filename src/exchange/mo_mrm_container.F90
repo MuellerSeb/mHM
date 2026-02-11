@@ -332,13 +332,12 @@ contains
         river             = self%river, &
         input_grid        = self%exchange%level1, &
         input_step        = int(self%exchange%step/one_hour(), i4), &
-        ! max_route_step    = real(self%config%max_route_step(id(1)), dp), &
-        max_route_step    = 3600.0_dp, &! truncate routing steps to 1 hour
+        max_route_step    = real(self%config%max_route_step(id(1)), dp), &
         root_levels       = self%config%river_net_order_root_based(id(1)), &
         omp_level_thresh  = int(self%config%river_net_omp_level_min(id(1)), i8), &
         read_fluxes       = self%config%read_restart_fluxes(id(1)))
     else
-      ! NOTE: if slope data pointer is null, optional slope will be seen as "not present"
+      ! NOTE: if slope data pointer is null (i.e. slope not provided), optional slope will be seen as "not present"
       if (is_close(self%level3%cellsize, self%exchange%level0%cellsize)) then
         call self%river%calc_celerity(gamma=gamma(1), slope=self%exchange%slope%data, constant_celerity=const_celerity)
       else
@@ -349,8 +348,7 @@ contains
         river            = self%river, &
         input_grid       = self%exchange%level1, &
         input_step       = int(self%exchange%step/one_hour(), i4), &
-        ! max_route_step   = real(self%config%max_route_step(id(1)), dp), &
-        max_route_step   = 3600.0_dp, &! truncate routing steps to 1 hour
+        max_route_step   = real(self%config%max_route_step(id(1)), dp), &
         root_levels      = self%config%river_net_order_root_based(id(1)), &
         omp_level_thresh = int(self%config%river_net_omp_level_min(id(1)), i8))
     end if

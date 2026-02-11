@@ -20,6 +20,7 @@
 
 &config_mrm
   resolution(1)  = 12000.0
+  max_route_step(1) = 3600 ! [s] truncate routing steps to 1 hour
   output_path(1) = "mrm_output_1990-1992.nc"
   write_restart(1) = .true.
   restart_output_path(1) = "mrm_restart_1992.nc"
