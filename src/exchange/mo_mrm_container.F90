@@ -180,9 +180,8 @@ contains
 
   ! read initial values and populate exchange
   subroutine mrm_connect(self)
-    use mo_datetime, only: datetime, timedelta, DAY_HOURS, one_hour, one_day
+    use mo_datetime, only: datetime, timedelta, one_hour, one_day
     use mo_grid, only: grid_t
-    use mo_grid_io, only: var, input_dataset, output_dataset, center_timestamp, hourly, daily, monthly, yearly, time_units_delta
     use mo_river, only: river_t
     use mo_river_tools, only: read_scc_gauges
     use mo_os, only: path_ext, path_isfile
@@ -191,25 +190,11 @@ contains
     implicit none
 
     class(mrm_t), target, intent(inout) :: self
-    type(input_dataset) :: input, in_ds
-    type(datetime) :: current_time, start_time_frame
-    type(input_dataset) :: ds
-    logical                     :: rout
-    logical, allocatable        :: scc_latlon
-    character(:), allocatable   :: file, tmp, restart_in
-    character(:), allocatable   :: delta
-    integer(i4)                 :: write_step
-    integer(i4)                 :: chunk_offset
-    integer(i2), allocatable    :: fdir(:)
-    integer(i4), allocatable    :: mfdir(:,:)
-    integer(i8), allocatable    :: omp_min
-    real(dp), allocatable       :: mdem(:,:), dem(:), mslope(:,:), slope(:), scc_gauges(:,:)
-    real(dp), pointer           :: runoff(:) => null()
-
+    logical, allocatable        :: scc_latlon ! allocatable to be able to make it "not present" if not allocated
+    character(:), allocatable   :: file
+    real(dp), allocatable       :: scc_gauges(:,:)
     integer(i4)                 :: id(1)
     logical                     :: const_celerity
-    real(dp), allocatable       :: gamma(:)
-    logical                     :: read_restart
 
     integer :: status
     character(1024) :: errmsg
@@ -281,7 +266,7 @@ contains
     else if (is_close(self%level3%cellsize, self%exchange%level0%cellsize)) then
       ! TODO: the upscaler should handle also the case of no upscaling (level0 == level11)
       scope_info(s,*) "level-0 and level-3 river network are equal of size:", n2s(self%exchange%level3%ncells)
-      call self%river%from_fdir(fdir, self%level3)
+      call self%river%from_fdir(int(self%exchange%fdir%data, i2), self%level3)
     else
       scope_info(s,*) "Create level-0 river network of size:", n2s(self%exchange%level0%ncells)
       ! TODO: make fdir i2
@@ -309,7 +294,7 @@ contains
 
   ! set initial values like timestep 0
   subroutine mrm_initialize(self)
-    use mo_datetime, only: datetime, timedelta, DAY_HOURS, one_hour, one_day
+    use mo_datetime, only: datetime, timedelta, one_hour, one_day
     class(mrm_t), target, intent(inout) :: self
 
     integer(i4)           :: id(1)
@@ -366,7 +351,7 @@ contains
 
   ! perform routing within time loop
   subroutine mrm_update(self)
-    use mo_grid_io, only: hourly, daily, monthly, yearly
+    use mo_grid_io, only: daily, monthly, yearly, no_time
     class(mrm_t), target, intent(inout) :: self
     logical :: write_stamp
     log_trace(*) "Update mRM"
@@ -376,19 +361,18 @@ contains
 
     ! write time-stamp depending on config
     write_stamp = .false.
-    if (self%exchange%time%is_new_day()) write_stamp = .true.
-    ! select case(self%config%out_frequency)
-    !   case("hourly")
-    !     write_stamp = .true.
-    !   case("daily")
-    !     if (self%exchange%time%is_new_day()) write_stamp = .true.
-    !   case("monthly")
-    !     if (self%exchange%time%is_new_month()) write_stamp = .true.
-    !   case("yearly")
-    !     if (self%exchange%time%is_new_year()) write_stamp = .true.
-    !   case("once")
-    !     if (self%exchange%time == self%exchange%end_time) write_stamp = .true.
-    ! end select
+    select case(self%output_config%output_frequency)
+      case(daily)
+        if (self%exchange%time%is_new_day()) write_stamp = .true.
+      case(monthly)
+        if (self%exchange%time%is_new_month()) write_stamp = .true.
+      case(yearly)
+        if (self%exchange%time%is_new_year()) write_stamp = .true.
+      case(no_time) ! once
+        if (self%exchange%time == self%exchange%end_time) write_stamp = .true.
+      case default ! every n time steps
+        if (mod(self%exchange%step_count, self%output_config%output_frequency) == 0_i4) write_stamp = .true.
+    end select
 
     ! update output
     if (self%output_node_active) then
@@ -423,57 +407,52 @@ contains
   end subroutine mrm_cleanup
 
   subroutine mrm_create_output(self)
-    use mo_grid_io, only: var, center_timestamp, hourly, daily, monthly, yearly, time_units_delta
-    use mo_datetime, only: datetime, timedelta, one_hour, one_day
+    use mo_grid_io, only: var, time_units_delta
     class(mrm_t), intent(inout), target :: self
 
-    integer(i4) :: write_step
-    character(:), allocatable :: delta
+    integer(i4) :: timestamp
+    character(:), allocatable :: delta, dtype
     type(var), allocatable :: vars(:)
 
     ! shortcut
     if (.not.self%output_active .and. .not.self%output_node_active) return
 
-    ! create output
-    log_info(*) "Create output file: " // self%output_path
-    write_step = daily
-    ! select case(self%config%out_frequency)
-    !   case("hourly")
-    !     write_step = hourly
-    !     call message(" ... hourly output")
-    !   case("daily")
-    !     write_step = daily
-    !     call message(" ... daily output")
-    !   case("monthly")
-    !     write_step = monthly
-    !     call message(" ... monthly output")
-    !   case("yearly")
-    !     write_step = yearly
-    !     call message(" ... yearly output")
-    !   case("once")
-    !     write_step = 0_i4
-    !     call message(" ... output once at end of run")
-    !   case default
-    !     call error_message("Unknown value for 'out_frequency': ", self%config%out_frequency)
-    ! end select
-    delta = time_units_delta(write_step, center_timestamp)
-    vars = [var(name="discharge", units="m3 s-1", avg=.true.)]
-    call self%ds_out%init( &
-      path        = self%output_path, &
-      grid        = self%level3, &
-      vars        = vars, &
-      start_time  = self%exchange%start_time, &
-      delta       = delta, &
-      timestamp   = center_timestamp)
+    ! general config
+    timestamp = self%output_config%output_time_reference
+    delta = time_units_delta(self%output_config%output_frequency, timestamp)
 
-    ! if (self%scc_active) then
-    !   call message(" ... create node based output file: ", self%config%node_out_file)
-    !   call self%dsr%init(path=self%config%node_out_file, &
-    !     river=self%river, &
-    !     vars=vars, &
-    !     start_time=self%exchange%start_time, &
-    !     delta=delta, &
-    !     timestamp=center_timestamp)
-    ! end if
+    ! create output variables
+    dtype = "f64"
+    if (.not.self%output_config%output_double_precision) dtype = "f32"
+    allocate(vars(0))
+    if (self%output_config%out_Qrouted) vars = [vars, var(name="discharge", units="m3 s-1", dtype=dtype, avg=.true.)]
+
+    ! create grid based output
+    if (self%output_active) then
+      log_info(*) "Create mRM grid based output file: ", self%output_path
+      ! create output dataset
+      call self%ds_out%init( &
+        path        = self%output_path, &
+        grid        = self%level3, &
+        vars        = vars, &
+        start_time  = self%exchange%start_time, &
+        delta       = delta, &
+        timestamp   = timestamp, &
+        deflate_level = self%output_config%output_deflate_level)
+    end if
+
+    ! create node based output
+    if (self%output_node_active) then
+      log_info(*) "Create mRM node based output file: ", self%output_node_path
+      call self%ds_node_out%init( &
+        path        = self%output_node_path, &
+        river       = self%river, &
+        vars        = vars, &
+        start_time  = self%exchange%start_time, &
+        delta       = delta, &
+        timestamp   = timestamp, &
+        deflate_level = self%output_config%output_deflate_level)
+    end if
+
   end subroutine mrm_create_output
 end module mo_mrm_container
