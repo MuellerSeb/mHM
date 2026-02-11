@@ -104,7 +104,7 @@ contains
     character(*), intent(in), optional :: para_file !< file containing the parameter namelists
     integer(i4), intent(in), optional :: domain !< domain ID of the current domain in the configuration arrays (1 by default)
     character(len=*), intent(in), optional :: cwd !< current working directory to set relative paths
-    log_info(*) "... setup new domain"
+    log_info(*) "Setup new domain"
     call self%exchange%init(meta_file, main_file, para_file, domain, cwd)
     ! set exchange pointer in components
     self%input%exchange => self%exchange
@@ -120,7 +120,7 @@ contains
     class(domain_t), intent(inout), target :: self ! needs "target" so components can safely point to "exchange"
     character(*), intent(in), optional :: file !< file containing the namelists
     character(*), intent(in), optional :: out_file !< file containing the output namelists
-    log_info(*) "... configure domain"
+    log_info(*) "Configure domain"
     call self%input%configure(file)
     if (self%exchange%parameters%meteo_active()) call self%meteo%configure(file)
     if (self%exchange%parameters%mhm_active()) call self%mpr%configure(file)
@@ -133,7 +133,7 @@ contains
   subroutine domain_connect(self)
     ! domain is always an item of a domain_list, which stores "allocated pointers" and these implicitly have the "target" attribute
     class(domain_t), intent(inout), target :: self ! needs "target" so components can safely point to "exchange"
-    log_info(*) "... connect domain components"
+    log_info(*) "Connect domain components"
     call self%input%connect()
     if (self%exchange%parameters%meteo_active()) call self%meteo%connect()
     if (self%exchange%parameters%mhm_active()) call self%mpr%connect()
@@ -147,7 +147,9 @@ contains
     class(domain_t), intent(inout), target :: self
     !> a set of global parameter (gamma) to run mHM, DIMENSION [no. of global_Parameters]
     real(dp), dimension(:), optional, intent(in) :: parameters
-    log_info(*) "... initialize domain"
+    log_info(*) "Initialize domain"
+    self%exchange%step_count = 0_i4
+    self%exchange%time = self%exchange%start_time
     call self%exchange%parameters%set(parameters)
     call self%input%initialize()
     if (self%exchange%parameters%meteo_active()) call self%meteo%initialize()
@@ -169,7 +171,7 @@ contains
     if (self%exchange%parameters%mrm_active()) call self%mrm%update()
     log_trace(*) "Time step: ", self%exchange%time%str()
     if (self%exchange%time%is_new_year()) then
-      log_info(*) "... finished year  : ", self%exchange%time%year - 1_i4
+      log_info(*) "Finished year: ", self%exchange%time%year - 1_i4
     end if
   end subroutine domain_update
 
@@ -177,7 +179,7 @@ contains
   subroutine domain_finalize(self)
     ! domain is always an item of a domain_list, which stores "allocated pointers" and these implicitly have the "target" attribute
     class(domain_t), intent(inout), target :: self
-    log_info(*) "... finalize domain"
+    log_info(*) "Finalize domain"
     call self%input%finalize()
     if (self%exchange%parameters%meteo_active()) call self%meteo%finalize()
     if (self%exchange%parameters%mhm_active()) call self%mpr%finalize()
