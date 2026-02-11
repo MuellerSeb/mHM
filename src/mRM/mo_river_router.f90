@@ -159,7 +159,6 @@ contains
 
   !> \brief Setup river upscaler from fine river and coarse target grid.
   subroutine river_router_init(this, river, input_grid, input_step, max_route_step, root_levels, omp_level_thresh)
-    !$ use omp_lib, only: omp_get_num_threads
     implicit none
     class(river_router_t), intent(inout) :: this
     type(river_t), pointer, intent(in) :: river !< river definition
@@ -464,6 +463,7 @@ contains
 
   !> \brief Setup parallelization of river routing based on river level sizes and user settings.
   subroutine river_router_setup_parallelization(this, root_levels, omp_level_thresh)
+    !$ use omp_lib, only: omp_get_num_threads
     implicit none
     class(river_router_t), intent(inout) :: this
     logical, intent(in), optional :: root_levels !< order levels as distance from graph roots (default: .false.)
