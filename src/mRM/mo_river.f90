@@ -85,7 +85,7 @@ module mo_river
     integer(i4), allocatable :: facc(:) !< flow accumulation size(n_nodes)
     real(dp), allocatable :: upstream_area(:) !< upstream area of node size(n_nodes)
     real(dp), allocatable :: link_length(:) !< length of link starting at node (0 if node is sink) size(n_nodes)
-    real(dp), allocatable :: link_slope(:) !< slope of link starting at node (in [0,1]) size(n_nodes)
+    real(dp), allocatable :: link_slope(:) !< slope of link starting at node (in %) size(n_nodes)
     real(dp), allocatable :: celerity(:) !< celerity of link starting at node set by upscaler size(n_nodes)
     type(order_t) :: order !< level based order of the network
     ! scc related attributes
@@ -107,11 +107,11 @@ module mo_river
     procedure, public :: calc_celerity => river_celerity
     procedure, public :: select_cell_values => river_select_cell_values
     procedure, public :: export => river_export
-    procedure, public :: write_restart => river_write_restart
-    procedure, public :: write_restart_to_dataset => river_write_restart_to_dataset
-    procedure, public :: read_restart => river_read_restart
-    procedure, public :: init_from_restart => river_init_from_restart
     procedure, public :: clean => river_destroy
+    procedure, private :: to_restart_dataset => river_to_restart_dataset, to_restart_file => river_to_restart_file
+    generic, public :: to_restart => to_restart_dataset, to_restart_file
+    procedure, private :: from_restart_dataset => river_from_restart_dataset, from_restart_file => river_from_restart_file
+    generic, public :: from_restart => from_restart_dataset, from_restart_file
   end type river_t
 
 contains
@@ -317,8 +317,8 @@ contains
     logical, intent(in), optional :: calculate_length !< whether to calculate the link length from fdir (default: .true.)
     logical, intent(in), optional :: calculate_node_xy !< whether to calculate node locations (default: .true.)
     integer(i8), allocatable :: cells(:,:), down(:)
-    integer(i8) :: downstream, i
-    integer(i4) :: ix, iy, dy ! direction of north in the grid matrix (1/-1)
+    integer(i8) :: downstream,  i
+    integer(i4) :: dy ! direction of north in the grid matrix (1/-1)
     logical :: periodic, calc_length, calc_node_xy
     real(dp), allocatable :: xax(:), yax(:)
 
@@ -600,10 +600,9 @@ contains
         k = k + 1_i8
         ! *, "link is going upwards: ", i, j, dem(i), dem(j)
       end if
-      this%link_slope(i) = max(( dem(i) - dem(j) ) / this%link_length(i), 0.0_dp)
+      this%link_slope(i) = max(( dem(i) - dem(j) ) / this%link_length(i), 0.0_dp) * 100.0_dp ! in %
     end do
     !$omp end parallel do
-    ! print*, "upward links: ", k, this%grid%ncells
   end subroutine river_slope
 
   !> \brief Calculate the celerity
@@ -617,19 +616,23 @@ contains
     class(river_t), intent(inout) :: this
     real(dp), intent(in) :: gamma !< model parameter: c_i = gamma * sqrt(s_i) or c = gamma
     logical, optional, intent(in) :: constant_celerity !< whether celerity is assumed constant: c = gamma (default: .false.)
-    real(dp), optional, intent(in) :: slope(this%n_nodes) !< [%] river slope
+    real(dp), optional, intent(in) :: slope(this%n_nodes) !< [%] river slope, will be stored in link_slope if provided
     logical, optional, intent(in) :: mask(this%n_nodes) !< mask for slope smoothing (may come from upscaled river network)
     real(dp), allocatable :: smooth_slope(:)
-    logical :: constant, smoothing
+    logical :: smoothing
 
-    constant = optval(constant_celerity, .false.)
-    if (constant) then
+    ! constant celerity
+    if (optval(constant_celerity, .false.)) then
       allocate(this%celerity(this%n_nodes), source=gamma)
       return
     end if
     ! need slope for non constant celerity
-    if (.not.present(slope)) call error_message("river%calc_celerity: need slope to calculate celerity.")
-    allocate(smooth_slope(this%n_nodes), source=slope)
+    if (present(slope)) then
+      if (.not.allocated(this%link_slope)) allocate(this%link_slope(this%n_nodes))
+      this%link_slope(:) = slope
+    end if
+    if (.not.allocated(this%link_slope)) call error_message("river%calc_celerity: need slope to calculate celerity.")
+    allocate(smooth_slope(this%n_nodes), source=this%link_slope)
     ! set min val for river slope to enable h-mean
     where ( smooth_slope < 0.1_dp ) smooth_slope = 0.1_dp
     ! smooth river slope if there is more than one cell
@@ -742,65 +745,47 @@ contains
     deallocate(vars)
   end subroutine river_export
 
-  subroutine river_write_restart(this, path, deflate_level)
+  !> \brief Write river network to restart file
+  subroutine river_to_restart_file(this, path, append)
     class(river_t), intent(in) :: this
-    character(*), intent(in) :: path !< path to the file
-    integer(i4), intent(in), optional :: deflate_level
+    character(*), intent(in) :: path !< NetCDF file path
+    logical, optional, intent(in) :: append !< whether NetCDF file should be opened in append mode (default .false.)
+    type(NcDataset) :: nc
+    character(1) :: fmode
+    fmode = "w"
+    if ( optval(append, .false.) ) fmode = "a"
+    nc = NcDataset(path, fmode)
+    call this%to_restart_dataset(nc)
+    call nc%close()
+  end subroutine river_to_restart_file
 
-    type(NcDataset) :: restart_nc
-    integer(i4) :: deflate
-
-    deflate = optval(deflate_level, 6_i4)
-    restart_nc = NcDataset(trim(path), "w")
-    call this%write_restart_to_dataset(restart_nc, deflate)
-    call restart_nc%close()
-
-  end subroutine river_write_restart
-
-  !> \brief Write setup file
-  subroutine river_write_restart_to_dataset(this, restart_nc, deflate_level)
+  !> \brief Write river network to restart dataset
+  subroutine river_to_restart_dataset(this, nc)
     class(river_t), intent(in) :: this
-    integer(i4), intent(in), optional :: deflate_level
-
-    character(:), allocatable :: units, units_dt
-    type(NcDimension) :: t_dim, two_dim, node_dim, link_dim, dims(2), order_dim, sink_dim, xdim, ydim
+    type(NcDimension) :: two_dim, node_dim, link_dim, dims(2), order_dim, sink_dim, xdim, ydim
     type(NcVariable) :: node_x_var, node_y_var, nc_var
-    type(NcDataset) :: restart_nc
-    integer(i4) :: i, nlinks, topo_dim, deflate
-    integer(i8) :: n, k
-    integer(i8), allocatable :: links(:, :), dummy(:)
+    type(NcDataset) :: nc
+    integer(i8) :: i
+    integer(i8), allocatable :: dummy2d(:, :)
+    integer(i2), allocatable :: dummy2d_i2(:, :)
 
-    deflate = optval(deflate_level, 6_i4)
-
-    call this%grid%to_netcdf(restart_nc)
     if ( this%grid%coordsys == cartesian ) then
-      xdim = restart_nc%getDimension("x")
-      ydim = restart_nc%getDimension("y")
+      xdim = nc%getDimension("x")
+      ydim = nc%getDimension("y")
     else
-      xdim = restart_nc%getDimension("lon")
-      ydim = restart_nc%getDimension("lat")
+      xdim = nc%getDimension("lon")
+      ydim = nc%getDimension("lat")
     end if
 
-    ! cell area
-    nc_var = restart_nc%setVariable("cell_area", "f64", [xdim, ydim], deflate_level=deflate, shuffle=.true.)
-    call nc_var%setAttribute("long_name", "cell area")
-    call nc_var%setAttribute("standard_name", "cell area")
-    call nc_var%setAttribute("units", "m2")
-    if (this%grid%has_aux_coords()) call nc_var%setAttribute("coordinates", "lat lon")
-    call nc_var%setFillValue(nodata_dp)
-    call nc_var%setAttribute("missing_value", nodata_dp)
-    call nc_var%setData(this%grid%unpack(this%grid%cell_area))
-
-    ! self%nc = nc%setVariable(self%name, self%dtype, dims(:2), deflate_level=deflate, shuffle=.true.)
-
+    ! river network
     if (this%n_nodes > int(huge(1_i4),i8)) call error_message("river%write_restart: river network too large to write to restart.")
-    node_dim = restart_nc%setDimension("node", int(this%n_nodes, i4))  ! only works if network is not to huge for i4
-    sink_dim = restart_nc%setDimension("sink", size(this%sinks))
-    link_dim = restart_nc%setDimension("link", size(this%up))
-    two_dim = restart_nc%setDimension("Two", 2_i4)
+    node_dim = nc%setDimension("node", int(this%n_nodes, i4))  ! only works if network is not to huge for i4
+    sink_dim = nc%setDimension("sink", size(this%sinks))
+    link_dim = nc%setDimension("link", size(this%up))
+    two_dim = nc%setDimension("Two", 2_i4)
 
     ! 1D network topology following UGRID conventions
-    nc_var = restart_nc%setVariable("river", "i32", dims(:0)) ! mesh variable as scalar integer
+    nc_var = nc%setVariable("river", "i32", dims(:0)) ! mesh variable as scalar integer
     call nc_var%setAttribute("cf_role", "mesh_topology")
     call nc_var%setAttribute("long_name", "river network definition")
     call nc_var%setAttribute("topology_dimension", 1_i4)  ! 0 - only nodes, 1 - with links
@@ -810,24 +795,24 @@ contains
     end if
 
     ! links (from-to flow)
-    nc_var = restart_nc%setVariable("links", "i64", [two_dim, link_dim])
+    nc_var = nc%setVariable("links", "i64", [two_dim, link_dim])
     call nc_var%setAttribute("cf_role", "edge_node_connectivity")
     call nc_var%setAttribute("long_name", "river links definition")
     call nc_var%setAttribute("start_index", 1_i4)  ! fortran indices starting with 1
-    allocate(links(2_i4, size(this%up)))
+    allocate(dummy2d(2_i4, size(this%up)))
     !$omp parallel do default(shared) schedule(static)
     do i = 1_i8, this%n_nodes
       if (this%n_up(i) == 0_i8) cycle
-      links(1_i4, this%off_up(i):this%off_up(i)+this%n_up(i)-1_i8) = this%up(this%off_up(i):this%off_up(i)+this%n_up(i)-1_i8)
-      links(2_i4, this%off_up(i):this%off_up(i)+this%n_up(i)-1_i8) = i
+      dummy2d(1_i4, this%off_up(i):this%off_up(i)+this%n_up(i)-1_i8) = this%up(this%off_up(i):this%off_up(i)+this%n_up(i)-1_i8)
+      dummy2d(2_i4, this%off_up(i):this%off_up(i)+this%n_up(i)-1_i8) = i
     end do
     !$omp end parallel do
-    call nc_var%setData(links)
-    deallocate(links)
+    call nc_var%setData(dummy2d)
+    deallocate(dummy2d)
 
     ! down
     print*, "writing down to restart file"
-    nc_var = restart_nc%setVariable("down", "i64", [node_dim])
+    nc_var = nc%setVariable("down", "i64", [node_dim])
     call nc_var%setAttribute("long_name", "downstream cell")
     call nc_var%setFillValue(nodata_i8)
     call nc_var%setAttribute("missing_value", nodata_i8)
@@ -835,7 +820,7 @@ contains
 
     ! sinks
     print*, "writing sinks to restart file"
-    nc_var = restart_nc%setVariable("sinks", "i64", [sink_dim])
+    nc_var = nc%setVariable("sinks", "i64", [sink_dim])
     call nc_var%setAttribute("long_name", "sinks")
     call nc_var%setFillValue(nodata_i8)
     call nc_var%setAttribute("missing_value", nodata_i8)
@@ -843,7 +828,7 @@ contains
 
     ! n_up
     print*, "writing n_up to restart file"
-    nc_var = restart_nc%setVariable("n_up", "i64", [node_dim])
+    nc_var = nc%setVariable("n_up", "i64", [node_dim])
     call nc_var%setAttribute("long_name", "number of upstream nodes")
     call nc_var%setFillValue(nodata_i8)
     call nc_var%setAttribute("missing_value", nodata_i8)
@@ -851,7 +836,7 @@ contains
 
     ! off_up
     print*, "writing off_up to restart file"
-    nc_var = restart_nc%setVariable("off_up", "i64", [node_dim])
+    nc_var = nc%setVariable("off_up", "i64", [node_dim])
     call nc_var%setAttribute("long_name", "offset to upstream nodes")
     call nc_var%setFillValue(nodata_i8)
     call nc_var%setAttribute("missing_value", nodata_i8)
@@ -865,8 +850,8 @@ contains
 
     if ( allocated(this%node_x) .and. allocated(this%node_y) ) then
       ! coordinates
-      node_x_var = restart_nc%setVariable("river_node_x", "f64", [node_dim])
-      node_y_var = restart_nc%setVariable("river_node_y", "f64", [node_dim])
+      node_x_var = nc%setVariable("river_node_x", "f64", [node_dim])
+      node_y_var = nc%setVariable("river_node_y", "f64", [node_dim])
       if (this%grid%coordsys==cartesian) then
         call node_x_var%setAttribute("long_name", "x coordinate of projection")
         call node_x_var%setAttribute("standard_name", "projection_x_coordinate")
@@ -889,17 +874,20 @@ contains
     ! fdir
     if ( allocated(this%fdir) ) then
       print*, "writing fdir to restart file"
-      nc_var = restart_nc%setVariable("fdir", "i16", [xdim, ydim], deflate_level=deflate, shuffle=.true.)
+      nc_var = nc%setVariable("fdir", "i16", [xdim, ydim], shuffle=.true.)
       call nc_var%setAttribute("long_name", "flow direction")
       call nc_var%setFillValue(nodata_i2)
       call nc_var%setAttribute("missing_value", nodata_i2)
-      call nc_var%setData(this%grid%unpack(this%fdir)) ! fdir is always grid sized
+      allocate(dummy2d_i2(this%grid%nx, this%grid%ny))
+      call this%grid%unpack_into(this%fdir, dummy2d_i2)
+      call nc_var%setData(dummy2d_i2)
+      deallocate(dummy2d_i2)
     end if
 
     ! facc
     if ( allocated(this%facc) ) then
       print*, "writing facc to restart file"
-      nc_var = restart_nc%setVariable("facc", "i32", [node_dim])
+      nc_var = nc%setVariable("facc", "i32", [node_dim])
       call nc_var%setAttribute("long_name", "flow accumulation")
       call nc_var%setFillValue(nodata_i4)
       call nc_var%setAttribute("missing_value", nodata_i4)
@@ -909,7 +897,7 @@ contains
     ! upstream_area
     if ( allocated(this%upstream_area) ) then
       print*, "writing upstream_area to restart file"
-      nc_var = restart_nc%setVariable("upstream_area", "f64", [node_dim])
+      nc_var = nc%setVariable("upstream_area", "f64", [node_dim])
       call nc_var%setAttribute("long_name", "upstream area")
       call nc_var%setFillValue(nodata_dp)
       call nc_var%setAttribute("missing_value", nodata_dp)
@@ -919,7 +907,7 @@ contains
     ! link_length
     if ( allocated(this%link_length) ) then
       print*, "writing link_length to restart file"
-      nc_var = restart_nc%setVariable("link_length", "f64", [node_dim])
+      nc_var = nc%setVariable("link_length", "f64", [node_dim])
       call nc_var%setAttribute("long_name", "link length")
       call nc_var%setFillValue(nodata_dp)
       call nc_var%setAttribute("missing_value", nodata_dp)
@@ -929,7 +917,7 @@ contains
     ! link_slope
     if ( allocated(this%link_slope) ) then
       print*, "writing link_slope to restart file"
-      nc_var = restart_nc%setVariable("link_slope", "f64", [node_dim])
+      nc_var = nc%setVariable("link_slope", "f64", [node_dim])
       call nc_var%setAttribute("long_name", "average slope of link")
       call nc_var%setFillValue(nodata_dp)
       call nc_var%setAttribute("missing_value", nodata_dp)
@@ -939,17 +927,24 @@ contains
     ! celerity
     if ( allocated(this%celerity) ) then
       print*, "writing celerity to restart file"
-      nc_var = restart_nc%setVariable("celerity", "f64", [node_dim])
+      nc_var = nc%setVariable("celerity", "f64", [node_dim])
       call nc_var%setAttribute("long_name", "streamflow celerity")
       call nc_var%setFillValue(nodata_dp)
       call nc_var%setAttribute("missing_value", nodata_dp)
       call nc_var%setData(this%celerity)
     end if
 
+    ! scc state
+    nc_var = nc%setVariable("scc", "i8", dims(:0)) ! scalar integer to indicate scc river
+    call nc_var%setAttribute("long_name", "scc river flag")
+    call nc_var%setData(merge(1_i1, 0_i1, this%scc))
+    call nc_var%setAttribute("flag_values", [0_i1, 1_i1])
+    call nc_var%setAttribute("flag_meanings", "not_scc scc")
+
     ! node_cell
     if ( allocated(this%node_cell) ) then
       print*, "writing node_cell to restart file"
-      nc_var = restart_nc%setVariable("node_cell", "i64", [node_dim])
+      nc_var = nc%setVariable("node_cell", "i64", [node_dim])
       call nc_var%setAttribute("long_name", "map node to grid cell")
       call nc_var%setFillValue(nodata_i8)
       call nc_var%setAttribute("missing_value", nodata_i8)
@@ -959,17 +954,20 @@ contains
     ! cell_node_select
     if ( allocated(this%cell_node_select) ) then
       print*, "writing cell_node_select to restart file"
-      nc_var = restart_nc%setVariable("cell_node_select", "i64", [xdim, ydim], deflate_level=deflate, shuffle=.true.)
+      nc_var = nc%setVariable("cell_node_select", "i64", [xdim, ydim], shuffle=.true.)
       call nc_var%setAttribute("long_name", "cell node select")
       call nc_var%setFillValue(nodata_i8)
       call nc_var%setAttribute("missing_value", nodata_i8)
-      call nc_var%setData(this%grid%unpack(this%cell_node_select))
+      allocate(dummy2d(this%grid%nx, this%grid%ny))
+      call this%grid%unpack_into(this%cell_node_select, dummy2d)
+      call nc_var%setData(dummy2d)
+      deallocate(dummy2d)
     end if
 
     ! area_fraction
     if ( allocated(this%area_fraction) ) then
       print*, "writing area_fraction to restart file"
-      nc_var = restart_nc%setVariable("area_fraction", "f64", [node_dim])
+      nc_var = nc%setVariable("area_fraction", "f64", [node_dim])
       call nc_var%setAttribute("long_name", "area fraction for each node in cell")
       call nc_var%setFillValue(nodata_dp)
       call nc_var%setAttribute("missing_value", nodata_dp)
@@ -978,69 +976,67 @@ contains
 
     ! order
     if ( allocated(this%order%id) ) then
-      order_dim = restart_nc%setDimension("order_dim", int(this%order%n_levels, i4))
+      order_dim = nc%setDimension("order_dim", int(this%order%n_levels, i4))
       ! order%id
-      nc_var = restart_nc%setVariable("order_id", "i64", [node_dim])
+      nc_var = nc%setVariable("order_id", "i64", [node_dim])
       call nc_var%setAttribute("long_name", "id in order")
       call nc_var%setFillValue(nodata_i8)
       call nc_var%setAttribute("missing_value", nodata_i8)
       call nc_var%setData(this%order%id)
       ! order%level_start
-      nc_var = restart_nc%setVariable("order_level_start", "i64", [order_dim])
+      nc_var = nc%setVariable("order_level_start", "i64", [order_dim])
       call nc_var%setAttribute("long_name", "level start in order")
       call nc_var%setData(this%order%level_start)
       ! order%level_end
-      nc_var = restart_nc%setVariable("order_level_end", "i64", [order_dim])
+      nc_var = nc%setVariable("order_level_end", "i64", [order_dim])
       call nc_var%setAttribute("long_name", "level start in order")
       call nc_var%setData(this%order%level_end)
       ! order%level_size
-      nc_var = restart_nc%setVariable("order_level_size", "i64", [order_dim])
+      nc_var = nc%setVariable("order_level_size", "i64", [order_dim])
       call nc_var%setAttribute("long_name", "level start in order")
       call nc_var%setData(this%order%level_size)
     end if
 
-  end subroutine river_write_restart_to_dataset
+  end subroutine river_to_restart_dataset
 
-  subroutine river_read_restart(this, path)
+  !> \brief Read river network from restart file
+  subroutine river_from_restart_file(this, path, grid)
     class(river_t), intent(inout) :: this
-    character(*), intent(in) :: path !< path to the file
+    character(*), intent(in) :: path !< NetCDF file path
+    type(grid_t), pointer, intent(in), optional :: grid !< grid the river network is defined on
+    type(NcDataset) :: nc
+    nc = NcDataset(path, "r")
+    call this%from_restart_dataset(nc, grid)
+    call nc%close()
+  end subroutine river_from_restart_file
 
-    type(NcDataset) :: restart_nc
-
-    restart_nc = NcDataset(trim(path), "r")
-
-    call this%init_from_restart(restart_nc)
-    ! call restart_nc%close()
-
-  end subroutine river_read_restart
-
-  subroutine river_init_from_restart(this, restart_nc)
+  !> \brief Read river network from restart dataset
+  subroutine river_from_restart_dataset(this, nc, grid)
     class(river_t), intent(inout) :: this
-    type(NcDataset), intent(in) :: restart_nc
+    type(NcDataset), intent(in) :: nc !< netcdf dataset to read from
+    type(grid_t), pointer, intent(in), optional :: grid !< grid the river network is defined on
     type(NcVariable) :: nc_var
-    type(NcDimension) :: nc_dim, xdim, ydim
+    type(NcDimension) :: nc_dim
 
-    integer(i8) :: i, n_sinks, n_links, x, y
-    integer(i4), allocatable :: dummy(:)
+    integer(i8) :: i, n_sinks, n_links
+    integer(i1), allocatable :: dummy_i1
     integer(i2), allocatable :: dummy2di2(:, :)
-    integer(i4), allocatable :: dummy2di4(:, :)
-    integer(i8), allocatable :: ids(:), dummy1di8(:), dummy2di8(:, :)
-    real(dp), allocatable :: dummy2d(:, :)
+    integer(i8), allocatable :: dummy2di8(:, :)
 
-    ! TODO: this shouldn't be necessary - grid should already be initialized
-    nc_var = restart_nc%getVariable("cell_area")
-    call nc_var%getData(dummy2d)
-    this%grid%cell_area = this%grid%pack(dummy2d)
-    deallocate(dummy2d)
+    ! reset all attributes
+    call this%clean()
 
-    nc_dim = restart_nc%getDimension("node")
+    ! grid should be read separately and passed as argument to avoid circular dependency between river and grid
+    this%grid => grid
+
+    nc_dim = nc%getDimension("node")
     this%n_nodes = int(nc_dim%getLength(), i8)
-    nc_dim = restart_nc%getDimension("sink")
+    nc_dim = nc%getDimension("sink")
     n_sinks = int(nc_dim%getLength(), i8)
-    nc_dim = restart_nc%getDimension("link")
+    nc_dim = nc%getDimension("link")
     n_links = int(nc_dim%getLength(), i8)
 
-    nc_var = restart_nc%getVariable("links")
+    nc_var = nc%getVariable("links")
     allocate(this%up(n_links))
     call nc_var%getData(dummy2di8)
     !$omp parallel do default(shared) schedule(static)
@@ -1050,7 +1046,7 @@ contains
     !$omp end parallel do
     deallocate(dummy2di8)
 
-    nc_var = restart_nc%getVariable("down")
+    nc_var = nc%getVariable("down")
     allocate(this%down(this%n_nodes))
     call nc_var%readInto(this%down)
 
@@ -1063,115 +1059,121 @@ contains
     end do
     !$omp end parallel do
 
-    nc_var = restart_nc%getVariable("sinks")
+    nc_var = nc%getVariable("sinks")
     allocate(this%sinks(n_sinks))
     call nc_var%readInto(this%sinks)
 
-    nc_var = restart_nc%getVariable("n_up")
+    nc_var = nc%getVariable("n_up")
     allocate(this%n_up(this%n_nodes))
     call nc_var%readInto(this%n_up)
 
-    nc_var = restart_nc%getVariable("off_up")
+    nc_var = nc%getVariable("off_up")
     allocate(this%off_up(this%n_nodes))
     call nc_var%readInto(this%off_up)
 
-    if (restart_nc%hasVariable("river_node_x")) then
-      nc_var = restart_nc%getVariable("river_node_x")
+    if (nc%hasVariable("river_node_x")) then
+      nc_var = nc%getVariable("river_node_x")
       allocate(this%node_x(this%n_nodes))
       call nc_var%readInto(this%node_x)
     end if
 
-    if (restart_nc%hasVariable("river_node_y")) then
-      nc_var = restart_nc%getVariable("river_node_y")
+    if (nc%hasVariable("river_node_y")) then
+      nc_var = nc%getVariable("river_node_y")
       allocate(this%node_y(this%n_nodes))
       call nc_var%readInto(this%node_y)
     end if
 
-    if (restart_nc%hasVariable("fdir")) then
-      nc_var = restart_nc%getVariable("fdir")
+    if (nc%hasVariable("fdir")) then
+      nc_var = nc%getVariable("fdir")
       call nc_var%getData(dummy2di2)
       allocate(this%fdir(this%grid%ncells))
       call this%grid%pack_into(dummy2di2, this%fdir)
       deallocate(dummy2di2)
     end if
 
-    if (restart_nc%hasVariable("facc")) then
-      nc_var = restart_nc%getVariable("facc")
+    if (nc%hasVariable("facc")) then
+      nc_var = nc%getVariable("facc")
       allocate(this%facc(this%n_nodes))
       call nc_var%readInto(this%facc)
     end if
 
-    if (restart_nc%hasVariable("upstream_area")) then
-      nc_var = restart_nc%getVariable("upstream_area")
+    if (nc%hasVariable("upstream_area")) then
+      nc_var = nc%getVariable("upstream_area")
       allocate(this%upstream_area(this%n_nodes))
       call nc_var%readInto(this%upstream_area)
     end if
 
-    if (restart_nc%hasVariable("link_length")) then
-      nc_var = restart_nc%getVariable("link_length")
+    if (nc%hasVariable("link_length")) then
+      nc_var = nc%getVariable("link_length")
       allocate(this%link_length(this%n_nodes))
       call nc_var%readInto(this%link_length)
     end if
 
-    if (restart_nc%hasVariable("link_slope")) then
-      nc_var = restart_nc%getVariable("link_slope")
+    if (nc%hasVariable("link_slope")) then
+      nc_var = nc%getVariable("link_slope")
       allocate(this%link_slope(this%n_nodes))
       call nc_var%readInto(this%link_slope)
     end if
 
-    if (restart_nc%hasVariable("celerity")) then
-      nc_var = restart_nc%getVariable("celerity")
+    if (nc%hasVariable("celerity")) then
+      nc_var = nc%getVariable("celerity")
       allocate(this%celerity(this%n_nodes))
       call nc_var%readInto(this%celerity)
     end if
 
-    if (restart_nc%hasVariable("node_cell")) then
-      nc_var = restart_nc%getVariable("node_cell")
+    if (nc%hasVariable("node_cell")) then
+      nc_var = nc%getVariable("node_cell")
       allocate(this%node_cell(this%n_nodes))
       call nc_var%readInto(this%node_cell)
     end if
 
-    if (restart_nc%hasVariable("cell_node_select")) then
-      nc_var = restart_nc%getVariable("cell_node_select")
+    if (nc%hasVariable("cell_node_select")) then
+      nc_var = nc%getVariable("cell_node_select")
       call nc_var%getData(dummy2di8)
       allocate(this%cell_node_select(this%grid%ncells))
       call this%grid%pack_into(dummy2di8, this%cell_node_select)
       deallocate(dummy2di8)
     end if
 
-    if (restart_nc%hasVariable("area_fraction")) then
-      nc_var = restart_nc%getVariable("area_fraction")
+    if (nc%hasVariable("area_fraction")) then
+      nc_var = nc%getVariable("area_fraction")
       allocate(this%area_fraction(this%n_nodes))
       call nc_var%readInto(this%area_fraction)
     end if
 
-    if (restart_nc%hasDimension("order_dim")) then
+    if (nc%hasDimension("order_dim")) then
       this%order%to_root = .false.
-      nc_dim = restart_nc%getDimension("order_dim")
+      nc_dim = nc%getDimension("order_dim")
       this%order%n_levels = int(nc_dim%getLength(), i8)
 
-      nc_var = restart_nc%getVariable("order_id")
+      nc_var = nc%getVariable("order_id")
       allocate(this%order%id(this%n_nodes))
       call nc_var%readInto(this%order%id)
 
-      nc_var = restart_nc%getVariable("order_level_start")
+      nc_var = nc%getVariable("order_level_start")
       allocate(this%order%level_start(this%order%n_levels))
       call nc_var%readInto(this%order%level_start)
 
-      nc_var = restart_nc%getVariable("order_level_end")
+      nc_var = nc%getVariable("order_level_end")
       allocate(this%order%level_end(this%order%n_levels))
       call nc_var%readInto(this%order%level_end)
 
-      nc_var = restart_nc%getVariable("order_level_size")
+      nc_var = nc%getVariable("order_level_size")
       allocate(this%order%level_size(this%order%n_levels))
       call nc_var%readInto(this%order%level_size)
     end if
 
-  end subroutine river_init_from_restart
+    this%scc = .false.
+    if (nc%hasVariable("scc")) then
+      nc_var = nc%getVariable("scc")
+      call nc_var%getData(dummy_i1)
+      this%scc = dummy_i1 == 1_i1
+    end if
+
+  end subroutine river_from_restart_dataset
 
   subroutine river_destroy(this)
     class(river_t), intent(inout) :: this
-    integer(i8) :: i
     if (allocated(this%fdir)) deallocate(this%fdir)
     if (allocated(this%facc)) deallocate(this%facc)
     if (allocated(this%is_sink)) deallocate(this%is_sink)
