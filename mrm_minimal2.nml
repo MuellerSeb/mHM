@@ -7,8 +7,8 @@
 /
 
 &config_time
-  sim_start(1)   = "1990" ! "1990-01-01 00:00"
-  eval_start(1)  = "1990" ! "1990-01-01 00:00"
+  sim_start(1)   = "1992" ! "1992-01-01 00:00"
+  eval_start(1)  = "1992" ! "1992-01-01 00:00"
   sim_end(1)     = "1994" ! "1994-01-01 00:00"
 /
 
@@ -20,6 +20,8 @@
 
 &config_mrm
   resolution(1)  = 12000.0
-  output_path(1) = "mrm_output.nc"
+  output_path(1) = "mrm_output_1992-1994.nc"
+  read_restart(1) = .true.
+  restart_input_path(1) = "mrm_restart_1992.nc"
   scc_gauges_path(1) = "src/tests/files/scc_gauges.nc"
 /
