@@ -27,6 +27,7 @@ module nml_petm2
     NML_ERR_INVALID_NAME, &
     NML_ERR_INVALID_INDEX, &
     idx_check, &
+    to_lower, &
     NML_ERR_PARTLY_SET
   use ieee_arithmetic, only: ieee_value, ieee_quiet_nan, ieee_is_nan
   ! kind specifiers listed in the nml-tools configuration file
@@ -40,9 +41,9 @@ module nml_petm2
   !> \details Parameters for PET (case -2 - aspect correction).
   type, public :: nml_petm2_t
     logical :: is_configured = .false. !< whether the namelist has been configured
-    real(dp), dimension(5) :: minCorrectionFactorPET !< minimum factor for PET correction with aspect
-    real(dp), dimension(5) :: maxCorrectionFactorPET !< maximum factor for PET correction with aspect
-    real(dp), dimension(5) :: aspectTresholdPET !< aspect threshold
+    real(dp), dimension(5) :: mincorrectionfactorpet !< minimum factor for PET correction with aspect
+    real(dp), dimension(5) :: maxcorrectionfactorpet !< maximum factor for PET correction with aspect
+    real(dp), dimension(5) :: aspecttresholdpet !< aspect threshold
   contains
     procedure :: init => nml_petm2_init
     procedure :: from_file => nml_petm2_from_file
@@ -63,9 +64,9 @@ contains
     this%is_configured = .false.
 
     ! sentinel values for required/optional parameters
-    this%minCorrectionFactorPET = ieee_value(this%minCorrectionFactorPET, ieee_quiet_nan) ! sentinel for required real array
-    this%maxCorrectionFactorPET = ieee_value(this%maxCorrectionFactorPET, ieee_quiet_nan) ! sentinel for required real array
-    this%aspectTresholdPET = ieee_value(this%aspectTresholdPET, ieee_quiet_nan) ! sentinel for required real array
+    this%mincorrectionfactorpet = ieee_value(this%mincorrectionfactorpet, ieee_quiet_nan) ! sentinel for required real array
+    this%maxcorrectionfactorpet = ieee_value(this%maxcorrectionfactorpet, ieee_quiet_nan) ! sentinel for required real array
+    this%aspecttresholdpet = ieee_value(this%aspecttresholdpet, ieee_quiet_nan) ! sentinel for required real array
   end function nml_petm2_init
 
   !> \brief Read petm2 namelist from file
@@ -74,9 +75,9 @@ contains
     character(len=*), intent(in) :: file !< path to namelist file
     character(len=*), intent(out), optional :: errmsg
     ! namelist variables
-    real(dp), dimension(5) :: minCorrectionFactorPET
-    real(dp), dimension(5) :: maxCorrectionFactorPET
-    real(dp), dimension(5) :: aspectTresholdPET
+    real(dp), dimension(5) :: mincorrectionfactorpet
+    real(dp), dimension(5) :: maxcorrectionfactorpet
+    real(dp), dimension(5) :: aspecttresholdpet
     ! locals
     type(nml_file_t) :: nml
     integer :: iostat
@@ -84,15 +85,15 @@ contains
     character(len=nml_line_buffer) :: iomsg
 
     namelist /petm2/ &
-      minCorrectionFactorPET, &
-      maxCorrectionFactorPET, &
-      aspectTresholdPET
+      mincorrectionfactorpet, &
+      maxcorrectionfactorpet, &
+      aspecttresholdpet
 
     status = this%init(errmsg=errmsg)
     if (status /= NML_OK) return
-    minCorrectionFactorPET = this%minCorrectionFactorPET
-    maxCorrectionFactorPET = this%maxCorrectionFactorPET
-    aspectTresholdPET = this%aspectTresholdPET
+    mincorrectionfactorpet = this%mincorrectionfactorpet
+    maxcorrectionfactorpet = this%maxcorrectionfactorpet
+    aspecttresholdpet = this%aspecttresholdpet
 
     status = nml%open(file, errmsg=errmsg)
     if (status /= NML_OK) return
@@ -118,9 +119,9 @@ contains
     end if
 
     ! assign values
-    this%minCorrectionFactorPET = minCorrectionFactorPET
-    this%maxCorrectionFactorPET = maxCorrectionFactorPET
-    this%aspectTresholdPET = aspectTresholdPET
+    this%mincorrectionfactorpet = mincorrectionfactorpet
+    this%maxcorrectionfactorpet = maxcorrectionfactorpet
+    this%aspecttresholdpet = aspecttresholdpet
 
     ! mark as configured
     this%is_configured = .true.
@@ -129,24 +130,24 @@ contains
 
   !> \brief Set petm2 values
   integer function nml_petm2_set(this, &
-    minCorrectionFactorPET, &
-    maxCorrectionFactorPET, &
-    aspectTresholdPET, &
+    mincorrectionfactorpet, &
+    maxcorrectionfactorpet, &
+    aspecttresholdpet, &
     errmsg) result(status)
 
     class(nml_petm2_t), intent(inout) :: this
     character(len=*), intent(out), optional :: errmsg
-    real(dp), dimension(5), intent(in) :: minCorrectionFactorPET
-    real(dp), dimension(5), intent(in) :: maxCorrectionFactorPET
-    real(dp), dimension(5), intent(in) :: aspectTresholdPET
+    real(dp), dimension(5), intent(in) :: mincorrectionfactorpet
+    real(dp), dimension(5), intent(in) :: maxcorrectionfactorpet
+    real(dp), dimension(5), intent(in) :: aspecttresholdpet
 
     status = this%init(errmsg=errmsg)
     if (status /= NML_OK) return
 
     ! required parameters
-    this%minCorrectionFactorPET = minCorrectionFactorPET
-    this%maxCorrectionFactorPET = maxCorrectionFactorPET
-    this%aspectTresholdPET = aspectTresholdPET
+    this%mincorrectionfactorpet = mincorrectionfactorpet
+    this%maxcorrectionfactorpet = maxcorrectionfactorpet
+    this%aspecttresholdpet = aspecttresholdpet
 
     ! mark as configured
     this%is_configured = .true.
@@ -162,33 +163,33 @@ contains
 
     status = NML_OK
     if (present(errmsg)) errmsg = ""
-    select case (trim(name))
-    case ("minCorrectionFactorPET")
+    select case (to_lower(trim(name)))
+    case ("mincorrectionfactorpet")
       if (present(idx)) then
-        status = idx_check(idx, lbound(this%minCorrectionFactorPET), ubound(this%minCorrectionFactorPET), &
+        status = idx_check(idx, lbound(this%mincorrectionfactorpet), ubound(this%mincorrectionfactorpet), &
           "minCorrectionFactorPET", errmsg)
         if (status /= NML_OK) return
-        if (ieee_is_nan(this%minCorrectionFactorPET(idx(1)))) status = NML_ERR_NOT_SET
+        if (ieee_is_nan(this%mincorrectionfactorpet(idx(1)))) status = NML_ERR_NOT_SET
       else
-        if (all(ieee_is_nan(this%minCorrectionFactorPET))) status = NML_ERR_NOT_SET
+        if (all(ieee_is_nan(this%mincorrectionfactorpet))) status = NML_ERR_NOT_SET
       end if
-    case ("maxCorrectionFactorPET")
+    case ("maxcorrectionfactorpet")
       if (present(idx)) then
-        status = idx_check(idx, lbound(this%maxCorrectionFactorPET), ubound(this%maxCorrectionFactorPET), &
+        status = idx_check(idx, lbound(this%maxcorrectionfactorpet), ubound(this%maxcorrectionfactorpet), &
           "maxCorrectionFactorPET", errmsg)
         if (status /= NML_OK) return
-        if (ieee_is_nan(this%maxCorrectionFactorPET(idx(1)))) status = NML_ERR_NOT_SET
+        if (ieee_is_nan(this%maxcorrectionfactorpet(idx(1)))) status = NML_ERR_NOT_SET
       else
-        if (all(ieee_is_nan(this%maxCorrectionFactorPET))) status = NML_ERR_NOT_SET
+        if (all(ieee_is_nan(this%maxcorrectionfactorpet))) status = NML_ERR_NOT_SET
       end if
-    case ("aspectTresholdPET")
+    case ("aspecttresholdpet")
       if (present(idx)) then
-        status = idx_check(idx, lbound(this%aspectTresholdPET), ubound(this%aspectTresholdPET), &
+        status = idx_check(idx, lbound(this%aspecttresholdpet), ubound(this%aspecttresholdpet), &
           "aspectTresholdPET", errmsg)
         if (status /= NML_OK) return
-        if (ieee_is_nan(this%aspectTresholdPET(idx(1)))) status = NML_ERR_NOT_SET
+        if (ieee_is_nan(this%aspecttresholdpet(idx(1)))) status = NML_ERR_NOT_SET
       else
-        if (all(ieee_is_nan(this%aspectTresholdPET))) status = NML_ERR_NOT_SET
+        if (all(ieee_is_nan(this%aspecttresholdpet))) status = NML_ERR_NOT_SET
       end if
     case default
       status = NML_ERR_INVALID_NAME
@@ -209,32 +210,32 @@ contains
     if (present(errmsg)) errmsg = ""
 
     ! required arrays
-    if (all(ieee_is_nan(this%minCorrectionFactorPET))) then
+    if (all(ieee_is_nan(this%mincorrectionfactorpet))) then
       status = NML_ERR_REQUIRED
       if (present(errmsg)) errmsg = "required field not set: minCorrectionFactorPET"
       return
     end if
-    if (any(ieee_is_nan(this%minCorrectionFactorPET))) then
+    if (any(ieee_is_nan(this%mincorrectionfactorpet))) then
       status = NML_ERR_PARTLY_SET
       if (present(errmsg)) errmsg = "array partly set: minCorrectionFactorPET"
       return
     end if
-    if (all(ieee_is_nan(this%maxCorrectionFactorPET))) then
+    if (all(ieee_is_nan(this%maxcorrectionfactorpet))) then
       status = NML_ERR_REQUIRED
       if (present(errmsg)) errmsg = "required field not set: maxCorrectionFactorPET"
       return
     end if
-    if (any(ieee_is_nan(this%maxCorrectionFactorPET))) then
+    if (any(ieee_is_nan(this%maxcorrectionfactorpet))) then
       status = NML_ERR_PARTLY_SET
       if (present(errmsg)) errmsg = "array partly set: maxCorrectionFactorPET"
       return
     end if
-    if (all(ieee_is_nan(this%aspectTresholdPET))) then
+    if (all(ieee_is_nan(this%aspecttresholdpet))) then
       status = NML_ERR_REQUIRED
       if (present(errmsg)) errmsg = "required field not set: aspectTresholdPET"
       return
     end if
-    if (any(ieee_is_nan(this%aspectTresholdPET))) then
+    if (any(ieee_is_nan(this%aspecttresholdpet))) then
       status = NML_ERR_PARTLY_SET
       if (present(errmsg)) errmsg = "array partly set: aspectTresholdPET"
       return

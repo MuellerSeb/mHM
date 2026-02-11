@@ -29,6 +29,7 @@ module nml_neutrons2
     NML_ERR_INVALID_NAME, &
     NML_ERR_INVALID_INDEX, &
     idx_check, &
+    to_lower, &
     NML_ERR_PARTLY_SET
   use ieee_arithmetic, only: ieee_value, ieee_quiet_nan, ieee_is_nan
   ! kind specifiers listed in the nml-tools configuration file
@@ -44,15 +45,15 @@ module nml_neutrons2
   !! THIS IS WORK IN PROGRESS, DO NOT USE FOR RESEARCH
   type, public :: nml_neutrons2_t
     logical :: is_configured = .false. !< whether the namelist has been configured
-    real(dp), dimension(5) :: COSMIC_N0 !< Cosmic N0 parameter
-    real(dp), dimension(5) :: COSMIC_N1 !< Cosmic N1 parameter
-    real(dp), dimension(5) :: COSMIC_N2 !< Cosmic N2 parameter
-    real(dp), dimension(5) :: COSMIC_alpha0 !< Cosmic alpha0 parameter
-    real(dp), dimension(5) :: COSMIC_alpha1 !< Cosmic alpha1 parameter
-    real(dp), dimension(5) :: COSMIC_L30 !< Cosmic L30 parameter
-    real(dp), dimension(5) :: COSMIC_L31 !< Cosmic L31 parameter
-    real(dp), dimension(5) :: COSMIC_LW0 !< Cosmic LW0 parameter
-    real(dp), dimension(5) :: COSMIC_LW1 !< Cosmic LW1 parameter
+    real(dp), dimension(5) :: cosmic_n0 !< Cosmic N0 parameter
+    real(dp), dimension(5) :: cosmic_n1 !< Cosmic N1 parameter
+    real(dp), dimension(5) :: cosmic_n2 !< Cosmic N2 parameter
+    real(dp), dimension(5) :: cosmic_alpha0 !< Cosmic alpha0 parameter
+    real(dp), dimension(5) :: cosmic_alpha1 !< Cosmic alpha1 parameter
+    real(dp), dimension(5) :: cosmic_l30 !< Cosmic L30 parameter
+    real(dp), dimension(5) :: cosmic_l31 !< Cosmic L31 parameter
+    real(dp), dimension(5) :: cosmic_lw0 !< Cosmic LW0 parameter
+    real(dp), dimension(5) :: cosmic_lw1 !< Cosmic LW1 parameter
   contains
     procedure :: init => nml_neutrons2_init
     procedure :: from_file => nml_neutrons2_from_file
@@ -73,15 +74,15 @@ contains
     this%is_configured = .false.
 
     ! sentinel values for required/optional parameters
-    this%COSMIC_N0 = ieee_value(this%COSMIC_N0, ieee_quiet_nan) ! sentinel for required real array
-    this%COSMIC_N1 = ieee_value(this%COSMIC_N1, ieee_quiet_nan) ! sentinel for required real array
-    this%COSMIC_N2 = ieee_value(this%COSMIC_N2, ieee_quiet_nan) ! sentinel for required real array
-    this%COSMIC_alpha0 = ieee_value(this%COSMIC_alpha0, ieee_quiet_nan) ! sentinel for required real array
-    this%COSMIC_alpha1 = ieee_value(this%COSMIC_alpha1, ieee_quiet_nan) ! sentinel for required real array
-    this%COSMIC_L30 = ieee_value(this%COSMIC_L30, ieee_quiet_nan) ! sentinel for required real array
-    this%COSMIC_L31 = ieee_value(this%COSMIC_L31, ieee_quiet_nan) ! sentinel for required real array
-    this%COSMIC_LW0 = ieee_value(this%COSMIC_LW0, ieee_quiet_nan) ! sentinel for required real array
-    this%COSMIC_LW1 = ieee_value(this%COSMIC_LW1, ieee_quiet_nan) ! sentinel for required real array
+    this%cosmic_n0 = ieee_value(this%cosmic_n0, ieee_quiet_nan) ! sentinel for required real array
+    this%cosmic_n1 = ieee_value(this%cosmic_n1, ieee_quiet_nan) ! sentinel for required real array
+    this%cosmic_n2 = ieee_value(this%cosmic_n2, ieee_quiet_nan) ! sentinel for required real array
+    this%cosmic_alpha0 = ieee_value(this%cosmic_alpha0, ieee_quiet_nan) ! sentinel for required real array
+    this%cosmic_alpha1 = ieee_value(this%cosmic_alpha1, ieee_quiet_nan) ! sentinel for required real array
+    this%cosmic_l30 = ieee_value(this%cosmic_l30, ieee_quiet_nan) ! sentinel for required real array
+    this%cosmic_l31 = ieee_value(this%cosmic_l31, ieee_quiet_nan) ! sentinel for required real array
+    this%cosmic_lw0 = ieee_value(this%cosmic_lw0, ieee_quiet_nan) ! sentinel for required real array
+    this%cosmic_lw1 = ieee_value(this%cosmic_lw1, ieee_quiet_nan) ! sentinel for required real array
   end function nml_neutrons2_init
 
   !> \brief Read neutrons2 namelist from file
@@ -90,15 +91,15 @@ contains
     character(len=*), intent(in) :: file !< path to namelist file
     character(len=*), intent(out), optional :: errmsg
     ! namelist variables
-    real(dp), dimension(5) :: COSMIC_N0
-    real(dp), dimension(5) :: COSMIC_N1
-    real(dp), dimension(5) :: COSMIC_N2
-    real(dp), dimension(5) :: COSMIC_alpha0
-    real(dp), dimension(5) :: COSMIC_alpha1
-    real(dp), dimension(5) :: COSMIC_L30
-    real(dp), dimension(5) :: COSMIC_L31
-    real(dp), dimension(5) :: COSMIC_LW0
-    real(dp), dimension(5) :: COSMIC_LW1
+    real(dp), dimension(5) :: cosmic_n0
+    real(dp), dimension(5) :: cosmic_n1
+    real(dp), dimension(5) :: cosmic_n2
+    real(dp), dimension(5) :: cosmic_alpha0
+    real(dp), dimension(5) :: cosmic_alpha1
+    real(dp), dimension(5) :: cosmic_l30
+    real(dp), dimension(5) :: cosmic_l31
+    real(dp), dimension(5) :: cosmic_lw0
+    real(dp), dimension(5) :: cosmic_lw1
     ! locals
     type(nml_file_t) :: nml
     integer :: iostat
@@ -106,27 +107,27 @@ contains
     character(len=nml_line_buffer) :: iomsg
 
     namelist /neutrons2/ &
-      COSMIC_N0, &
-      COSMIC_N1, &
-      COSMIC_N2, &
-      COSMIC_alpha0, &
-      COSMIC_alpha1, &
-      COSMIC_L30, &
-      COSMIC_L31, &
-      COSMIC_LW0, &
-      COSMIC_LW1
+      cosmic_n0, &
+      cosmic_n1, &
+      cosmic_n2, &
+      cosmic_alpha0, &
+      cosmic_alpha1, &
+      cosmic_l30, &
+      cosmic_l31, &
+      cosmic_lw0, &
+      cosmic_lw1
 
     status = this%init(errmsg=errmsg)
     if (status /= NML_OK) return
-    COSMIC_N0 = this%COSMIC_N0
-    COSMIC_N1 = this%COSMIC_N1
-    COSMIC_N2 = this%COSMIC_N2
-    COSMIC_alpha0 = this%COSMIC_alpha0
-    COSMIC_alpha1 = this%COSMIC_alpha1
-    COSMIC_L30 = this%COSMIC_L30
-    COSMIC_L31 = this%COSMIC_L31
-    COSMIC_LW0 = this%COSMIC_LW0
-    COSMIC_LW1 = this%COSMIC_LW1
+    cosmic_n0 = this%cosmic_n0
+    cosmic_n1 = this%cosmic_n1
+    cosmic_n2 = this%cosmic_n2
+    cosmic_alpha0 = this%cosmic_alpha0
+    cosmic_alpha1 = this%cosmic_alpha1
+    cosmic_l30 = this%cosmic_l30
+    cosmic_l31 = this%cosmic_l31
+    cosmic_lw0 = this%cosmic_lw0
+    cosmic_lw1 = this%cosmic_lw1
 
     status = nml%open(file, errmsg=errmsg)
     if (status /= NML_OK) return
@@ -152,15 +153,15 @@ contains
     end if
 
     ! assign values
-    this%COSMIC_N0 = COSMIC_N0
-    this%COSMIC_N1 = COSMIC_N1
-    this%COSMIC_N2 = COSMIC_N2
-    this%COSMIC_alpha0 = COSMIC_alpha0
-    this%COSMIC_alpha1 = COSMIC_alpha1
-    this%COSMIC_L30 = COSMIC_L30
-    this%COSMIC_L31 = COSMIC_L31
-    this%COSMIC_LW0 = COSMIC_LW0
-    this%COSMIC_LW1 = COSMIC_LW1
+    this%cosmic_n0 = cosmic_n0
+    this%cosmic_n1 = cosmic_n1
+    this%cosmic_n2 = cosmic_n2
+    this%cosmic_alpha0 = cosmic_alpha0
+    this%cosmic_alpha1 = cosmic_alpha1
+    this%cosmic_l30 = cosmic_l30
+    this%cosmic_l31 = cosmic_l31
+    this%cosmic_lw0 = cosmic_lw0
+    this%cosmic_lw1 = cosmic_lw1
 
     ! mark as configured
     this%is_configured = .true.
@@ -169,42 +170,42 @@ contains
 
   !> \brief Set neutrons2 values
   integer function nml_neutrons2_set(this, &
-    COSMIC_N0, &
-    COSMIC_N1, &
-    COSMIC_N2, &
-    COSMIC_alpha0, &
-    COSMIC_alpha1, &
-    COSMIC_L30, &
-    COSMIC_L31, &
-    COSMIC_LW0, &
-    COSMIC_LW1, &
+    cosmic_n0, &
+    cosmic_n1, &
+    cosmic_n2, &
+    cosmic_alpha0, &
+    cosmic_alpha1, &
+    cosmic_l30, &
+    cosmic_l31, &
+    cosmic_lw0, &
+    cosmic_lw1, &
     errmsg) result(status)
 
     class(nml_neutrons2_t), intent(inout) :: this
     character(len=*), intent(out), optional :: errmsg
-    real(dp), dimension(5), intent(in) :: COSMIC_N0
-    real(dp), dimension(5), intent(in) :: COSMIC_N1
-    real(dp), dimension(5), intent(in) :: COSMIC_N2
-    real(dp), dimension(5), intent(in) :: COSMIC_alpha0
-    real(dp), dimension(5), intent(in) :: COSMIC_alpha1
-    real(dp), dimension(5), intent(in) :: COSMIC_L30
-    real(dp), dimension(5), intent(in) :: COSMIC_L31
-    real(dp), dimension(5), intent(in) :: COSMIC_LW0
-    real(dp), dimension(5), intent(in) :: COSMIC_LW1
+    real(dp), dimension(5), intent(in) :: cosmic_n0
+    real(dp), dimension(5), intent(in) :: cosmic_n1
+    real(dp), dimension(5), intent(in) :: cosmic_n2
+    real(dp), dimension(5), intent(in) :: cosmic_alpha0
+    real(dp), dimension(5), intent(in) :: cosmic_alpha1
+    real(dp), dimension(5), intent(in) :: cosmic_l30
+    real(dp), dimension(5), intent(in) :: cosmic_l31
+    real(dp), dimension(5), intent(in) :: cosmic_lw0
+    real(dp), dimension(5), intent(in) :: cosmic_lw1
 
     status = this%init(errmsg=errmsg)
     if (status /= NML_OK) return
 
     ! required parameters
-    this%COSMIC_N0 = COSMIC_N0
-    this%COSMIC_N1 = COSMIC_N1
-    this%COSMIC_N2 = COSMIC_N2
-    this%COSMIC_alpha0 = COSMIC_alpha0
-    this%COSMIC_alpha1 = COSMIC_alpha1
-    this%COSMIC_L30 = COSMIC_L30
-    this%COSMIC_L31 = COSMIC_L31
-    this%COSMIC_LW0 = COSMIC_LW0
-    this%COSMIC_LW1 = COSMIC_LW1
+    this%cosmic_n0 = cosmic_n0
+    this%cosmic_n1 = cosmic_n1
+    this%cosmic_n2 = cosmic_n2
+    this%cosmic_alpha0 = cosmic_alpha0
+    this%cosmic_alpha1 = cosmic_alpha1
+    this%cosmic_l30 = cosmic_l30
+    this%cosmic_l31 = cosmic_l31
+    this%cosmic_lw0 = cosmic_lw0
+    this%cosmic_lw1 = cosmic_lw1
 
     ! mark as configured
     this%is_configured = .true.
@@ -220,87 +221,87 @@ contains
 
     status = NML_OK
     if (present(errmsg)) errmsg = ""
-    select case (trim(name))
-    case ("COSMIC_N0")
+    select case (to_lower(trim(name)))
+    case ("cosmic_n0")
       if (present(idx)) then
-        status = idx_check(idx, lbound(this%COSMIC_N0), ubound(this%COSMIC_N0), &
+        status = idx_check(idx, lbound(this%cosmic_n0), ubound(this%cosmic_n0), &
           "COSMIC_N0", errmsg)
         if (status /= NML_OK) return
-        if (ieee_is_nan(this%COSMIC_N0(idx(1)))) status = NML_ERR_NOT_SET
+        if (ieee_is_nan(this%cosmic_n0(idx(1)))) status = NML_ERR_NOT_SET
       else
-        if (all(ieee_is_nan(this%COSMIC_N0))) status = NML_ERR_NOT_SET
+        if (all(ieee_is_nan(this%cosmic_n0))) status = NML_ERR_NOT_SET
       end if
-    case ("COSMIC_N1")
+    case ("cosmic_n1")
       if (present(idx)) then
-        status = idx_check(idx, lbound(this%COSMIC_N1), ubound(this%COSMIC_N1), &
+        status = idx_check(idx, lbound(this%cosmic_n1), ubound(this%cosmic_n1), &
           "COSMIC_N1", errmsg)
         if (status /= NML_OK) return
-        if (ieee_is_nan(this%COSMIC_N1(idx(1)))) status = NML_ERR_NOT_SET
+        if (ieee_is_nan(this%cosmic_n1(idx(1)))) status = NML_ERR_NOT_SET
       else
-        if (all(ieee_is_nan(this%COSMIC_N1))) status = NML_ERR_NOT_SET
+        if (all(ieee_is_nan(this%cosmic_n1))) status = NML_ERR_NOT_SET
       end if
-    case ("COSMIC_N2")
+    case ("cosmic_n2")
       if (present(idx)) then
-        status = idx_check(idx, lbound(this%COSMIC_N2), ubound(this%COSMIC_N2), &
+        status = idx_check(idx, lbound(this%cosmic_n2), ubound(this%cosmic_n2), &
           "COSMIC_N2", errmsg)
         if (status /= NML_OK) return
-        if (ieee_is_nan(this%COSMIC_N2(idx(1)))) status = NML_ERR_NOT_SET
+        if (ieee_is_nan(this%cosmic_n2(idx(1)))) status = NML_ERR_NOT_SET
       else
-        if (all(ieee_is_nan(this%COSMIC_N2))) status = NML_ERR_NOT_SET
+        if (all(ieee_is_nan(this%cosmic_n2))) status = NML_ERR_NOT_SET
       end if
-    case ("COSMIC_alpha0")
+    case ("cosmic_alpha0")
       if (present(idx)) then
-        status = idx_check(idx, lbound(this%COSMIC_alpha0), ubound(this%COSMIC_alpha0), &
+        status = idx_check(idx, lbound(this%cosmic_alpha0), ubound(this%cosmic_alpha0), &
           "COSMIC_alpha0", errmsg)
         if (status /= NML_OK) return
-        if (ieee_is_nan(this%COSMIC_alpha0(idx(1)))) status = NML_ERR_NOT_SET
+        if (ieee_is_nan(this%cosmic_alpha0(idx(1)))) status = NML_ERR_NOT_SET
       else
-        if (all(ieee_is_nan(this%COSMIC_alpha0))) status = NML_ERR_NOT_SET
+        if (all(ieee_is_nan(this%cosmic_alpha0))) status = NML_ERR_NOT_SET
       end if
-    case ("COSMIC_alpha1")
+    case ("cosmic_alpha1")
       if (present(idx)) then
-        status = idx_check(idx, lbound(this%COSMIC_alpha1), ubound(this%COSMIC_alpha1), &
+        status = idx_check(idx, lbound(this%cosmic_alpha1), ubound(this%cosmic_alpha1), &
           "COSMIC_alpha1", errmsg)
         if (status /= NML_OK) return
-        if (ieee_is_nan(this%COSMIC_alpha1(idx(1)))) status = NML_ERR_NOT_SET
+        if (ieee_is_nan(this%cosmic_alpha1(idx(1)))) status = NML_ERR_NOT_SET
       else
-        if (all(ieee_is_nan(this%COSMIC_alpha1))) status = NML_ERR_NOT_SET
+        if (all(ieee_is_nan(this%cosmic_alpha1))) status = NML_ERR_NOT_SET
       end if
-    case ("COSMIC_L30")
+    case ("cosmic_l30")
       if (present(idx)) then
-        status = idx_check(idx, lbound(this%COSMIC_L30), ubound(this%COSMIC_L30), &
+        status = idx_check(idx, lbound(this%cosmic_l30), ubound(this%cosmic_l30), &
           "COSMIC_L30", errmsg)
         if (status /= NML_OK) return
-        if (ieee_is_nan(this%COSMIC_L30(idx(1)))) status = NML_ERR_NOT_SET
+        if (ieee_is_nan(this%cosmic_l30(idx(1)))) status = NML_ERR_NOT_SET
       else
-        if (all(ieee_is_nan(this%COSMIC_L30))) status = NML_ERR_NOT_SET
+        if (all(ieee_is_nan(this%cosmic_l30))) status = NML_ERR_NOT_SET
       end if
-    case ("COSMIC_L31")
+    case ("cosmic_l31")
       if (present(idx)) then
-        status = idx_check(idx, lbound(this%COSMIC_L31), ubound(this%COSMIC_L31), &
+        status = idx_check(idx, lbound(this%cosmic_l31), ubound(this%cosmic_l31), &
           "COSMIC_L31", errmsg)
         if (status /= NML_OK) return
-        if (ieee_is_nan(this%COSMIC_L31(idx(1)))) status = NML_ERR_NOT_SET
+        if (ieee_is_nan(this%cosmic_l31(idx(1)))) status = NML_ERR_NOT_SET
       else
-        if (all(ieee_is_nan(this%COSMIC_L31))) status = NML_ERR_NOT_SET
+        if (all(ieee_is_nan(this%cosmic_l31))) status = NML_ERR_NOT_SET
       end if
-    case ("COSMIC_LW0")
+    case ("cosmic_lw0")
       if (present(idx)) then
-        status = idx_check(idx, lbound(this%COSMIC_LW0), ubound(this%COSMIC_LW0), &
+        status = idx_check(idx, lbound(this%cosmic_lw0), ubound(this%cosmic_lw0), &
           "COSMIC_LW0", errmsg)
         if (status /= NML_OK) return
-        if (ieee_is_nan(this%COSMIC_LW0(idx(1)))) status = NML_ERR_NOT_SET
+        if (ieee_is_nan(this%cosmic_lw0(idx(1)))) status = NML_ERR_NOT_SET
       else
-        if (all(ieee_is_nan(this%COSMIC_LW0))) status = NML_ERR_NOT_SET
+        if (all(ieee_is_nan(this%cosmic_lw0))) status = NML_ERR_NOT_SET
       end if
-    case ("COSMIC_LW1")
+    case ("cosmic_lw1")
       if (present(idx)) then
-        status = idx_check(idx, lbound(this%COSMIC_LW1), ubound(this%COSMIC_LW1), &
+        status = idx_check(idx, lbound(this%cosmic_lw1), ubound(this%cosmic_lw1), &
           "COSMIC_LW1", errmsg)
         if (status /= NML_OK) return
-        if (ieee_is_nan(this%COSMIC_LW1(idx(1)))) status = NML_ERR_NOT_SET
+        if (ieee_is_nan(this%cosmic_lw1(idx(1)))) status = NML_ERR_NOT_SET
       else
-        if (all(ieee_is_nan(this%COSMIC_LW1))) status = NML_ERR_NOT_SET
+        if (all(ieee_is_nan(this%cosmic_lw1))) status = NML_ERR_NOT_SET
       end if
     case default
       status = NML_ERR_INVALID_NAME
@@ -321,92 +322,92 @@ contains
     if (present(errmsg)) errmsg = ""
 
     ! required arrays
-    if (all(ieee_is_nan(this%COSMIC_N0))) then
+    if (all(ieee_is_nan(this%cosmic_n0))) then
       status = NML_ERR_REQUIRED
       if (present(errmsg)) errmsg = "required field not set: COSMIC_N0"
       return
     end if
-    if (any(ieee_is_nan(this%COSMIC_N0))) then
+    if (any(ieee_is_nan(this%cosmic_n0))) then
       status = NML_ERR_PARTLY_SET
       if (present(errmsg)) errmsg = "array partly set: COSMIC_N0"
       return
     end if
-    if (all(ieee_is_nan(this%COSMIC_N1))) then
+    if (all(ieee_is_nan(this%cosmic_n1))) then
       status = NML_ERR_REQUIRED
       if (present(errmsg)) errmsg = "required field not set: COSMIC_N1"
       return
     end if
-    if (any(ieee_is_nan(this%COSMIC_N1))) then
+    if (any(ieee_is_nan(this%cosmic_n1))) then
       status = NML_ERR_PARTLY_SET
       if (present(errmsg)) errmsg = "array partly set: COSMIC_N1"
       return
     end if
-    if (all(ieee_is_nan(this%COSMIC_N2))) then
+    if (all(ieee_is_nan(this%cosmic_n2))) then
       status = NML_ERR_REQUIRED
       if (present(errmsg)) errmsg = "required field not set: COSMIC_N2"
       return
     end if
-    if (any(ieee_is_nan(this%COSMIC_N2))) then
+    if (any(ieee_is_nan(this%cosmic_n2))) then
       status = NML_ERR_PARTLY_SET
       if (present(errmsg)) errmsg = "array partly set: COSMIC_N2"
       return
     end if
-    if (all(ieee_is_nan(this%COSMIC_alpha0))) then
+    if (all(ieee_is_nan(this%cosmic_alpha0))) then
       status = NML_ERR_REQUIRED
       if (present(errmsg)) errmsg = "required field not set: COSMIC_alpha0"
       return
     end if
-    if (any(ieee_is_nan(this%COSMIC_alpha0))) then
+    if (any(ieee_is_nan(this%cosmic_alpha0))) then
       status = NML_ERR_PARTLY_SET
       if (present(errmsg)) errmsg = "array partly set: COSMIC_alpha0"
       return
     end if
-    if (all(ieee_is_nan(this%COSMIC_alpha1))) then
+    if (all(ieee_is_nan(this%cosmic_alpha1))) then
       status = NML_ERR_REQUIRED
       if (present(errmsg)) errmsg = "required field not set: COSMIC_alpha1"
       return
     end if
-    if (any(ieee_is_nan(this%COSMIC_alpha1))) then
+    if (any(ieee_is_nan(this%cosmic_alpha1))) then
       status = NML_ERR_PARTLY_SET
       if (present(errmsg)) errmsg = "array partly set: COSMIC_alpha1"
       return
     end if
-    if (all(ieee_is_nan(this%COSMIC_L30))) then
+    if (all(ieee_is_nan(this%cosmic_l30))) then
       status = NML_ERR_REQUIRED
       if (present(errmsg)) errmsg = "required field not set: COSMIC_L30"
       return
     end if
-    if (any(ieee_is_nan(this%COSMIC_L30))) then
+    if (any(ieee_is_nan(this%cosmic_l30))) then
       status = NML_ERR_PARTLY_SET
       if (present(errmsg)) errmsg = "array partly set: COSMIC_L30"
       return
     end if
-    if (all(ieee_is_nan(this%COSMIC_L31))) then
+    if (all(ieee_is_nan(this%cosmic_l31))) then
       status = NML_ERR_REQUIRED
       if (present(errmsg)) errmsg = "required field not set: COSMIC_L31"
       return
     end if
-    if (any(ieee_is_nan(this%COSMIC_L31))) then
+    if (any(ieee_is_nan(this%cosmic_l31))) then
       status = NML_ERR_PARTLY_SET
       if (present(errmsg)) errmsg = "array partly set: COSMIC_L31"
       return
     end if
-    if (all(ieee_is_nan(this%COSMIC_LW0))) then
+    if (all(ieee_is_nan(this%cosmic_lw0))) then
       status = NML_ERR_REQUIRED
       if (present(errmsg)) errmsg = "required field not set: COSMIC_LW0"
       return
     end if
-    if (any(ieee_is_nan(this%COSMIC_LW0))) then
+    if (any(ieee_is_nan(this%cosmic_lw0))) then
       status = NML_ERR_PARTLY_SET
       if (present(errmsg)) errmsg = "array partly set: COSMIC_LW0"
       return
     end if
-    if (all(ieee_is_nan(this%COSMIC_LW1))) then
+    if (all(ieee_is_nan(this%cosmic_lw1))) then
       status = NML_ERR_REQUIRED
       if (present(errmsg)) errmsg = "required field not set: COSMIC_LW1"
       return
     end if
-    if (any(ieee_is_nan(this%COSMIC_LW1))) then
+    if (any(ieee_is_nan(this%cosmic_lw1))) then
       status = NML_ERR_PARTLY_SET
       if (present(errmsg)) errmsg = "array partly set: COSMIC_LW1"
       return

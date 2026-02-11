@@ -26,7 +26,8 @@ module nml_output_mhm
     NML_ERR_NOT_SET, &
     NML_ERR_INVALID_NAME, &
     NML_ERR_INVALID_INDEX, &
-    idx_check
+    idx_check, &
+    to_lower
   ! kind specifiers listed in the nml-tools configuration file
   use mo_kind, only: &
     i4
@@ -40,25 +41,25 @@ module nml_output_mhm
   integer(i4), parameter, public :: output_frequency_default = -2_i4
   logical, parameter, public :: out_interception_default = .false.
   logical, parameter, public :: out_snowpack_default = .false.
-  logical, parameter, public :: out_SWC_default = .false.
-  logical, parameter, public :: out_SM_default = .false.
-  logical, parameter, public :: out_SM_all_default = .false.
-  logical, parameter, public :: out_sealedSTW_default = .false.
-  logical, parameter, public :: out_unsatSTW_default = .false.
-  logical, parameter, public :: out_satSTW_default = .false.
-  logical, parameter, public :: out_PET_default = .false.
-  logical, parameter, public :: out_aET_all_default = .false.
-  logical, parameter, public :: out_Q_default = .false.
-  logical, parameter, public :: out_QD_default = .false.
-  logical, parameter, public :: out_QIf_default = .false.
-  logical, parameter, public :: out_QIs_default = .false.
-  logical, parameter, public :: out_QB_default = .false.
+  logical, parameter, public :: out_swc_default = .false.
+  logical, parameter, public :: out_sm_default = .false.
+  logical, parameter, public :: out_sm_all_default = .false.
+  logical, parameter, public :: out_sealedstw_default = .false.
+  logical, parameter, public :: out_unsatstw_default = .false.
+  logical, parameter, public :: out_satstw_default = .false.
+  logical, parameter, public :: out_pet_default = .false.
+  logical, parameter, public :: out_aet_all_default = .false.
+  logical, parameter, public :: out_q_default = .false.
+  logical, parameter, public :: out_qd_default = .false.
+  logical, parameter, public :: out_qif_default = .false.
+  logical, parameter, public :: out_qis_default = .false.
+  logical, parameter, public :: out_qb_default = .false.
   logical, parameter, public :: out_recharge_default = .false.
   logical, parameter, public :: out_soil_infil_default = .false.
   logical, parameter, public :: out_neutrons_default = .false.
-  logical, parameter, public :: out_aET_layer_default = .false.
-  logical, parameter, public :: out_preEffect_default = .false.
-  logical, parameter, public :: out_Qsm_default = .false.
+  logical, parameter, public :: out_aet_layer_default = .false.
+  logical, parameter, public :: out_preeffect_default = .false.
+  logical, parameter, public :: out_qsm_default = .false.
 
   ! enum values
   integer(i4), parameter, public :: output_time_reference_enum_values(3) = [0_i4, 1_i4, 2_i4]
@@ -79,25 +80,25 @@ module nml_output_mhm
     integer(i4) :: output_frequency !< Output time step
     logical :: out_interception !< Interception
     logical :: out_snowpack !< Snowpack
-    logical :: out_SWC !< Layered Soil Water Content
-    logical :: out_SM !< Layered Volumetric Soil Moisture
-    logical :: out_SM_all !< Mean Volumetric Soil Moisture
-    logical :: out_sealedSTW !< Reservoir of Sealed areas
-    logical :: out_unsatSTW !< Reservoir of Unsaturated areas
-    logical :: out_satSTW !< Reservoir of Saturated areas
-    logical :: out_PET !< Potential Evapotranspiration
-    logical :: out_aET_all !< Mean actual Evapotranspiration
-    logical :: out_Q !< Total Discharge
-    logical :: out_QD !< Direct Runoff
-    logical :: out_QIf !< Fast Interflow
-    logical :: out_QIs !< Slow Interflow
-    logical :: out_QB !< Baseflow
+    logical :: out_swc !< Layered Soil Water Content
+    logical :: out_sm !< Layered Volumetric Soil Moisture
+    logical :: out_sm_all !< Mean Volumetric Soil Moisture
+    logical :: out_sealedstw !< Reservoir of Sealed areas
+    logical :: out_unsatstw !< Reservoir of Unsaturated areas
+    logical :: out_satstw !< Reservoir of Saturated areas
+    logical :: out_pet !< Potential Evapotranspiration
+    logical :: out_aet_all !< Mean actual Evapotranspiration
+    logical :: out_q !< Total Discharge
+    logical :: out_qd !< Direct Runoff
+    logical :: out_qif !< Fast Interflow
+    logical :: out_qis !< Slow Interflow
+    logical :: out_qb !< Baseflow
     logical :: out_recharge !< Groundwater Recharge
     logical :: out_soil_infil !< Soil Infiltration
     logical :: out_neutrons !< Neutrons
-    logical :: out_aET_layer !< Actual Evapotranspiration from Soil Layers
-    logical :: out_preEffect !< Effective Precipitation
-    logical :: out_Qsm !< Snow Melt
+    logical :: out_aet_layer !< Actual Evapotranspiration from Soil Layers
+    logical :: out_preeffect !< Effective Precipitation
+    logical :: out_qsm !< Snow Melt
   contains
     procedure :: init => nml_output_mhm_init
     procedure :: from_file => nml_output_mhm_from_file
@@ -177,25 +178,25 @@ contains
     this%output_frequency = output_frequency_default
     this%out_interception = out_interception_default ! bool values always need a default
     this%out_snowpack = out_snowpack_default ! bool values always need a default
-    this%out_SWC = out_SWC_default ! bool values always need a default
-    this%out_SM = out_SM_default ! bool values always need a default
-    this%out_SM_all = out_SM_all_default ! bool values always need a default
-    this%out_sealedSTW = out_sealedSTW_default ! bool values always need a default
-    this%out_unsatSTW = out_unsatSTW_default ! bool values always need a default
-    this%out_satSTW = out_satSTW_default ! bool values always need a default
-    this%out_PET = out_PET_default ! bool values always need a default
-    this%out_aET_all = out_aET_all_default ! bool values always need a default
-    this%out_Q = out_Q_default ! bool values always need a default
-    this%out_QD = out_QD_default ! bool values always need a default
-    this%out_QIf = out_QIf_default ! bool values always need a default
-    this%out_QIs = out_QIs_default ! bool values always need a default
-    this%out_QB = out_QB_default ! bool values always need a default
+    this%out_swc = out_swc_default ! bool values always need a default
+    this%out_sm = out_sm_default ! bool values always need a default
+    this%out_sm_all = out_sm_all_default ! bool values always need a default
+    this%out_sealedstw = out_sealedstw_default ! bool values always need a default
+    this%out_unsatstw = out_unsatstw_default ! bool values always need a default
+    this%out_satstw = out_satstw_default ! bool values always need a default
+    this%out_pet = out_pet_default ! bool values always need a default
+    this%out_aet_all = out_aet_all_default ! bool values always need a default
+    this%out_q = out_q_default ! bool values always need a default
+    this%out_qd = out_qd_default ! bool values always need a default
+    this%out_qif = out_qif_default ! bool values always need a default
+    this%out_qis = out_qis_default ! bool values always need a default
+    this%out_qb = out_qb_default ! bool values always need a default
     this%out_recharge = out_recharge_default ! bool values always need a default
     this%out_soil_infil = out_soil_infil_default ! bool values always need a default
     this%out_neutrons = out_neutrons_default ! bool values always need a default
-    this%out_aET_layer = out_aET_layer_default ! bool values always need a default
-    this%out_preEffect = out_preEffect_default ! bool values always need a default
-    this%out_Qsm = out_Qsm_default ! bool values always need a default
+    this%out_aet_layer = out_aet_layer_default ! bool values always need a default
+    this%out_preeffect = out_preeffect_default ! bool values always need a default
+    this%out_qsm = out_qsm_default ! bool values always need a default
   end function nml_output_mhm_init
 
   !> \brief Read output_mhm namelist from file
@@ -210,25 +211,25 @@ contains
     integer(i4) :: output_frequency
     logical :: out_interception
     logical :: out_snowpack
-    logical :: out_SWC
-    logical :: out_SM
-    logical :: out_SM_all
-    logical :: out_sealedSTW
-    logical :: out_unsatSTW
-    logical :: out_satSTW
-    logical :: out_PET
-    logical :: out_aET_all
-    logical :: out_Q
-    logical :: out_QD
-    logical :: out_QIf
-    logical :: out_QIs
-    logical :: out_QB
+    logical :: out_swc
+    logical :: out_sm
+    logical :: out_sm_all
+    logical :: out_sealedstw
+    logical :: out_unsatstw
+    logical :: out_satstw
+    logical :: out_pet
+    logical :: out_aet_all
+    logical :: out_q
+    logical :: out_qd
+    logical :: out_qif
+    logical :: out_qis
+    logical :: out_qb
     logical :: out_recharge
     logical :: out_soil_infil
     logical :: out_neutrons
-    logical :: out_aET_layer
-    logical :: out_preEffect
-    logical :: out_Qsm
+    logical :: out_aet_layer
+    logical :: out_preeffect
+    logical :: out_qsm
     ! locals
     type(nml_file_t) :: nml
     integer :: iostat
@@ -242,25 +243,25 @@ contains
       output_frequency, &
       out_interception, &
       out_snowpack, &
-      out_SWC, &
-      out_SM, &
-      out_SM_all, &
-      out_sealedSTW, &
-      out_unsatSTW, &
-      out_satSTW, &
-      out_PET, &
-      out_aET_all, &
-      out_Q, &
-      out_QD, &
-      out_QIf, &
-      out_QIs, &
-      out_QB, &
+      out_swc, &
+      out_sm, &
+      out_sm_all, &
+      out_sealedstw, &
+      out_unsatstw, &
+      out_satstw, &
+      out_pet, &
+      out_aet_all, &
+      out_q, &
+      out_qd, &
+      out_qif, &
+      out_qis, &
+      out_qb, &
       out_recharge, &
       out_soil_infil, &
       out_neutrons, &
-      out_aET_layer, &
-      out_preEffect, &
-      out_Qsm
+      out_aet_layer, &
+      out_preeffect, &
+      out_qsm
 
     status = this%init(errmsg=errmsg)
     if (status /= NML_OK) return
@@ -270,25 +271,25 @@ contains
     output_frequency = this%output_frequency
     out_interception = this%out_interception
     out_snowpack = this%out_snowpack
-    out_SWC = this%out_SWC
-    out_SM = this%out_SM
-    out_SM_all = this%out_SM_all
-    out_sealedSTW = this%out_sealedSTW
-    out_unsatSTW = this%out_unsatSTW
-    out_satSTW = this%out_satSTW
-    out_PET = this%out_PET
-    out_aET_all = this%out_aET_all
-    out_Q = this%out_Q
-    out_QD = this%out_QD
-    out_QIf = this%out_QIf
-    out_QIs = this%out_QIs
-    out_QB = this%out_QB
+    out_swc = this%out_swc
+    out_sm = this%out_sm
+    out_sm_all = this%out_sm_all
+    out_sealedstw = this%out_sealedstw
+    out_unsatstw = this%out_unsatstw
+    out_satstw = this%out_satstw
+    out_pet = this%out_pet
+    out_aet_all = this%out_aet_all
+    out_q = this%out_q
+    out_qd = this%out_qd
+    out_qif = this%out_qif
+    out_qis = this%out_qis
+    out_qb = this%out_qb
     out_recharge = this%out_recharge
     out_soil_infil = this%out_soil_infil
     out_neutrons = this%out_neutrons
-    out_aET_layer = this%out_aET_layer
-    out_preEffect = this%out_preEffect
-    out_Qsm = this%out_Qsm
+    out_aet_layer = this%out_aet_layer
+    out_preeffect = this%out_preeffect
+    out_qsm = this%out_qsm
 
     status = nml%open(file, errmsg=errmsg)
     if (status /= NML_OK) return
@@ -320,25 +321,25 @@ contains
     this%output_frequency = output_frequency
     this%out_interception = out_interception
     this%out_snowpack = out_snowpack
-    this%out_SWC = out_SWC
-    this%out_SM = out_SM
-    this%out_SM_all = out_SM_all
-    this%out_sealedSTW = out_sealedSTW
-    this%out_unsatSTW = out_unsatSTW
-    this%out_satSTW = out_satSTW
-    this%out_PET = out_PET
-    this%out_aET_all = out_aET_all
-    this%out_Q = out_Q
-    this%out_QD = out_QD
-    this%out_QIf = out_QIf
-    this%out_QIs = out_QIs
-    this%out_QB = out_QB
+    this%out_swc = out_swc
+    this%out_sm = out_sm
+    this%out_sm_all = out_sm_all
+    this%out_sealedstw = out_sealedstw
+    this%out_unsatstw = out_unsatstw
+    this%out_satstw = out_satstw
+    this%out_pet = out_pet
+    this%out_aet_all = out_aet_all
+    this%out_q = out_q
+    this%out_qd = out_qd
+    this%out_qif = out_qif
+    this%out_qis = out_qis
+    this%out_qb = out_qb
     this%out_recharge = out_recharge
     this%out_soil_infil = out_soil_infil
     this%out_neutrons = out_neutrons
-    this%out_aET_layer = out_aET_layer
-    this%out_preEffect = out_preEffect
-    this%out_Qsm = out_Qsm
+    this%out_aet_layer = out_aet_layer
+    this%out_preeffect = out_preeffect
+    this%out_qsm = out_qsm
 
     ! mark as configured
     this%is_configured = .true.
@@ -353,25 +354,25 @@ contains
     output_frequency, &
     out_interception, &
     out_snowpack, &
-    out_SWC, &
-    out_SM, &
-    out_SM_all, &
-    out_sealedSTW, &
-    out_unsatSTW, &
-    out_satSTW, &
-    out_PET, &
-    out_aET_all, &
-    out_Q, &
-    out_QD, &
-    out_QIf, &
-    out_QIs, &
-    out_QB, &
+    out_swc, &
+    out_sm, &
+    out_sm_all, &
+    out_sealedstw, &
+    out_unsatstw, &
+    out_satstw, &
+    out_pet, &
+    out_aet_all, &
+    out_q, &
+    out_qd, &
+    out_qif, &
+    out_qis, &
+    out_qb, &
     out_recharge, &
     out_soil_infil, &
     out_neutrons, &
-    out_aET_layer, &
-    out_preEffect, &
-    out_Qsm, &
+    out_aet_layer, &
+    out_preeffect, &
+    out_qsm, &
     errmsg) result(status)
 
     class(nml_output_mhm_t), intent(inout) :: this
@@ -382,25 +383,25 @@ contains
     integer(i4), intent(in), optional :: output_frequency
     logical, intent(in), optional :: out_interception
     logical, intent(in), optional :: out_snowpack
-    logical, intent(in), optional :: out_SWC
-    logical, intent(in), optional :: out_SM
-    logical, intent(in), optional :: out_SM_all
-    logical, intent(in), optional :: out_sealedSTW
-    logical, intent(in), optional :: out_unsatSTW
-    logical, intent(in), optional :: out_satSTW
-    logical, intent(in), optional :: out_PET
-    logical, intent(in), optional :: out_aET_all
-    logical, intent(in), optional :: out_Q
-    logical, intent(in), optional :: out_QD
-    logical, intent(in), optional :: out_QIf
-    logical, intent(in), optional :: out_QIs
-    logical, intent(in), optional :: out_QB
+    logical, intent(in), optional :: out_swc
+    logical, intent(in), optional :: out_sm
+    logical, intent(in), optional :: out_sm_all
+    logical, intent(in), optional :: out_sealedstw
+    logical, intent(in), optional :: out_unsatstw
+    logical, intent(in), optional :: out_satstw
+    logical, intent(in), optional :: out_pet
+    logical, intent(in), optional :: out_aet_all
+    logical, intent(in), optional :: out_q
+    logical, intent(in), optional :: out_qd
+    logical, intent(in), optional :: out_qif
+    logical, intent(in), optional :: out_qis
+    logical, intent(in), optional :: out_qb
     logical, intent(in), optional :: out_recharge
     logical, intent(in), optional :: out_soil_infil
     logical, intent(in), optional :: out_neutrons
-    logical, intent(in), optional :: out_aET_layer
-    logical, intent(in), optional :: out_preEffect
-    logical, intent(in), optional :: out_Qsm
+    logical, intent(in), optional :: out_aet_layer
+    logical, intent(in), optional :: out_preeffect
+    logical, intent(in), optional :: out_qsm
 
     status = this%init(errmsg=errmsg)
     if (status /= NML_OK) return
@@ -413,25 +414,25 @@ contains
     if (present(output_frequency)) this%output_frequency = output_frequency
     if (present(out_interception)) this%out_interception = out_interception
     if (present(out_snowpack)) this%out_snowpack = out_snowpack
-    if (present(out_SWC)) this%out_SWC = out_SWC
-    if (present(out_SM)) this%out_SM = out_SM
-    if (present(out_SM_all)) this%out_SM_all = out_SM_all
-    if (present(out_sealedSTW)) this%out_sealedSTW = out_sealedSTW
-    if (present(out_unsatSTW)) this%out_unsatSTW = out_unsatSTW
-    if (present(out_satSTW)) this%out_satSTW = out_satSTW
-    if (present(out_PET)) this%out_PET = out_PET
-    if (present(out_aET_all)) this%out_aET_all = out_aET_all
-    if (present(out_Q)) this%out_Q = out_Q
-    if (present(out_QD)) this%out_QD = out_QD
-    if (present(out_QIf)) this%out_QIf = out_QIf
-    if (present(out_QIs)) this%out_QIs = out_QIs
-    if (present(out_QB)) this%out_QB = out_QB
+    if (present(out_swc)) this%out_swc = out_swc
+    if (present(out_sm)) this%out_sm = out_sm
+    if (present(out_sm_all)) this%out_sm_all = out_sm_all
+    if (present(out_sealedstw)) this%out_sealedstw = out_sealedstw
+    if (present(out_unsatstw)) this%out_unsatstw = out_unsatstw
+    if (present(out_satstw)) this%out_satstw = out_satstw
+    if (present(out_pet)) this%out_pet = out_pet
+    if (present(out_aet_all)) this%out_aet_all = out_aet_all
+    if (present(out_q)) this%out_q = out_q
+    if (present(out_qd)) this%out_qd = out_qd
+    if (present(out_qif)) this%out_qif = out_qif
+    if (present(out_qis)) this%out_qis = out_qis
+    if (present(out_qb)) this%out_qb = out_qb
     if (present(out_recharge)) this%out_recharge = out_recharge
     if (present(out_soil_infil)) this%out_soil_infil = out_soil_infil
     if (present(out_neutrons)) this%out_neutrons = out_neutrons
-    if (present(out_aET_layer)) this%out_aET_layer = out_aET_layer
-    if (present(out_preEffect)) this%out_preEffect = out_preEffect
-    if (present(out_Qsm)) this%out_Qsm = out_Qsm
+    if (present(out_aet_layer)) this%out_aet_layer = out_aet_layer
+    if (present(out_preeffect)) this%out_preeffect = out_preeffect
+    if (present(out_qsm)) this%out_qsm = out_qsm
 
     ! mark as configured
     this%is_configured = .true.
@@ -447,7 +448,7 @@ contains
 
     status = NML_OK
     if (present(errmsg)) errmsg = ""
-    select case (trim(name))
+    select case (to_lower(trim(name)))
     case ("output_deflate_level")
       if (present(idx)) then
         status = NML_ERR_INVALID_INDEX
@@ -484,79 +485,79 @@ contains
         if (present(errmsg)) errmsg = "index not supported for 'out_snowpack'"
         return
       end if
-    case ("out_SWC")
+    case ("out_swc")
       if (present(idx)) then
         status = NML_ERR_INVALID_INDEX
         if (present(errmsg)) errmsg = "index not supported for 'out_SWC'"
         return
       end if
-    case ("out_SM")
+    case ("out_sm")
       if (present(idx)) then
         status = NML_ERR_INVALID_INDEX
         if (present(errmsg)) errmsg = "index not supported for 'out_SM'"
         return
       end if
-    case ("out_SM_all")
+    case ("out_sm_all")
       if (present(idx)) then
         status = NML_ERR_INVALID_INDEX
         if (present(errmsg)) errmsg = "index not supported for 'out_SM_all'"
         return
       end if
-    case ("out_sealedSTW")
+    case ("out_sealedstw")
       if (present(idx)) then
         status = NML_ERR_INVALID_INDEX
         if (present(errmsg)) errmsg = "index not supported for 'out_sealedSTW'"
         return
       end if
-    case ("out_unsatSTW")
+    case ("out_unsatstw")
       if (present(idx)) then
         status = NML_ERR_INVALID_INDEX
         if (present(errmsg)) errmsg = "index not supported for 'out_unsatSTW'"
         return
       end if
-    case ("out_satSTW")
+    case ("out_satstw")
       if (present(idx)) then
         status = NML_ERR_INVALID_INDEX
         if (present(errmsg)) errmsg = "index not supported for 'out_satSTW'"
         return
       end if
-    case ("out_PET")
+    case ("out_pet")
       if (present(idx)) then
         status = NML_ERR_INVALID_INDEX
         if (present(errmsg)) errmsg = "index not supported for 'out_PET'"
         return
       end if
-    case ("out_aET_all")
+    case ("out_aet_all")
       if (present(idx)) then
         status = NML_ERR_INVALID_INDEX
         if (present(errmsg)) errmsg = "index not supported for 'out_aET_all'"
         return
       end if
-    case ("out_Q")
+    case ("out_q")
       if (present(idx)) then
         status = NML_ERR_INVALID_INDEX
         if (present(errmsg)) errmsg = "index not supported for 'out_Q'"
         return
       end if
-    case ("out_QD")
+    case ("out_qd")
       if (present(idx)) then
         status = NML_ERR_INVALID_INDEX
         if (present(errmsg)) errmsg = "index not supported for 'out_QD'"
         return
       end if
-    case ("out_QIf")
+    case ("out_qif")
       if (present(idx)) then
         status = NML_ERR_INVALID_INDEX
         if (present(errmsg)) errmsg = "index not supported for 'out_QIf'"
         return
       end if
-    case ("out_QIs")
+    case ("out_qis")
       if (present(idx)) then
         status = NML_ERR_INVALID_INDEX
         if (present(errmsg)) errmsg = "index not supported for 'out_QIs'"
         return
       end if
-    case ("out_QB")
+    case ("out_qb")
       if (present(idx)) then
         status = NML_ERR_INVALID_INDEX
         if (present(errmsg)) errmsg = "index not supported for 'out_QB'"
@@ -580,19 +581,19 @@ contains
         if (present(errmsg)) errmsg = "index not supported for 'out_neutrons'"
         return
       end if
-    case ("out_aET_layer")
+    case ("out_aet_layer")
       if (present(idx)) then
         status = NML_ERR_INVALID_INDEX
         if (present(errmsg)) errmsg = "index not supported for 'out_aET_layer'"
         return
       end if
-    case ("out_preEffect")
+    case ("out_preeffect")
       if (present(idx)) then
         status = NML_ERR_INVALID_INDEX
         if (present(errmsg)) errmsg = "index not supported for 'out_preEffect'"
         return
       end if
-    case ("out_Qsm")
+    case ("out_qsm")
       if (present(idx)) then
         status = NML_ERR_INVALID_INDEX
         if (present(errmsg)) errmsg = "index not supported for 'out_Qsm'"

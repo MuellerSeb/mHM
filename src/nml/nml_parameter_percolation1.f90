@@ -27,6 +27,7 @@ module nml_percolation1
     NML_ERR_INVALID_NAME, &
     NML_ERR_INVALID_INDEX, &
     idx_check, &
+    to_lower, &
     NML_ERR_PARTLY_SET
   use ieee_arithmetic, only: ieee_value, ieee_quiet_nan, ieee_is_nan
   ! kind specifiers listed in the nml-tools configuration file
@@ -40,9 +41,9 @@ module nml_percolation1
   !> \details Parameters for percolation.
   type, public :: nml_percolation1_t
     logical :: is_configured = .false. !< whether the namelist has been configured
-    real(dp), dimension(5) :: rechargeCoefficient !< Recharge coefficient
-    real(dp), dimension(5) :: rechargeFactor_karstic !< Recharge factor karstic
-    real(dp), dimension(5) :: gain_loss_GWreservoir_karstic !< Gain/loss GW reservoir karstic
+    real(dp), dimension(5) :: rechargecoefficient !< Recharge coefficient
+    real(dp), dimension(5) :: rechargefactor_karstic !< Recharge factor karstic
+    real(dp), dimension(5) :: gain_loss_gwreservoir_karstic !< Gain/loss GW reservoir karstic
   contains
     procedure :: init => nml_percolation1_init
     procedure :: from_file => nml_percolation1_from_file
@@ -63,9 +64,9 @@ contains
     this%is_configured = .false.
 
     ! sentinel values for required/optional parameters
-    this%rechargeCoefficient = ieee_value(this%rechargeCoefficient, ieee_quiet_nan) ! sentinel for required real array
-    this%rechargeFactor_karstic = ieee_value(this%rechargeFactor_karstic, ieee_quiet_nan) ! sentinel for required real array
-    this%gain_loss_GWreservoir_karstic = ieee_value(this%gain_loss_GWreservoir_karstic, ieee_quiet_nan) ! sentinel for required real array
+    this%rechargecoefficient = ieee_value(this%rechargecoefficient, ieee_quiet_nan) ! sentinel for required real array
+    this%rechargefactor_karstic = ieee_value(this%rechargefactor_karstic, ieee_quiet_nan) ! sentinel for required real array
+    this%gain_loss_gwreservoir_karstic = ieee_value(this%gain_loss_gwreservoir_karstic, ieee_quiet_nan) ! sentinel for required real array
   end function nml_percolation1_init
 
   !> \brief Read percolation1 namelist from file
@@ -74,9 +75,9 @@ contains
     character(len=*), intent(in) :: file !< path to namelist file
     character(len=*), intent(out), optional :: errmsg
     ! namelist variables
-    real(dp), dimension(5) :: rechargeCoefficient
-    real(dp), dimension(5) :: rechargeFactor_karstic
-    real(dp), dimension(5) :: gain_loss_GWreservoir_karstic
+    real(dp), dimension(5) :: rechargecoefficient
+    real(dp), dimension(5) :: rechargefactor_karstic
+    real(dp), dimension(5) :: gain_loss_gwreservoir_karstic
     ! locals
     type(nml_file_t) :: nml
     integer :: iostat
@@ -84,15 +85,15 @@ contains
     character(len=nml_line_buffer) :: iomsg
 
     namelist /percolation1/ &
-      rechargeCoefficient, &
-      rechargeFactor_karstic, &
-      gain_loss_GWreservoir_karstic
+      rechargecoefficient, &
+      rechargefactor_karstic, &
+      gain_loss_gwreservoir_karstic
 
     status = this%init(errmsg=errmsg)
     if (status /= NML_OK) return
-    rechargeCoefficient = this%rechargeCoefficient
-    rechargeFactor_karstic = this%rechargeFactor_karstic
-    gain_loss_GWreservoir_karstic = this%gain_loss_GWreservoir_karstic
+    rechargecoefficient = this%rechargecoefficient
+    rechargefactor_karstic = this%rechargefactor_karstic
+    gain_loss_gwreservoir_karstic = this%gain_loss_gwreservoir_karstic
 
     status = nml%open(file, errmsg=errmsg)
     if (status /= NML_OK) return
@@ -118,9 +119,9 @@ contains
     end if
 
     ! assign values
-    this%rechargeCoefficient = rechargeCoefficient
-    this%rechargeFactor_karstic = rechargeFactor_karstic
-    this%gain_loss_GWreservoir_karstic = gain_loss_GWreservoir_karstic
+    this%rechargecoefficient = rechargecoefficient
+    this%rechargefactor_karstic = rechargefactor_karstic
+    this%gain_loss_gwreservoir_karstic = gain_loss_gwreservoir_karstic
 
     ! mark as configured
     this%is_configured = .true.
@@ -129,24 +130,24 @@ contains
 
   !> \brief Set percolation1 values
   integer function nml_percolation1_set(this, &
-    rechargeCoefficient, &
-    rechargeFactor_karstic, &
-    gain_loss_GWreservoir_karstic, &
+    rechargecoefficient, &
+    rechargefactor_karstic, &
+    gain_loss_gwreservoir_karstic, &
     errmsg) result(status)
 
     class(nml_percolation1_t), intent(inout) :: this
     character(len=*), intent(out), optional :: errmsg
-    real(dp), dimension(5), intent(in) :: rechargeCoefficient
-    real(dp), dimension(5), intent(in) :: rechargeFactor_karstic
-    real(dp), dimension(5), intent(in) :: gain_loss_GWreservoir_karstic
+    real(dp), dimension(5), intent(in) :: rechargecoefficient
+    real(dp), dimension(5), intent(in) :: rechargefactor_karstic
+    real(dp), dimension(5), intent(in) :: gain_loss_gwreservoir_karstic
 
     status = this%init(errmsg=errmsg)
     if (status /= NML_OK) return
 
     ! required parameters
-    this%rechargeCoefficient = rechargeCoefficient
-    this%rechargeFactor_karstic = rechargeFactor_karstic
-    this%gain_loss_GWreservoir_karstic = gain_loss_GWreservoir_karstic
+    this%rechargecoefficient = rechargecoefficient
+    this%rechargefactor_karstic = rechargefactor_karstic
+    this%gain_loss_gwreservoir_karstic = gain_loss_gwreservoir_karstic
 
     ! mark as configured
     this%is_configured = .true.
@@ -162,33 +163,33 @@ contains
 
     status = NML_OK
     if (present(errmsg)) errmsg = ""
-    select case (trim(name))
-    case ("rechargeCoefficient")
+    select case (to_lower(trim(name)))
+    case ("rechargecoefficient")
       if (present(idx)) then
-        status = idx_check(idx, lbound(this%rechargeCoefficient), ubound(this%rechargeCoefficient), &
+        status = idx_check(idx, lbound(this%rechargecoefficient), ubound(this%rechargecoefficient), &
           "rechargeCoefficient", errmsg)
         if (status /= NML_OK) return
-        if (ieee_is_nan(this%rechargeCoefficient(idx(1)))) status = NML_ERR_NOT_SET
+        if (ieee_is_nan(this%rechargecoefficient(idx(1)))) status = NML_ERR_NOT_SET
       else
-        if (all(ieee_is_nan(this%rechargeCoefficient))) status = NML_ERR_NOT_SET
+        if (all(ieee_is_nan(this%rechargecoefficient))) status = NML_ERR_NOT_SET
       end if
-    case ("rechargeFactor_karstic")
+    case ("rechargefactor_karstic")
       if (present(idx)) then
-        status = idx_check(idx, lbound(this%rechargeFactor_karstic), ubound(this%rechargeFactor_karstic), &
+        status = idx_check(idx, lbound(this%rechargefactor_karstic), ubound(this%rechargefactor_karstic), &
           "rechargeFactor_karstic", errmsg)
         if (status /= NML_OK) return
-        if (ieee_is_nan(this%rechargeFactor_karstic(idx(1)))) status = NML_ERR_NOT_SET
+        if (ieee_is_nan(this%rechargefactor_karstic(idx(1)))) status = NML_ERR_NOT_SET
       else
-        if (all(ieee_is_nan(this%rechargeFactor_karstic))) status = NML_ERR_NOT_SET
+        if (all(ieee_is_nan(this%rechargefactor_karstic))) status = NML_ERR_NOT_SET
       end if
-    case ("gain_loss_GWreservoir_karstic")
+    case ("gain_loss_gwreservoir_karstic")
       if (present(idx)) then
-        status = idx_check(idx, lbound(this%gain_loss_GWreservoir_karstic), ubound(this%gain_loss_GWreservoir_karstic), &
+        status = idx_check(idx, lbound(this%gain_loss_gwreservoir_karstic), ubound(this%gain_loss_gwreservoir_karstic), &
           "gain_loss_GWreservoir_karstic", errmsg)
         if (status /= NML_OK) return
-        if (ieee_is_nan(this%gain_loss_GWreservoir_karstic(idx(1)))) status = NML_ERR_NOT_SET
+        if (ieee_is_nan(this%gain_loss_gwreservoir_karstic(idx(1)))) status = NML_ERR_NOT_SET
       else
-        if (all(ieee_is_nan(this%gain_loss_GWreservoir_karstic))) status = NML_ERR_NOT_SET
+        if (all(ieee_is_nan(this%gain_loss_gwreservoir_karstic))) status = NML_ERR_NOT_SET
       end if
     case default
       status = NML_ERR_INVALID_NAME
@@ -209,32 +210,32 @@ contains
     if (present(errmsg)) errmsg = ""
 
     ! required arrays
-    if (all(ieee_is_nan(this%rechargeCoefficient))) then
+    if (all(ieee_is_nan(this%rechargecoefficient))) then
       status = NML_ERR_REQUIRED
       if (present(errmsg)) errmsg = "required field not set: rechargeCoefficient"
       return
     end if
-    if (any(ieee_is_nan(this%rechargeCoefficient))) then
+    if (any(ieee_is_nan(this%rechargecoefficient))) then
       status = NML_ERR_PARTLY_SET
       if (present(errmsg)) errmsg = "array partly set: rechargeCoefficient"
       return
     end if
-    if (all(ieee_is_nan(this%rechargeFactor_karstic))) then
+    if (all(ieee_is_nan(this%rechargefactor_karstic))) then
       status = NML_ERR_REQUIRED
       if (present(errmsg)) errmsg = "required field not set: rechargeFactor_karstic"
       return
     end if
-    if (any(ieee_is_nan(this%rechargeFactor_karstic))) then
+    if (any(ieee_is_nan(this%rechargefactor_karstic))) then
       status = NML_ERR_PARTLY_SET
       if (present(errmsg)) errmsg = "array partly set: rechargeFactor_karstic"
       return
     end if
-    if (all(ieee_is_nan(this%gain_loss_GWreservoir_karstic))) then
+    if (all(ieee_is_nan(this%gain_loss_gwreservoir_karstic))) then
       status = NML_ERR_REQUIRED
       if (present(errmsg)) errmsg = "required field not set: gain_loss_GWreservoir_karstic"
       return
     end if
-    if (any(ieee_is_nan(this%gain_loss_GWreservoir_karstic))) then
+    if (any(ieee_is_nan(this%gain_loss_gwreservoir_karstic))) then
       status = NML_ERR_PARTLY_SET
       if (present(errmsg)) errmsg = "array partly set: gain_loss_GWreservoir_karstic"
       return

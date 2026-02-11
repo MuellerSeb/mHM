@@ -30,6 +30,7 @@ module nml_config_coupling
     NML_ERR_INVALID_NAME, &
     NML_ERR_INVALID_INDEX, &
     idx_check, &
+    to_lower, &
     max_domains, &
     NML_ERR_PARTLY_SET
   use ieee_arithmetic, only: ieee_value, ieee_quiet_nan, ieee_is_nan
@@ -1363,7 +1364,7 @@ contains
 
     status = NML_OK
     if (present(errmsg)) errmsg = ""
-    select case (trim(name))
+    select case (to_lower(trim(name)))
     case ("meteo_grid_nx")
       if (present(idx)) then
         status = idx_check(idx, lbound(this%meteo_grid_nx), ubound(this%meteo_grid_nx), &
@@ -1767,7 +1768,7 @@ contains
 
     status = NML_OK
     if (present(errmsg)) errmsg = ""
-    select case (trim(name))
+    select case (to_lower(trim(name)))
     case ("meteo_grid_nx")
       if (size(filled) /= 1) then
         status = NML_ERR_INVALID_INDEX

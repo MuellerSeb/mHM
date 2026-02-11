@@ -26,7 +26,8 @@ module nml_config_processes
     NML_ERR_NOT_SET, &
     NML_ERR_INVALID_NAME, &
     NML_ERR_INVALID_INDEX, &
-    idx_check
+    idx_check, &
+    to_lower
   ! kind specifiers listed in the nml-tools configuration file
   use mo_kind, only: &
     i4
@@ -435,7 +436,7 @@ contains
 
     status = NML_OK
     if (present(errmsg)) errmsg = ""
-    select case (trim(name))
+    select case (to_lower(trim(name)))
     case ("interception")
       if (present(idx)) then
         status = NML_ERR_INVALID_INDEX

@@ -29,6 +29,7 @@ module nml_neutrons1
     NML_ERR_INVALID_NAME, &
     NML_ERR_INVALID_INDEX, &
     idx_check, &
+    to_lower, &
     NML_ERR_PARTLY_SET
   use ieee_arithmetic, only: ieee_value, ieee_quiet_nan, ieee_is_nan
   ! kind specifiers listed in the nml-tools configuration file
@@ -44,9 +45,9 @@ module nml_neutrons1
   !! THIS IS WORK IN PROGRESS, DO NOT USE FOR RESEARCH
   type, public :: nml_neutrons1_t
     logical :: is_configured = .false. !< whether the namelist has been configured
-    real(dp), dimension(5) :: Desilets_N0 !< Desilets N0 dry count
-    real(dp), dimension(5) :: Desilets_LW0 !< Desilets LW0 parameter
-    real(dp), dimension(5) :: Desilets_LW1 !< Desilets LW1 parameter
+    real(dp), dimension(5) :: desilets_n0 !< Desilets N0 dry count
+    real(dp), dimension(5) :: desilets_lw0 !< Desilets LW0 parameter
+    real(dp), dimension(5) :: desilets_lw1 !< Desilets LW1 parameter
   contains
     procedure :: init => nml_neutrons1_init
     procedure :: from_file => nml_neutrons1_from_file
@@ -67,9 +68,9 @@ contains
     this%is_configured = .false.
 
     ! sentinel values for required/optional parameters
-    this%Desilets_N0 = ieee_value(this%Desilets_N0, ieee_quiet_nan) ! sentinel for required real array
-    this%Desilets_LW0 = ieee_value(this%Desilets_LW0, ieee_quiet_nan) ! sentinel for required real array
-    this%Desilets_LW1 = ieee_value(this%Desilets_LW1, ieee_quiet_nan) ! sentinel for required real array
+    this%desilets_n0 = ieee_value(this%desilets_n0, ieee_quiet_nan) ! sentinel for required real array
+    this%desilets_lw0 = ieee_value(this%desilets_lw0, ieee_quiet_nan) ! sentinel for required real array
+    this%desilets_lw1 = ieee_value(this%desilets_lw1, ieee_quiet_nan) ! sentinel for required real array
   end function nml_neutrons1_init
 
   !> \brief Read neutrons1 namelist from file
@@ -78,9 +79,9 @@ contains
     character(len=*), intent(in) :: file !< path to namelist file
     character(len=*), intent(out), optional :: errmsg
     ! namelist variables
-    real(dp), dimension(5) :: Desilets_N0
-    real(dp), dimension(5) :: Desilets_LW0
-    real(dp), dimension(5) :: Desilets_LW1
+    real(dp), dimension(5) :: desilets_n0
+    real(dp), dimension(5) :: desilets_lw0
+    real(dp), dimension(5) :: desilets_lw1
     ! locals
     type(nml_file_t) :: nml
     integer :: iostat
@@ -88,15 +89,15 @@ contains
     character(len=nml_line_buffer) :: iomsg
 
     namelist /neutrons1/ &
-      Desilets_N0, &
-      Desilets_LW0, &
-      Desilets_LW1
+      desilets_n0, &
+      desilets_lw0, &
+      desilets_lw1
 
     status = this%init(errmsg=errmsg)
     if (status /= NML_OK) return
-    Desilets_N0 = this%Desilets_N0
-    Desilets_LW0 = this%Desilets_LW0
-    Desilets_LW1 = this%Desilets_LW1
+    desilets_n0 = this%desilets_n0
+    desilets_lw0 = this%desilets_lw0
+    desilets_lw1 = this%desilets_lw1
 
     status = nml%open(file, errmsg=errmsg)
     if (status /= NML_OK) return
@@ -122,9 +123,9 @@ contains
     end if
 
     ! assign values
-    this%Desilets_N0 = Desilets_N0
-    this%Desilets_LW0 = Desilets_LW0
-    this%Desilets_LW1 = Desilets_LW1
+    this%desilets_n0 = desilets_n0
+    this%desilets_lw0 = desilets_lw0
+    this%desilets_lw1 = desilets_lw1
 
     ! mark as configured
     this%is_configured = .true.
@@ -133,24 +134,24 @@ contains
 
   !> \brief Set neutrons1 values
   integer function nml_neutrons1_set(this, &
-    Desilets_N0, &
-    Desilets_LW0, &
-    Desilets_LW1, &
+    desilets_n0, &
+    desilets_lw0, &
+    desilets_lw1, &
     errmsg) result(status)
 
     class(nml_neutrons1_t), intent(inout) :: this
     character(len=*), intent(out), optional :: errmsg
-    real(dp), dimension(5), intent(in) :: Desilets_N0
-    real(dp), dimension(5), intent(in) :: Desilets_LW0
-    real(dp), dimension(5), intent(in) :: Desilets_LW1
+    real(dp), dimension(5), intent(in) :: desilets_n0
+    real(dp), dimension(5), intent(in) :: desilets_lw0
+    real(dp), dimension(5), intent(in) :: desilets_lw1
 
     status = this%init(errmsg=errmsg)
     if (status /= NML_OK) return
 
     ! required parameters
-    this%Desilets_N0 = Desilets_N0
-    this%Desilets_LW0 = Desilets_LW0
-    this%Desilets_LW1 = Desilets_LW1
+    this%desilets_n0 = desilets_n0
+    this%desilets_lw0 = desilets_lw0
+    this%desilets_lw1 = desilets_lw1
 
     ! mark as configured
     this%is_configured = .true.
@@ -166,33 +167,33 @@ contains
 
     status = NML_OK
     if (present(errmsg)) errmsg = ""
-    select case (trim(name))
-    case ("Desilets_N0")
+    select case (to_lower(trim(name)))
+    case ("desilets_n0")
       if (present(idx)) then
-        status = idx_check(idx, lbound(this%Desilets_N0), ubound(this%Desilets_N0), &
+        status = idx_check(idx, lbound(this%desilets_n0), ubound(this%desilets_n0), &
           "Desilets_N0", errmsg)
         if (status /= NML_OK) return
-        if (ieee_is_nan(this%Desilets_N0(idx(1)))) status = NML_ERR_NOT_SET
+        if (ieee_is_nan(this%desilets_n0(idx(1)))) status = NML_ERR_NOT_SET
       else
-        if (all(ieee_is_nan(this%Desilets_N0))) status = NML_ERR_NOT_SET
+        if (all(ieee_is_nan(this%desilets_n0))) status = NML_ERR_NOT_SET
       end if
-    case ("Desilets_LW0")
+    case ("desilets_lw0")
       if (present(idx)) then
-        status = idx_check(idx, lbound(this%Desilets_LW0), ubound(this%Desilets_LW0), &
+        status = idx_check(idx, lbound(this%desilets_lw0), ubound(this%desilets_lw0), &
           "Desilets_LW0", errmsg)
         if (status /= NML_OK) return
-        if (ieee_is_nan(this%Desilets_LW0(idx(1)))) status = NML_ERR_NOT_SET
+        if (ieee_is_nan(this%desilets_lw0(idx(1)))) status = NML_ERR_NOT_SET
       else
-        if (all(ieee_is_nan(this%Desilets_LW0))) status = NML_ERR_NOT_SET
+        if (all(ieee_is_nan(this%desilets_lw0))) status = NML_ERR_NOT_SET
       end if
-    case ("Desilets_LW1")
+    case ("desilets_lw1")
       if (present(idx)) then
-        status = idx_check(idx, lbound(this%Desilets_LW1), ubound(this%Desilets_LW1), &
+        status = idx_check(idx, lbound(this%desilets_lw1), ubound(this%desilets_lw1), &
           "Desilets_LW1", errmsg)
         if (status /= NML_OK) return
-        if (ieee_is_nan(this%Desilets_LW1(idx(1)))) status = NML_ERR_NOT_SET
+        if (ieee_is_nan(this%desilets_lw1(idx(1)))) status = NML_ERR_NOT_SET
       else
-        if (all(ieee_is_nan(this%Desilets_LW1))) status = NML_ERR_NOT_SET
+        if (all(ieee_is_nan(this%desilets_lw1))) status = NML_ERR_NOT_SET
       end if
     case default
       status = NML_ERR_INVALID_NAME
@@ -213,32 +214,32 @@ contains
     if (present(errmsg)) errmsg = ""
 
     ! required arrays
-    if (all(ieee_is_nan(this%Desilets_N0))) then
+    if (all(ieee_is_nan(this%desilets_n0))) then
       status = NML_ERR_REQUIRED
       if (present(errmsg)) errmsg = "required field not set: Desilets_N0"
       return
     end if
-    if (any(ieee_is_nan(this%Desilets_N0))) then
+    if (any(ieee_is_nan(this%desilets_n0))) then
       status = NML_ERR_PARTLY_SET
       if (present(errmsg)) errmsg = "array partly set: Desilets_N0"
       return
     end if
-    if (all(ieee_is_nan(this%Desilets_LW0))) then
+    if (all(ieee_is_nan(this%desilets_lw0))) then
       status = NML_ERR_REQUIRED
       if (present(errmsg)) errmsg = "required field not set: Desilets_LW0"
       return
     end if
-    if (any(ieee_is_nan(this%Desilets_LW0))) then
+    if (any(ieee_is_nan(this%desilets_lw0))) then
       status = NML_ERR_PARTLY_SET
       if (present(errmsg)) errmsg = "array partly set: Desilets_LW0"
       return
     end if
-    if (all(ieee_is_nan(this%Desilets_LW1))) then
+    if (all(ieee_is_nan(this%desilets_lw1))) then
       status = NML_ERR_REQUIRED
       if (present(errmsg)) errmsg = "required field not set: Desilets_LW1"
       return
     end if
-    if (any(ieee_is_nan(this%Desilets_LW1))) then
+    if (any(ieee_is_nan(this%desilets_lw1))) then
       status = NML_ERR_PARTLY_SET
       if (present(errmsg)) errmsg = "array partly set: Desilets_LW1"
       return

@@ -27,6 +27,7 @@ module nml_interception1
     NML_ERR_INVALID_NAME, &
     NML_ERR_INVALID_INDEX, &
     idx_check, &
+    to_lower, &
     NML_ERR_PARTLY_SET
   use ieee_arithmetic, only: ieee_value, ieee_quiet_nan, ieee_is_nan
   ! kind specifiers listed in the nml-tools configuration file
@@ -40,7 +41,7 @@ module nml_interception1
   !> \details Parameters for interception.
   type, public :: nml_interception1_t
     logical :: is_configured = .false. !< whether the namelist has been configured
-    real(dp), dimension(5) :: canopyInterceptionFactor !< Multiplier to relate LAI to interception storage
+    real(dp), dimension(5) :: canopyinterceptionfactor !< Multiplier to relate LAI to interception storage
   contains
     procedure :: init => nml_interception1_init
     procedure :: from_file => nml_interception1_from_file
@@ -61,7 +62,7 @@ contains
     this%is_configured = .false.
 
     ! sentinel values for required/optional parameters
-    this%canopyInterceptionFactor = ieee_value(this%canopyInterceptionFactor, ieee_quiet_nan) ! sentinel for required real array
+    this%canopyinterceptionfactor = ieee_value(this%canopyinterceptionfactor, ieee_quiet_nan) ! sentinel for required real array
   end function nml_interception1_init
 
   !> \brief Read interception1 namelist from file
@@ -70,7 +71,7 @@ contains
     character(len=*), intent(in) :: file !< path to namelist file
     character(len=*), intent(out), optional :: errmsg
     ! namelist variables
-    real(dp), dimension(5) :: canopyInterceptionFactor
+    real(dp), dimension(5) :: canopyinterceptionfactor
     ! locals
     type(nml_file_t) :: nml
     integer :: iostat
@@ -78,11 +79,11 @@ contains
     character(len=nml_line_buffer) :: iomsg
 
     namelist /interception1/ &
-      canopyInterceptionFactor
+      canopyinterceptionfactor
 
     status = this%init(errmsg=errmsg)
     if (status /= NML_OK) return
-    canopyInterceptionFactor = this%canopyInterceptionFactor
+    canopyinterceptionfactor = this%canopyinterceptionfactor
 
     status = nml%open(file, errmsg=errmsg)
     if (status /= NML_OK) return
@@ -108,7 +109,7 @@ contains
     end if
 
     ! assign values
-    this%canopyInterceptionFactor = canopyInterceptionFactor
+    this%canopyinterceptionfactor = canopyinterceptionfactor
 
     ! mark as configured
     this%is_configured = .true.
@@ -117,18 +118,18 @@ contains
 
   !> \brief Set interception1 values
   integer function nml_interception1_set(this, &
-    canopyInterceptionFactor, &
+    canopyinterceptionfactor, &
     errmsg) result(status)
 
     class(nml_interception1_t), intent(inout) :: this
     character(len=*), intent(out), optional :: errmsg
-    real(dp), dimension(5), intent(in) :: canopyInterceptionFactor
+    real(dp), dimension(5), intent(in) :: canopyinterceptionfactor
 
     status = this%init(errmsg=errmsg)
     if (status /= NML_OK) return
 
     ! required parameters
-    this%canopyInterceptionFactor = canopyInterceptionFactor
+    this%canopyinterceptionfactor = canopyinterceptionfactor
 
     ! mark as configured
     this%is_configured = .true.
@@ -144,15 +145,15 @@ contains
 
     status = NML_OK
     if (present(errmsg)) errmsg = ""
-    select case (trim(name))
-    case ("canopyInterceptionFactor")
+    select case (to_lower(trim(name)))
+    case ("canopyinterceptionfactor")
       if (present(idx)) then
-        status = idx_check(idx, lbound(this%canopyInterceptionFactor), ubound(this%canopyInterceptionFactor), &
+        status = idx_check(idx, lbound(this%canopyinterceptionfactor), ubound(this%canopyinterceptionfactor), &
           "canopyInterceptionFactor", errmsg)
         if (status /= NML_OK) return
-        if (ieee_is_nan(this%canopyInterceptionFactor(idx(1)))) status = NML_ERR_NOT_SET
+        if (ieee_is_nan(this%canopyinterceptionfactor(idx(1)))) status = NML_ERR_NOT_SET
       else
-        if (all(ieee_is_nan(this%canopyInterceptionFactor))) status = NML_ERR_NOT_SET
+        if (all(ieee_is_nan(this%canopyinterceptionfactor))) status = NML_ERR_NOT_SET
       end if
     case default
       status = NML_ERR_INVALID_NAME
@@ -173,12 +174,12 @@ contains
     if (present(errmsg)) errmsg = ""
 
     ! required arrays
-    if (all(ieee_is_nan(this%canopyInterceptionFactor))) then
+    if (all(ieee_is_nan(this%canopyinterceptionfactor))) then
       status = NML_ERR_REQUIRED
       if (present(errmsg)) errmsg = "required field not set: canopyInterceptionFactor"
       return
     end if
-    if (any(ieee_is_nan(this%canopyInterceptionFactor))) then
+    if (any(ieee_is_nan(this%canopyinterceptionfactor))) then
       status = NML_ERR_PARTLY_SET
       if (present(errmsg)) errmsg = "array partly set: canopyInterceptionFactor"
       return

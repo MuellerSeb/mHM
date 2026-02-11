@@ -27,6 +27,7 @@ module nml_soilmoisture4
     NML_ERR_INVALID_NAME, &
     NML_ERR_INVALID_INDEX, &
     idx_check, &
+    to_lower, &
     NML_ERR_PARTLY_SET
   use ieee_arithmetic, only: ieee_value, ieee_quiet_nan, ieee_is_nan
   ! kind specifiers listed in the nml-tools configuration file
@@ -36,34 +37,34 @@ module nml_soilmoisture4
   implicit none
 
   ! default values
-  real(dp), parameter, public :: PTF_Ks_curveSlope_default(5) = [60.96_dp, 60.96_dp, 60.96_dp, 0.0_dp, 1.0_dp]
+  real(dp), parameter, public :: ptf_ks_curveslope_default(5) = [60.96_dp, 60.96_dp, 60.96_dp, 0.0_dp, 1.0_dp]
 
   !> \class nml_soilmoisture4_t
   !> \brief Soil moisture - Case 4
   !> \details Feddes equation for ET reduction and global FC dependency on root fraction coefficient
   type, public :: nml_soilmoisture4_t
     logical :: is_configured = .false. !< whether the namelist has been configured
-    real(dp), dimension(5) :: orgMatterContent_forest !< Organic matter content for forest
-    real(dp), dimension(5) :: orgMatterContent_impervious !< Organic matter content for impervious
-    real(dp), dimension(5) :: orgMatterContent_pervious !< Organic matter content for pervious
-    real(dp), dimension(5) :: PTF_lower66_5_constant !< Zacharias PTF parameters below 66.5 % sand content
-    real(dp), dimension(5) :: PTF_lower66_5_clay !< Multiplier for clay constant below 66.5 % sand content
-    real(dp), dimension(5) :: PTF_lower66_5_Db !< Multiplier for mineral bulk density below 66.5 % sand content
-    real(dp), dimension(5) :: PTF_higher66_5_constant !< Zacharias PTF parameters above 66.5 % sand content
-    real(dp), dimension(5) :: PTF_higher66_5_clay !< Multiplier for clay constant above 66.5 % sand content
-    real(dp), dimension(5) :: PTF_higher66_5_Db !< Multiplier for mineral bulk density above 66.5 % sand content
-    real(dp), dimension(5) :: PTF_Ks_constant !< PTF constant for saturated hydraulic conductivity
-    real(dp), dimension(5) :: PTF_Ks_sand !< Multiplier for sand for saturated hydraulic conductivity
-    real(dp), dimension(5) :: PTF_Ks_clay !< Multiplier for clay for saturated hydraulic conductivity
-    real(dp), dimension(5) :: PTF_Ks_curveSlope !< Unit conversion factor
-    real(dp), dimension(5) :: rootFractionCoefficient_forest !< Root fraction coefficient for forest
-    real(dp), dimension(5) :: rootFractionCoefficient_impervious !< Root fraction coefficient for impervious
-    real(dp), dimension(5) :: rootFractionCoefficient_pervious !< Root fraction coefficient for pervious
-    real(dp), dimension(5) :: infiltrationShapeFactor !< Infiltration shape factor
-    real(dp), dimension(5) :: rootFractionCoefficient_sand !< Root fraction coefficient for sand
-    real(dp), dimension(5) :: rootFractionCoefficient_clay !< Root fraction coefficient for clay
-    real(dp), dimension(5) :: FCmin_glob !< Field capacity minimum global
-    real(dp), dimension(5) :: FCdelta_glob !< Field capacity delta global
+    real(dp), dimension(5) :: orgmattercontent_forest !< Organic matter content for forest
+    real(dp), dimension(5) :: orgmattercontent_impervious !< Organic matter content for impervious
+    real(dp), dimension(5) :: orgmattercontent_pervious !< Organic matter content for pervious
+    real(dp), dimension(5) :: ptf_lower66_5_constant !< Zacharias PTF parameters below 66.5 % sand content
+    real(dp), dimension(5) :: ptf_lower66_5_clay !< Multiplier for clay constant below 66.5 % sand content
+    real(dp), dimension(5) :: ptf_lower66_5_db !< Multiplier for mineral bulk density below 66.5 % sand content
+    real(dp), dimension(5) :: ptf_higher66_5_constant !< Zacharias PTF parameters above 66.5 % sand content
+    real(dp), dimension(5) :: ptf_higher66_5_clay !< Multiplier for clay constant above 66.5 % sand content
+    real(dp), dimension(5) :: ptf_higher66_5_db !< Multiplier for mineral bulk density above 66.5 % sand content
+    real(dp), dimension(5) :: ptf_ks_constant !< PTF constant for saturated hydraulic conductivity
+    real(dp), dimension(5) :: ptf_ks_sand !< Multiplier for sand for saturated hydraulic conductivity
+    real(dp), dimension(5) :: ptf_ks_clay !< Multiplier for clay for saturated hydraulic conductivity
+    real(dp), dimension(5) :: ptf_ks_curveslope !< Unit conversion factor
+    real(dp), dimension(5) :: rootfractioncoefficient_forest !< Root fraction coefficient for forest
+    real(dp), dimension(5) :: rootfractioncoefficient_impervious !< Root fraction coefficient for impervious
+    real(dp), dimension(5) :: rootfractioncoefficient_pervious !< Root fraction coefficient for pervious
+    real(dp), dimension(5) :: infiltrationshapefactor !< Infiltration shape factor
+    real(dp), dimension(5) :: rootfractioncoefficient_sand !< Root fraction coefficient for sand
+    real(dp), dimension(5) :: rootfractioncoefficient_clay !< Root fraction coefficient for clay
+    real(dp), dimension(5) :: fcmin_glob !< Field capacity minimum global
+    real(dp), dimension(5) :: fcdelta_glob !< Field capacity delta global
   contains
     procedure :: init => nml_soilmoisture4_init
     procedure :: from_file => nml_soilmoisture4_from_file
@@ -84,28 +85,28 @@ contains
     this%is_configured = .false.
 
     ! sentinel values for required/optional parameters
-    this%orgMatterContent_forest = ieee_value(this%orgMatterContent_forest, ieee_quiet_nan) ! sentinel for required real array
-    this%orgMatterContent_impervious = ieee_value(this%orgMatterContent_impervious, ieee_quiet_nan) ! sentinel for required real array
-    this%orgMatterContent_pervious = ieee_value(this%orgMatterContent_pervious, ieee_quiet_nan) ! sentinel for required real array
-    this%PTF_lower66_5_constant = ieee_value(this%PTF_lower66_5_constant, ieee_quiet_nan) ! sentinel for required real array
-    this%PTF_lower66_5_clay = ieee_value(this%PTF_lower66_5_clay, ieee_quiet_nan) ! sentinel for required real array
-    this%PTF_lower66_5_Db = ieee_value(this%PTF_lower66_5_Db, ieee_quiet_nan) ! sentinel for required real array
-    this%PTF_higher66_5_constant = ieee_value(this%PTF_higher66_5_constant, ieee_quiet_nan) ! sentinel for required real array
-    this%PTF_higher66_5_clay = ieee_value(this%PTF_higher66_5_clay, ieee_quiet_nan) ! sentinel for required real array
-    this%PTF_higher66_5_Db = ieee_value(this%PTF_higher66_5_Db, ieee_quiet_nan) ! sentinel for required real array
-    this%PTF_Ks_constant = ieee_value(this%PTF_Ks_constant, ieee_quiet_nan) ! sentinel for required real array
-    this%PTF_Ks_sand = ieee_value(this%PTF_Ks_sand, ieee_quiet_nan) ! sentinel for required real array
-    this%PTF_Ks_clay = ieee_value(this%PTF_Ks_clay, ieee_quiet_nan) ! sentinel for required real array
-    this%rootFractionCoefficient_forest = ieee_value(this%rootFractionCoefficient_forest, ieee_quiet_nan) ! sentinel for required real array
-    this%rootFractionCoefficient_impervious = ieee_value(this%rootFractionCoefficient_impervious, ieee_quiet_nan) ! sentinel for required real array
-    this%rootFractionCoefficient_pervious = ieee_value(this%rootFractionCoefficient_pervious, ieee_quiet_nan) ! sentinel for required real array
-    this%infiltrationShapeFactor = ieee_value(this%infiltrationShapeFactor, ieee_quiet_nan) ! sentinel for required real array
-    this%rootFractionCoefficient_sand = ieee_value(this%rootFractionCoefficient_sand, ieee_quiet_nan) ! sentinel for required real array
-    this%rootFractionCoefficient_clay = ieee_value(this%rootFractionCoefficient_clay, ieee_quiet_nan) ! sentinel for required real array
-    this%FCmin_glob = ieee_value(this%FCmin_glob, ieee_quiet_nan) ! sentinel for required real array
-    this%FCdelta_glob = ieee_value(this%FCdelta_glob, ieee_quiet_nan) ! sentinel for required real array
+    this%orgmattercontent_forest = ieee_value(this%orgmattercontent_forest, ieee_quiet_nan) ! sentinel for required real array
+    this%orgmattercontent_impervious = ieee_value(this%orgmattercontent_impervious, ieee_quiet_nan) ! sentinel for required real array
+    this%orgmattercontent_pervious = ieee_value(this%orgmattercontent_pervious, ieee_quiet_nan) ! sentinel for required real array
+    this%ptf_lower66_5_constant = ieee_value(this%ptf_lower66_5_constant, ieee_quiet_nan) ! sentinel for required real array
+    this%ptf_lower66_5_clay = ieee_value(this%ptf_lower66_5_clay, ieee_quiet_nan) ! sentinel for required real array
+    this%ptf_lower66_5_db = ieee_value(this%ptf_lower66_5_db, ieee_quiet_nan) ! sentinel for required real array
+    this%ptf_higher66_5_constant = ieee_value(this%ptf_higher66_5_constant, ieee_quiet_nan) ! sentinel for required real array
+    this%ptf_higher66_5_clay = ieee_value(this%ptf_higher66_5_clay, ieee_quiet_nan) ! sentinel for required real array
+    this%ptf_higher66_5_db = ieee_value(this%ptf_higher66_5_db, ieee_quiet_nan) ! sentinel for required real array
+    this%ptf_ks_constant = ieee_value(this%ptf_ks_constant, ieee_quiet_nan) ! sentinel for required real array
+    this%ptf_ks_sand = ieee_value(this%ptf_ks_sand, ieee_quiet_nan) ! sentinel for required real array
+    this%ptf_ks_clay = ieee_value(this%ptf_ks_clay, ieee_quiet_nan) ! sentinel for required real array
+    this%rootfractioncoefficient_forest = ieee_value(this%rootfractioncoefficient_forest, ieee_quiet_nan) ! sentinel for required real array
+    this%rootfractioncoefficient_impervious = ieee_value(this%rootfractioncoefficient_impervious, ieee_quiet_nan) ! sentinel for required real array
+    this%rootfractioncoefficient_pervious = ieee_value(this%rootfractioncoefficient_pervious, ieee_quiet_nan) ! sentinel for required real array
+    this%infiltrationshapefactor = ieee_value(this%infiltrationshapefactor, ieee_quiet_nan) ! sentinel for required real array
+    this%rootfractioncoefficient_sand = ieee_value(this%rootfractioncoefficient_sand, ieee_quiet_nan) ! sentinel for required real array
+    this%rootfractioncoefficient_clay = ieee_value(this%rootfractioncoefficient_clay, ieee_quiet_nan) ! sentinel for required real array
+    this%fcmin_glob = ieee_value(this%fcmin_glob, ieee_quiet_nan) ! sentinel for required real array
+    this%fcdelta_glob = ieee_value(this%fcdelta_glob, ieee_quiet_nan) ! sentinel for required real array
     ! default values
-    this%PTF_Ks_curveSlope = PTF_Ks_curveSlope_default
+    this%ptf_ks_curveslope = ptf_ks_curveslope_default
   end function nml_soilmoisture4_init
 
   !> \brief Read soilmoisture4 namelist from file
@@ -114,27 +115,27 @@ contains
     character(len=*), intent(in) :: file !< path to namelist file
     character(len=*), intent(out), optional :: errmsg
     ! namelist variables
-    real(dp), dimension(5) :: orgMatterContent_forest
-    real(dp), dimension(5) :: orgMatterContent_impervious
-    real(dp), dimension(5) :: orgMatterContent_pervious
-    real(dp), dimension(5) :: PTF_lower66_5_constant
-    real(dp), dimension(5) :: PTF_lower66_5_clay
-    real(dp), dimension(5) :: PTF_lower66_5_Db
-    real(dp), dimension(5) :: PTF_higher66_5_constant
-    real(dp), dimension(5) :: PTF_higher66_5_clay
-    real(dp), dimension(5) :: PTF_higher66_5_Db
-    real(dp), dimension(5) :: PTF_Ks_constant
-    real(dp), dimension(5) :: PTF_Ks_sand
-    real(dp), dimension(5) :: PTF_Ks_clay
-    real(dp), dimension(5) :: PTF_Ks_curveSlope
-    real(dp), dimension(5) :: rootFractionCoefficient_forest
-    real(dp), dimension(5) :: rootFractionCoefficient_impervious
-    real(dp), dimension(5) :: rootFractionCoefficient_pervious
-    real(dp), dimension(5) :: infiltrationShapeFactor
-    real(dp), dimension(5) :: rootFractionCoefficient_sand
-    real(dp), dimension(5) :: rootFractionCoefficient_clay
-    real(dp), dimension(5) :: FCmin_glob
-    real(dp), dimension(5) :: FCdelta_glob
+    real(dp), dimension(5) :: orgmattercontent_forest
+    real(dp), dimension(5) :: orgmattercontent_impervious
+    real(dp), dimension(5) :: orgmattercontent_pervious
+    real(dp), dimension(5) :: ptf_lower66_5_constant
+    real(dp), dimension(5) :: ptf_lower66_5_clay
+    real(dp), dimension(5) :: ptf_lower66_5_db
+    real(dp), dimension(5) :: ptf_higher66_5_constant
+    real(dp), dimension(5) :: ptf_higher66_5_clay
+    real(dp), dimension(5) :: ptf_higher66_5_db
+    real(dp), dimension(5) :: ptf_ks_constant
+    real(dp), dimension(5) :: ptf_ks_sand
+    real(dp), dimension(5) :: ptf_ks_clay
+    real(dp), dimension(5) :: ptf_ks_curveslope
+    real(dp), dimension(5) :: rootfractioncoefficient_forest
+    real(dp), dimension(5) :: rootfractioncoefficient_impervious
+    real(dp), dimension(5) :: rootfractioncoefficient_pervious
+    real(dp), dimension(5) :: infiltrationshapefactor
+    real(dp), dimension(5) :: rootfractioncoefficient_sand
+    real(dp), dimension(5) :: rootfractioncoefficient_clay
+    real(dp), dimension(5) :: fcmin_glob
+    real(dp), dimension(5) :: fcdelta_glob
     ! locals
     type(nml_file_t) :: nml
     integer :: iostat
@@ -142,51 +143,51 @@ contains
     character(len=nml_line_buffer) :: iomsg
 
     namelist /soilmoisture4/ &
-      orgMatterContent_forest, &
-      orgMatterContent_impervious, &
-      orgMatterContent_pervious, &
-      PTF_lower66_5_constant, &
-      PTF_lower66_5_clay, &
-      PTF_lower66_5_Db, &
-      PTF_higher66_5_constant, &
-      PTF_higher66_5_clay, &
-      PTF_higher66_5_Db, &
-      PTF_Ks_constant, &
-      PTF_Ks_sand, &
-      PTF_Ks_clay, &
-      PTF_Ks_curveSlope, &
-      rootFractionCoefficient_forest, &
-      rootFractionCoefficient_impervious, &
-      rootFractionCoefficient_pervious, &
-      infiltrationShapeFactor, &
-      rootFractionCoefficient_sand, &
-      rootFractionCoefficient_clay, &
-      FCmin_glob, &
-      FCdelta_glob
+      orgmattercontent_forest, &
+      orgmattercontent_impervious, &
+      orgmattercontent_pervious, &
+      ptf_lower66_5_constant, &
+      ptf_lower66_5_clay, &
+      ptf_lower66_5_db, &
+      ptf_higher66_5_constant, &
+      ptf_higher66_5_clay, &
+      ptf_higher66_5_db, &
+      ptf_ks_constant, &
+      ptf_ks_sand, &
+      ptf_ks_clay, &
+      ptf_ks_curveslope, &
+      rootfractioncoefficient_forest, &
+      rootfractioncoefficient_impervious, &
+      rootfractioncoefficient_pervious, &
+      infiltrationshapefactor, &
+      rootfractioncoefficient_sand, &
+      rootfractioncoefficient_clay, &
+      fcmin_glob, &
+      fcdelta_glob
 
     status = this%init(errmsg=errmsg)
     if (status /= NML_OK) return
-    orgMatterContent_forest = this%orgMatterContent_forest
-    orgMatterContent_impervious = this%orgMatterContent_impervious
-    orgMatterContent_pervious = this%orgMatterContent_pervious
-    PTF_lower66_5_constant = this%PTF_lower66_5_constant
-    PTF_lower66_5_clay = this%PTF_lower66_5_clay
-    PTF_lower66_5_Db = this%PTF_lower66_5_Db
-    PTF_higher66_5_constant = this%PTF_higher66_5_constant
-    PTF_higher66_5_clay = this%PTF_higher66_5_clay
-    PTF_higher66_5_Db = this%PTF_higher66_5_Db
-    PTF_Ks_constant = this%PTF_Ks_constant
-    PTF_Ks_sand = this%PTF_Ks_sand
-    PTF_Ks_clay = this%PTF_Ks_clay
-    PTF_Ks_curveSlope = this%PTF_Ks_curveSlope
-    rootFractionCoefficient_forest = this%rootFractionCoefficient_forest
-    rootFractionCoefficient_impervious = this%rootFractionCoefficient_impervious
-    rootFractionCoefficient_pervious = this%rootFractionCoefficient_pervious
-    infiltrationShapeFactor = this%infiltrationShapeFactor
-    rootFractionCoefficient_sand = this%rootFractionCoefficient_sand
-    rootFractionCoefficient_clay = this%rootFractionCoefficient_clay
-    FCmin_glob = this%FCmin_glob
-    FCdelta_glob = this%FCdelta_glob
+    orgmattercontent_forest = this%orgmattercontent_forest
+    orgmattercontent_impervious = this%orgmattercontent_impervious
+    orgmattercontent_pervious = this%orgmattercontent_pervious
+    ptf_lower66_5_constant = this%ptf_lower66_5_constant
+    ptf_lower66_5_clay = this%ptf_lower66_5_clay
+    ptf_lower66_5_db = this%ptf_lower66_5_db
+    ptf_higher66_5_constant = this%ptf_higher66_5_constant
+    ptf_higher66_5_clay = this%ptf_higher66_5_clay
+    ptf_higher66_5_db = this%ptf_higher66_5_db
+    ptf_ks_constant = this%ptf_ks_constant
+    ptf_ks_sand = this%ptf_ks_sand
+    ptf_ks_clay = this%ptf_ks_clay
+    ptf_ks_curveslope = this%ptf_ks_curveslope
+    rootfractioncoefficient_forest = this%rootfractioncoefficient_forest
+    rootfractioncoefficient_impervious = this%rootfractioncoefficient_impervious
+    rootfractioncoefficient_pervious = this%rootfractioncoefficient_pervious
+    infiltrationshapefactor = this%infiltrationshapefactor
+    rootfractioncoefficient_sand = this%rootfractioncoefficient_sand
+    rootfractioncoefficient_clay = this%rootfractioncoefficient_clay
+    fcmin_glob = this%fcmin_glob
+    fcdelta_glob = this%fcdelta_glob
 
     status = nml%open(file, errmsg=errmsg)
     if (status /= NML_OK) return
@@ -212,27 +213,27 @@ contains
     end if
 
     ! assign values
-    this%orgMatterContent_forest = orgMatterContent_forest
-    this%orgMatterContent_impervious = orgMatterContent_impervious
-    this%orgMatterContent_pervious = orgMatterContent_pervious
-    this%PTF_lower66_5_constant = PTF_lower66_5_constant
-    this%PTF_lower66_5_clay = PTF_lower66_5_clay
-    this%PTF_lower66_5_Db = PTF_lower66_5_Db
-    this%PTF_higher66_5_constant = PTF_higher66_5_constant
-    this%PTF_higher66_5_clay = PTF_higher66_5_clay
-    this%PTF_higher66_5_Db = PTF_higher66_5_Db
-    this%PTF_Ks_constant = PTF_Ks_constant
-    this%PTF_Ks_sand = PTF_Ks_sand
-    this%PTF_Ks_clay = PTF_Ks_clay
-    this%PTF_Ks_curveSlope = PTF_Ks_curveSlope
-    this%rootFractionCoefficient_forest = rootFractionCoefficient_forest
-    this%rootFractionCoefficient_impervious = rootFractionCoefficient_impervious
-    this%rootFractionCoefficient_pervious = rootFractionCoefficient_pervious
-    this%infiltrationShapeFactor = infiltrationShapeFactor
-    this%rootFractionCoefficient_sand = rootFractionCoefficient_sand
-    this%rootFractionCoefficient_clay = rootFractionCoefficient_clay
-    this%FCmin_glob = FCmin_glob
-    this%FCdelta_glob = FCdelta_glob
+    this%orgmattercontent_forest = orgmattercontent_forest
+    this%orgmattercontent_impervious = orgmattercontent_impervious
+    this%orgmattercontent_pervious = orgmattercontent_pervious
+    this%ptf_lower66_5_constant = ptf_lower66_5_constant
+    this%ptf_lower66_5_clay = ptf_lower66_5_clay
+    this%ptf_lower66_5_db = ptf_lower66_5_db
+    this%ptf_higher66_5_constant = ptf_higher66_5_constant
+    this%ptf_higher66_5_clay = ptf_higher66_5_clay
+    this%ptf_higher66_5_db = ptf_higher66_5_db
+    this%ptf_ks_constant = ptf_ks_constant
+    this%ptf_ks_sand = ptf_ks_sand
+    this%ptf_ks_clay = ptf_ks_clay
+    this%ptf_ks_curveslope = ptf_ks_curveslope
+    this%rootfractioncoefficient_forest = rootfractioncoefficient_forest
+    this%rootfractioncoefficient_impervious = rootfractioncoefficient_impervious
+    this%rootfractioncoefficient_pervious = rootfractioncoefficient_pervious
+    this%infiltrationshapefactor = infiltrationshapefactor
+    this%rootfractioncoefficient_sand = rootfractioncoefficient_sand
+    this%rootfractioncoefficient_clay = rootfractioncoefficient_clay
+    this%fcmin_glob = fcmin_glob
+    this%fcdelta_glob = fcdelta_glob
 
     ! mark as configured
     this%is_configured = .true.
@@ -241,52 +242,52 @@ contains
 
   !> \brief Set soilmoisture4 values
   integer function nml_soilmoisture4_set(this, &
-    orgMatterContent_forest, &
-    orgMatterContent_impervious, &
-    orgMatterContent_pervious, &
-    PTF_lower66_5_constant, &
-    PTF_lower66_5_clay, &
-    PTF_lower66_5_Db, &
-    PTF_higher66_5_constant, &
-    PTF_higher66_5_clay, &
-    PTF_higher66_5_Db, &
-    PTF_Ks_constant, &
-    PTF_Ks_sand, &
-    PTF_Ks_clay, &
-    rootFractionCoefficient_forest, &
-    rootFractionCoefficient_impervious, &
-    rootFractionCoefficient_pervious, &
-    infiltrationShapeFactor, &
-    rootFractionCoefficient_sand, &
-    rootFractionCoefficient_clay, &
-    FCmin_glob, &
-    FCdelta_glob, &
-    PTF_Ks_curveSlope, &
+    orgmattercontent_forest, &
+    orgmattercontent_impervious, &
+    orgmattercontent_pervious, &
+    ptf_lower66_5_constant, &
+    ptf_lower66_5_clay, &
+    ptf_lower66_5_db, &
+    ptf_higher66_5_constant, &
+    ptf_higher66_5_clay, &
+    ptf_higher66_5_db, &
+    ptf_ks_constant, &
+    ptf_ks_sand, &
+    ptf_ks_clay, &
+    rootfractioncoefficient_forest, &
+    rootfractioncoefficient_impervious, &
+    rootfractioncoefficient_pervious, &
+    infiltrationshapefactor, &
+    rootfractioncoefficient_sand, &
+    rootfractioncoefficient_clay, &
+    fcmin_glob, &
+    fcdelta_glob, &
+    ptf_ks_curveslope, &
     errmsg) result(status)
 
     class(nml_soilmoisture4_t), intent(inout) :: this
     character(len=*), intent(out), optional :: errmsg
-    real(dp), dimension(5), intent(in) :: orgMatterContent_forest
-    real(dp), dimension(5), intent(in) :: orgMatterContent_impervious
-    real(dp), dimension(5), intent(in) :: orgMatterContent_pervious
-    real(dp), dimension(5), intent(in) :: PTF_lower66_5_constant
-    real(dp), dimension(5), intent(in) :: PTF_lower66_5_clay
-    real(dp), dimension(5), intent(in) :: PTF_lower66_5_Db
-    real(dp), dimension(5), intent(in) :: PTF_higher66_5_constant
-    real(dp), dimension(5), intent(in) :: PTF_higher66_5_clay
-    real(dp), dimension(5), intent(in) :: PTF_higher66_5_Db
-    real(dp), dimension(5), intent(in) :: PTF_Ks_constant
-    real(dp), dimension(5), intent(in) :: PTF_Ks_sand
-    real(dp), dimension(5), intent(in) :: PTF_Ks_clay
-    real(dp), dimension(5), intent(in) :: rootFractionCoefficient_forest
-    real(dp), dimension(5), intent(in) :: rootFractionCoefficient_impervious
-    real(dp), dimension(5), intent(in) :: rootFractionCoefficient_pervious
-    real(dp), dimension(5), intent(in) :: infiltrationShapeFactor
-    real(dp), dimension(5), intent(in) :: rootFractionCoefficient_sand
-    real(dp), dimension(5), intent(in) :: rootFractionCoefficient_clay
-    real(dp), dimension(5), intent(in) :: FCmin_glob
-    real(dp), dimension(5), intent(in) :: FCdelta_glob
-    real(dp), dimension(:), intent(in), optional :: PTF_Ks_curveSlope
+    real(dp), dimension(5), intent(in) :: orgmattercontent_forest
+    real(dp), dimension(5), intent(in) :: orgmattercontent_impervious
+    real(dp), dimension(5), intent(in) :: orgmattercontent_pervious
+    real(dp), dimension(5), intent(in) :: ptf_lower66_5_constant
+    real(dp), dimension(5), intent(in) :: ptf_lower66_5_clay
+    real(dp), dimension(5), intent(in) :: ptf_lower66_5_db
+    real(dp), dimension(5), intent(in) :: ptf_higher66_5_constant
+    real(dp), dimension(5), intent(in) :: ptf_higher66_5_clay
+    real(dp), dimension(5), intent(in) :: ptf_higher66_5_db
+    real(dp), dimension(5), intent(in) :: ptf_ks_constant
+    real(dp), dimension(5), intent(in) :: ptf_ks_sand
+    real(dp), dimension(5), intent(in) :: ptf_ks_clay
+    real(dp), dimension(5), intent(in) :: rootfractioncoefficient_forest
+    real(dp), dimension(5), intent(in) :: rootfractioncoefficient_impervious
+    real(dp), dimension(5), intent(in) :: rootfractioncoefficient_pervious
+    real(dp), dimension(5), intent(in) :: infiltrationshapefactor
+    real(dp), dimension(5), intent(in) :: rootfractioncoefficient_sand
+    real(dp), dimension(5), intent(in) :: rootfractioncoefficient_clay
+    real(dp), dimension(5), intent(in) :: fcmin_glob
+    real(dp), dimension(5), intent(in) :: fcdelta_glob
+    real(dp), dimension(:), intent(in), optional :: ptf_ks_curveslope
     integer :: &
       lb_1, &
       ub_1
@@ -295,36 +296,36 @@ contains
     if (status /= NML_OK) return
 
     ! required parameters
-    this%orgMatterContent_forest = orgMatterContent_forest
-    this%orgMatterContent_impervious = orgMatterContent_impervious
-    this%orgMatterContent_pervious = orgMatterContent_pervious
-    this%PTF_lower66_5_constant = PTF_lower66_5_constant
-    this%PTF_lower66_5_clay = PTF_lower66_5_clay
-    this%PTF_lower66_5_Db = PTF_lower66_5_Db
-    this%PTF_higher66_5_constant = PTF_higher66_5_constant
-    this%PTF_higher66_5_clay = PTF_higher66_5_clay
-    this%PTF_higher66_5_Db = PTF_higher66_5_Db
-    this%PTF_Ks_constant = PTF_Ks_constant
-    this%PTF_Ks_sand = PTF_Ks_sand
-    this%PTF_Ks_clay = PTF_Ks_clay
-    this%rootFractionCoefficient_forest = rootFractionCoefficient_forest
-    this%rootFractionCoefficient_impervious = rootFractionCoefficient_impervious
-    this%rootFractionCoefficient_pervious = rootFractionCoefficient_pervious
-    this%infiltrationShapeFactor = infiltrationShapeFactor
-    this%rootFractionCoefficient_sand = rootFractionCoefficient_sand
-    this%rootFractionCoefficient_clay = rootFractionCoefficient_clay
-    this%FCmin_glob = FCmin_glob
-    this%FCdelta_glob = FCdelta_glob
+    this%orgmattercontent_forest = orgmattercontent_forest
+    this%orgmattercontent_impervious = orgmattercontent_impervious
+    this%orgmattercontent_pervious = orgmattercontent_pervious
+    this%ptf_lower66_5_constant = ptf_lower66_5_constant
+    this%ptf_lower66_5_clay = ptf_lower66_5_clay
+    this%ptf_lower66_5_db = ptf_lower66_5_db
+    this%ptf_higher66_5_constant = ptf_higher66_5_constant
+    this%ptf_higher66_5_clay = ptf_higher66_5_clay
+    this%ptf_higher66_5_db = ptf_higher66_5_db
+    this%ptf_ks_constant = ptf_ks_constant
+    this%ptf_ks_sand = ptf_ks_sand
+    this%ptf_ks_clay = ptf_ks_clay
+    this%rootfractioncoefficient_forest = rootfractioncoefficient_forest
+    this%rootfractioncoefficient_impervious = rootfractioncoefficient_impervious
+    this%rootfractioncoefficient_pervious = rootfractioncoefficient_pervious
+    this%infiltrationshapefactor = infiltrationshapefactor
+    this%rootfractioncoefficient_sand = rootfractioncoefficient_sand
+    this%rootfractioncoefficient_clay = rootfractioncoefficient_clay
+    this%fcmin_glob = fcmin_glob
+    this%fcdelta_glob = fcdelta_glob
     ! override with provided values
-    if (present(PTF_Ks_curveSlope)) then
-      if (size(PTF_Ks_curveSlope, 1) > size(this%PTF_Ks_curveSlope, 1)) then
+    if (present(ptf_ks_curveslope)) then
+      if (size(ptf_ks_curveslope, 1) > size(this%ptf_ks_curveslope, 1)) then
         status = NML_ERR_INVALID_INDEX
-        if (present(errmsg)) errmsg = "dimension 1 exceeds bounds for 'PTF_Ks_curveSlope'"
+        if (present(errmsg)) errmsg = "dimension 1 exceeds bounds for 'ptf_ks_curveslope'"
         return
       end if
-      lb_1 = lbound(this%PTF_Ks_curveSlope, 1)
-      ub_1 = lb_1 + size(PTF_Ks_curveSlope, 1) - 1
-      this%PTF_Ks_curveSlope(lb_1:ub_1) = PTF_Ks_curveSlope
+      lb_1 = lbound(this%ptf_ks_curveslope, 1)
+      ub_1 = lb_1 + size(ptf_ks_curveslope, 1) - 1
+      this%ptf_ks_curveslope(lb_1:ub_1) = ptf_ks_curveslope
     end if
 
     ! mark as configured
@@ -341,193 +342,193 @@ contains
 
     status = NML_OK
     if (present(errmsg)) errmsg = ""
-    select case (trim(name))
-    case ("orgMatterContent_forest")
+    select case (to_lower(trim(name)))
+    case ("orgmattercontent_forest")
       if (present(idx)) then
-        status = idx_check(idx, lbound(this%orgMatterContent_forest), ubound(this%orgMatterContent_forest), &
+        status = idx_check(idx, lbound(this%orgmattercontent_forest), ubound(this%orgmattercontent_forest), &
           "orgMatterContent_forest", errmsg)
         if (status /= NML_OK) return
-        if (ieee_is_nan(this%orgMatterContent_forest(idx(1)))) status = NML_ERR_NOT_SET
+        if (ieee_is_nan(this%orgmattercontent_forest(idx(1)))) status = NML_ERR_NOT_SET
       else
-        if (all(ieee_is_nan(this%orgMatterContent_forest))) status = NML_ERR_NOT_SET
+        if (all(ieee_is_nan(this%orgmattercontent_forest))) status = NML_ERR_NOT_SET
       end if
-    case ("orgMatterContent_impervious")
+    case ("orgmattercontent_impervious")
       if (present(idx)) then
-        status = idx_check(idx, lbound(this%orgMatterContent_impervious), ubound(this%orgMatterContent_impervious), &
+        status = idx_check(idx, lbound(this%orgmattercontent_impervious), ubound(this%orgmattercontent_impervious), &
           "orgMatterContent_impervious", errmsg)
         if (status /= NML_OK) return
-        if (ieee_is_nan(this%orgMatterContent_impervious(idx(1)))) status = NML_ERR_NOT_SET
+        if (ieee_is_nan(this%orgmattercontent_impervious(idx(1)))) status = NML_ERR_NOT_SET
       else
-        if (all(ieee_is_nan(this%orgMatterContent_impervious))) status = NML_ERR_NOT_SET
+        if (all(ieee_is_nan(this%orgmattercontent_impervious))) status = NML_ERR_NOT_SET
       end if
-    case ("orgMatterContent_pervious")
+    case ("orgmattercontent_pervious")
       if (present(idx)) then
-        status = idx_check(idx, lbound(this%orgMatterContent_pervious), ubound(this%orgMatterContent_pervious), &
+        status = idx_check(idx, lbound(this%orgmattercontent_pervious), ubound(this%orgmattercontent_pervious), &
           "orgMatterContent_pervious", errmsg)
         if (status /= NML_OK) return
-        if (ieee_is_nan(this%orgMatterContent_pervious(idx(1)))) status = NML_ERR_NOT_SET
+        if (ieee_is_nan(this%orgmattercontent_pervious(idx(1)))) status = NML_ERR_NOT_SET
       else
-        if (all(ieee_is_nan(this%orgMatterContent_pervious))) status = NML_ERR_NOT_SET
+        if (all(ieee_is_nan(this%orgmattercontent_pervious))) status = NML_ERR_NOT_SET
       end if
-    case ("PTF_lower66_5_constant")
+    case ("ptf_lower66_5_constant")
       if (present(idx)) then
-        status = idx_check(idx, lbound(this%PTF_lower66_5_constant), ubound(this%PTF_lower66_5_constant), &
+        status = idx_check(idx, lbound(this%ptf_lower66_5_constant), ubound(this%ptf_lower66_5_constant), &
           "PTF_lower66_5_constant", errmsg)
         if (status /= NML_OK) return
-        if (ieee_is_nan(this%PTF_lower66_5_constant(idx(1)))) status = NML_ERR_NOT_SET
+        if (ieee_is_nan(this%ptf_lower66_5_constant(idx(1)))) status = NML_ERR_NOT_SET
       else
-        if (all(ieee_is_nan(this%PTF_lower66_5_constant))) status = NML_ERR_NOT_SET
+        if (all(ieee_is_nan(this%ptf_lower66_5_constant))) status = NML_ERR_NOT_SET
       end if
-    case ("PTF_lower66_5_clay")
+    case ("ptf_lower66_5_clay")
       if (present(idx)) then
-        status = idx_check(idx, lbound(this%PTF_lower66_5_clay), ubound(this%PTF_lower66_5_clay), &
+        status = idx_check(idx, lbound(this%ptf_lower66_5_clay), ubound(this%ptf_lower66_5_clay), &
           "PTF_lower66_5_clay", errmsg)
         if (status /= NML_OK) return
-        if (ieee_is_nan(this%PTF_lower66_5_clay(idx(1)))) status = NML_ERR_NOT_SET
+        if (ieee_is_nan(this%ptf_lower66_5_clay(idx(1)))) status = NML_ERR_NOT_SET
       else
-        if (all(ieee_is_nan(this%PTF_lower66_5_clay))) status = NML_ERR_NOT_SET
+        if (all(ieee_is_nan(this%ptf_lower66_5_clay))) status = NML_ERR_NOT_SET
       end if
-    case ("PTF_lower66_5_Db")
+    case ("ptf_lower66_5_db")
       if (present(idx)) then
-        status = idx_check(idx, lbound(this%PTF_lower66_5_Db), ubound(this%PTF_lower66_5_Db), &
+        status = idx_check(idx, lbound(this%ptf_lower66_5_db), ubound(this%ptf_lower66_5_db), &
           "PTF_lower66_5_Db", errmsg)
         if (status /= NML_OK) return
-        if (ieee_is_nan(this%PTF_lower66_5_Db(idx(1)))) status = NML_ERR_NOT_SET
+        if (ieee_is_nan(this%ptf_lower66_5_db(idx(1)))) status = NML_ERR_NOT_SET
       else
-        if (all(ieee_is_nan(this%PTF_lower66_5_Db))) status = NML_ERR_NOT_SET
+        if (all(ieee_is_nan(this%ptf_lower66_5_db))) status = NML_ERR_NOT_SET
       end if
-    case ("PTF_higher66_5_constant")
+    case ("ptf_higher66_5_constant")
       if (present(idx)) then
-        status = idx_check(idx, lbound(this%PTF_higher66_5_constant), ubound(this%PTF_higher66_5_constant), &
+        status = idx_check(idx, lbound(this%ptf_higher66_5_constant), ubound(this%ptf_higher66_5_constant), &
           "PTF_higher66_5_constant", errmsg)
         if (status /= NML_OK) return
-        if (ieee_is_nan(this%PTF_higher66_5_constant(idx(1)))) status = NML_ERR_NOT_SET
+        if (ieee_is_nan(this%ptf_higher66_5_constant(idx(1)))) status = NML_ERR_NOT_SET
       else
-        if (all(ieee_is_nan(this%PTF_higher66_5_constant))) status = NML_ERR_NOT_SET
+        if (all(ieee_is_nan(this%ptf_higher66_5_constant))) status = NML_ERR_NOT_SET
       end if
-    case ("PTF_higher66_5_clay")
+    case ("ptf_higher66_5_clay")
       if (present(idx)) then
-        status = idx_check(idx, lbound(this%PTF_higher66_5_clay), ubound(this%PTF_higher66_5_clay), &
+        status = idx_check(idx, lbound(this%ptf_higher66_5_clay), ubound(this%ptf_higher66_5_clay), &
           "PTF_higher66_5_clay", errmsg)
         if (status /= NML_OK) return
-        if (ieee_is_nan(this%PTF_higher66_5_clay(idx(1)))) status = NML_ERR_NOT_SET
+        if (ieee_is_nan(this%ptf_higher66_5_clay(idx(1)))) status = NML_ERR_NOT_SET
       else
-        if (all(ieee_is_nan(this%PTF_higher66_5_clay))) status = NML_ERR_NOT_SET
+        if (all(ieee_is_nan(this%ptf_higher66_5_clay))) status = NML_ERR_NOT_SET
       end if
-    case ("PTF_higher66_5_Db")
+    case ("ptf_higher66_5_db")
       if (present(idx)) then
-        status = idx_check(idx, lbound(this%PTF_higher66_5_Db), ubound(this%PTF_higher66_5_Db), &
+        status = idx_check(idx, lbound(this%ptf_higher66_5_db), ubound(this%ptf_higher66_5_db), &
           "PTF_higher66_5_Db", errmsg)
         if (status /= NML_OK) return
-        if (ieee_is_nan(this%PTF_higher66_5_Db(idx(1)))) status = NML_ERR_NOT_SET
+        if (ieee_is_nan(this%ptf_higher66_5_db(idx(1)))) status = NML_ERR_NOT_SET
       else
-        if (all(ieee_is_nan(this%PTF_higher66_5_Db))) status = NML_ERR_NOT_SET
+        if (all(ieee_is_nan(this%ptf_higher66_5_db))) status = NML_ERR_NOT_SET
       end if
-    case ("PTF_Ks_constant")
+    case ("ptf_ks_constant")
       if (present(idx)) then
-        status = idx_check(idx, lbound(this%PTF_Ks_constant), ubound(this%PTF_Ks_constant), &
+        status = idx_check(idx, lbound(this%ptf_ks_constant), ubound(this%ptf_ks_constant), &
           "PTF_Ks_constant", errmsg)
         if (status /= NML_OK) return
-        if (ieee_is_nan(this%PTF_Ks_constant(idx(1)))) status = NML_ERR_NOT_SET
+        if (ieee_is_nan(this%ptf_ks_constant(idx(1)))) status = NML_ERR_NOT_SET
       else
-        if (all(ieee_is_nan(this%PTF_Ks_constant))) status = NML_ERR_NOT_SET
+        if (all(ieee_is_nan(this%ptf_ks_constant))) status = NML_ERR_NOT_SET
       end if
-    case ("PTF_Ks_sand")
+    case ("ptf_ks_sand")
       if (present(idx)) then
-        status = idx_check(idx, lbound(this%PTF_Ks_sand), ubound(this%PTF_Ks_sand), &
+        status = idx_check(idx, lbound(this%ptf_ks_sand), ubound(this%ptf_ks_sand), &
           "PTF_Ks_sand", errmsg)
         if (status /= NML_OK) return
-        if (ieee_is_nan(this%PTF_Ks_sand(idx(1)))) status = NML_ERR_NOT_SET
+        if (ieee_is_nan(this%ptf_ks_sand(idx(1)))) status = NML_ERR_NOT_SET
       else
-        if (all(ieee_is_nan(this%PTF_Ks_sand))) status = NML_ERR_NOT_SET
+        if (all(ieee_is_nan(this%ptf_ks_sand))) status = NML_ERR_NOT_SET
       end if
-    case ("PTF_Ks_clay")
+    case ("ptf_ks_clay")
       if (present(idx)) then
-        status = idx_check(idx, lbound(this%PTF_Ks_clay), ubound(this%PTF_Ks_clay), &
+        status = idx_check(idx, lbound(this%ptf_ks_clay), ubound(this%ptf_ks_clay), &
           "PTF_Ks_clay", errmsg)
         if (status /= NML_OK) return
-        if (ieee_is_nan(this%PTF_Ks_clay(idx(1)))) status = NML_ERR_NOT_SET
+        if (ieee_is_nan(this%ptf_ks_clay(idx(1)))) status = NML_ERR_NOT_SET
       else
-        if (all(ieee_is_nan(this%PTF_Ks_clay))) status = NML_ERR_NOT_SET
+        if (all(ieee_is_nan(this%ptf_ks_clay))) status = NML_ERR_NOT_SET
       end if
-    case ("PTF_Ks_curveSlope")
+    case ("ptf_ks_curveslope")
       if (present(idx)) then
-        status = idx_check(idx, lbound(this%PTF_Ks_curveSlope), ubound(this%PTF_Ks_curveSlope), &
+        status = idx_check(idx, lbound(this%ptf_ks_curveslope), ubound(this%ptf_ks_curveslope), &
           "PTF_Ks_curveSlope", errmsg)
         if (status /= NML_OK) return
       else
       end if
-    case ("rootFractionCoefficient_forest")
+    case ("rootfractioncoefficient_forest")
       if (present(idx)) then
-        status = idx_check(idx, lbound(this%rootFractionCoefficient_forest), ubound(this%rootFractionCoefficient_forest), &
+        status = idx_check(idx, lbound(this%rootfractioncoefficient_forest), ubound(this%rootfractioncoefficient_forest), &
           "rootFractionCoefficient_forest", errmsg)
         if (status /= NML_OK) return
-        if (ieee_is_nan(this%rootFractionCoefficient_forest(idx(1)))) status = NML_ERR_NOT_SET
+        if (ieee_is_nan(this%rootfractioncoefficient_forest(idx(1)))) status = NML_ERR_NOT_SET
       else
-        if (all(ieee_is_nan(this%rootFractionCoefficient_forest))) status = NML_ERR_NOT_SET
+        if (all(ieee_is_nan(this%rootfractioncoefficient_forest))) status = NML_ERR_NOT_SET
       end if
-    case ("rootFractionCoefficient_impervious")
+    case ("rootfractioncoefficient_impervious")
       if (present(idx)) then
-        status = idx_check(idx, lbound(this%rootFractionCoefficient_impervious), ubound(this%rootFractionCoefficient_impervious), &
+        status = idx_check(idx, lbound(this%rootfractioncoefficient_impervious), ubound(this%rootfractioncoefficient_impervious), &
           "rootFractionCoefficient_impervious", errmsg)
         if (status /= NML_OK) return
-        if (ieee_is_nan(this%rootFractionCoefficient_impervious(idx(1)))) status = NML_ERR_NOT_SET
+        if (ieee_is_nan(this%rootfractioncoefficient_impervious(idx(1)))) status = NML_ERR_NOT_SET
       else
-        if (all(ieee_is_nan(this%rootFractionCoefficient_impervious))) status = NML_ERR_NOT_SET
+        if (all(ieee_is_nan(this%rootfractioncoefficient_impervious))) status = NML_ERR_NOT_SET
       end if
-    case ("rootFractionCoefficient_pervious")
+    case ("rootfractioncoefficient_pervious")
       if (present(idx)) then
-        status = idx_check(idx, lbound(this%rootFractionCoefficient_pervious), ubound(this%rootFractionCoefficient_pervious), &
+        status = idx_check(idx, lbound(this%rootfractioncoefficient_pervious), ubound(this%rootfractioncoefficient_pervious), &
           "rootFractionCoefficient_pervious", errmsg)
         if (status /= NML_OK) return
-        if (ieee_is_nan(this%rootFractionCoefficient_pervious(idx(1)))) status = NML_ERR_NOT_SET
+        if (ieee_is_nan(this%rootfractioncoefficient_pervious(idx(1)))) status = NML_ERR_NOT_SET
       else
-        if (all(ieee_is_nan(this%rootFractionCoefficient_pervious))) status = NML_ERR_NOT_SET
+        if (all(ieee_is_nan(this%rootfractioncoefficient_pervious))) status = NML_ERR_NOT_SET
       end if
-    case ("infiltrationShapeFactor")
+    case ("infiltrationshapefactor")
       if (present(idx)) then
-        status = idx_check(idx, lbound(this%infiltrationShapeFactor), ubound(this%infiltrationShapeFactor), &
+        status = idx_check(idx, lbound(this%infiltrationshapefactor), ubound(this%infiltrationshapefactor), &
           "infiltrationShapeFactor", errmsg)
         if (status /= NML_OK) return
-        if (ieee_is_nan(this%infiltrationShapeFactor(idx(1)))) status = NML_ERR_NOT_SET
+        if (ieee_is_nan(this%infiltrationshapefactor(idx(1)))) status = NML_ERR_NOT_SET
       else
-        if (all(ieee_is_nan(this%infiltrationShapeFactor))) status = NML_ERR_NOT_SET
+        if (all(ieee_is_nan(this%infiltrationshapefactor))) status = NML_ERR_NOT_SET
       end if
-    case ("rootFractionCoefficient_sand")
+    case ("rootfractioncoefficient_sand")
       if (present(idx)) then
-        status = idx_check(idx, lbound(this%rootFractionCoefficient_sand), ubound(this%rootFractionCoefficient_sand), &
+        status = idx_check(idx, lbound(this%rootfractioncoefficient_sand), ubound(this%rootfractioncoefficient_sand), &
           "rootFractionCoefficient_sand", errmsg)
         if (status /= NML_OK) return
-        if (ieee_is_nan(this%rootFractionCoefficient_sand(idx(1)))) status = NML_ERR_NOT_SET
+        if (ieee_is_nan(this%rootfractioncoefficient_sand(idx(1)))) status = NML_ERR_NOT_SET
       else
-        if (all(ieee_is_nan(this%rootFractionCoefficient_sand))) status = NML_ERR_NOT_SET
+        if (all(ieee_is_nan(this%rootfractioncoefficient_sand))) status = NML_ERR_NOT_SET
       end if
-    case ("rootFractionCoefficient_clay")
+    case ("rootfractioncoefficient_clay")
       if (present(idx)) then
-        status = idx_check(idx, lbound(this%rootFractionCoefficient_clay), ubound(this%rootFractionCoefficient_clay), &
+        status = idx_check(idx, lbound(this%rootfractioncoefficient_clay), ubound(this%rootfractioncoefficient_clay), &
           "rootFractionCoefficient_clay", errmsg)
         if (status /= NML_OK) return
-        if (ieee_is_nan(this%rootFractionCoefficient_clay(idx(1)))) status = NML_ERR_NOT_SET
+        if (ieee_is_nan(this%rootfractioncoefficient_clay(idx(1)))) status = NML_ERR_NOT_SET
       else
-        if (all(ieee_is_nan(this%rootFractionCoefficient_clay))) status = NML_ERR_NOT_SET
+        if (all(ieee_is_nan(this%rootfractioncoefficient_clay))) status = NML_ERR_NOT_SET
       end if
-    case ("FCmin_glob")
+    case ("fcmin_glob")
       if (present(idx)) then
-        status = idx_check(idx, lbound(this%FCmin_glob), ubound(this%FCmin_glob), &
+        status = idx_check(idx, lbound(this%fcmin_glob), ubound(this%fcmin_glob), &
           "FCmin_glob", errmsg)
         if (status /= NML_OK) return
-        if (ieee_is_nan(this%FCmin_glob(idx(1)))) status = NML_ERR_NOT_SET
+        if (ieee_is_nan(this%fcmin_glob(idx(1)))) status = NML_ERR_NOT_SET
       else
-        if (all(ieee_is_nan(this%FCmin_glob))) status = NML_ERR_NOT_SET
+        if (all(ieee_is_nan(this%fcmin_glob))) status = NML_ERR_NOT_SET
       end if
-    case ("FCdelta_glob")
+    case ("fcdelta_glob")
       if (present(idx)) then
-        status = idx_check(idx, lbound(this%FCdelta_glob), ubound(this%FCdelta_glob), &
+        status = idx_check(idx, lbound(this%fcdelta_glob), ubound(this%fcdelta_glob), &
           "FCdelta_glob", errmsg)
         if (status /= NML_OK) return
-        if (ieee_is_nan(this%FCdelta_glob(idx(1)))) status = NML_ERR_NOT_SET
+        if (ieee_is_nan(this%fcdelta_glob(idx(1)))) status = NML_ERR_NOT_SET
       else
-        if (all(ieee_is_nan(this%FCdelta_glob))) status = NML_ERR_NOT_SET
+        if (all(ieee_is_nan(this%fcdelta_glob))) status = NML_ERR_NOT_SET
       end if
     case default
       status = NML_ERR_INVALID_NAME
@@ -548,202 +549,202 @@ contains
     if (present(errmsg)) errmsg = ""
 
     ! required arrays
-    if (all(ieee_is_nan(this%orgMatterContent_forest))) then
+    if (all(ieee_is_nan(this%orgmattercontent_forest))) then
       status = NML_ERR_REQUIRED
       if (present(errmsg)) errmsg = "required field not set: orgMatterContent_forest"
       return
     end if
-    if (any(ieee_is_nan(this%orgMatterContent_forest))) then
+    if (any(ieee_is_nan(this%orgmattercontent_forest))) then
       status = NML_ERR_PARTLY_SET
       if (present(errmsg)) errmsg = "array partly set: orgMatterContent_forest"
       return
     end if
-    if (all(ieee_is_nan(this%orgMatterContent_impervious))) then
+    if (all(ieee_is_nan(this%orgmattercontent_impervious))) then
       status = NML_ERR_REQUIRED
       if (present(errmsg)) errmsg = "required field not set: orgMatterContent_impervious"
       return
     end if
-    if (any(ieee_is_nan(this%orgMatterContent_impervious))) then
+    if (any(ieee_is_nan(this%orgmattercontent_impervious))) then
       status = NML_ERR_PARTLY_SET
       if (present(errmsg)) errmsg = "array partly set: orgMatterContent_impervious"
       return
     end if
-    if (all(ieee_is_nan(this%orgMatterContent_pervious))) then
+    if (all(ieee_is_nan(this%orgmattercontent_pervious))) then
       status = NML_ERR_REQUIRED
       if (present(errmsg)) errmsg = "required field not set: orgMatterContent_pervious"
       return
     end if
-    if (any(ieee_is_nan(this%orgMatterContent_pervious))) then
+    if (any(ieee_is_nan(this%orgmattercontent_pervious))) then
       status = NML_ERR_PARTLY_SET
       if (present(errmsg)) errmsg = "array partly set: orgMatterContent_pervious"
       return
     end if
-    if (all(ieee_is_nan(this%PTF_lower66_5_constant))) then
+    if (all(ieee_is_nan(this%ptf_lower66_5_constant))) then
       status = NML_ERR_REQUIRED
       if (present(errmsg)) errmsg = "required field not set: PTF_lower66_5_constant"
       return
     end if
-    if (any(ieee_is_nan(this%PTF_lower66_5_constant))) then
+    if (any(ieee_is_nan(this%ptf_lower66_5_constant))) then
       status = NML_ERR_PARTLY_SET
       if (present(errmsg)) errmsg = "array partly set: PTF_lower66_5_constant"
       return
     end if
-    if (all(ieee_is_nan(this%PTF_lower66_5_clay))) then
+    if (all(ieee_is_nan(this%ptf_lower66_5_clay))) then
       status = NML_ERR_REQUIRED
       if (present(errmsg)) errmsg = "required field not set: PTF_lower66_5_clay"
       return
     end if
-    if (any(ieee_is_nan(this%PTF_lower66_5_clay))) then
+    if (any(ieee_is_nan(this%ptf_lower66_5_clay))) then
       status = NML_ERR_PARTLY_SET
       if (present(errmsg)) errmsg = "array partly set: PTF_lower66_5_clay"
       return
     end if
-    if (all(ieee_is_nan(this%PTF_lower66_5_Db))) then
+    if (all(ieee_is_nan(this%ptf_lower66_5_db))) then
       status = NML_ERR_REQUIRED
       if (present(errmsg)) errmsg = "required field not set: PTF_lower66_5_Db"
       return
     end if
-    if (any(ieee_is_nan(this%PTF_lower66_5_Db))) then
+    if (any(ieee_is_nan(this%ptf_lower66_5_db))) then
       status = NML_ERR_PARTLY_SET
       if (present(errmsg)) errmsg = "array partly set: PTF_lower66_5_Db"
       return
     end if
-    if (all(ieee_is_nan(this%PTF_higher66_5_constant))) then
+    if (all(ieee_is_nan(this%ptf_higher66_5_constant))) then
       status = NML_ERR_REQUIRED
       if (present(errmsg)) errmsg = "required field not set: PTF_higher66_5_constant"
       return
     end if
-    if (any(ieee_is_nan(this%PTF_higher66_5_constant))) then
+    if (any(ieee_is_nan(this%ptf_higher66_5_constant))) then
       status = NML_ERR_PARTLY_SET
       if (present(errmsg)) errmsg = "array partly set: PTF_higher66_5_constant"
       return
     end if
-    if (all(ieee_is_nan(this%PTF_higher66_5_clay))) then
+    if (all(ieee_is_nan(this%ptf_higher66_5_clay))) then
       status = NML_ERR_REQUIRED
       if (present(errmsg)) errmsg = "required field not set: PTF_higher66_5_clay"
       return
     end if
-    if (any(ieee_is_nan(this%PTF_higher66_5_clay))) then
+    if (any(ieee_is_nan(this%ptf_higher66_5_clay))) then
       status = NML_ERR_PARTLY_SET
       if (present(errmsg)) errmsg = "array partly set: PTF_higher66_5_clay"
       return
     end if
-    if (all(ieee_is_nan(this%PTF_higher66_5_Db))) then
+    if (all(ieee_is_nan(this%ptf_higher66_5_db))) then
       status = NML_ERR_REQUIRED
       if (present(errmsg)) errmsg = "required field not set: PTF_higher66_5_Db"
       return
     end if
-    if (any(ieee_is_nan(this%PTF_higher66_5_Db))) then
+    if (any(ieee_is_nan(this%ptf_higher66_5_db))) then
       status = NML_ERR_PARTLY_SET
       if (present(errmsg)) errmsg = "array partly set: PTF_higher66_5_Db"
       return
     end if
-    if (all(ieee_is_nan(this%PTF_Ks_constant))) then
+    if (all(ieee_is_nan(this%ptf_ks_constant))) then
       status = NML_ERR_REQUIRED
       if (present(errmsg)) errmsg = "required field not set: PTF_Ks_constant"
       return
     end if
-    if (any(ieee_is_nan(this%PTF_Ks_constant))) then
+    if (any(ieee_is_nan(this%ptf_ks_constant))) then
       status = NML_ERR_PARTLY_SET
       if (present(errmsg)) errmsg = "array partly set: PTF_Ks_constant"
       return
     end if
-    if (all(ieee_is_nan(this%PTF_Ks_sand))) then
+    if (all(ieee_is_nan(this%ptf_ks_sand))) then
       status = NML_ERR_REQUIRED
       if (present(errmsg)) errmsg = "required field not set: PTF_Ks_sand"
       return
     end if
-    if (any(ieee_is_nan(this%PTF_Ks_sand))) then
+    if (any(ieee_is_nan(this%ptf_ks_sand))) then
       status = NML_ERR_PARTLY_SET
       if (present(errmsg)) errmsg = "array partly set: PTF_Ks_sand"
       return
     end if
-    if (all(ieee_is_nan(this%PTF_Ks_clay))) then
+    if (all(ieee_is_nan(this%ptf_ks_clay))) then
       status = NML_ERR_REQUIRED
       if (present(errmsg)) errmsg = "required field not set: PTF_Ks_clay"
       return
     end if
-    if (any(ieee_is_nan(this%PTF_Ks_clay))) then
+    if (any(ieee_is_nan(this%ptf_ks_clay))) then
       status = NML_ERR_PARTLY_SET
       if (present(errmsg)) errmsg = "array partly set: PTF_Ks_clay"
       return
     end if
-    if (all(ieee_is_nan(this%rootFractionCoefficient_forest))) then
+    if (all(ieee_is_nan(this%rootfractioncoefficient_forest))) then
       status = NML_ERR_REQUIRED
       if (present(errmsg)) errmsg = "required field not set: rootFractionCoefficient_forest"
       return
     end if
-    if (any(ieee_is_nan(this%rootFractionCoefficient_forest))) then
+    if (any(ieee_is_nan(this%rootfractioncoefficient_forest))) then
       status = NML_ERR_PARTLY_SET
       if (present(errmsg)) errmsg = "array partly set: rootFractionCoefficient_forest"
       return
     end if
-    if (all(ieee_is_nan(this%rootFractionCoefficient_impervious))) then
+    if (all(ieee_is_nan(this%rootfractioncoefficient_impervious))) then
       status = NML_ERR_REQUIRED
       if (present(errmsg)) errmsg = "required field not set: rootFractionCoefficient_impervious"
       return
     end if
-    if (any(ieee_is_nan(this%rootFractionCoefficient_impervious))) then
+    if (any(ieee_is_nan(this%rootfractioncoefficient_impervious))) then
       status = NML_ERR_PARTLY_SET
       if (present(errmsg)) errmsg = "array partly set: rootFractionCoefficient_impervious"
       return
     end if
-    if (all(ieee_is_nan(this%rootFractionCoefficient_pervious))) then
+    if (all(ieee_is_nan(this%rootfractioncoefficient_pervious))) then
       status = NML_ERR_REQUIRED
       if (present(errmsg)) errmsg = "required field not set: rootFractionCoefficient_pervious"
       return
     end if
-    if (any(ieee_is_nan(this%rootFractionCoefficient_pervious))) then
+    if (any(ieee_is_nan(this%rootfractioncoefficient_pervious))) then
       status = NML_ERR_PARTLY_SET
       if (present(errmsg)) errmsg = "array partly set: rootFractionCoefficient_pervious"
       return
     end if
-    if (all(ieee_is_nan(this%infiltrationShapeFactor))) then
+    if (all(ieee_is_nan(this%infiltrationshapefactor))) then
       status = NML_ERR_REQUIRED
       if (present(errmsg)) errmsg = "required field not set: infiltrationShapeFactor"
       return
     end if
-    if (any(ieee_is_nan(this%infiltrationShapeFactor))) then
+    if (any(ieee_is_nan(this%infiltrationshapefactor))) then
       status = NML_ERR_PARTLY_SET
       if (present(errmsg)) errmsg = "array partly set: infiltrationShapeFactor"
       return
     end if
-    if (all(ieee_is_nan(this%rootFractionCoefficient_sand))) then
+    if (all(ieee_is_nan(this%rootfractioncoefficient_sand))) then
       status = NML_ERR_REQUIRED
       if (present(errmsg)) errmsg = "required field not set: rootFractionCoefficient_sand"
       return
     end if
-    if (any(ieee_is_nan(this%rootFractionCoefficient_sand))) then
+    if (any(ieee_is_nan(this%rootfractioncoefficient_sand))) then
       status = NML_ERR_PARTLY_SET
       if (present(errmsg)) errmsg = "array partly set: rootFractionCoefficient_sand"
       return
     end if
-    if (all(ieee_is_nan(this%rootFractionCoefficient_clay))) then
+    if (all(ieee_is_nan(this%rootfractioncoefficient_clay))) then
       status = NML_ERR_REQUIRED
       if (present(errmsg)) errmsg = "required field not set: rootFractionCoefficient_clay"
       return
     end if
-    if (any(ieee_is_nan(this%rootFractionCoefficient_clay))) then
+    if (any(ieee_is_nan(this%rootfractioncoefficient_clay))) then
       status = NML_ERR_PARTLY_SET
       if (present(errmsg)) errmsg = "array partly set: rootFractionCoefficient_clay"
       return
     end if
-    if (all(ieee_is_nan(this%FCmin_glob))) then
+    if (all(ieee_is_nan(this%fcmin_glob))) then
       status = NML_ERR_REQUIRED
       if (present(errmsg)) errmsg = "required field not set: FCmin_glob"
       return
     end if
-    if (any(ieee_is_nan(this%FCmin_glob))) then
+    if (any(ieee_is_nan(this%fcmin_glob))) then
       status = NML_ERR_PARTLY_SET
       if (present(errmsg)) errmsg = "array partly set: FCmin_glob"
       return
     end if
-    if (all(ieee_is_nan(this%FCdelta_glob))) then
+    if (all(ieee_is_nan(this%fcdelta_glob))) then
       status = NML_ERR_REQUIRED
       if (present(errmsg)) errmsg = "required field not set: FCdelta_glob"
       return
     end if
-    if (any(ieee_is_nan(this%FCdelta_glob))) then
+    if (any(ieee_is_nan(this%fcdelta_glob))) then
       status = NML_ERR_PARTLY_SET
       if (present(errmsg)) errmsg = "array partly set: FCdelta_glob"
       return

@@ -27,6 +27,7 @@ module nml_config_mpr
     NML_ERR_INVALID_NAME, &
     NML_ERR_INVALID_INDEX, &
     idx_check, &
+    to_lower, &
     max_domains, &
     max_layers, &
     buf, &
@@ -55,7 +56,7 @@ module nml_config_mpr
     integer(i4), dimension(max_domains) :: n_horizons !< Number of soil horizons
     integer(i4), dimension(max_domains) :: tillage_depth !< Tillage depth
     integer(i4), dimension(max_layers, max_domains) :: soil_depth !< Soil horizon depth
-    real(dp), dimension(max_domains) :: fracSealed_cityArea !< Sealed fraction of city area
+    real(dp), dimension(max_domains) :: fracsealed_cityarea !< Sealed fraction of city area
     character(len=buf), dimension(max_domains) :: land_cover_path !< Land cover path
     integer(i4), dimension(max_domains) :: lai_time_step !< LAI time step
     character(len=buf), dimension(max_domains) :: lai_path !< LAI path
@@ -118,7 +119,7 @@ contains
     this%n_horizons = -huge(this%n_horizons) ! sentinel for optional integer array
     this%tillage_depth = -huge(this%tillage_depth) ! sentinel for optional integer array
     this%soil_depth = -huge(this%soil_depth) ! sentinel for optional integer array
-    this%fracSealed_cityArea = ieee_value(this%fracSealed_cityArea, ieee_quiet_nan) ! sentinel for optional real array
+    this%fracsealed_cityarea = ieee_value(this%fracsealed_cityarea, ieee_quiet_nan) ! sentinel for optional real array
     this%land_cover_path = repeat(achar(0), len(this%land_cover_path)) ! sentinel for optional string array
     this%lai_time_step = -huge(this%lai_time_step) ! sentinel for optional integer array
     this%lai_path = repeat(achar(0), len(this%lai_path)) ! sentinel for optional string array
@@ -139,7 +140,7 @@ contains
     integer(i4), dimension(max_domains) :: n_horizons
     integer(i4), dimension(max_domains) :: tillage_depth
     integer(i4), dimension(max_layers, max_domains) :: soil_depth
-    real(dp), dimension(max_domains) :: fracSealed_cityArea
+    real(dp), dimension(max_domains) :: fracsealed_cityarea
     character(len=buf), dimension(max_domains) :: land_cover_path
     integer(i4), dimension(max_domains) :: lai_time_step
     character(len=buf), dimension(max_domains) :: lai_path
@@ -157,7 +158,7 @@ contains
       n_horizons, &
       tillage_depth, &
       soil_depth, &
-      fracSealed_cityArea, &
+      fracsealed_cityarea, &
       land_cover_path, &
       lai_time_step, &
       lai_path, &
@@ -171,7 +172,7 @@ contains
     n_horizons = this%n_horizons
     tillage_depth = this%tillage_depth
     soil_depth = this%soil_depth
-    fracSealed_cityArea = this%fracSealed_cityArea
+    fracsealed_cityarea = this%fracsealed_cityarea
     land_cover_path = this%land_cover_path
     lai_time_step = this%lai_time_step
     lai_path = this%lai_path
@@ -207,7 +208,7 @@ contains
     this%n_horizons = n_horizons
     this%tillage_depth = tillage_depth
     this%soil_depth = soil_depth
-    this%fracSealed_cityArea = fracSealed_cityArea
+    this%fracsealed_cityarea = fracsealed_cityarea
     this%land_cover_path = land_cover_path
     this%lai_time_step = lai_time_step
     this%lai_path = lai_path
@@ -226,7 +227,7 @@ contains
     n_horizons, &
     tillage_depth, &
     soil_depth, &
-    fracSealed_cityArea, &
+    fracsealed_cityarea, &
     land_cover_path, &
     lai_time_step, &
     lai_path, &
@@ -241,7 +242,7 @@ contains
     integer(i4), dimension(:), intent(in), optional :: n_horizons
     integer(i4), dimension(:), intent(in), optional :: tillage_depth
     integer(i4), dimension(:, :), intent(in), optional :: soil_depth
-    real(dp), dimension(:), intent(in), optional :: fracSealed_cityArea
+    real(dp), dimension(:), intent(in), optional :: fracsealed_cityarea
     character(len=*), dimension(:), intent(in), optional :: land_cover_path
     integer(i4), dimension(:), intent(in), optional :: lai_time_step
     character(len=*), dimension(:), intent(in), optional :: lai_path
@@ -306,15 +307,15 @@ contains
       ub_2 = lb_2 + size(soil_depth, 2) - 1
       this%soil_depth(lb_1:ub_1, lb_2:ub_2) = soil_depth
     end if
-    if (present(fracSealed_cityArea)) then
-      if (size(fracSealed_cityArea, 1) > size(this%fracSealed_cityArea, 1)) then
+    if (present(fracsealed_cityarea)) then
+      if (size(fracsealed_cityarea, 1) > size(this%fracsealed_cityarea, 1)) then
         status = NML_ERR_INVALID_INDEX
-        if (present(errmsg)) errmsg = "dimension 1 exceeds bounds for 'fracSealed_cityArea'"
+        if (present(errmsg)) errmsg = "dimension 1 exceeds bounds for 'fracsealed_cityarea'"
         return
       end if
-      lb_1 = lbound(this%fracSealed_cityArea, 1)
-      ub_1 = lb_1 + size(fracSealed_cityArea, 1) - 1
-      this%fracSealed_cityArea(lb_1:ub_1) = fracSealed_cityArea
+      lb_1 = lbound(this%fracsealed_cityarea, 1)
+      ub_1 = lb_1 + size(fracsealed_cityarea, 1) - 1
+      this%fracsealed_cityarea(lb_1:ub_1) = fracsealed_cityarea
     end if
     if (present(land_cover_path)) then
       if (size(land_cover_path, 1) > size(this%land_cover_path, 1)) then
@@ -391,7 +392,7 @@ contains
 
     status = NML_OK
     if (present(errmsg)) errmsg = ""
-    select case (trim(name))
+    select case (to_lower(trim(name)))
     case ("soil_db_mode")
       if (present(idx)) then
         status = idx_check(idx, lbound(this%soil_db_mode), ubound(this%soil_db_mode), &
@@ -426,14 +427,14 @@ contains
       else
         if (all(this%soil_depth == -huge(this%soil_depth))) status = NML_ERR_NOT_SET
       end if
-    case ("fracSealed_cityArea")
+    case ("fracsealed_cityarea")
       if (present(idx)) then
-        status = idx_check(idx, lbound(this%fracSealed_cityArea), ubound(this%fracSealed_cityArea), &
+        status = idx_check(idx, lbound(this%fracsealed_cityarea), ubound(this%fracsealed_cityarea), &
           "fracSealed_cityArea", errmsg)
         if (status /= NML_OK) return
-        if (ieee_is_nan(this%fracSealed_cityArea(idx(1)))) status = NML_ERR_NOT_SET
+        if (ieee_is_nan(this%fracsealed_cityarea(idx(1)))) status = NML_ERR_NOT_SET
       else
-        if (all(ieee_is_nan(this%fracSealed_cityArea))) status = NML_ERR_NOT_SET
+        if (all(ieee_is_nan(this%fracsealed_cityarea))) status = NML_ERR_NOT_SET
       end if
     case ("land_cover_path")
       if (present(idx)) then
@@ -514,7 +515,7 @@ contains
 
     status = NML_OK
     if (present(errmsg)) errmsg = ""
-    select case (trim(name))
+    select case (to_lower(trim(name)))
     case ("n_horizons")
       if (size(filled) /= 1) then
         status = NML_ERR_INVALID_INDEX
@@ -603,27 +604,27 @@ contains
           return
         end if
       end if
-    case ("fracSealed_cityArea")
+    case ("fracsealed_cityarea")
       if (size(filled) /= 1) then
         status = NML_ERR_INVALID_INDEX
         if (present(errmsg)) errmsg = "shape rank mismatch for 'fracSealed_cityArea'"
         return
       end if
       do dim = 1, 1
-        filled(dim) = size(this%fracSealed_cityArea, dim)
+        filled(dim) = size(this%fracsealed_cityarea, dim)
       end do
       filled(1) = 0
-      do idx = ubound(this%fracSealed_cityArea, 1), &
-        lbound(this%fracSealed_cityArea, 1), -1
-        if (.not. (ieee_is_nan(this%fracSealed_cityArea(idx)))) then
-          filled(1) = idx - lbound(this%fracSealed_cityArea, 1) + 1
+      do idx = ubound(this%fracsealed_cityarea, 1), &
+        lbound(this%fracsealed_cityarea, 1), -1
+        if (.not. (ieee_is_nan(this%fracsealed_cityarea(idx)))) then
+          filled(1) = idx - lbound(this%fracsealed_cityarea, 1) + 1
           exit
         end if
       end do
       if (minval(filled) > 0) then
-        lb_1 = lbound(this%fracSealed_cityArea, 1)
+        lb_1 = lbound(this%fracsealed_cityarea, 1)
         ub_1 = lb_1 + filled(1) - 1
-        if (any(ieee_is_nan(this%fracSealed_cityArea(lb_1:ub_1)))) then
+        if (any(ieee_is_nan(this%fracsealed_cityarea(lb_1:ub_1)))) then
           status = NML_ERR_PARTLY_SET
           if (present(errmsg)) errmsg = "array partly set: fracSealed_cityArea"
           return

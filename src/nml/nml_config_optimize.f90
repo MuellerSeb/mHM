@@ -26,7 +26,8 @@ module nml_config_optimize
     NML_ERR_NOT_SET, &
     NML_ERR_INVALID_NAME, &
     NML_ERR_INVALID_INDEX, &
-    idx_check
+    idx_check, &
+    to_lower
   ! kind specifiers listed in the nml-tools configuration file
   use mo_kind, only: &
     i4, &
@@ -48,7 +49,7 @@ module nml_config_optimize
   integer(i4), parameter, public :: sce_nps_default = -9_i4
   logical, parameter, public :: mcmc_opti_default = .false.
   real(dp), parameter, public :: mcmc_error_params_default(2) = [0.01_dp, 0.6_dp]
-  logical, parameter, public :: BFI_calc_default = .true.
+  logical, parameter, public :: bfi_calc_default = .true.
 
   !> \class nml_config_optimize_t
   !> \brief Optimization configuration
@@ -68,7 +69,7 @@ module nml_config_optimize
     integer(i4) :: sce_nps !< Points per SCE Sub-Complex
     logical :: mcmc_opti !< MCMC for optimisation
     real(dp), dimension(2) :: mcmc_error_params !< Parameters of MCMC error model.
-    logical :: BFI_calc !< Calculate BFI from discharge time series with the Eckhardt filter
+    logical :: bfi_calc !< Calculate BFI from discharge time series with the Eckhardt filter
   contains
     procedure :: init => nml_config_optimize_init
     procedure :: from_file => nml_config_optimize_from_file
@@ -102,7 +103,7 @@ contains
     this%sce_nps = sce_nps_default
     this%mcmc_opti = mcmc_opti_default ! bool values always need a default
     this%mcmc_error_params = mcmc_error_params_default
-    this%BFI_calc = BFI_calc_default ! bool values always need a default
+    this%bfi_calc = bfi_calc_default ! bool values always need a default
   end function nml_config_optimize_init
 
   !> \brief Read config_optimize namelist from file
@@ -124,7 +125,7 @@ contains
     integer(i4) :: sce_nps
     logical :: mcmc_opti
     real(dp), dimension(2) :: mcmc_error_params
-    logical :: BFI_calc
+    logical :: bfi_calc
     ! locals
     type(nml_file_t) :: nml
     integer :: iostat
@@ -145,7 +146,7 @@ contains
       sce_nps, &
       mcmc_opti, &
       mcmc_error_params, &
-      BFI_calc
+      bfi_calc
 
     status = this%init(errmsg=errmsg)
     if (status /= NML_OK) return
@@ -162,7 +163,7 @@ contains
     sce_nps = this%sce_nps
     mcmc_opti = this%mcmc_opti
     mcmc_error_params = this%mcmc_error_params
-    BFI_calc = this%BFI_calc
+    bfi_calc = this%bfi_calc
 
     status = nml%open(file, errmsg=errmsg)
     if (status /= NML_OK) return
@@ -201,7 +202,7 @@ contains
     this%sce_nps = sce_nps
     this%mcmc_opti = mcmc_opti
     this%mcmc_error_params = mcmc_error_params
-    this%BFI_calc = BFI_calc
+    this%bfi_calc = bfi_calc
 
     ! mark as configured
     this%is_configured = .true.
@@ -223,7 +224,7 @@ contains
     sce_nps, &
     mcmc_opti, &
     mcmc_error_params, &
-    BFI_calc, &
+    bfi_calc, &
     errmsg) result(status)
 
     class(nml_config_optimize_t), intent(inout) :: this
@@ -241,7 +242,7 @@ contains
     integer(i4), intent(in), optional :: sce_nps
     logical, intent(in), optional :: mcmc_opti
     real(dp), dimension(:), intent(in), optional :: mcmc_error_params
-    logical, intent(in), optional :: BFI_calc
+    logical, intent(in), optional :: bfi_calc
     integer :: &
       lb_1, &
       ub_1
@@ -273,7 +274,7 @@ contains
       ub_1 = lb_1 + size(mcmc_error_params, 1) - 1
       this%mcmc_error_params(lb_1:ub_1) = mcmc_error_params
     end if
-    if (present(BFI_calc)) this%BFI_calc = BFI_calc
+    if (present(bfi_calc)) this%bfi_calc = bfi_calc
 
     ! mark as configured
     this%is_configured = .true.
@@ -289,7 +290,7 @@ contains
 
     status = NML_OK
     if (present(errmsg)) errmsg = ""
-    select case (trim(name))
+    select case (to_lower(trim(name)))
     case ("optimize")
       if (present(idx)) then
         status = NML_ERR_INVALID_INDEX
@@ -369,7 +370,7 @@ contains
         if (status /= NML_OK) return
       else
       end if
-    case ("BFI_calc")
+    case ("bfi_calc")
       if (present(idx)) then
         status = NML_ERR_INVALID_INDEX
         if (present(errmsg)) errmsg = "index not supported for 'BFI_calc'"

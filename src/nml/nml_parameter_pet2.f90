@@ -27,6 +27,7 @@ module nml_pet2
     NML_ERR_INVALID_NAME, &
     NML_ERR_INVALID_INDEX, &
     idx_check, &
+    to_lower, &
     NML_ERR_PARTLY_SET
   use ieee_arithmetic, only: ieee_value, ieee_quiet_nan, ieee_is_nan
   ! kind specifiers listed in the nml-tools configuration file
@@ -40,8 +41,8 @@ module nml_pet2
   !> \details Parameters for PET (case 2 - Priestley-Taylor).
   type, public :: nml_pet2_t
     logical :: is_configured = .false. !< whether the namelist has been configured
-    real(dp), dimension(5) :: PriestleyTaylorCoeff !< Priestley-Taylor coefficient
-    real(dp), dimension(5) :: PriestleyTaylorLAIcorr !< Priestley-Taylor LAI correction factor
+    real(dp), dimension(5) :: priestleytaylorcoeff !< Priestley-Taylor coefficient
+    real(dp), dimension(5) :: priestleytaylorlaicorr !< Priestley-Taylor LAI correction factor
   contains
     procedure :: init => nml_pet2_init
     procedure :: from_file => nml_pet2_from_file
@@ -62,8 +63,8 @@ contains
     this%is_configured = .false.
 
     ! sentinel values for required/optional parameters
-    this%PriestleyTaylorCoeff = ieee_value(this%PriestleyTaylorCoeff, ieee_quiet_nan) ! sentinel for required real array
-    this%PriestleyTaylorLAIcorr = ieee_value(this%PriestleyTaylorLAIcorr, ieee_quiet_nan) ! sentinel for required real array
+    this%priestleytaylorcoeff = ieee_value(this%priestleytaylorcoeff, ieee_quiet_nan) ! sentinel for required real array
+    this%priestleytaylorlaicorr = ieee_value(this%priestleytaylorlaicorr, ieee_quiet_nan) ! sentinel for required real array
   end function nml_pet2_init
 
   !> \brief Read pet2 namelist from file
@@ -72,8 +73,8 @@ contains
     character(len=*), intent(in) :: file !< path to namelist file
     character(len=*), intent(out), optional :: errmsg
     ! namelist variables
-    real(dp), dimension(5) :: PriestleyTaylorCoeff
-    real(dp), dimension(5) :: PriestleyTaylorLAIcorr
+    real(dp), dimension(5) :: priestleytaylorcoeff
+    real(dp), dimension(5) :: priestleytaylorlaicorr
     ! locals
     type(nml_file_t) :: nml
     integer :: iostat
@@ -81,13 +82,13 @@ contains
     character(len=nml_line_buffer) :: iomsg
 
     namelist /pet2/ &
-      PriestleyTaylorCoeff, &
-      PriestleyTaylorLAIcorr
+      priestleytaylorcoeff, &
+      priestleytaylorlaicorr
 
     status = this%init(errmsg=errmsg)
     if (status /= NML_OK) return
-    PriestleyTaylorCoeff = this%PriestleyTaylorCoeff
-    PriestleyTaylorLAIcorr = this%PriestleyTaylorLAIcorr
+    priestleytaylorcoeff = this%priestleytaylorcoeff
+    priestleytaylorlaicorr = this%priestleytaylorlaicorr
 
     status = nml%open(file, errmsg=errmsg)
     if (status /= NML_OK) return
@@ -113,8 +114,8 @@ contains
     end if
 
     ! assign values
-    this%PriestleyTaylorCoeff = PriestleyTaylorCoeff
-    this%PriestleyTaylorLAIcorr = PriestleyTaylorLAIcorr
+    this%priestleytaylorcoeff = priestleytaylorcoeff
+    this%priestleytaylorlaicorr = priestleytaylorlaicorr
 
     ! mark as configured
     this%is_configured = .true.
@@ -123,21 +124,21 @@ contains
 
   !> \brief Set pet2 values
   integer function nml_pet2_set(this, &
-    PriestleyTaylorCoeff, &
-    PriestleyTaylorLAIcorr, &
+    priestleytaylorcoeff, &
+    priestleytaylorlaicorr, &
     errmsg) result(status)
 
     class(nml_pet2_t), intent(inout) :: this
     character(len=*), intent(out), optional :: errmsg
-    real(dp), dimension(5), intent(in) :: PriestleyTaylorCoeff
-    real(dp), dimension(5), intent(in) :: PriestleyTaylorLAIcorr
+    real(dp), dimension(5), intent(in) :: priestleytaylorcoeff
+    real(dp), dimension(5), intent(in) :: priestleytaylorlaicorr
 
     status = this%init(errmsg=errmsg)
     if (status /= NML_OK) return
 
     ! required parameters
-    this%PriestleyTaylorCoeff = PriestleyTaylorCoeff
-    this%PriestleyTaylorLAIcorr = PriestleyTaylorLAIcorr
+    this%priestleytaylorcoeff = priestleytaylorcoeff
+    this%priestleytaylorlaicorr = priestleytaylorlaicorr
 
     ! mark as configured
     this%is_configured = .true.
@@ -153,24 +154,24 @@ contains
 
     status = NML_OK
     if (present(errmsg)) errmsg = ""
-    select case (trim(name))
-    case ("PriestleyTaylorCoeff")
+    select case (to_lower(trim(name)))
+    case ("priestleytaylorcoeff")
       if (present(idx)) then
-        status = idx_check(idx, lbound(this%PriestleyTaylorCoeff), ubound(this%PriestleyTaylorCoeff), &
+        status = idx_check(idx, lbound(this%priestleytaylorcoeff), ubound(this%priestleytaylorcoeff), &
           "PriestleyTaylorCoeff", errmsg)
         if (status /= NML_OK) return
-        if (ieee_is_nan(this%PriestleyTaylorCoeff(idx(1)))) status = NML_ERR_NOT_SET
+        if (ieee_is_nan(this%priestleytaylorcoeff(idx(1)))) status = NML_ERR_NOT_SET
       else
-        if (all(ieee_is_nan(this%PriestleyTaylorCoeff))) status = NML_ERR_NOT_SET
+        if (all(ieee_is_nan(this%priestleytaylorcoeff))) status = NML_ERR_NOT_SET
       end if
-    case ("PriestleyTaylorLAIcorr")
+    case ("priestleytaylorlaicorr")
       if (present(idx)) then
-        status = idx_check(idx, lbound(this%PriestleyTaylorLAIcorr), ubound(this%PriestleyTaylorLAIcorr), &
+        status = idx_check(idx, lbound(this%priestleytaylorlaicorr), ubound(this%priestleytaylorlaicorr), &
           "PriestleyTaylorLAIcorr", errmsg)
         if (status /= NML_OK) return
-        if (ieee_is_nan(this%PriestleyTaylorLAIcorr(idx(1)))) status = NML_ERR_NOT_SET
+        if (ieee_is_nan(this%priestleytaylorlaicorr(idx(1)))) status = NML_ERR_NOT_SET
       else
-        if (all(ieee_is_nan(this%PriestleyTaylorLAIcorr))) status = NML_ERR_NOT_SET
+        if (all(ieee_is_nan(this%priestleytaylorlaicorr))) status = NML_ERR_NOT_SET
       end if
     case default
       status = NML_ERR_INVALID_NAME
@@ -191,22 +192,22 @@ contains
     if (present(errmsg)) errmsg = ""
 
     ! required arrays
-    if (all(ieee_is_nan(this%PriestleyTaylorCoeff))) then
+    if (all(ieee_is_nan(this%priestleytaylorcoeff))) then
       status = NML_ERR_REQUIRED
       if (present(errmsg)) errmsg = "required field not set: PriestleyTaylorCoeff"
       return
     end if
-    if (any(ieee_is_nan(this%PriestleyTaylorCoeff))) then
+    if (any(ieee_is_nan(this%priestleytaylorcoeff))) then
       status = NML_ERR_PARTLY_SET
       if (present(errmsg)) errmsg = "array partly set: PriestleyTaylorCoeff"
       return
     end if
-    if (all(ieee_is_nan(this%PriestleyTaylorLAIcorr))) then
+    if (all(ieee_is_nan(this%priestleytaylorlaicorr))) then
       status = NML_ERR_REQUIRED
       if (present(errmsg)) errmsg = "required field not set: PriestleyTaylorLAIcorr"
       return
     end if
-    if (any(ieee_is_nan(this%PriestleyTaylorLAIcorr))) then
+    if (any(ieee_is_nan(this%priestleytaylorlaicorr))) then
       status = NML_ERR_PARTLY_SET
       if (present(errmsg)) errmsg = "array partly set: PriestleyTaylorLAIcorr"
       return

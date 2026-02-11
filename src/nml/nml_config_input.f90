@@ -29,6 +29,7 @@ module nml_config_input
     NML_ERR_INVALID_NAME, &
     NML_ERR_INVALID_INDEX, &
     idx_check, &
+    to_lower, &
     max_domains, &
     buf, &
     NML_ERR_PARTLY_SET
@@ -1431,7 +1432,7 @@ contains
 
     status = NML_OK
     if (present(errmsg)) errmsg = ""
-    select case (trim(name))
+    select case (to_lower(trim(name)))
     case ("chunking")
       if (present(idx)) then
         status = idx_check(idx, lbound(this%chunking), ubound(this%chunking), &
@@ -1984,7 +1985,7 @@ contains
 
     status = NML_OK
     if (present(errmsg)) errmsg = ""
-    select case (trim(name))
+    select case (to_lower(trim(name)))
     case ("latlon_path")
       if (size(filled) /= 1) then
         status = NML_ERR_INVALID_INDEX

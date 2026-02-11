@@ -26,7 +26,8 @@ module nml_output_mrm
     NML_ERR_NOT_SET, &
     NML_ERR_INVALID_NAME, &
     NML_ERR_INVALID_INDEX, &
-    idx_check
+    idx_check, &
+    to_lower
   ! kind specifiers listed in the nml-tools configuration file
   use mo_kind, only: &
     i4
@@ -38,8 +39,8 @@ module nml_output_mrm
   logical, parameter, public :: output_double_precision_default = .false.
   integer(i4), parameter, public :: output_time_reference_default = 2_i4
   integer(i4), parameter, public :: output_frequency_default = -2_i4
-  logical, parameter, public :: out_Qrouted_default = .false.
-  logical, parameter, public :: out_RivTemp_default = .false.
+  logical, parameter, public :: out_qrouted_default = .false.
+  logical, parameter, public :: out_rivtemp_default = .false.
 
   ! enum values
   integer(i4), parameter, public :: output_time_reference_enum_values(3) = [0_i4, 1_i4, 2_i4]
@@ -58,8 +59,8 @@ module nml_output_mrm
     logical :: output_double_precision !< Output double precision
     integer(i4) :: output_time_reference !< Output time reference
     integer(i4) :: output_frequency !< Output time step
-    logical :: out_Qrouted !< Routed Streamflow
-    logical :: out_RivTemp !< Routed Temperature
+    logical :: out_qrouted !< Routed Streamflow
+    logical :: out_rivtemp !< Routed Temperature
   contains
     procedure :: init => nml_output_mrm_init
     procedure :: from_file => nml_output_mrm_from_file
@@ -137,8 +138,8 @@ contains
     this%output_double_precision = output_double_precision_default ! bool values always need a default
     this%output_time_reference = output_time_reference_default
     this%output_frequency = output_frequency_default
-    this%out_Qrouted = out_Qrouted_default ! bool values always need a default
-    this%out_RivTemp = out_RivTemp_default ! bool values always need a default
+    this%out_qrouted = out_qrouted_default ! bool values always need a default
+    this%out_rivtemp = out_rivtemp_default ! bool values always need a default
   end function nml_output_mrm_init
 
   !> \brief Read output_mrm namelist from file
@@ -151,8 +152,8 @@ contains
     logical :: output_double_precision
     integer(i4) :: output_time_reference
     integer(i4) :: output_frequency
-    logical :: out_Qrouted
-    logical :: out_RivTemp
+    logical :: out_qrouted
+    logical :: out_rivtemp
     ! locals
     type(nml_file_t) :: nml
     integer :: iostat
@@ -164,8 +165,8 @@ contains
       output_double_precision, &
       output_time_reference, &
       output_frequency, &
-      out_Qrouted, &
-      out_RivTemp
+      out_qrouted, &
+      out_rivtemp
 
     status = this%init(errmsg=errmsg)
     if (status /= NML_OK) return
@@ -173,8 +174,8 @@ contains
     output_double_precision = this%output_double_precision
     output_time_reference = this%output_time_reference
     output_frequency = this%output_frequency
-    out_Qrouted = this%out_Qrouted
-    out_RivTemp = this%out_RivTemp
+    out_qrouted = this%out_qrouted
+    out_rivtemp = this%out_rivtemp
 
     status = nml%open(file, errmsg=errmsg)
     if (status /= NML_OK) return
@@ -204,8 +205,8 @@ contains
     this%output_double_precision = output_double_precision
     this%output_time_reference = output_time_reference
     this%output_frequency = output_frequency
-    this%out_Qrouted = out_Qrouted
-    this%out_RivTemp = out_RivTemp
+    this%out_qrouted = out_qrouted
+    this%out_rivtemp = out_rivtemp
 
     ! mark as configured
     this%is_configured = .true.
@@ -218,8 +219,8 @@ contains
     output_double_precision, &
     output_time_reference, &
     output_frequency, &
-    out_Qrouted, &
-    out_RivTemp, &
+    out_qrouted, &
+    out_rivtemp, &
     errmsg) result(status)
 
     class(nml_output_mrm_t), intent(inout) :: this
@@ -228,8 +229,8 @@ contains
     logical, intent(in), optional :: output_double_precision
     integer(i4), intent(in), optional :: output_time_reference
     integer(i4), intent(in), optional :: output_frequency
-    logical, intent(in), optional :: out_Qrouted
-    logical, intent(in), optional :: out_RivTemp
+    logical, intent(in), optional :: out_qrouted
+    logical, intent(in), optional :: out_rivtemp
 
     status = this%init(errmsg=errmsg)
     if (status /= NML_OK) return
@@ -240,8 +241,8 @@ contains
     if (present(output_double_precision)) this%output_double_precision = output_double_precision
     if (present(output_time_reference)) this%output_time_reference = output_time_reference
     if (present(output_frequency)) this%output_frequency = output_frequency
-    if (present(out_Qrouted)) this%out_Qrouted = out_Qrouted
-    if (present(out_RivTemp)) this%out_RivTemp = out_RivTemp
+    if (present(out_qrouted)) this%out_qrouted = out_qrouted
+    if (present(out_rivtemp)) this%out_rivtemp = out_rivtemp
 
     ! mark as configured
     this%is_configured = .true.
@@ -257,7 +258,7 @@ contains
 
     status = NML_OK
     if (present(errmsg)) errmsg = ""
-    select case (trim(name))
+    select case (to_lower(trim(name)))
     case ("output_deflate_level")
       if (present(idx)) then
         status = NML_ERR_INVALID_INDEX
@@ -282,13 +283,13 @@ contains
         if (present(errmsg)) errmsg = "index not supported for 'output_frequency'"
         return
       end if
-    case ("out_Qrouted")
+    case ("out_qrouted")
       if (present(idx)) then
         status = NML_ERR_INVALID_INDEX
         if (present(errmsg)) errmsg = "index not supported for 'out_Qrouted'"
         return
       end if
-    case ("out_RivTemp")
+    case ("out_rivtemp")
       if (present(idx)) then
         status = NML_ERR_INVALID_INDEX
         if (present(errmsg)) errmsg = "index not supported for 'out_RivTemp'"

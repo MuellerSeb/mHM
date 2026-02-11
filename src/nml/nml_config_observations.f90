@@ -27,6 +27,7 @@ module nml_config_observations
     NML_ERR_INVALID_NAME, &
     NML_ERR_INVALID_INDEX, &
     idx_check, &
+    to_lower, &
     max_domains, &
     buf, &
     NML_ERR_PARTLY_SET
@@ -47,7 +48,7 @@ module nml_config_observations
     character(len=buf), dimension(max_domains) :: neutrons_path !< Neutron data path
     character(len=buf), dimension(max_domains) :: et_path !< Evapotranspiration data path
     character(len=buf), dimension(max_domains) :: tws_path !< Domain average TWS path
-    real(dp), dimension(max_domains) :: BFI_obs !< Baseflow index per domain
+    real(dp), dimension(max_domains) :: bfi_obs !< Baseflow index per domain
     integer(i4) :: sm_horizons !< Number of mHM soil moisture horizons
     integer(i4) :: sm_time_step !< Time step of soil moisture
     integer(i4) :: et_time_step !< Time step of evapotranspiration
@@ -77,7 +78,7 @@ contains
     this%neutrons_path = repeat(achar(0), len(this%neutrons_path)) ! sentinel for optional string array
     this%et_path = repeat(achar(0), len(this%et_path)) ! sentinel for optional string array
     this%tws_path = repeat(achar(0), len(this%tws_path)) ! sentinel for optional string array
-    this%BFI_obs = ieee_value(this%BFI_obs, ieee_quiet_nan) ! sentinel for optional real array
+    this%bfi_obs = ieee_value(this%bfi_obs, ieee_quiet_nan) ! sentinel for optional real array
     this%sm_horizons = -huge(this%sm_horizons) ! sentinel for optional integer
     this%sm_time_step = -huge(this%sm_time_step) ! sentinel for optional integer
     this%et_time_step = -huge(this%et_time_step) ! sentinel for optional integer
@@ -94,7 +95,7 @@ contains
     character(len=buf), dimension(max_domains) :: neutrons_path
     character(len=buf), dimension(max_domains) :: et_path
     character(len=buf), dimension(max_domains) :: tws_path
-    real(dp), dimension(max_domains) :: BFI_obs
+    real(dp), dimension(max_domains) :: bfi_obs
     integer(i4) :: sm_horizons
     integer(i4) :: sm_time_step
     integer(i4) :: et_time_step
@@ -110,7 +111,7 @@ contains
       neutrons_path, &
       et_path, &
       tws_path, &
-      BFI_obs, &
+      bfi_obs, &
       sm_horizons, &
       sm_time_step, &
       et_time_step, &
@@ -122,7 +123,7 @@ contains
     neutrons_path = this%neutrons_path
     et_path = this%et_path
     tws_path = this%tws_path
-    BFI_obs = this%BFI_obs
+    bfi_obs = this%bfi_obs
     sm_horizons = this%sm_horizons
     sm_time_step = this%sm_time_step
     et_time_step = this%et_time_step
@@ -156,7 +157,7 @@ contains
     this%neutrons_path = neutrons_path
     this%et_path = et_path
     this%tws_path = tws_path
-    this%BFI_obs = BFI_obs
+    this%bfi_obs = bfi_obs
     this%sm_horizons = sm_horizons
     this%sm_time_step = sm_time_step
     this%et_time_step = et_time_step
@@ -173,7 +174,7 @@ contains
     neutrons_path, &
     et_path, &
     tws_path, &
-    BFI_obs, &
+    bfi_obs, &
     sm_horizons, &
     sm_time_step, &
     et_time_step, &
@@ -186,7 +187,7 @@ contains
     character(len=*), dimension(:), intent(in), optional :: neutrons_path
     character(len=*), dimension(:), intent(in), optional :: et_path
     character(len=*), dimension(:), intent(in), optional :: tws_path
-    real(dp), dimension(:), intent(in), optional :: BFI_obs
+    real(dp), dimension(:), intent(in), optional :: bfi_obs
     integer(i4), intent(in), optional :: sm_horizons
     integer(i4), intent(in), optional :: sm_time_step
     integer(i4), intent(in), optional :: et_time_step
@@ -240,15 +241,15 @@ contains
       ub_1 = lb_1 + size(tws_path, 1) - 1
       this%tws_path(lb_1:ub_1) = tws_path
     end if
-    if (present(BFI_obs)) then
-      if (size(BFI_obs, 1) > size(this%BFI_obs, 1)) then
+    if (present(bfi_obs)) then
+      if (size(bfi_obs, 1) > size(this%bfi_obs, 1)) then
         status = NML_ERR_INVALID_INDEX
-        if (present(errmsg)) errmsg = "dimension 1 exceeds bounds for 'BFI_obs'"
+        if (present(errmsg)) errmsg = "dimension 1 exceeds bounds for 'bfi_obs'"
         return
       end if
-      lb_1 = lbound(this%BFI_obs, 1)
-      ub_1 = lb_1 + size(BFI_obs, 1) - 1
-      this%BFI_obs(lb_1:ub_1) = BFI_obs
+      lb_1 = lbound(this%bfi_obs, 1)
+      ub_1 = lb_1 + size(bfi_obs, 1) - 1
+      this%bfi_obs(lb_1:ub_1) = bfi_obs
     end if
     if (present(sm_horizons)) this%sm_horizons = sm_horizons
     if (present(sm_time_step)) this%sm_time_step = sm_time_step
@@ -269,7 +270,7 @@ contains
 
     status = NML_OK
     if (present(errmsg)) errmsg = ""
-    select case (trim(name))
+    select case (to_lower(trim(name)))
     case ("sm_path")
       if (present(idx)) then
         status = idx_check(idx, lbound(this%sm_path), ubound(this%sm_path), &
@@ -306,14 +307,14 @@ contains
       else
         if (all(this%tws_path == repeat(achar(0), len(this%tws_path)))) status = NML_ERR_NOT_SET
       end if
-    case ("BFI_obs")
+    case ("bfi_obs")
       if (present(idx)) then
-        status = idx_check(idx, lbound(this%BFI_obs), ubound(this%BFI_obs), &
+        status = idx_check(idx, lbound(this%bfi_obs), ubound(this%bfi_obs), &
           "BFI_obs", errmsg)
         if (status /= NML_OK) return
-        if (ieee_is_nan(this%BFI_obs(idx(1)))) status = NML_ERR_NOT_SET
+        if (ieee_is_nan(this%bfi_obs(idx(1)))) status = NML_ERR_NOT_SET
       else
-        if (all(ieee_is_nan(this%BFI_obs))) status = NML_ERR_NOT_SET
+        if (all(ieee_is_nan(this%bfi_obs))) status = NML_ERR_NOT_SET
       end if
     case ("sm_horizons")
       if (present(idx)) then
@@ -366,7 +367,7 @@ contains
 
     status = NML_OK
     if (present(errmsg)) errmsg = ""
-    select case (trim(name))
+    select case (to_lower(trim(name)))
     case ("sm_path")
       if (size(filled) /= 1) then
         status = NML_ERR_INVALID_INDEX
@@ -471,27 +472,27 @@ contains
           return
         end if
       end if
-    case ("BFI_obs")
+    case ("bfi_obs")
       if (size(filled) /= 1) then
         status = NML_ERR_INVALID_INDEX
         if (present(errmsg)) errmsg = "shape rank mismatch for 'BFI_obs'"
         return
       end if
       do dim = 1, 1
-        filled(dim) = size(this%BFI_obs, dim)
+        filled(dim) = size(this%bfi_obs, dim)
       end do
       filled(1) = 0
-      do idx = ubound(this%BFI_obs, 1), &
-        lbound(this%BFI_obs, 1), -1
-        if (.not. (ieee_is_nan(this%BFI_obs(idx)))) then
-          filled(1) = idx - lbound(this%BFI_obs, 1) + 1
+      do idx = ubound(this%bfi_obs, 1), &
+        lbound(this%bfi_obs, 1), -1
+        if (.not. (ieee_is_nan(this%bfi_obs(idx)))) then
+          filled(1) = idx - lbound(this%bfi_obs, 1) + 1
           exit
         end if
       end do
       if (minval(filled) > 0) then
-        lb_1 = lbound(this%BFI_obs, 1)
+        lb_1 = lbound(this%bfi_obs, 1)
         ub_1 = lb_1 + filled(1) - 1
-        if (any(ieee_is_nan(this%BFI_obs(lb_1:ub_1)))) then
+        if (any(ieee_is_nan(this%bfi_obs(lb_1:ub_1)))) then
           status = NML_ERR_PARTLY_SET
           if (present(errmsg)) errmsg = "array partly set: BFI_obs"
           return

@@ -28,6 +28,7 @@ module nml_config_meteo
     NML_ERR_INVALID_NAME, &
     NML_ERR_INVALID_INDEX, &
     idx_check, &
+    to_lower, &
     max_domains, &
     buf, &
     NML_ERR_PARTLY_SET
@@ -478,7 +479,7 @@ contains
 
     status = NML_OK
     if (present(errmsg)) errmsg = ""
-    select case (trim(name))
+    select case (to_lower(trim(name)))
     case ("read_meteo_weights")
       if (present(idx)) then
         status = idx_check(idx, lbound(this%read_meteo_weights), ubound(this%read_meteo_weights), &
@@ -642,7 +643,7 @@ contains
 
     status = NML_OK
     if (present(errmsg)) errmsg = ""
-    select case (trim(name))
+    select case (to_lower(trim(name)))
     case ("pre_weights_path")
       if (size(filled) /= 1) then
         status = NML_ERR_INVALID_INDEX

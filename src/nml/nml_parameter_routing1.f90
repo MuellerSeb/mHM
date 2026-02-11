@@ -27,6 +27,7 @@ module nml_routing1
     NML_ERR_INVALID_NAME, &
     NML_ERR_INVALID_INDEX, &
     idx_check, &
+    to_lower, &
     NML_ERR_PARTLY_SET
   use ieee_arithmetic, only: ieee_value, ieee_quiet_nan, ieee_is_nan
   ! kind specifiers listed in the nml-tools configuration file
@@ -40,11 +41,11 @@ module nml_routing1
   !> \details Parameters for routing (case 1 - Muskingum).
   type, public :: nml_routing1_t
     logical :: is_configured = .false. !< whether the namelist has been configured
-    real(dp), dimension(5) :: muskingumTravelTime_constant !< Muskingum travel time constant
-    real(dp), dimension(5) :: muskingumTravelTime_riverLength !< Muskingum travel time river length
-    real(dp), dimension(5) :: muskingumTravelTime_riverSlope !< Muskingum travel time river slope
-    real(dp), dimension(5) :: muskingumTravelTime_impervious !< Muskingum travel time impervious
-    real(dp), dimension(5) :: muskingumAttenuation_riverSlope !< Muskingum attenuation river slope
+    real(dp), dimension(5) :: muskingumtraveltime_constant !< Muskingum travel time constant
+    real(dp), dimension(5) :: muskingumtraveltime_riverlength !< Muskingum travel time river length
+    real(dp), dimension(5) :: muskingumtraveltime_riverslope !< Muskingum travel time river slope
+    real(dp), dimension(5) :: muskingumtraveltime_impervious !< Muskingum travel time impervious
+    real(dp), dimension(5) :: muskingumattenuation_riverslope !< Muskingum attenuation river slope
   contains
     procedure :: init => nml_routing1_init
     procedure :: from_file => nml_routing1_from_file
@@ -65,11 +66,11 @@ contains
     this%is_configured = .false.
 
     ! sentinel values for required/optional parameters
-    this%muskingumTravelTime_constant = ieee_value(this%muskingumTravelTime_constant, ieee_quiet_nan) ! sentinel for required real array
-    this%muskingumTravelTime_riverLength = ieee_value(this%muskingumTravelTime_riverLength, ieee_quiet_nan) ! sentinel for required real array
-    this%muskingumTravelTime_riverSlope = ieee_value(this%muskingumTravelTime_riverSlope, ieee_quiet_nan) ! sentinel for required real array
-    this%muskingumTravelTime_impervious = ieee_value(this%muskingumTravelTime_impervious, ieee_quiet_nan) ! sentinel for required real array
-    this%muskingumAttenuation_riverSlope = ieee_value(this%muskingumAttenuation_riverSlope, ieee_quiet_nan) ! sentinel for required real array
+    this%muskingumtraveltime_constant = ieee_value(this%muskingumtraveltime_constant, ieee_quiet_nan) ! sentinel for required real array
+    this%muskingumtraveltime_riverlength = ieee_value(this%muskingumtraveltime_riverlength, ieee_quiet_nan) ! sentinel for required real array
+    this%muskingumtraveltime_riverslope = ieee_value(this%muskingumtraveltime_riverslope, ieee_quiet_nan) ! sentinel for required real array
+    this%muskingumtraveltime_impervious = ieee_value(this%muskingumtraveltime_impervious, ieee_quiet_nan) ! sentinel for required real array
+    this%muskingumattenuation_riverslope = ieee_value(this%muskingumattenuation_riverslope, ieee_quiet_nan) ! sentinel for required real array
   end function nml_routing1_init
 
   !> \brief Read routing1 namelist from file
@@ -78,11 +79,11 @@ contains
     character(len=*), intent(in) :: file !< path to namelist file
     character(len=*), intent(out), optional :: errmsg
     ! namelist variables
-    real(dp), dimension(5) :: muskingumTravelTime_constant
-    real(dp), dimension(5) :: muskingumTravelTime_riverLength
-    real(dp), dimension(5) :: muskingumTravelTime_riverSlope
-    real(dp), dimension(5) :: muskingumTravelTime_impervious
-    real(dp), dimension(5) :: muskingumAttenuation_riverSlope
+    real(dp), dimension(5) :: muskingumtraveltime_constant
+    real(dp), dimension(5) :: muskingumtraveltime_riverlength
+    real(dp), dimension(5) :: muskingumtraveltime_riverslope
+    real(dp), dimension(5) :: muskingumtraveltime_impervious
+    real(dp), dimension(5) :: muskingumattenuation_riverslope
     ! locals
     type(nml_file_t) :: nml
     integer :: iostat
@@ -90,19 +91,19 @@ contains
     character(len=nml_line_buffer) :: iomsg
 
     namelist /routing1/ &
-      muskingumTravelTime_constant, &
-      muskingumTravelTime_riverLength, &
-      muskingumTravelTime_riverSlope, &
-      muskingumTravelTime_impervious, &
-      muskingumAttenuation_riverSlope
+      muskingumtraveltime_constant, &
+      muskingumtraveltime_riverlength, &
+      muskingumtraveltime_riverslope, &
+      muskingumtraveltime_impervious, &
+      muskingumattenuation_riverslope
 
     status = this%init(errmsg=errmsg)
     if (status /= NML_OK) return
-    muskingumTravelTime_constant = this%muskingumTravelTime_constant
-    muskingumTravelTime_riverLength = this%muskingumTravelTime_riverLength
-    muskingumTravelTime_riverSlope = this%muskingumTravelTime_riverSlope
-    muskingumTravelTime_impervious = this%muskingumTravelTime_impervious
-    muskingumAttenuation_riverSlope = this%muskingumAttenuation_riverSlope
+    muskingumtraveltime_constant = this%muskingumtraveltime_constant
+    muskingumtraveltime_riverlength = this%muskingumtraveltime_riverlength
+    muskingumtraveltime_riverslope = this%muskingumtraveltime_riverslope
+    muskingumtraveltime_impervious = this%muskingumtraveltime_impervious
+    muskingumattenuation_riverslope = this%muskingumattenuation_riverslope
 
     status = nml%open(file, errmsg=errmsg)
     if (status /= NML_OK) return
@@ -128,11 +129,11 @@ contains
     end if
 
     ! assign values
-    this%muskingumTravelTime_constant = muskingumTravelTime_constant
-    this%muskingumTravelTime_riverLength = muskingumTravelTime_riverLength
-    this%muskingumTravelTime_riverSlope = muskingumTravelTime_riverSlope
-    this%muskingumTravelTime_impervious = muskingumTravelTime_impervious
-    this%muskingumAttenuation_riverSlope = muskingumAttenuation_riverSlope
+    this%muskingumtraveltime_constant = muskingumtraveltime_constant
+    this%muskingumtraveltime_riverlength = muskingumtraveltime_riverlength
+    this%muskingumtraveltime_riverslope = muskingumtraveltime_riverslope
+    this%muskingumtraveltime_impervious = muskingumtraveltime_impervious
+    this%muskingumattenuation_riverslope = muskingumattenuation_riverslope
 
     ! mark as configured
     this%is_configured = .true.
@@ -141,30 +142,30 @@ contains
 
   !> \brief Set routing1 values
   integer function nml_routing1_set(this, &
-    muskingumTravelTime_constant, &
-    muskingumTravelTime_riverLength, &
-    muskingumTravelTime_riverSlope, &
-    muskingumTravelTime_impervious, &
-    muskingumAttenuation_riverSlope, &
+    muskingumtraveltime_constant, &
+    muskingumtraveltime_riverlength, &
+    muskingumtraveltime_riverslope, &
+    muskingumtraveltime_impervious, &
+    muskingumattenuation_riverslope, &
     errmsg) result(status)
 
     class(nml_routing1_t), intent(inout) :: this
     character(len=*), intent(out), optional :: errmsg
-    real(dp), dimension(5), intent(in) :: muskingumTravelTime_constant
-    real(dp), dimension(5), intent(in) :: muskingumTravelTime_riverLength
-    real(dp), dimension(5), intent(in) :: muskingumTravelTime_riverSlope
-    real(dp), dimension(5), intent(in) :: muskingumTravelTime_impervious
-    real(dp), dimension(5), intent(in) :: muskingumAttenuation_riverSlope
+    real(dp), dimension(5), intent(in) :: muskingumtraveltime_constant
+    real(dp), dimension(5), intent(in) :: muskingumtraveltime_riverlength
+    real(dp), dimension(5), intent(in) :: muskingumtraveltime_riverslope
+    real(dp), dimension(5), intent(in) :: muskingumtraveltime_impervious
+    real(dp), dimension(5), intent(in) :: muskingumattenuation_riverslope
 
     status = this%init(errmsg=errmsg)
     if (status /= NML_OK) return
 
     ! required parameters
-    this%muskingumTravelTime_constant = muskingumTravelTime_constant
-    this%muskingumTravelTime_riverLength = muskingumTravelTime_riverLength
-    this%muskingumTravelTime_riverSlope = muskingumTravelTime_riverSlope
-    this%muskingumTravelTime_impervious = muskingumTravelTime_impervious
-    this%muskingumAttenuation_riverSlope = muskingumAttenuation_riverSlope
+    this%muskingumtraveltime_constant = muskingumtraveltime_constant
+    this%muskingumtraveltime_riverlength = muskingumtraveltime_riverlength
+    this%muskingumtraveltime_riverslope = muskingumtraveltime_riverslope
+    this%muskingumtraveltime_impervious = muskingumtraveltime_impervious
+    this%muskingumattenuation_riverslope = muskingumattenuation_riverslope
 
     ! mark as configured
     this%is_configured = .true.
@@ -180,51 +181,51 @@ contains
 
     status = NML_OK
     if (present(errmsg)) errmsg = ""
-    select case (trim(name))
-    case ("muskingumTravelTime_constant")
+    select case (to_lower(trim(name)))
+    case ("muskingumtraveltime_constant")
       if (present(idx)) then
-        status = idx_check(idx, lbound(this%muskingumTravelTime_constant), ubound(this%muskingumTravelTime_constant), &
+        status = idx_check(idx, lbound(this%muskingumtraveltime_constant), ubound(this%muskingumtraveltime_constant), &
           "muskingumTravelTime_constant", errmsg)
         if (status /= NML_OK) return
-        if (ieee_is_nan(this%muskingumTravelTime_constant(idx(1)))) status = NML_ERR_NOT_SET
+        if (ieee_is_nan(this%muskingumtraveltime_constant(idx(1)))) status = NML_ERR_NOT_SET
       else
-        if (all(ieee_is_nan(this%muskingumTravelTime_constant))) status = NML_ERR_NOT_SET
+        if (all(ieee_is_nan(this%muskingumtraveltime_constant))) status = NML_ERR_NOT_SET
       end if
-    case ("muskingumTravelTime_riverLength")
+    case ("muskingumtraveltime_riverlength")
       if (present(idx)) then
-        status = idx_check(idx, lbound(this%muskingumTravelTime_riverLength), ubound(this%muskingumTravelTime_riverLength), &
+        status = idx_check(idx, lbound(this%muskingumtraveltime_riverlength), ubound(this%muskingumtraveltime_riverlength), &
           "muskingumTravelTime_riverLength", errmsg)
         if (status /= NML_OK) return
-        if (ieee_is_nan(this%muskingumTravelTime_riverLength(idx(1)))) status = NML_ERR_NOT_SET
+        if (ieee_is_nan(this%muskingumtraveltime_riverlength(idx(1)))) status = NML_ERR_NOT_SET
       else
-        if (all(ieee_is_nan(this%muskingumTravelTime_riverLength))) status = NML_ERR_NOT_SET
+        if (all(ieee_is_nan(this%muskingumtraveltime_riverlength))) status = NML_ERR_NOT_SET
       end if
-    case ("muskingumTravelTime_riverSlope")
+    case ("muskingumtraveltime_riverslope")
       if (present(idx)) then
-        status = idx_check(idx, lbound(this%muskingumTravelTime_riverSlope), ubound(this%muskingumTravelTime_riverSlope), &
+        status = idx_check(idx, lbound(this%muskingumtraveltime_riverslope), ubound(this%muskingumtraveltime_riverslope), &
           "muskingumTravelTime_riverSlope", errmsg)
         if (status /= NML_OK) return
-        if (ieee_is_nan(this%muskingumTravelTime_riverSlope(idx(1)))) status = NML_ERR_NOT_SET
+        if (ieee_is_nan(this%muskingumtraveltime_riverslope(idx(1)))) status = NML_ERR_NOT_SET
       else
-        if (all(ieee_is_nan(this%muskingumTravelTime_riverSlope))) status = NML_ERR_NOT_SET
+        if (all(ieee_is_nan(this%muskingumtraveltime_riverslope))) status = NML_ERR_NOT_SET
       end if
-    case ("muskingumTravelTime_impervious")
+    case ("muskingumtraveltime_impervious")
       if (present(idx)) then
-        status = idx_check(idx, lbound(this%muskingumTravelTime_impervious), ubound(this%muskingumTravelTime_impervious), &
+        status = idx_check(idx, lbound(this%muskingumtraveltime_impervious), ubound(this%muskingumtraveltime_impervious), &
           "muskingumTravelTime_impervious", errmsg)
         if (status /= NML_OK) return
-        if (ieee_is_nan(this%muskingumTravelTime_impervious(idx(1)))) status = NML_ERR_NOT_SET
+        if (ieee_is_nan(this%muskingumtraveltime_impervious(idx(1)))) status = NML_ERR_NOT_SET
       else
-        if (all(ieee_is_nan(this%muskingumTravelTime_impervious))) status = NML_ERR_NOT_SET
+        if (all(ieee_is_nan(this%muskingumtraveltime_impervious))) status = NML_ERR_NOT_SET
       end if
-    case ("muskingumAttenuation_riverSlope")
+    case ("muskingumattenuation_riverslope")
       if (present(idx)) then
-        status = idx_check(idx, lbound(this%muskingumAttenuation_riverSlope), ubound(this%muskingumAttenuation_riverSlope), &
+        status = idx_check(idx, lbound(this%muskingumattenuation_riverslope), ubound(this%muskingumattenuation_riverslope), &
           "muskingumAttenuation_riverSlope", errmsg)
         if (status /= NML_OK) return
-        if (ieee_is_nan(this%muskingumAttenuation_riverSlope(idx(1)))) status = NML_ERR_NOT_SET
+        if (ieee_is_nan(this%muskingumattenuation_riverslope(idx(1)))) status = NML_ERR_NOT_SET
       else
-        if (all(ieee_is_nan(this%muskingumAttenuation_riverSlope))) status = NML_ERR_NOT_SET
+        if (all(ieee_is_nan(this%muskingumattenuation_riverslope))) status = NML_ERR_NOT_SET
       end if
     case default
       status = NML_ERR_INVALID_NAME
@@ -245,52 +246,52 @@ contains
     if (present(errmsg)) errmsg = ""
 
     ! required arrays
-    if (all(ieee_is_nan(this%muskingumTravelTime_constant))) then
+    if (all(ieee_is_nan(this%muskingumtraveltime_constant))) then
       status = NML_ERR_REQUIRED
       if (present(errmsg)) errmsg = "required field not set: muskingumTravelTime_constant"
       return
     end if
-    if (any(ieee_is_nan(this%muskingumTravelTime_constant))) then
+    if (any(ieee_is_nan(this%muskingumtraveltime_constant))) then
       status = NML_ERR_PARTLY_SET
       if (present(errmsg)) errmsg = "array partly set: muskingumTravelTime_constant"
       return
     end if
-    if (all(ieee_is_nan(this%muskingumTravelTime_riverLength))) then
+    if (all(ieee_is_nan(this%muskingumtraveltime_riverlength))) then
       status = NML_ERR_REQUIRED
       if (present(errmsg)) errmsg = "required field not set: muskingumTravelTime_riverLength"
       return
     end if
-    if (any(ieee_is_nan(this%muskingumTravelTime_riverLength))) then
+    if (any(ieee_is_nan(this%muskingumtraveltime_riverlength))) then
       status = NML_ERR_PARTLY_SET
       if (present(errmsg)) errmsg = "array partly set: muskingumTravelTime_riverLength"
       return
     end if
-    if (all(ieee_is_nan(this%muskingumTravelTime_riverSlope))) then
+    if (all(ieee_is_nan(this%muskingumtraveltime_riverslope))) then
       status = NML_ERR_REQUIRED
       if (present(errmsg)) errmsg = "required field not set: muskingumTravelTime_riverSlope"
       return
     end if
-    if (any(ieee_is_nan(this%muskingumTravelTime_riverSlope))) then
+    if (any(ieee_is_nan(this%muskingumtraveltime_riverslope))) then
       status = NML_ERR_PARTLY_SET
       if (present(errmsg)) errmsg = "array partly set: muskingumTravelTime_riverSlope"
       return
     end if
-    if (all(ieee_is_nan(this%muskingumTravelTime_impervious))) then
+    if (all(ieee_is_nan(this%muskingumtraveltime_impervious))) then
       status = NML_ERR_REQUIRED
       if (present(errmsg)) errmsg = "required field not set: muskingumTravelTime_impervious"
       return
     end if
-    if (any(ieee_is_nan(this%muskingumTravelTime_impervious))) then
+    if (any(ieee_is_nan(this%muskingumtraveltime_impervious))) then
       status = NML_ERR_PARTLY_SET
       if (present(errmsg)) errmsg = "array partly set: muskingumTravelTime_impervious"
       return
     end if
-    if (all(ieee_is_nan(this%muskingumAttenuation_riverSlope))) then
+    if (all(ieee_is_nan(this%muskingumattenuation_riverslope))) then
       status = NML_ERR_REQUIRED
       if (present(errmsg)) errmsg = "required field not set: muskingumAttenuation_riverSlope"
       return
     end if
-    if (any(ieee_is_nan(this%muskingumAttenuation_riverSlope))) then
+    if (any(ieee_is_nan(this%muskingumattenuation_riverslope))) then
       status = NML_ERR_PARTLY_SET
       if (present(errmsg)) errmsg = "array partly set: muskingumAttenuation_riverSlope"
       return

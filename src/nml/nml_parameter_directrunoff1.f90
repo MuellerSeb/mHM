@@ -27,6 +27,7 @@ module nml_directrunoff1
     NML_ERR_INVALID_NAME, &
     NML_ERR_INVALID_INDEX, &
     idx_check, &
+    to_lower, &
     NML_ERR_PARTLY_SET
   use ieee_arithmetic, only: ieee_value, ieee_quiet_nan, ieee_is_nan
   ! kind specifiers listed in the nml-tools configuration file
@@ -40,7 +41,7 @@ module nml_directrunoff1
   !> \details Parameters for Direct sealed area runoff.
   type, public :: nml_directrunoff1_t
     logical :: is_configured = .false. !< whether the namelist has been configured
-    real(dp), dimension(5) :: imperviousStorageCapacity !< Capacity of impervious storage [mm]
+    real(dp), dimension(5) :: imperviousstoragecapacity !< Capacity of impervious storage [mm]
   contains
     procedure :: init => nml_directrunoff1_init
     procedure :: from_file => nml_directrunoff1_from_file
@@ -61,7 +62,7 @@ contains
     this%is_configured = .false.
 
     ! sentinel values for required/optional parameters
-    this%imperviousStorageCapacity = ieee_value(this%imperviousStorageCapacity, ieee_quiet_nan) ! sentinel for required real array
+    this%imperviousstoragecapacity = ieee_value(this%imperviousstoragecapacity, ieee_quiet_nan) ! sentinel for required real array
   end function nml_directrunoff1_init
 
   !> \brief Read directrunoff1 namelist from file
@@ -70,7 +71,7 @@ contains
     character(len=*), intent(in) :: file !< path to namelist file
     character(len=*), intent(out), optional :: errmsg
     ! namelist variables
-    real(dp), dimension(5) :: imperviousStorageCapacity
+    real(dp), dimension(5) :: imperviousstoragecapacity
     ! locals
     type(nml_file_t) :: nml
     integer :: iostat
@@ -78,11 +79,11 @@ contains
     character(len=nml_line_buffer) :: iomsg
 
     namelist /directrunoff1/ &
-      imperviousStorageCapacity
+      imperviousstoragecapacity
 
     status = this%init(errmsg=errmsg)
     if (status /= NML_OK) return
-    imperviousStorageCapacity = this%imperviousStorageCapacity
+    imperviousstoragecapacity = this%imperviousstoragecapacity
 
     status = nml%open(file, errmsg=errmsg)
     if (status /= NML_OK) return
@@ -108,7 +109,7 @@ contains
     end if
 
     ! assign values
-    this%imperviousStorageCapacity = imperviousStorageCapacity
+    this%imperviousstoragecapacity = imperviousstoragecapacity
 
     ! mark as configured
     this%is_configured = .true.
@@ -117,18 +118,18 @@ contains
 
   !> \brief Set directrunoff1 values
   integer function nml_directrunoff1_set(this, &
-    imperviousStorageCapacity, &
+    imperviousstoragecapacity, &
     errmsg) result(status)
 
     class(nml_directrunoff1_t), intent(inout) :: this
     character(len=*), intent(out), optional :: errmsg
-    real(dp), dimension(5), intent(in) :: imperviousStorageCapacity
+    real(dp), dimension(5), intent(in) :: imperviousstoragecapacity
 
     status = this%init(errmsg=errmsg)
     if (status /= NML_OK) return
 
     ! required parameters
-    this%imperviousStorageCapacity = imperviousStorageCapacity
+    this%imperviousstoragecapacity = imperviousstoragecapacity
 
     ! mark as configured
     this%is_configured = .true.
@@ -144,15 +145,15 @@ contains
 
     status = NML_OK
     if (present(errmsg)) errmsg = ""
-    select case (trim(name))
-    case ("imperviousStorageCapacity")
+    select case (to_lower(trim(name)))
+    case ("imperviousstoragecapacity")
       if (present(idx)) then
-        status = idx_check(idx, lbound(this%imperviousStorageCapacity), ubound(this%imperviousStorageCapacity), &
+        status = idx_check(idx, lbound(this%imperviousstoragecapacity), ubound(this%imperviousstoragecapacity), &
           "imperviousStorageCapacity", errmsg)
         if (status /= NML_OK) return
-        if (ieee_is_nan(this%imperviousStorageCapacity(idx(1)))) status = NML_ERR_NOT_SET
+        if (ieee_is_nan(this%imperviousstoragecapacity(idx(1)))) status = NML_ERR_NOT_SET
       else
-        if (all(ieee_is_nan(this%imperviousStorageCapacity))) status = NML_ERR_NOT_SET
+        if (all(ieee_is_nan(this%imperviousstoragecapacity))) status = NML_ERR_NOT_SET
       end if
     case default
       status = NML_ERR_INVALID_NAME
@@ -173,12 +174,12 @@ contains
     if (present(errmsg)) errmsg = ""
 
     ! required arrays
-    if (all(ieee_is_nan(this%imperviousStorageCapacity))) then
+    if (all(ieee_is_nan(this%imperviousstoragecapacity))) then
       status = NML_ERR_REQUIRED
       if (present(errmsg)) errmsg = "required field not set: imperviousStorageCapacity"
       return
     end if
-    if (any(ieee_is_nan(this%imperviousStorageCapacity))) then
+    if (any(ieee_is_nan(this%imperviousstoragecapacity))) then
       status = NML_ERR_PARTLY_SET
       if (present(errmsg)) errmsg = "array partly set: imperviousStorageCapacity"
       return

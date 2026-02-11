@@ -27,6 +27,7 @@ module nml_interflow1
     NML_ERR_INVALID_NAME, &
     NML_ERR_INVALID_INDEX, &
     idx_check, &
+    to_lower, &
     NML_ERR_PARTLY_SET
   use ieee_arithmetic, only: ieee_value, ieee_quiet_nan, ieee_is_nan
   ! kind specifiers listed in the nml-tools configuration file
@@ -40,11 +41,11 @@ module nml_interflow1
   !> \details Parameters for interflow1.
   type, public :: nml_interflow1_t
     logical :: is_configured = .false. !< whether the namelist has been configured
-    real(dp), dimension(5) :: interflowStorageCapacityFactor !< Storage capacity factor for interflow
-    real(dp), dimension(5) :: interflowRecession_slope !< Multiplier for slope to derive interflow recession constant
-    real(dp), dimension(5) :: fastInterflowRecession_forest !< Multiplier for forest to derive fast interflow recession constant
-    real(dp), dimension(5) :: slowInterflowRecession_Ks !< Multiplier for variability of saturated hydraulic conductivity to derive slow interflow recession constant
-    real(dp), dimension(5) :: exponentSlowInterflow !< Multiplier for variability of saturated hydraulic conductivity to derive slow interflow exponent
+    real(dp), dimension(5) :: interflowstoragecapacityfactor !< Storage capacity factor for interflow
+    real(dp), dimension(5) :: interflowrecession_slope !< Multiplier for slope to derive interflow recession constant
+    real(dp), dimension(5) :: fastinterflowrecession_forest !< Multiplier for forest to derive fast interflow recession constant
+    real(dp), dimension(5) :: slowinterflowrecession_ks !< Multiplier for variability of saturated hydraulic conductivity to derive slow interflow recession constant
+    real(dp), dimension(5) :: exponentslowinterflow !< Multiplier for variability of saturated hydraulic conductivity to derive slow interflow exponent
   contains
     procedure :: init => nml_interflow1_init
     procedure :: from_file => nml_interflow1_from_file
@@ -65,11 +66,11 @@ contains
     this%is_configured = .false.
 
     ! sentinel values for required/optional parameters
-    this%interflowStorageCapacityFactor = ieee_value(this%interflowStorageCapacityFactor, ieee_quiet_nan) ! sentinel for required real array
-    this%interflowRecession_slope = ieee_value(this%interflowRecession_slope, ieee_quiet_nan) ! sentinel for required real array
-    this%fastInterflowRecession_forest = ieee_value(this%fastInterflowRecession_forest, ieee_quiet_nan) ! sentinel for required real array
-    this%slowInterflowRecession_Ks = ieee_value(this%slowInterflowRecession_Ks, ieee_quiet_nan) ! sentinel for required real array
-    this%exponentSlowInterflow = ieee_value(this%exponentSlowInterflow, ieee_quiet_nan) ! sentinel for required real array
+    this%interflowstoragecapacityfactor = ieee_value(this%interflowstoragecapacityfactor, ieee_quiet_nan) ! sentinel for required real array
+    this%interflowrecession_slope = ieee_value(this%interflowrecession_slope, ieee_quiet_nan) ! sentinel for required real array
+    this%fastinterflowrecession_forest = ieee_value(this%fastinterflowrecession_forest, ieee_quiet_nan) ! sentinel for required real array
+    this%slowinterflowrecession_ks = ieee_value(this%slowinterflowrecession_ks, ieee_quiet_nan) ! sentinel for required real array
+    this%exponentslowinterflow = ieee_value(this%exponentslowinterflow, ieee_quiet_nan) ! sentinel for required real array
   end function nml_interflow1_init
 
   !> \brief Read interflow1 namelist from file
@@ -78,11 +79,11 @@ contains
     character(len=*), intent(in) :: file !< path to namelist file
     character(len=*), intent(out), optional :: errmsg
     ! namelist variables
-    real(dp), dimension(5) :: interflowStorageCapacityFactor
-    real(dp), dimension(5) :: interflowRecession_slope
-    real(dp), dimension(5) :: fastInterflowRecession_forest
-    real(dp), dimension(5) :: slowInterflowRecession_Ks
-    real(dp), dimension(5) :: exponentSlowInterflow
+    real(dp), dimension(5) :: interflowstoragecapacityfactor
+    real(dp), dimension(5) :: interflowrecession_slope
+    real(dp), dimension(5) :: fastinterflowrecession_forest
+    real(dp), dimension(5) :: slowinterflowrecession_ks
+    real(dp), dimension(5) :: exponentslowinterflow
     ! locals
     type(nml_file_t) :: nml
     integer :: iostat
@@ -90,19 +91,19 @@ contains
     character(len=nml_line_buffer) :: iomsg
 
     namelist /interflow1/ &
-      interflowStorageCapacityFactor, &
-      interflowRecession_slope, &
-      fastInterflowRecession_forest, &
-      slowInterflowRecession_Ks, &
-      exponentSlowInterflow
+      interflowstoragecapacityfactor, &
+      interflowrecession_slope, &
+      fastinterflowrecession_forest, &
+      slowinterflowrecession_ks, &
+      exponentslowinterflow
 
     status = this%init(errmsg=errmsg)
     if (status /= NML_OK) return
-    interflowStorageCapacityFactor = this%interflowStorageCapacityFactor
-    interflowRecession_slope = this%interflowRecession_slope
-    fastInterflowRecession_forest = this%fastInterflowRecession_forest
-    slowInterflowRecession_Ks = this%slowInterflowRecession_Ks
-    exponentSlowInterflow = this%exponentSlowInterflow
+    interflowstoragecapacityfactor = this%interflowstoragecapacityfactor
+    interflowrecession_slope = this%interflowrecession_slope
+    fastinterflowrecession_forest = this%fastinterflowrecession_forest
+    slowinterflowrecession_ks = this%slowinterflowrecession_ks
+    exponentslowinterflow = this%exponentslowinterflow
 
     status = nml%open(file, errmsg=errmsg)
     if (status /= NML_OK) return
@@ -128,11 +129,11 @@ contains
     end if
 
     ! assign values
-    this%interflowStorageCapacityFactor = interflowStorageCapacityFactor
-    this%interflowRecession_slope = interflowRecession_slope
-    this%fastInterflowRecession_forest = fastInterflowRecession_forest
-    this%slowInterflowRecession_Ks = slowInterflowRecession_Ks
-    this%exponentSlowInterflow = exponentSlowInterflow
+    this%interflowstoragecapacityfactor = interflowstoragecapacityfactor
+    this%interflowrecession_slope = interflowrecession_slope
+    this%fastinterflowrecession_forest = fastinterflowrecession_forest
+    this%slowinterflowrecession_ks = slowinterflowrecession_ks
+    this%exponentslowinterflow = exponentslowinterflow
 
     ! mark as configured
     this%is_configured = .true.
@@ -141,30 +142,30 @@ contains
 
   !> \brief Set interflow1 values
   integer function nml_interflow1_set(this, &
-    interflowStorageCapacityFactor, &
-    interflowRecession_slope, &
-    fastInterflowRecession_forest, &
-    slowInterflowRecession_Ks, &
-    exponentSlowInterflow, &
+    interflowstoragecapacityfactor, &
+    interflowrecession_slope, &
+    fastinterflowrecession_forest, &
+    slowinterflowrecession_ks, &
+    exponentslowinterflow, &
     errmsg) result(status)
 
     class(nml_interflow1_t), intent(inout) :: this
     character(len=*), intent(out), optional :: errmsg
-    real(dp), dimension(5), intent(in) :: interflowStorageCapacityFactor
-    real(dp), dimension(5), intent(in) :: interflowRecession_slope
-    real(dp), dimension(5), intent(in) :: fastInterflowRecession_forest
-    real(dp), dimension(5), intent(in) :: slowInterflowRecession_Ks
-    real(dp), dimension(5), intent(in) :: exponentSlowInterflow
+    real(dp), dimension(5), intent(in) :: interflowstoragecapacityfactor
+    real(dp), dimension(5), intent(in) :: interflowrecession_slope
+    real(dp), dimension(5), intent(in) :: fastinterflowrecession_forest
+    real(dp), dimension(5), intent(in) :: slowinterflowrecession_ks
+    real(dp), dimension(5), intent(in) :: exponentslowinterflow
 
     status = this%init(errmsg=errmsg)
     if (status /= NML_OK) return
 
     ! required parameters
-    this%interflowStorageCapacityFactor = interflowStorageCapacityFactor
-    this%interflowRecession_slope = interflowRecession_slope
-    this%fastInterflowRecession_forest = fastInterflowRecession_forest
-    this%slowInterflowRecession_Ks = slowInterflowRecession_Ks
-    this%exponentSlowInterflow = exponentSlowInterflow
+    this%interflowstoragecapacityfactor = interflowstoragecapacityfactor
+    this%interflowrecession_slope = interflowrecession_slope
+    this%fastinterflowrecession_forest = fastinterflowrecession_forest
+    this%slowinterflowrecession_ks = slowinterflowrecession_ks
+    this%exponentslowinterflow = exponentslowinterflow
 
     ! mark as configured
     this%is_configured = .true.
@@ -180,51 +181,51 @@ contains
 
     status = NML_OK
     if (present(errmsg)) errmsg = ""
-    select case (trim(name))
-    case ("interflowStorageCapacityFactor")
+    select case (to_lower(trim(name)))
+    case ("interflowstoragecapacityfactor")
       if (present(idx)) then
-        status = idx_check(idx, lbound(this%interflowStorageCapacityFactor), ubound(this%interflowStorageCapacityFactor), &
+        status = idx_check(idx, lbound(this%interflowstoragecapacityfactor), ubound(this%interflowstoragecapacityfactor), &
           "interflowStorageCapacityFactor", errmsg)
         if (status /= NML_OK) return
-        if (ieee_is_nan(this%interflowStorageCapacityFactor(idx(1)))) status = NML_ERR_NOT_SET
+        if (ieee_is_nan(this%interflowstoragecapacityfactor(idx(1)))) status = NML_ERR_NOT_SET
       else
-        if (all(ieee_is_nan(this%interflowStorageCapacityFactor))) status = NML_ERR_NOT_SET
+        if (all(ieee_is_nan(this%interflowstoragecapacityfactor))) status = NML_ERR_NOT_SET
       end if
-    case ("interflowRecession_slope")
+    case ("interflowrecession_slope")
       if (present(idx)) then
-        status = idx_check(idx, lbound(this%interflowRecession_slope), ubound(this%interflowRecession_slope), &
+        status = idx_check(idx, lbound(this%interflowrecession_slope), ubound(this%interflowrecession_slope), &
           "interflowRecession_slope", errmsg)
         if (status /= NML_OK) return
-        if (ieee_is_nan(this%interflowRecession_slope(idx(1)))) status = NML_ERR_NOT_SET
+        if (ieee_is_nan(this%interflowrecession_slope(idx(1)))) status = NML_ERR_NOT_SET
       else
-        if (all(ieee_is_nan(this%interflowRecession_slope))) status = NML_ERR_NOT_SET
+        if (all(ieee_is_nan(this%interflowrecession_slope))) status = NML_ERR_NOT_SET
       end if
-    case ("fastInterflowRecession_forest")
+    case ("fastinterflowrecession_forest")
       if (present(idx)) then
-        status = idx_check(idx, lbound(this%fastInterflowRecession_forest), ubound(this%fastInterflowRecession_forest), &
+        status = idx_check(idx, lbound(this%fastinterflowrecession_forest), ubound(this%fastinterflowrecession_forest), &
           "fastInterflowRecession_forest", errmsg)
         if (status /= NML_OK) return
-        if (ieee_is_nan(this%fastInterflowRecession_forest(idx(1)))) status = NML_ERR_NOT_SET
+        if (ieee_is_nan(this%fastinterflowrecession_forest(idx(1)))) status = NML_ERR_NOT_SET
       else
-        if (all(ieee_is_nan(this%fastInterflowRecession_forest))) status = NML_ERR_NOT_SET
+        if (all(ieee_is_nan(this%fastinterflowrecession_forest))) status = NML_ERR_NOT_SET
       end if
-    case ("slowInterflowRecession_Ks")
+    case ("slowinterflowrecession_ks")
       if (present(idx)) then
-        status = idx_check(idx, lbound(this%slowInterflowRecession_Ks), ubound(this%slowInterflowRecession_Ks), &
+        status = idx_check(idx, lbound(this%slowinterflowrecession_ks), ubound(this%slowinterflowrecession_ks), &
           "slowInterflowRecession_Ks", errmsg)
         if (status /= NML_OK) return
-        if (ieee_is_nan(this%slowInterflowRecession_Ks(idx(1)))) status = NML_ERR_NOT_SET
+        if (ieee_is_nan(this%slowinterflowrecession_ks(idx(1)))) status = NML_ERR_NOT_SET
       else
-        if (all(ieee_is_nan(this%slowInterflowRecession_Ks))) status = NML_ERR_NOT_SET
+        if (all(ieee_is_nan(this%slowinterflowrecession_ks))) status = NML_ERR_NOT_SET
       end if
-    case ("exponentSlowInterflow")
+    case ("exponentslowinterflow")
       if (present(idx)) then
-        status = idx_check(idx, lbound(this%exponentSlowInterflow), ubound(this%exponentSlowInterflow), &
+        status = idx_check(idx, lbound(this%exponentslowinterflow), ubound(this%exponentslowinterflow), &
           "exponentSlowInterflow", errmsg)
         if (status /= NML_OK) return
-        if (ieee_is_nan(this%exponentSlowInterflow(idx(1)))) status = NML_ERR_NOT_SET
+        if (ieee_is_nan(this%exponentslowinterflow(idx(1)))) status = NML_ERR_NOT_SET
       else
-        if (all(ieee_is_nan(this%exponentSlowInterflow))) status = NML_ERR_NOT_SET
+        if (all(ieee_is_nan(this%exponentslowinterflow))) status = NML_ERR_NOT_SET
       end if
     case default
       status = NML_ERR_INVALID_NAME
@@ -245,52 +246,52 @@ contains
     if (present(errmsg)) errmsg = ""
 
     ! required arrays
-    if (all(ieee_is_nan(this%interflowStorageCapacityFactor))) then
+    if (all(ieee_is_nan(this%interflowstoragecapacityfactor))) then
       status = NML_ERR_REQUIRED
       if (present(errmsg)) errmsg = "required field not set: interflowStorageCapacityFactor"
       return
     end if
-    if (any(ieee_is_nan(this%interflowStorageCapacityFactor))) then
+    if (any(ieee_is_nan(this%interflowstoragecapacityfactor))) then
       status = NML_ERR_PARTLY_SET
       if (present(errmsg)) errmsg = "array partly set: interflowStorageCapacityFactor"
       return
     end if
-    if (all(ieee_is_nan(this%interflowRecession_slope))) then
+    if (all(ieee_is_nan(this%interflowrecession_slope))) then
       status = NML_ERR_REQUIRED
       if (present(errmsg)) errmsg = "required field not set: interflowRecession_slope"
       return
     end if
-    if (any(ieee_is_nan(this%interflowRecession_slope))) then
+    if (any(ieee_is_nan(this%interflowrecession_slope))) then
       status = NML_ERR_PARTLY_SET
       if (present(errmsg)) errmsg = "array partly set: interflowRecession_slope"
       return
     end if
-    if (all(ieee_is_nan(this%fastInterflowRecession_forest))) then
+    if (all(ieee_is_nan(this%fastinterflowrecession_forest))) then
       status = NML_ERR_REQUIRED
       if (present(errmsg)) errmsg = "required field not set: fastInterflowRecession_forest"
       return
     end if
-    if (any(ieee_is_nan(this%fastInterflowRecession_forest))) then
+    if (any(ieee_is_nan(this%fastinterflowrecession_forest))) then
       status = NML_ERR_PARTLY_SET
       if (present(errmsg)) errmsg = "array partly set: fastInterflowRecession_forest"
       return
     end if
-    if (all(ieee_is_nan(this%slowInterflowRecession_Ks))) then
+    if (all(ieee_is_nan(this%slowinterflowrecession_ks))) then
       status = NML_ERR_REQUIRED
       if (present(errmsg)) errmsg = "required field not set: slowInterflowRecession_Ks"
       return
     end if
-    if (any(ieee_is_nan(this%slowInterflowRecession_Ks))) then
+    if (any(ieee_is_nan(this%slowinterflowrecession_ks))) then
       status = NML_ERR_PARTLY_SET
       if (present(errmsg)) errmsg = "array partly set: slowInterflowRecession_Ks"
       return
     end if
-    if (all(ieee_is_nan(this%exponentSlowInterflow))) then
+    if (all(ieee_is_nan(this%exponentslowinterflow))) then
       status = NML_ERR_REQUIRED
       if (present(errmsg)) errmsg = "required field not set: exponentSlowInterflow"
       return
     end if
-    if (any(ieee_is_nan(this%exponentSlowInterflow))) then
+    if (any(ieee_is_nan(this%exponentslowinterflow))) then
       status = NML_ERR_PARTLY_SET
       if (present(errmsg)) errmsg = "array partly set: exponentSlowInterflow"
       return

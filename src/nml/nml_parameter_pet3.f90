@@ -27,6 +27,7 @@ module nml_pet3
     NML_ERR_INVALID_NAME, &
     NML_ERR_INVALID_INDEX, &
     idx_check, &
+    to_lower, &
     NML_ERR_PARTLY_SET
   use ieee_arithmetic, only: ieee_value, ieee_quiet_nan, ieee_is_nan
   ! kind specifiers listed in the nml-tools configuration file
@@ -198,7 +199,7 @@ contains
 
     status = NML_OK
     if (present(errmsg)) errmsg = ""
-    select case (trim(name))
+    select case (to_lower(trim(name)))
     case ("canopyheigth_forest")
       if (present(idx)) then
         status = idx_check(idx, lbound(this%canopyheigth_forest), ubound(this%canopyheigth_forest), &

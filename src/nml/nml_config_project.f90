@@ -27,6 +27,7 @@ module nml_config_project
     NML_ERR_INVALID_NAME, &
     NML_ERR_INVALID_INDEX, &
     idx_check, &
+    to_lower, &
     buf, &
     max_domains, &
     NML_ERR_PARTLY_SET
@@ -40,9 +41,9 @@ module nml_config_project
   character(len=buf), parameter, public :: project_details_default = "mHM project"
   character(len=buf), parameter, public :: setup_description_default = "Model run"
   character(len=buf), parameter, public :: simulation_type_default = "Simulation"
-  character(len=buf), parameter, public :: Conventions_default = "None"
+  character(len=buf), parameter, public :: conventions_default = "None"
   character(len=buf), parameter, public :: contact_default = "Developer"
-  character(len=buf), parameter, public :: mHM_details_default = "Research unit"
+  character(len=buf), parameter, public :: mhm_details_default = "Research unit"
   character(len=buf), parameter, public :: history_default = "Model run version 1"
   integer(i4), parameter, public :: n_domains_default = 1_i4
   logical, parameter, public :: read_domains_from_dirs_default = .false.
@@ -55,9 +56,9 @@ module nml_config_project
     character(len=buf) :: project_details !< Project name
     character(len=buf) :: setup_description !< Description of the setup
     character(len=buf) :: simulation_type !< Type of simulation
-    character(len=buf) :: Conventions !< Convention used for dataset
+    character(len=buf) :: conventions !< Convention used for dataset
     character(len=buf) :: contact !< Contact details, incl. PI name, modellers
-    character(len=buf) :: mHM_details !< Developing institution
+    character(len=buf) :: mhm_details !< Developing institution
     character(len=buf) :: history !< Some details on data/model run version.
     integer(i4) :: n_domains !< Number of domains
     logical :: read_domains_from_dirs !< Flag for separate domains
@@ -88,9 +89,9 @@ contains
     this%project_details = project_details_default
     this%setup_description = setup_description_default
     this%simulation_type = simulation_type_default
-    this%Conventions = Conventions_default
+    this%conventions = conventions_default
     this%contact = contact_default
-    this%mHM_details = mHM_details_default
+    this%mhm_details = mhm_details_default
     this%history = history_default
     this%n_domains = n_domains_default
     this%read_domains_from_dirs = read_domains_from_dirs_default ! bool values always need a default
@@ -105,9 +106,9 @@ contains
     character(len=buf) :: project_details
     character(len=buf) :: setup_description
     character(len=buf) :: simulation_type
-    character(len=buf) :: Conventions
+    character(len=buf) :: conventions
     character(len=buf) :: contact
-    character(len=buf) :: mHM_details
+    character(len=buf) :: mhm_details
     character(len=buf) :: history
     integer(i4) :: n_domains
     logical :: read_domains_from_dirs
@@ -122,9 +123,9 @@ contains
       project_details, &
       setup_description, &
       simulation_type, &
-      Conventions, &
+      conventions, &
       contact, &
-      mHM_details, &
+      mhm_details, &
       history, &
       n_domains, &
       read_domains_from_dirs, &
@@ -135,9 +136,9 @@ contains
     project_details = this%project_details
     setup_description = this%setup_description
     simulation_type = this%simulation_type
-    Conventions = this%Conventions
+    conventions = this%conventions
     contact = this%contact
-    mHM_details = this%mHM_details
+    mhm_details = this%mhm_details
     history = this%history
     n_domains = this%n_domains
     read_domains_from_dirs = this%read_domains_from_dirs
@@ -170,9 +171,9 @@ contains
     this%project_details = project_details
     this%setup_description = setup_description
     this%simulation_type = simulation_type
-    this%Conventions = Conventions
+    this%conventions = conventions
     this%contact = contact
-    this%mHM_details = mHM_details
+    this%mhm_details = mhm_details
     this%history = history
     this%n_domains = n_domains
     this%read_domains_from_dirs = read_domains_from_dirs
@@ -188,9 +189,9 @@ contains
     project_details, &
     setup_description, &
     simulation_type, &
-    Conventions, &
+    conventions, &
     contact, &
-    mHM_details, &
+    mhm_details, &
     history, &
     n_domains, &
     read_domains_from_dirs, &
@@ -202,9 +203,9 @@ contains
     character(len=*), intent(in), optional :: project_details
     character(len=*), intent(in), optional :: setup_description
     character(len=*), intent(in), optional :: simulation_type
-    character(len=*), intent(in), optional :: Conventions
+    character(len=*), intent(in), optional :: conventions
     character(len=*), intent(in), optional :: contact
-    character(len=*), intent(in), optional :: mHM_details
+    character(len=*), intent(in), optional :: mhm_details
     character(len=*), intent(in), optional :: history
     integer(i4), intent(in), optional :: n_domains
     logical, intent(in), optional :: read_domains_from_dirs
@@ -221,9 +222,9 @@ contains
     if (present(project_details)) this%project_details = project_details
     if (present(setup_description)) this%setup_description = setup_description
     if (present(simulation_type)) this%simulation_type = simulation_type
-    if (present(Conventions)) this%Conventions = Conventions
+    if (present(conventions)) this%conventions = conventions
     if (present(contact)) this%contact = contact
-    if (present(mHM_details)) this%mHM_details = mHM_details
+    if (present(mhm_details)) this%mhm_details = mhm_details
     if (present(history)) this%history = history
     if (present(n_domains)) this%n_domains = n_domains
     if (present(read_domains_from_dirs)) this%read_domains_from_dirs = read_domains_from_dirs
@@ -252,7 +253,7 @@ contains
 
     status = NML_OK
     if (present(errmsg)) errmsg = ""
-    select case (trim(name))
+    select case (to_lower(trim(name)))
     case ("project_details")
       if (present(idx)) then
         status = NML_ERR_INVALID_INDEX
@@ -271,7 +272,7 @@ contains
         if (present(errmsg)) errmsg = "index not supported for 'simulation_type'"
         return
       end if
-    case ("Conventions")
+    case ("conventions")
       if (present(idx)) then
         status = NML_ERR_INVALID_INDEX
         if (present(errmsg)) errmsg = "index not supported for 'Conventions'"
@@ -283,7 +284,7 @@ contains
         if (present(errmsg)) errmsg = "index not supported for 'contact'"
         return
       end if
-    case ("mHM_details")
+    case ("mhm_details")
       if (present(idx)) then
         status = NML_ERR_INVALID_INDEX
         if (present(errmsg)) errmsg = "index not supported for 'mHM_details'"
@@ -339,7 +340,7 @@ contains
 
     status = NML_OK
     if (present(errmsg)) errmsg = ""
-    select case (trim(name))
+    select case (to_lower(trim(name)))
     case ("domain_dirs")
       if (size(filled) /= 1) then
         status = NML_ERR_INVALID_INDEX
