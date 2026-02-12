@@ -191,7 +191,8 @@ contains
     if (.not.self%provided) return
     if (init_grid) grid_init_var = self%name ! allocate variable name for grid initialization
     call self%ds%init(path=self%path, vars=[var(name=trim(self%name), kind=kind, static=self%static)], &
-      timestamp=timestamp, grid=grid, grid_init_var=grid_init_var) ! if grid_init_var is un-allocated, it is "not present"
+      timestamp=timestamp, grid=grid, grid_init_var=grid_init_var, tol=1.0e-5_dp) ! if grid_init_var is un-allocated, it is "not present"
+    ! TODO: make tol configurable in case of single precision variables with small values
     self%var_id = self%ds%var_index(self%name)
     if (.not.self%static) self%stepping = self%ds%timestep
   end subroutine input_var_open_dataset
