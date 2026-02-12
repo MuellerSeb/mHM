@@ -18,6 +18,7 @@ module mo_river_upscaler
   use mo_grid_scaler, only: scaler_t, down_scaling
   use mo_message, only: error_message, message
   use mo_utils, only: optval
+  use mo_string_utils, only: n2s => num2str
 
   implicit none
   private
@@ -92,19 +93,24 @@ contains
     ! TODO: shortcut for same resolution of fine and coarse river
 
     ! initialize scc related variables
+    call message("river_upscaler: initialize scc")
     call this%init_scc(scc_gauges, scc_latlon)
 
     ! find leaving fine cells in every coarse cell
+    call message("river_upscaler: find leaving cells")
     call this%find_leaving_cells()
 
     ! upscale river depending on scc configuration
     if (this%coarse_river%scc) then
+      call message("river_upscaler: upscale river with scc")
       call this%upscale_scc()
     else
+      call message("river_upscaler: upscale river without scc")
       call this%upscale_fdir()
     end if
 
     ! calculate stream features (stream mask, link lengths)
+    call message("river_upscaler: calculate stream features")
     if (stream) call this%calc_stream(length_percentile)
 
   end subroutine river_upscaler_init
@@ -119,10 +125,10 @@ contains
     integer(i8), allocatable :: gauge_facc(:)
     type(traversal_visit) :: handler
     integer(i4) :: i, j, n
-    real(dp) :: coords(2)
     logical :: aux, latlon
 
     if (.not.present(scc_gauges)) then
+      call message("river_upscaler%init_scc: no scc gauges provided, initialize without scc")
       this%nsub = 1_i4
       allocate(this%scc_map(this%fine_river%n_nodes), source=1_i4)
       allocate(this%scc_gauges(0))
@@ -146,9 +152,11 @@ contains
     allocate(this%scc_gauges(n))
 
     ! find gauge cell ids
+    call message("river_upscaler%init_scc: find gauge cell ids")
+    if (.not.aux) this%scc_gauges = this%fine_river%grid%closest_cell_id_by_axes(scc_gauges)
     do i = 1_i4, n
-      coords = scc_gauges(i,:)
-      this%scc_gauges(i) = this%fine_river%grid%closest_cell_id(coords, use_aux=aux)
+      call message("river_upscaler%init_scc: find gauge cell id for gauge ", n2s(i))
+      if (aux) this%scc_gauges(i) = this%fine_river%grid%closest_cell_id(scc_gauges(i,:), use_aux=aux)
       gauge_facc(i) = this%fine_river%facc(this%scc_gauges(i))
     end do
 
@@ -156,6 +164,7 @@ contains
     allocate(this%scc_map(this%fine_river%grid%ncells), source=n+1_i4) ! base catchment gets id n+1
     allocate(handler%visited(this%fine_river%grid%ncells))
     gauge_mask = .true.
+    call message("river_upscaler%init_scc: delineate sub-catchments for each gauge")
     do i = 1_i4, n
       ! sort sub-gauges by facc (high to low)
       j = maxloc(gauge_facc, mask=gauge_mask, dim=1)
@@ -168,6 +177,7 @@ contains
     deallocate(handler%visited)
 
     ! determine gauges
+    call message("river_upscaler%init_scc: determine scc gauges on fine grid")
     allocate(this%is_scc_gauge(this%fine_river%grid%ncells), source=.false.)
     do i = 1_i4, n
       this%is_scc_gauge(this%scc_gauges(i)) = .true.

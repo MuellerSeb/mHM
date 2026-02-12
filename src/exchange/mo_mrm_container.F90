@@ -282,6 +282,7 @@ contains
         call read_scc_gauges(file, scc_gauges, scc_latlon)
       end if
       ! scc_gauges/scc_latlon not present if not allocated
+        scope_info(s,*) "Initialize upscaler and upscale river network to level-3"
       call self%upscaler%init(self%river_l0, self%river, self%level3, scc_gauges, scc_latlon)
     end if
 
