@@ -687,7 +687,25 @@ contains
   subroutine input_initialize(self)
     class(input_t), target, intent(inout) :: self
     log_info(*) "Initialize Input"
-    ! TODO: warn if not required but provided
+    ! warn about provided but not required variables, since this likely indicates a configuration issue
+    if (self%fdir%provided .and. .not.self%exchange%fdir%required) then
+      log_warn(*) "Input: flow direction provided but not required. Check your configuration."
+    end if
+    if (self%facc%provided .and. .not.self%exchange%facc%required) then
+      log_warn(*) "Input: flow accumulation provided but not required. Check your configuration."
+    end if
+    if (self%dem%provided .and. .not.self%exchange%dem%required) then
+      log_warn(*) "Input: DEM provided but not required. Check your configuration."
+    end if
+    if (self%slope%provided .and. .not.self%exchange%slope%required) then
+      log_warn(*) "Input: slope provided but not required. Check your configuration."
+    end if
+    if (self%aspect%provided .and. .not.self%exchange%aspect%required) then
+      log_warn(*) "Input: aspect provided but not required. Check your configuration."
+    end if
+    if (self%runoff%provided .and. .not.self%exchange%runoff_total%required) then
+      log_warn(*) "Input: runoff provided but not required. Check your configuration."
+    end if
     self%runoff%provided = self%exchange%runoff_total%required ! only provide if required
     call self%runoff%reset_time(self%chunking, self%exchange%start_time)
   end subroutine input_initialize

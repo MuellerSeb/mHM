@@ -230,11 +230,11 @@ contains
       log_fatal(*) "mRM: runoff_total not provided (check input/mHM settings)."
       error stop 1
     end if
-    if (.not.self%exchange%fdir%provided) then
+    if (self%exchange%fdir%required .and. .not.self%exchange%fdir%provided) then ! req => prov not fulfilled
       log_fatal(*) "mRM: fdir not provided (check input settings)."
       error stop 1
     end if
-    if (.not.const_celerity .and. .not.self%exchange%slope%provided) then
+    if (.not.const_celerity .and. (self%exchange%slope%required .and. .not.self%exchange%slope%provided)) then
       log_fatal(*) "mRM: slope not provided, but required for variable celerity (routing case 3)."
       error stop 1
     end if
