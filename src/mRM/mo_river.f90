@@ -989,11 +989,11 @@ contains
       call nc_var%setData(this%order%level_start)
       ! order%level_end
       nc_var = nc%setVariable("order_level_end", "i64", [order_dim])
-      call nc_var%setAttribute("long_name", "level start in order")
+      call nc_var%setAttribute("long_name", "level end in order")
       call nc_var%setData(this%order%level_end)
       ! order%level_size
       nc_var = nc%setVariable("order_level_size", "i64", [order_dim])
-      call nc_var%setAttribute("long_name", "level start in order")
+      call nc_var%setAttribute("long_name", "level size in order")
       call nc_var%setData(this%order%level_size)
     end if
 
