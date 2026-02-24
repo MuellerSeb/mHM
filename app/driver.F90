@@ -21,6 +21,7 @@ program driver
   integer :: unit
   logical :: from_dirs
   integer(i4) :: n_domains, i, id
+  character(len=*), parameter :: separator = repeat("-", 72)
   character(len=:), allocatable :: cwd
   type(domain_t), pointer :: domain
   ! global configs
@@ -96,6 +97,7 @@ program driver
   if (from_dirs) main_file = "mhm.nml" ! default main file name in each domain directory
   allocate(selected_domains(n_domains))
 
+  log_text(*) separator
   log_info(*) "CREATE DOMAINS: ", n_domains
 
   ! create domain-list
@@ -113,16 +115,20 @@ program driver
   ! read configs
   do i = 1_i4, size(selected_domains)
     id = selected_domains(i)
+    log_text(*) separator
     log_info(*) "CONFIGURE DOMAIN: ", id
     ! get domain
     call domains%get_domain(id, domain)
     ! id either from list or 1 if from dirs (always take domain 1 in each sub-dir)
     if (from_dirs) id = 1_i4
     ! create new domain and its exchange
+    log_text(*) separator
     call domain%init(meta_file, main_file, para_file, id, cwd)
     ! configure domain components
+    log_text(*) separator
     call domain%configure(main_file, out_file)
     ! check for connections and dependencies
+    log_text(*) separator
     call domain%connect()
   end do
 
@@ -130,12 +136,15 @@ program driver
   do i = 1_i4, size(selected_domains)
     id = selected_domains(i)
     call domains%get_domain(id, domain)
+    log_text(*) separator
     log_info(*) "PREPARE DOMAIN: ", id
     call domain%initialize()
+    log_text(*) separator
     log_info(*) "RUN TIME LOOP"
     do while(domain%exchange%time < domain%exchange%end_time)
       call domain%update()
     end do
+    log_text(*) separator
     log_info(*) "FINALIZE DOMAIN: ", id
     call domain%finalize()
   end do
