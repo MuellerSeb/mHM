@@ -107,34 +107,35 @@ contains
     !        the warming days
     ! --------------------------------------------------------------------------
 
-    ! copy time resolution to local variables
-    TPD_sim = nTstepDay
-    TPD_obs = nMeasPerDay
+    if (nGaugesTotal > 0 .and. nMeasPerDay > 0) then
+      ! copy time resolution to local variables
+      TPD_sim = nTstepDay
+      TPD_obs = nMeasPerDay
 
-    ! check if modelled timestep is an integer multiple of measured timesteps
-    if (modulo(TPD_sim, TPD_obs) .eq. 0) then
-      factor = TPD_sim / TPD_obs
-    else
-      call error_message(' Error: Number of modelled datapoints is no multiple of measured datapoints per day')
-    end if
-
-
-    maxDailyTimeSteps = maxval(evalPer(1 : domainMeta%nDomains)%julEnd - evalPer(1 : domainMeta%nDomains)%julStart + 1)
-    maxMeasTimeSteps  = maxval(evalPer(1 : domainMeta%nDomains)%julEnd - evalPer(1 : domainMeta%nDomains)%julStart + 1) * TPD_obs
-    allocate(d_Qmod     (maxDailyTimeSteps, nGaugesTotal))
-    allocate(d_Qobs     (maxDailyTimeSteps, nGaugesTotal))
-    allocate(subd_Qmod  ( maxMeasTimeSteps, nGaugesTotal))
-    allocate(subd_Qobs  ( maxMeasTimeSteps, nGaugesTotal))
-    d_Qmod     = nodata_dp
-    d_Qobs     = nodata_dp
-    subd_Qmod  = nodata_dp
-    subd_Qobs  = nodata_dp
+      ! check if modelled timestep is an integer multiple of measured timesteps
+      if (modulo(TPD_sim, TPD_obs) .eq. 0) then
+        factor = TPD_sim / TPD_obs
+      else
+        call error_message(' Error: Number of modelled datapoints is no multiple of measured datapoints per day')
+      end if
 
 
-    ! loop over domains
-    do iDomain = 1, domainMeta%nDomains
-      if (domainMeta%doRouting(iDomain)) then
-        domainID = domainMeta%indices(iDomain)
+      maxDailyTimeSteps = maxval(evalPer(1 : domainMeta%nDomains)%julEnd - evalPer(1 : domainMeta%nDomains)%julStart + 1)
+      maxMeasTimeSteps  = maxval(evalPer(1 : domainMeta%nDomains)%julEnd - evalPer(1 : domainMeta%nDomains)%julStart + 1) * TPD_obs
+      allocate(d_Qmod     (maxDailyTimeSteps, nGaugesTotal))
+      allocate(d_Qobs     (maxDailyTimeSteps, nGaugesTotal))
+      allocate(subd_Qmod  ( maxMeasTimeSteps, nGaugesTotal))
+      allocate(subd_Qobs  ( maxMeasTimeSteps, nGaugesTotal))
+      d_Qmod     = nodata_dp
+      d_Qobs     = nodata_dp
+      subd_Qmod  = nodata_dp
+      subd_Qobs  = nodata_dp
+
+
+      ! loop over domains
+      do iDomain = 1, domainMeta%nDomains
+        if (domainMeta%doRouting(iDomain)) then
+          domainID = domainMeta%indices(iDomain)
 
         ! Convert simulated values to daily
         nTimeSteps = (simPer(iDomain)%julEnd - simPer(iDomain)%julStart + 1) * nTstepDay
@@ -207,20 +208,21 @@ contains
 
         end if subdailycheck
 
-      end if
-    end do
+        end if
+      end do
 
 
-    ! write in an ASCII file          ! OBS[nModeling_days X nGauges_total] , SIM[nModeling_days X nGauges_total]
-    ! ToDo: is this if statement reasonable
-    if (allocated(gauge%Q)) call write_daily_obs_sim_discharge(d_Qobs(:, :), d_Qmod(:, :))
+      ! write in an ASCII file          ! OBS[nModeling_days X nGauges_total] , SIM[nModeling_days X nGauges_total]
+      ! ToDo: is this if statement reasonable
+      if (allocated(gauge%Q)) call write_daily_obs_sim_discharge(d_Qobs(:, :), d_Qmod(:, :))
 
-    ! write in an ASCII file          ! OBS[nMeasPerDay X nGauges_total] , SIM[nMeasPerDay X nGauges_total]
-    if (nMeasPerDay > 1 .and. allocated(gauge%Q)) call write_subdaily_obs_sim_discharge(subd_Qobs(:, :), subd_Qmod(:, :), factor)
-    ! The subdaily routine is only called if subdaily Q data is provided
+      ! write in an ASCII file          ! OBS[nMeasPerDay X nGauges_total] , SIM[nMeasPerDay X nGauges_total]
+      if (nMeasPerDay > 1 .and. allocated(gauge%Q)) call write_subdaily_obs_sim_discharge(subd_Qobs(:, :), subd_Qmod(:, :), factor)
+      ! The subdaily routine is only called if subdaily Q data is provided
 
-    ! free space
-    deallocate(d_Qmod, d_Qobs, subd_Qmod, subd_Qobs)
+      ! free space
+      deallocate(d_Qmod, d_Qobs, subd_Qmod, subd_Qobs)
+    end if
   end subroutine mrm_write
   ! ------------------------------------------------------------------
 

@@ -469,6 +469,7 @@ contains
     use mo_common_types, only : grid
     use mo_common_grid, only : init_lowres_level
     use mo_read_spatial_data, only : read_header_ascii
+    use mo_read_spatial_data, only : check_header
     use mo_string_utils, only : num2str
 
     implicit none
@@ -502,29 +503,14 @@ contains
       fName = trim(adjustl(self%dir_meteo_header(iDomain))) // trim(adjustl(self%file_meteo_header))
       call read_header_ascii(trim(fName), self%umeteo_header, &
         nrows2, ncols2, xllcorner2, yllcorner2, cellsize2, nodata_dummy)
+      
       ! check grid compatibility
       call init_lowres_level(level0(self%L0DataFrom(iDomain)), cellsize2, self%level2(iDomain))
-      ! check
-      if ((ncols2     .ne.  self%level2(iDomain)%ncols)         .or. &
-          (nrows2     .ne.  self%level2(iDomain)%nrows)         .or. &
-          (abs(xllcorner2 - self%level2(iDomain)%xllcorner) .gt. tiny(1.0_dp))     .or. &
-          (abs(yllcorner2 - self%level2(iDomain)%yllcorner) .gt. tiny(1.0_dp))     .or. &
-          (abs(cellsize2  - self%level2(iDomain)%cellsize)  .gt. tiny(1.0_dp))) then
-        call error_message('   ***ERROR: subroutine L2_variable_init: size mismatch in grid file for level2 in domain ', &
-                           trim(adjustl(num2str(iDomain))), '!', raise=.false.)
-        call error_message('  Expected to have following properties (based on L0):', raise=.false.)
-        call error_message('... rows:     ', trim(adjustl(num2str(self%level2(iDomain)%nrows))), ', ', raise=.false.)
-        call error_message('... cols:     ', trim(adjustl(num2str(self%level2(iDomain)%ncols))), ', ', raise=.false.)
-        call error_message('... cellsize: ', trim(adjustl(num2str(self%level2(iDomain)%cellsize))), ', ', raise=.false.)
-        call error_message('... xllcorner:', trim(adjustl(num2str(self%level2(iDomain)%xllcorner))), ', ', raise=.false.)
-        call error_message('... yllcorner:', trim(adjustl(num2str(self%level2(iDomain)%yllcorner))), ', ', raise=.false.)
-        call error_message('  Provided (in precipitation file):', raise=.false.)
-        call error_message('... rows:     ', trim(adjustl(num2str(nrows2))), ', ', raise=.false.)
-        call error_message('... cols:     ', trim(adjustl(num2str(ncols2))), ', ', raise=.false.)
-        call error_message('... cellsize: ', trim(adjustl(num2str(cellsize2))), ', ', raise=.false.)
-        call error_message('... xllcorner:', trim(adjustl(num2str(xllcorner2))), ', ', raise=.false.)
-        call error_message('... yllcorner:', trim(adjustl(num2str(yllcorner2))), ', ')
-      end if
+      call check_header(ncols2, nrows2, xllcorner2, yllcorner2, cellsize2, &
+                        self%level2(iDomain)%ncols, self%level2(iDomain)%nrows, &
+                        self%level2(iDomain)%xllcorner, self%level2(iDomain)%yllcorner, self%level2(iDomain)%cellsize, &
+                        context = '***ERROR: subroutine L2_variable_init: size mismatch in grid file for level2 in domain ' // &
+                                  trim(adjustl(num2str(iDomain))) // '! ')
     end do
 
     ! set indices
