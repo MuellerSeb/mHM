@@ -22,9 +22,10 @@ MODULE mo_read_spatial_data
   USE mo_kind, ONLY : i4, dp
   USE mo_os, ONLY : check_path_isfile
   USE mo_message, only: error_message
+  use mo_string_utils, only : num2str
 
   IMPLICIT NONE
-  PUBLIC :: check_uniform_axis, get_header_info_from_nc
+  PUBLIC :: check_uniform_axis, get_header_info_from_nc, read_header_nc_or_ascii
   PUBLIC :: read_header_ascii             ! Reads header of ASCII files
   PUBLIC :: read_spatial_data_nc_or_ascii ! Reads netcdf and ASCII files
   PUBLIC :: read_spatial_data_nc          ! Reads netcdf files
@@ -92,6 +93,8 @@ MODULE mo_read_spatial_data
   INTERFACE  read_spatial_data_ascii
     MODULE PROCEDURE read_spatial_data_ascii_i4, read_spatial_data_ascii_dp
   END INTERFACE read_spatial_data_ascii
+
+  public :: check_header
 
   
 
@@ -190,22 +193,11 @@ CONTAINS
     ! mask
     logical, dimension(:, :), allocatable :: tmp_mask
 
-
-    ! compare headers always with reference header (intent in)
     call read_header_ascii(filename, fileunit, &
             file_ncols, file_nrows, &
             file_xllcorner, file_yllcorner, file_cellsize, file_nodata)
-    if ((file_ncols .ne. header_ncols)) &
-             call error_message('read_spatial_data_ascii: header not matching with reference header: ncols')
-    if ((file_nrows .ne. header_nrows)) &
-             call error_message('read_spatial_data_ascii: header not matching with reference header: nrows')
-    if ((abs(file_xllcorner - header_xllcorner) .gt. tiny(1.0_dp))) &
-             call error_message('read_spatial_data_ascii: header not matching with reference header: xllcorner')
-    if ((abs(file_yllcorner - header_yllcorner) .gt. tiny(1.0_dp))) &
-             call error_message('read_spatial_data_ascii: header not matching with reference header: yllcorner')
-    if ((abs(file_cellsize - header_cellsize)   .gt. tiny(1.0_dp))) &
-             call error_message('read_spatial_data_ascii: header not matching with reference header: cellsize')
-
+    call check_header(file_ncols, file_nrows, file_xllcorner, file_yllcorner, file_cellsize, & 
+                      header_ncols, header_nrows, header_xllcorner, header_yllcorner, header_cellsize)
     ! allocation and initialization of matrices
     allocate(tmp_data(file_nrows, file_ncols))
     tmp_data = file_nodata
@@ -330,22 +322,11 @@ CONTAINS
     ! mask
     logical, dimension(:, :), allocatable :: tmp_mask
 
-
-    ! compare headers always with reference header (intent in)
     call read_header_ascii(filename, fileunit, &
             file_ncols, file_nrows, &
             file_xllcorner, file_yllcorner, file_cellsize, file_nodata)
-    if ((file_ncols .ne. header_ncols)) &
-             call error_message('read_spatial_data_ascii: header not matching with reference header: ncols')
-    if ((file_nrows .ne. header_nrows)) &
-             call error_message('read_spatial_data_ascii: header not matching with reference header: nrows')
-    if ((abs(file_xllcorner - header_xllcorner) .gt. tiny(1.0_dp))) &
-             call error_message('read_spatial_data_ascii: header not matching with reference header: xllcorner')
-    if ((abs(file_yllcorner - header_yllcorner) .gt. tiny(1.0_dp))) &
-             call error_message('read_spatial_data_ascii: header not matching with reference header: yllcorner')
-    if ((abs(file_cellsize - header_cellsize)   .gt. tiny(1.0_dp))) &
-             call error_message('read_spatial_data_ascii: header not matching with reference header: cellsize')
-
+    call check_header(file_ncols, file_nrows, file_xllcorner, file_yllcorner, file_cellsize, &
+                      header_ncols, header_nrows, header_xllcorner, header_yllcorner, header_cellsize)
     ! allocation and initialization of matrices
     allocate(tmp_data(file_nrows, file_ncols))
     tmp_data = int(file_nodata, i4)
@@ -462,6 +443,115 @@ CONTAINS
     dummy = dummy // ''   ! only to avoid warning
 
   end subroutine read_header_ascii
+
+  subroutine check_header(ncols, nrows, xllcorner, yllcorner, &
+          cellsize, ref_ncols, ref_nrows, ref_xllcorner, ref_yllcorner, ref_cellsize, &
+          tolerance, context)
+
+    use mo_kind, only : dp, i4
+    use mo_message, only : error_message
+    use mo_string_utils, only : num2str
+    use mo_common_constants, only: defaultTolerance_dp
+
+    implicit none
+
+    integer(i4), intent(in) :: ncols
+    integer(i4), intent(in) :: nrows
+    real(dp), intent(in) :: xllcorner
+    real(dp), intent(in) :: yllcorner
+    real(dp), intent(in) :: cellsize
+    integer(i4), intent(in) :: ref_nrows
+    integer(i4), intent(in) :: ref_ncols
+    real(dp), intent(in) :: ref_xllcorner
+    real(dp), intent(in) :: ref_yllcorner
+    real(dp), intent(in) :: ref_cellsize
+    real(dp), intent(in), optional :: tolerance
+    character(*), intent(in), optional :: context
+
+    real(dp) :: tol_local
+    character(len=:), allocatable :: err_message
+
+    if (present(tolerance)) then
+      tol_local = tolerance
+    else
+      tol_local = defaultTolerance_dp
+    end if
+
+    err_message = ''
+    if ((ref_ncols .ne. ncols)) then
+      err_message = err_message // 'read_spatial_data_ascii: ncols mismatch file='// &
+                    trim(num2str(ncols))//' expected='//trim(num2str(ref_ncols))// &
+                    new_line('a')
+    end if
+    if ((nrows .ne. ref_nrows)) then
+      err_message = err_message // 'read_spatial_data_ascii: nrows mismatch file='// &
+                    trim(num2str(nrows))//' expected='//trim(num2str(ref_nrows))// &
+                    new_line('a')
+    end if
+    if ((abs(xllcorner - ref_xllcorner) .gt. tol_local)) then
+      err_message = err_message // 'read_spatial_data_ascii: xllcorner mismatch file='// &
+                    trim(num2str(xllcorner, '(G32.16)'))//' expected='// &
+                    trim(num2str(ref_xllcorner, '(G32.16)'))// &
+                    new_line('a')
+    end if
+    if ((abs(yllcorner - ref_yllcorner) .gt. tol_local)) then
+      err_message = err_message // 'read_spatial_data_ascii: yllcorner mismatch file='// &
+                    trim(num2str(yllcorner, '(G32.16)'))//' expected='// &
+                    trim(num2str(ref_yllcorner, '(G32.16)'))// &
+                    new_line('a')
+    end if
+    if ((abs(cellsize - ref_cellsize) .gt. tol_local)) then
+      err_message = err_message // 'read_spatial_data_ascii: cellsize mismatch file='// &
+                    trim(num2str(cellsize, '(G32.16)'))//' expected='// &
+                    trim(num2str(ref_cellsize, '(G32.16)'))// &
+                    new_line('a')
+    end if
+
+    if (len_trim(err_message) > 0) then
+      if (present(context)) then
+        err_message = trim(context) // new_line('a') // err_message
+      end if 
+      call error_message(trim(err_message))
+    end if
+
+  end subroutine check_header
+
+  !> \brief Read header information from either NetCDF or ASCII depending on file name/presence.
+  !> \authors Simon Lüdke
+  !> \date Feb 2025
+  subroutine read_header_nc_or_ascii(filepath, fileunit, header_ncols, header_nrows, header_xllcorner, header_yllcorner, &
+                                     header_cellsize, header_nodata, varName)
+    use mo_os, only : path_root, path_isfile
+    implicit none
+    character(len=*), intent(in) :: filepath
+    integer(i4), intent(in) :: fileunit
+    integer(i4), intent(out) :: header_ncols, header_nrows
+    real(dp), intent(out) :: header_xllcorner, header_yllcorner, header_cellsize, header_nodata
+    character(len=*), intent(in), optional :: varName
+
+    character(len=:), allocatable :: ncname
+    character(len=:), allocatable :: trimmed
+    integer(i4) :: len_path
+    logical :: is_nc
+
+    trimmed = trim(filepath)
+    len_path = len_trim(trimmed)
+    is_nc = .false.
+    if (len_path >= 3) then
+      if ((trimmed(len_path-2:len_path) == '.nc') .or. (trimmed(len_path-2:len_path) == '.NC')) is_nc = .true.
+    end if
+
+    ncname = trimmed
+    if (.not. is_nc) ncname = path_root(trimmed) // '.nc'
+
+    if (is_nc .or. path_isfile(ncname)) then
+      call get_header_info_from_nc(ncname, fileunit, header_ncols, header_nrows, header_xllcorner, header_yllcorner, &
+                                   header_cellsize, header_nodata, var=varName)
+    else
+      call read_header_ascii(trimmed, fileunit, header_ncols, header_nrows, header_xllcorner, header_yllcorner, &
+                             header_cellsize, header_nodata)
+    end if
+  end subroutine read_header_nc_or_ascii
 
     !> \brief check if given axis is a uniform axis.
   !> \authors Sebastian Müller
@@ -645,57 +735,66 @@ CONTAINS
   end function is_lat_coord
 
 
-  !> \brief initialize grid from a netcdf dataset
-  !> \details initialize grid from a netcdf dataset and a reference variable.
-  !> \authors Sebastian Müller
-  !> \date Mar 2024
-  subroutine get_header_info_from_nc(nc, var, nx, ny, xll, yll, cellsize, mask)
+  !> \brief Read NetCDF header information (matching read_header_ascii signature)
+  !> \details Reads grid metadata (ncols, nrows, corner, cellsize, nodata) from a NetCDF file.
+  !> \authors Sebastian Müller, Simon Lüdke
+  !> \date Mar 2024 / Feb 2025
+  subroutine get_header_info_from_nc(ncname, fileunit, header_ncols, header_nrows, header_xllcorner, header_yllcorner, &
+                                     header_cellsize, header_nodata, mask, var)
     use mo_netcdf, only : NcDataset, NcVariable, NcDimension
-    use mo_utils, only : is_close, flip
-    use mo_string_utils, only : splitString, num2str
+    use mo_utils, only : is_close
+    use mo_string_utils, only : num2str
     implicit none
-    type(NcDataset), intent(in) :: nc !< NetCDF Dataset
-    character(*), intent(in) :: var !< nc variable name to determine the grid from
-    integer(i4), intent(out) :: nx !< size of the x coordinate
-    integer(i4), intent(out) :: ny !< size of the y coordinate
-    real(dp), intent(out) :: xll !< x lower left corner
-    real(dp), intent(out) :: yll !< y lower left corner 
-    real(dp), intent(out) :: cellsize !< cellsize 
+    character(*), intent(in) :: ncname !< NetCDF filename
+    integer(i4), intent(in) :: fileunit !< Unused (kept for signature compatibility)
+    integer(i4), intent(out) :: header_ncols !< number of columns
+    integer(i4), intent(out) :: header_nrows !< number of rows
+    real(dp), intent(out) :: header_xllcorner !< lower left x
+    real(dp), intent(out) :: header_yllcorner !< lower left y
+    real(dp), intent(out) :: header_cellsize !< cell size
+    real(dp), intent(out) :: header_nodata !< nodata value
     logical, optional, allocatable, dimension(:,:), intent(out) :: mask !< mask 
-    ! integer(i4), intent(in), optional :: y_direction !< y-axis direction (-1 (default) as present, 0 for top-down, 1 for bottom-up)
+    character(*), intent(in), optional :: var !< optional variable name
 
+    type(NcDataset) :: nc
     type(NcVariable) :: ncvar, xvar, yvar
     type(NcDimension), dimension(:), allocatable :: dims
-
-    integer(i4), dimension(:), allocatable :: shp, start, cnt
-    integer(i4) :: rnk, coordsys, y_dir
+    integer(i4) :: rnk, y_dir
     integer(i4) :: bottom_up, top_down
     real(dp) ::  cs_x, cs_y, tol
-    real(dp), allocatable, dimension(:,:) :: dummy
     logical :: y_inc, x_sph, y_sph, x_cart, y_cart, flip_y
     integer(i4) :: keep_y
+    character(len=256) :: varName
+
     keep_y = -1_i4 
     y_dir = keep_y
-    ! if (present(y_direction)) y_dir = y_direction
 
     ! set defaults
     tol = 1.e-7_dp
     bottom_up = 1_i4
     top_down = 0_i4
 
-    ncvar = nc%getVariable(var)
+    nc = NcDataset(ncname, "r")
+
+    if (present(var)) then
+      varName = trim(var)
+    else
+      varName = determine_data_var_name(nc, ncname)
+    end if
+
+    ncvar = nc%getVariable(varName)
     rnk = ncvar%getRank()
-    if (rnk < 2) call error_message("grid % from_netcdf: given variable has too few dimensions: ", trim(nc%fname), ":", var)
+    if (rnk < 2) call error_message("grid % from_netcdf: given variable has too few dimensions: ", trim(nc%fname), ":", trim(varName))
 
     dims = ncvar%getDimensions()
-    nx = dims(1)%getLength()
-    ny = dims(2)%getLength()
+    header_ncols = dims(1)%getLength()
+    header_nrows = dims(2)%getLength()
     xvar = nc%getVariable(trim(dims(1)%getName()))
     yvar = nc%getVariable(trim(dims(2)%getName()))
 
     ! check if x/y axis are x/y/lon/lat by standard_name, units, axistype or long_name
     if (is_x_axis(yvar).or.is_lon_coord(yvar).or.is_y_axis(xvar).or.is_lat_coord(xvar)) &
-      call error_message("grid % from_netcdf: variable seems to have wrong axis order (not y-x): ", trim(nc%fname), ":", var)
+      call error_message("grid % from_netcdf: variable seems to have wrong axis order (not y-x): ", trim(nc%fname), ":", trim(varName))
 
     x_cart = is_x_axis(xvar)
     y_cart = is_y_axis(yvar)
@@ -703,18 +802,15 @@ CONTAINS
     y_sph = is_lat_coord(yvar)
 
     if (.not.(x_cart.or.x_sph)) &
-      call error_message("grid % from_netcdf: can't determine coordinate system from x-axis: ", trim(nc%fname), ":", var)
+      call error_message("grid % from_netcdf: can't determine coordinate system from x-axis: ", trim(nc%fname), ":", trim(varName))
     if (.not.(y_cart.or.y_sph)) &
-      call error_message("grid % from_netcdf: can't determine coordinate system from y-axis: ", trim(nc%fname), ":", var)
+      call error_message("grid % from_netcdf: can't determine coordinate system from y-axis: ", trim(nc%fname), ":", trim(varName))
     if (.not.(x_sph.eqv.y_sph)) &
-      call error_message("grid % from_netcdf: x and y axis seem to have different coordinate systems: ", trim(nc%fname), ":", var)
-
-    coordsys = 0_i4 !<    Cartesian coordinate system.
-    if (x_sph) coordsys = 1_i4 !< Spherical coordinates in degrees.
+      call error_message("grid % from_netcdf: x and y axis seem to have different coordinate systems: ", trim(nc%fname), ":", trim(varName))
 
     ! check axis uniformity and monotonicity
-    call check_uniform_axis(xvar, cellsize=cs_x, origin=xll, tol=tol)
-    call check_uniform_axis(yvar, cellsize=cs_y, origin=yll, increasing=y_inc, tol=tol)
+    call check_uniform_axis(xvar, cellsize=cs_x, origin=header_xllcorner, tol=tol)
+    call check_uniform_axis(yvar, cellsize=cs_y, origin=header_yllcorner, increasing=y_inc, tol=tol)
     if (y_dir == keep_y) then
       y_dir = top_down
       if (y_inc) y_dir = bottom_up
@@ -727,26 +823,74 @@ CONTAINS
     flip_y = y_inc.neqv.(y_dir==bottom_up)
     if (flip_y) then
       print *, "grid % from_netcdf: y axis direction is oposite to desired one (inefficient flipping). ", &
-                        "You could flip the file beforehand with: 'cdo invertlat <ifile> <ofile>'. ", trim(nc%fname), ":", var
+                        "You could flip the file beforehand with: 'cdo invertlat <ifile> <ofile>'. ", trim(nc%fname), ":", trim(varName)
     end if
     ! check cellsize in x and y direction
     if (.not.is_close(cs_x, cs_y, rtol=0.0_dp, atol=tol)) &
-      call error_message("grid % from_netcdf: x and y axis have different cell sizes: ", trim(nc%fname), ":", var)
-    cellsize = cs_x
+      call error_message("grid % from_netcdf: x and y axis have different cell sizes: ", trim(nc%fname), ":", trim(varName))
+    header_cellsize = cs_x
 
-    ! get mask from variable mask (assumed to be constant over time)
-    if (present(mask)) then
-      shp = ncvar%getShape()
-      allocate(start(rnk), source=1_i4)
-      allocate(cnt(rnk), source=1_i4)
-      ! only use first 2 dims and use first layer of potential other dims (z, time, soil-layer etc.)
-      cnt(:2) = shp(:2)
-      call ncvar%getData(dummy, start=start, cnt=cnt, mask=mask)
-      ! flip mask if y-axis is decreasing in nc-file
-      ! if (flip_y) call flip(mask, iDim=2)
-      deallocate(dummy)
+    ! Determine no-data value
+    if (ncvar%hasAttribute("_FillValue")) then
+      call ncvar%getAttribute("_FillValue", header_nodata)
+    else if (ncvar%hasAttribute("missing_value")) then
+      call ncvar%getAttribute("missing_value", header_nodata)
+    else
+      call error_message('***ERROR: read_nc_header: missing _FillValue or missing_value attribute')
     end if
+
+    call nc%close()
   end subroutine get_header_info_from_nc
+
+  function determine_data_var_name(nc, ncname) result(varName)
+    use mo_netcdf, only : NcDataset, NcVariable
+    use mo_message, only : error_message
+    use mo_os, only : path_stem
+    class(NcDataset), intent(in) :: nc
+    character(len=*), intent(in) :: ncname
+    character(len=256) :: varName
+
+    type(NcVariable), dimension(:), allocatable :: vars
+    character(len=256), dimension(:), allocatable :: data_var_names
+    integer(i4) :: i, data_var_count, data_var_index
+    character(len=256) :: stem
+
+    varName = ''
+    vars = nc%getVariables()
+
+    data_var_count = 0
+    do i = 1, size(vars)
+      if (vars(i)%getNoDimensions() >= 2) data_var_count = data_var_count + 1
+    end do
+
+    if (data_var_count == 0) then
+      call error_message('read_spatial_data_nc: could not determine variable name for file: ' // trim(ncname))
+    end if
+
+    allocate(data_var_names(data_var_count))
+    data_var_index = 0
+    do i = 1, size(vars)
+      if (vars(i)%getNoDimensions() >= 2) then
+        data_var_index = data_var_index + 1
+        data_var_names(data_var_index) = trim(vars(i)%getName())
+      end if
+    end do
+
+    if (data_var_count == 1) then
+      varName = trim(data_var_names(1))
+      return
+    end if
+
+    stem = trim(path_stem(ncname))
+    do i = 1, data_var_count
+      if ((trim(data_var_names(i)) == stem) .or. (trim(data_var_names(i)) == 'data')) then
+        varName = trim(data_var_names(i))
+        return
+      end if
+    end do
+
+    call error_message('read_spatial_data_nc: variable name could not be determined for file: ' // trim(ncname))
+  end function determine_data_var_name
 
 
   !    NAME
@@ -761,13 +905,13 @@ CONTAINS
   !>       \authors Simon Lüdke
 
   !>       \date June 2025
-  subroutine read_spatial_data_nc_i4(ncname, varName, data, maskout, ncols, nrows, xllcorner, yllcorner, cellsize, nodata_value)
+  subroutine read_spatial_data_nc_i4(ncname, data, maskout, ncols, nrows, xllcorner, yllcorner, cellsize, nodata_value, varName)
     use mo_netcdf, only : NcDataset, NcVariable
     use mo_message, only : error_message
     implicit none
 
     character(len=*), intent(in) :: ncname
-    character(len=*), intent(in) :: varName
+    character(len=*), intent(in), optional :: varName
     integer(i4), dimension(:, :), allocatable, intent(out) :: data
     logical, optional, allocatable, dimension(:, :), intent(out) :: maskout
     integer(i4), intent(out) :: ncols, nrows
@@ -776,21 +920,29 @@ CONTAINS
 
     type(NcDataset) :: nc
     type(NcVariable) :: var
-    integer(i4), allocatable :: var_shape(:)
-
-    allocate(var_shape(2))
+    integer(i4), allocatable :: var_shape(:), start(:), cnt(:)
+    character(len=256) :: varName_local
 
     ! Open NetCDF dataset
     nc = NcDataset(ncname, "r")
 
+    if (present(varName)) then
+      varName_local = trim(varName)
+    else
+      varName_local = determine_data_var_name(nc, ncname)
+    end if
+
     ! Extract header info
-    call get_header_info_from_nc(nc, varName, ncols, nrows, xllcorner, yllcorner, cellsize, maskout)
+    call get_header_info_from_nc(ncname, 0_i4, ncols, nrows, xllcorner, yllcorner, cellsize, nodata_value, var=varName_local)
 
     ! Retrieve variable
-    var = nc%getVariable(trim(varName))
+    var = nc%getVariable(trim(varName_local))
 
-    ! Determine shape
+    ! Determine shape and prepare read extents
     var_shape = var%getShape()
+    allocate(start(size(var_shape)), source=1_i4)
+    allocate(cnt(size(var_shape)), source=1_i4)
+    cnt(1:2) = var_shape(1:2)
 
     ! Determine no-data value
     if (var%hasAttribute("_FillValue")) then
@@ -803,7 +955,12 @@ CONTAINS
 
     ! Allocate and read data
     allocate(data(var_shape(1), var_shape(2)))
-    call var%getData(data, start=(/1, 1/), cnt=var_shape)
+    call var%getData(data, start=start, cnt=cnt)
+
+    if (present(maskout)) then
+      allocate(maskout(var_shape(1), var_shape(2)))
+      maskout = abs(real(data, dp) - nodata_value) .gt. tiny(1.0_dp)
+    end if
 
     call nc%close()
   end subroutine read_spatial_data_nc_i4
@@ -821,13 +978,13 @@ CONTAINS
   !>       \authors Simon Lüdke
 
   !>       \date June 2025
-  subroutine read_spatial_data_nc_dp(ncname, varName, data, maskout, ncols, nrows, xllcorner, yllcorner, cellsize, nodata_value)
+  subroutine read_spatial_data_nc_dp(ncname, data, maskout, ncols, nrows, xllcorner, yllcorner, cellsize, nodata_value, varName)
     use mo_netcdf, only : NcDataset, NcVariable
     use mo_message, only : error_message
     implicit none
 
     character(len=*), intent(in) :: ncname
-    character(len=*), intent(in) :: varName
+    character(len=*), intent(in), optional :: varName
     real(dp), dimension(:, :), allocatable, intent(out) :: data
     logical, optional, allocatable, dimension(:, :), intent(out) :: maskout
     integer(i4), intent(out) :: ncols, nrows
@@ -836,21 +993,29 @@ CONTAINS
 
     type(NcDataset) :: nc
     type(NcVariable) :: var
-    integer(i4), allocatable :: var_shape(:)
-
-    allocate(var_shape(2))
+    integer(i4), allocatable :: var_shape(:), start(:), cnt(:)
+    character(len=256) :: varName_local
 
     ! Open NetCDF dataset
     nc = NcDataset(ncname, "r")
 
+    if (present(varName)) then
+      varName_local = trim(varName)
+    else
+      varName_local = determine_data_var_name(nc, ncname)
+    end if
+
     ! Extract header info
-    call get_header_info_from_nc(nc, varName, ncols, nrows, xllcorner, yllcorner, cellsize, maskout)
+    call get_header_info_from_nc(ncname, 0_i4, ncols, nrows, xllcorner, yllcorner, cellsize, nodata_value, var=varName_local)
 
     ! Retrieve variable
-    var = nc%getVariable(trim(varName))
+    var = nc%getVariable(trim(varName_local))
 
-    ! Determine shape
+    ! Determine shape and prepare read extents
     var_shape = var%getShape()
+    allocate(start(size(var_shape)), source=1_i4)
+    allocate(cnt(size(var_shape)), source=1_i4)
+    cnt(1:2) = var_shape(1:2)
 
     ! Determine no-data value
     if (var%hasAttribute("_FillValue")) then
@@ -863,11 +1028,18 @@ CONTAINS
 
     ! Allocate and read data
     allocate(data(var_shape(1), var_shape(2)))
-    call var%getData(data, start=(/1, 1/), cnt=var_shape)
+    call var%getData(data, start=start, cnt=cnt)
+
+    if (present(maskout)) then
+      allocate(maskout(var_shape(1), var_shape(2)))
+      maskout = abs(data - nodata_value) .gt. tiny(1.0_dp)
+    end if
 
     call nc%close()
   end subroutine read_spatial_data_nc_dp
 
+  
+  
   !    NAME
   !        read_spatial_data_nc_or_ascii_dp
 
@@ -884,8 +1056,7 @@ CONTAINS
   subroutine read_spatial_data_nc_or_ascii_dp(filepath, fileunit, header_ncols, header_nrows, header_xllcorner, &
                                        header_yllcorner, header_cellsize, data, maskout, &
                                        out_nCols, out_nRows, out_xllcorner, out_yllcorner, out_cellsize, out_nodata_value)
-    use mo_netcdf, only : NcDataset, NcVariable
-    use mo_os, only : path_root, path_isfile, path_stem
+    use mo_os, only : path_root, path_isfile
         implicit none
 
     ! filename with location
@@ -933,27 +1104,30 @@ CONTAINS
     ! 
     real(dp), optional, intent(out) :: out_nodata_value
 
-    ! netcdf file
-    type(NcDataset) :: nc
-    ! variables for data from netcdf
-    type(NcVariable) :: var
-    
     ! file exists 
     real(dp) :: nodata_value
     integer(i4) :: nrows, ncols
     real(dp) :: xllcorner, yllcorner, cellsize
-    character(len=:), allocatable :: ncname, varName
-    integer(i4), allocatable :: var_shape(:)
-    allocate(var_shape(2))
+    character(len=:), allocatable :: ncname
 
-    ncname = path_root(filepath) // '.nc'
+    ! Prefer explicit NetCDF path if it already ends with .nc, otherwise use sidecar .nc
+    if (len_trim(filepath) >= 3) then
+      if ((filepath(len_trim(filepath)-2:len_trim(filepath)) == '.nc') .or. (filepath(len_trim(filepath)-2:len_trim(filepath)) == '.NC')) then
+        ncname = trim(filepath)
+      else
+        ncname = path_root(filepath) // '.nc'
+      end if
+    else
+      ncname = path_root(filepath) // '.nc'
+    end if
 
     ! preferably use nc file if it exists alternatively the asci version
     ! print *, "Check if ", ncname, " existis: ", path_isfile(ncname)
     if (path_isfile(ncname)) then
-      varName = path_stem(ncname)
-      call read_spatial_data_nc(ncname, varName, data, maskout, ncols, nrows, xllcorner, yllcorner, cellsize, nodata_value)
+      print *, "Read nc file: ", ncname
+      call read_spatial_data_nc(ncname, data, maskout, ncols, nrows, xllcorner, yllcorner, cellsize, nodata_value)
     else
+    print *, "Read ascii file: ", filepath
       if ((header_ncols /= 0_i4) .and. (header_nrows /= 0_i4)) then
         ncols = header_ncols
         nrows = header_nrows
@@ -1002,8 +1176,7 @@ CONTAINS
   subroutine read_spatial_data_nc_or_ascii_i4(filepath, fileunit, header_ncols, header_nrows, header_xllcorner, &
                                        header_yllcorner, header_cellsize, data, maskout, &
                                        out_nCols, out_nRows, out_xllcorner, out_yllcorner, out_cellsize, out_nodata_value)
-    use mo_netcdf, only : NcDataset, NcVariable
-    use mo_os, only : path_root, path_isfile, path_stem
+    use mo_os, only : path_root, path_isfile
     implicit none
 
     ! filename with location
@@ -1050,27 +1223,30 @@ CONTAINS
     
     real(dp), optional, intent(out) :: out_nodata_value
 
-    ! netcdf file
-    type(NcDataset) :: nc
-    ! variables for data from netcdf
-    type(NcVariable) :: var
-    
     ! file exists 
     real(dp) :: nodata_value
     integer(i4) :: nrows, ncols
     real(dp) :: xllcorner, yllcorner, cellsize
-    character(len=:), allocatable :: ncname, varName
-    integer(i4), allocatable :: var_shape(:)
-    allocate(var_shape(2))
+    character(len=:), allocatable :: ncname
 
-    ncname = path_root(filepath) // '.nc'
+    ! Prefer explicit NetCDF path if it already ends with .nc, otherwise use sidecar .nc
+    if (len_trim(filepath) >= 3) then
+      if ((filepath(len_trim(filepath)-2:len_trim(filepath)) == '.nc') .or. (filepath(len_trim(filepath)-2:len_trim(filepath)) == '.NC')) then
+        ncname = trim(filepath)
+      else
+        ncname = path_root(filepath) // '.nc'
+      end if
+    else
+      ncname = path_root(filepath) // '.nc'
+    end if
 
     ! preferably use nc file if it exists alternatively the asci version
     ! print *, "Check if ", ncname, " existis: ", path_isfile(ncname)
     if (path_isfile(ncname)) then
-      varName = path_stem(ncname)
-      call read_spatial_data_nc(ncname, varName, data, maskout, ncols, nrows, xllcorner, yllcorner, cellsize, nodata_value)
+      print *, "Read nc file: ", ncname
+      call read_spatial_data_nc(ncname, data, maskout, ncols, nrows, xllcorner, yllcorner, cellsize, nodata_value)
     else
+      print *, "Read ascii file: ", filepath
       if ((header_ncols /= 0_i4) .and. (header_nrows /= 0_i4)) then
         ncols = header_ncols
         nrows = header_nrows

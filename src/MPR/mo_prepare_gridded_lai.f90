@@ -149,6 +149,7 @@ CONTAINS
 
     use mo_append, only : append
     use mo_mpr_global_variables, only : L0_gridded_LAI, dirgridded_LAI, nLAI, LAIBoundaries
+    use mo_common_constants, only : defaultTolerance_dp
     use mo_ncread, only : Get_NcDim, Get_NcVar, Get_NcVarAtt
     use mo_string_utils, only : num2str
     use mo_utils, only : eq
@@ -214,6 +215,11 @@ CONTAINS
       end if
       ! optional check
       if (any((LAI0_3D(:, :, t) .lt. 0.0_dp) .AND. mask(:, :))) then
+        ! if difference is less than a small tolerance, set to zero
+        if (all((LAI0_3D(:, :, t) .gt. -defaultTolerance_dp) .AND. mask(:, :))) then
+          LAI0_3D(:, :, t) = max(LAI0_3D(:, :, t), 0.0_dp)
+          cycle
+        end if
         call error_message('***ERROR: read_nc: values in variable lai are lower than ', trim(num2str(0, '(F7.2)')), raise=.false.)
         call error_message('          at timestep  : ', trim(num2str(t)), raise=.false.)
         call error_message('File: ', trim(fName), raise=.false.)

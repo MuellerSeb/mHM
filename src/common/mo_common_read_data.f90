@@ -48,7 +48,7 @@ CONTAINS
     use mo_common_variables, only : L0_elev, dirMorpho, level0, domainMeta, &
                                     resolutionHydrology
     use mo_common_grid, only : set_domain_indices
-    use mo_read_spatial_data, only : read_header_ascii, read_spatial_data_ascii
+    use mo_read_spatial_data, only : read_header_nc_or_ascii, read_spatial_data_nc_or_ascii
     use mo_string_utils, only : num2str
 
     implicit none
@@ -93,13 +93,13 @@ CONTAINS
 
       ! Header (to check consistency)
       fName = trim(adjustl(dirMorpho(iDomain))) // trim(adjustl(file_dem))
-      call read_header_ascii(trim(fName), udem, &
+      call read_header_nc_or_ascii(trim(fName), udem, &
               level0_iDomain%nrows, level0_iDomain%ncols, level0_iDomain%xllcorner, &
               level0_iDomain%yllcorner, level0_iDomain%cellsize, level0_iDomain%nodata_value)
 
       ! check for L0 and L1 scale consistency
       if(resolutionHydrology(iDomain) .LT. level0_iDomain%cellsize) then
-        call error_message('***ERROR: resolutionHydrology (L1) should be smaller than the input data resolution (L0)', raise=.false.)
+        call error_message('***ERROR: resolutionHydrology (L1) should be coarser than the input data resolution (L0)', raise=.false.)
         call error_message('          check set-up (in mhm.nml) for domain: ', trim(adjustl(num2str(domainID))), ' ...')
       end if
 
@@ -146,7 +146,7 @@ CONTAINS
     use mo_common_file, only : ulcoverclass
     use mo_common_types, only: Grid
     use mo_common_variables, only : L0_LCover, LCfilename, dirLCover, level0, domainMeta, nLCoverScene
-    use mo_read_spatial_data, only : read_spatial_data_ascii
+    use mo_read_spatial_data, only : read_spatial_data_nc_or_ascii
     use mo_string_utils, only : num2str
 
     implicit none
