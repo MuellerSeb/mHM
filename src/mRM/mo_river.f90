@@ -408,10 +408,12 @@ contains
     use mo_message, only: error_message
     class(river_t), intent(inout) :: this
     integer(i8) :: i, j, n, m, k
+    logical :: reverse_order
     ! integer(i8), pointer :: sources(:)
     if (allocated(this%facc)) deallocate(this%facc)
     if (.not.allocated(this%order%id)) call error_message("river%calc_facc: order not initialized")
-    if (.not.this%order%to_root) call this%order%reverse()
+    reverse_order = .not.this%order%to_root
+    if (reverse_order) call this%order%reverse()
     allocate(this%facc(this%n_nodes))
     do i = 1_i8, this%order%n_levels
       !$omp parallel do default(shared) private(n,m,k) schedule(static)
@@ -426,17 +428,21 @@ contains
       end do
       !$omp end parallel do
     end do
+    ! restore original order if it was reversed
+    if (reverse_order) call this%order%reverse()
   end subroutine river_facc
 
   !> \brief Calculate flow accumulation
   subroutine river_label_subcatchments(this, label_map, selected_nodes, labels, default_label)
     use mo_message, only: error_message
     class(river_t), intent(inout) :: this
-    integer(i8), allocatable, intent(out) :: label_map(:) !< subcatchment labels
+    integer(i4), allocatable, intent(out) :: label_map(:) !< subcatchment labels
     integer(i8), dimension(:), intent(in) :: selected_nodes !< nodes to label subcatchments from
-    integer(i8), dimension(:), optional, intent(in) :: labels !< labels used for subcatchments
-    integer(i8), optional, intent(in) :: default_label !< default label for unlabeled nodes (default: 0)
-    integer(i8) :: i, j, n, def
+    integer(i4), dimension(:), optional, intent(in) :: labels !< labels used for subcatchments
+    integer(i4), optional, intent(in) :: default_label !< default label for unlabeled nodes (default: 0)
+    integer(i8) :: i, j, n
+    integer(i4) :: def, m
+    logical :: reverse_order
 
     if (present(labels)) then
       if (size(labels, kind=i8) /= size(selected_nodes, kind=i8)) then
@@ -445,9 +451,12 @@ contains
     end if
 
     if (.not.allocated(this%order%id)) call error_message("river%calc_facc: order not initialized")
-    if (this%order%to_root) call this%order%reverse()
 
-    def = optval(default_label, 0_i8)
+    ! we need to traverse from downstream to upstream, so reverse order if it is currently from headwater to root
+    reverse_order = this%order%to_root
+    if (reverse_order) call this%order%reverse()
+
+    def = optval(default_label, 0_i4)
     allocate(label_map(this%n_nodes))
 
     !$omp parallel do default(shared) schedule(static)
@@ -458,14 +467,14 @@ contains
 
     if (present(labels)) then
       !$omp parallel do default(shared) schedule(static)
-      do i = 1_i8, size(selected_nodes, kind=i8)
-        label_map(selected_nodes(i)) = labels(i)
+      do m = 1_i4, size(selected_nodes, kind=i4)
+        label_map(selected_nodes(m)) = labels(m)
       end do
       !$omp end parallel do
     else
       !$omp parallel do default(shared) schedule(static)
-      do i = 1_i8, size(selected_nodes, kind=i8)
-        label_map(selected_nodes(i)) = i
+      do m = 1_i4, size(selected_nodes, kind=i4)
+        label_map(selected_nodes(m)) = m
       end do
       !$omp end parallel do
     end if
@@ -480,6 +489,10 @@ contains
       end do
       !$omp end parallel do
     end do
+
+    ! restore original order if it was reversed
+    if (reverse_order) call this%order%reverse()
+
   end subroutine river_label_subcatchments
 
   !> \brief Calculate upstream area for each node (inclusive).
