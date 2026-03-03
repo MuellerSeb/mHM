@@ -17,7 +17,9 @@ program driver
   use mo_domain, only: domains, selected_domains, domain_t
   use mo_kind, only: i4
   use nml_config_project, only: nml_config_project_t, NML_OK
-
+  !$ use omp_lib, only: omp_get_num_threads
+  !$ integer(i4) :: n_threads
+  logical :: openmp_enabled = .false.
   integer :: unit
   logical :: from_dirs
   integer(i4) :: n_domains, i, id
@@ -66,6 +68,16 @@ program driver
 
   call startup_message()
 
+  !$omp parallel
+  !$ n_threads = omp_get_num_threads()
+  !$omp end parallel
+  !$ openmp_enabled = .true.
+  !$ log_info(*) "OpenMP enabled with ", n_threads, " threads."
+
+  if (.not. openmp_enabled) then
+    log_info(*) "OpenMP not enabled."
+  end if
+
   ! get current working directory
   ! we don't change the process working directory, but use cwd for all relative paths
   ! we store the CWD in the exchange type later and use the "get_path" method to get paths
@@ -97,7 +109,6 @@ program driver
   if (from_dirs) main_file = "mhm.nml" ! default main file name in each domain directory
   allocate(selected_domains(n_domains))
 
-  log_text(*) separator
   log_info(*) "CREATE DOMAINS: ", n_domains
 
   ! create domain-list
@@ -122,7 +133,6 @@ program driver
     ! id either from list or 1 if from dirs (always take domain 1 in each sub-dir)
     if (from_dirs) id = 1_i4
     ! create new domain and its exchange
-    log_text(*) separator
     call domain%init(meta_file, main_file, para_file, id, cwd)
     ! configure domain components
     log_text(*) separator
@@ -137,7 +147,7 @@ program driver
     id = selected_domains(i)
     call domains%get_domain(id, domain)
     log_text(*) separator
-    log_info(*) "PREPARE DOMAIN: ", id
+    log_info(*) "RUN DOMAIN: ", id
     call domain%initialize()
     log_text(*) separator
     log_info(*) "RUN TIME LOOP"
@@ -145,7 +155,6 @@ program driver
       call domain%update()
     end do
     log_text(*) separator
-    log_info(*) "FINALIZE DOMAIN: ", id
     call domain%finalize()
   end do
 
