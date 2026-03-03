@@ -262,7 +262,7 @@ contains
 
     ! create rivers
     if (self%read_restart) then
-      call self%river%from_restart(self%restart_input_path, self%level3)
+      call self%river%from_restart_file(self%restart_input_path, self%level3)
     else if (is_close(self%level3%cellsize, self%exchange%level0%cellsize)) then
       ! TODO: the upscaler should handle also the case of no upscaling (level0 == level11)
       scope_info(s,*) "level-0 and level-3 river network are equal of size:", n2s(self%exchange%level3%ncells)
@@ -313,7 +313,7 @@ contains
     if (self%read_restart) then
       scope_info(s,*) "Read routing state from restart file: ", self%restart_input_path
       ! TODO: warn about gamma mismatch between restart and config
-      call self%router%from_restart( &
+      call self%router%from_restart_file( &
         path              = self%restart_input_path, &
         river             = self%river, &
         input_grid        = self%exchange%level1, &
@@ -394,9 +394,18 @@ contains
     class(mrm_t), intent(inout), target :: self
     log_info(*) "Finalize mRM"
     if (self%write_restart) call self%create_restart()
-    log_info(*) "Close mRM output file: ", self%output_path
-    if (self%output_active) call self%ds_out%close()
-    ! if (self%scc_active) call self%dsr%close()
+    if (self%output_active) then
+      call self%ds_out%close()
+      log_info(*) "Close mRM grid output file: ", self%output_path
+    else
+      log_info(*) "No mRM grid output file will be written"
+    end if
+    if (self%output_node_active) then
+      call self%ds_node_out%close()
+      log_info(*) "Close mRM node output file: ", self%output_node_path
+    else
+      log_info(*) "No mRM node output file will be written"
+    end if
   end subroutine mrm_finalize
 
   subroutine mrm_cleanup(self)

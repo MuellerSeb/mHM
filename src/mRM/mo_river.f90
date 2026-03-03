@@ -108,9 +108,9 @@ module mo_river
     procedure, public :: select_cell_values => river_select_cell_values
     procedure, public :: export => river_export
     procedure, public :: clean => river_destroy
-    procedure, private :: to_restart_dataset => river_to_restart_dataset, to_restart_file => river_to_restart_file
+    procedure, public :: to_restart_dataset => river_to_restart_dataset, to_restart_file => river_to_restart_file
     generic, public :: to_restart => to_restart_dataset, to_restart_file
-    procedure, private :: from_restart_dataset => river_from_restart_dataset, from_restart_file => river_from_restart_file
+    procedure, public :: from_restart_dataset => river_from_restart_dataset, from_restart_file => river_from_restart_file
     generic, public :: from_restart => from_restart_dataset, from_restart_file
   end type river_t
 
@@ -1016,7 +1016,7 @@ contains
   subroutine river_from_restart_file(this, path, grid)
     class(river_t), intent(inout) :: this
     character(*), intent(in) :: path !< NetCDF file path
-    type(grid_t), pointer, intent(in), optional :: grid !< grid the river network is defined on
+    type(grid_t), pointer, intent(in) :: grid !< grid the river network is defined on
     type(NcDataset) :: nc
     nc = NcDataset(path, "r")
     call this%from_restart_dataset(nc, grid)
@@ -1027,7 +1027,7 @@ contains
   subroutine river_from_restart_dataset(this, nc, grid)
     class(river_t), intent(inout) :: this
     type(NcDataset), intent(in) :: nc !< netcdf dataset to read from
-    type(grid_t), pointer, intent(in), optional :: grid !< grid the river network is defined on
+    type(grid_t), pointer, intent(in) :: grid !< grid the river network is defined on
     type(NcVariable) :: nc_var
     type(NcDimension) :: nc_dim
 

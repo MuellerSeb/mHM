@@ -96,8 +96,8 @@ module mo_river_router
     procedure, private :: route => river_router_route
     procedure, private :: time_shift => river_router_time_shift
     ! restart
-    procedure, private :: to_restart_dataset => river_router_to_restart_dataset, to_restart_file => river_router_to_restart_file
-    procedure, private :: from_restart_dataset => river_router_from_restart_dataset, from_restart_file => river_router_from_restart_file
+    procedure, public :: to_restart_dataset => river_router_to_restart_dataset, to_restart_file => river_router_to_restart_file
+    procedure, public :: from_restart_dataset => river_router_from_restart_dataset, from_restart_file => river_router_from_restart_file
     generic, public :: to_restart => to_restart_dataset, to_restart_file
     generic, public :: from_restart => from_restart_dataset, from_restart_file
   end type river_router_t
