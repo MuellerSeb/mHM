@@ -22,6 +22,7 @@ Configuration for the multi-scale routing model (mRM) in mHM.
 | [restart_input_path](#restart_input_path) | string array | no | Restart input path |
 | [write_restart](#write_restart) | logical array | no | Write restart |
 | [restart_output_path](#restart_output_path) | string array | no | Restart output path |
+| [diagnostics_path](#diagnostics_path) | string array | no | Diagnostics output path |
 
 ## Field details
 
@@ -171,6 +172,18 @@ Summary:
 - Required: no
 - Examples: `["mrm_restart_out.nc"]`
 
+### diagnostics_path
+
+Diagnostics output path `diagnostics_path`
+
+Path for diagnostics output file containing information about the river upscaling and SCC.
+
+Summary:
+- Type: `character(len=buf), dimension(max_domains)`
+- Flexible tail dims: 1
+- Required: no
+- Examples: `["mrm_diagnostics.nc"]`
+
 ## Example
 
 ```fortran
@@ -187,6 +200,7 @@ Summary:
   restart_input_path(:) = "mrm_restart_in.nc"
   write_restart(:) = .false.
   restart_output_path(:) = "mrm_restart_out.nc"
+  diagnostics_path(:) = "mrm_diagnostics.nc"
 /
 ```
 

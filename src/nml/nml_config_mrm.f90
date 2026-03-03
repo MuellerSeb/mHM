@@ -71,6 +71,7 @@ module nml_config_mrm
     character(len=buf), dimension(max_domains) :: restart_input_path !< Restart input path
     logical, dimension(max_domains) :: write_restart !< Write restart
     character(len=buf), dimension(max_domains) :: restart_output_path !< Restart output path
+    character(len=buf), dimension(max_domains) :: diagnostics_path !< Diagnostics output path
   contains
     procedure :: init => nml_config_mrm_init
     procedure :: from_file => nml_config_mrm_from_file
@@ -150,6 +151,7 @@ contains
     this%output_node_path = repeat(achar(0), len(this%output_node_path)) ! sentinel for optional string array
     this%restart_input_path = repeat(achar(0), len(this%restart_input_path)) ! sentinel for optional string array
     this%restart_output_path = repeat(achar(0), len(this%restart_output_path)) ! sentinel for optional string array
+    this%diagnostics_path = repeat(achar(0), len(this%diagnostics_path)) ! sentinel for optional string array
     ! default values
     this%river_net_order_root_based = river_net_order_root_based_default
     this%river_net_omp_level_min = river_net_omp_level_min_default
@@ -177,6 +179,7 @@ contains
     character(len=buf), dimension(max_domains) :: restart_input_path
     logical, dimension(max_domains) :: write_restart
     character(len=buf), dimension(max_domains) :: restart_output_path
+    character(len=buf), dimension(max_domains) :: diagnostics_path
     ! locals
     type(nml_file_t) :: nml
     integer :: iostat
@@ -195,7 +198,8 @@ contains
       read_restart_fluxes, &
       restart_input_path, &
       write_restart, &
-      restart_output_path
+      restart_output_path, &
+      diagnostics_path
 
     status = this%init(errmsg=errmsg)
     if (status /= NML_OK) return
@@ -211,6 +215,7 @@ contains
     restart_input_path = this%restart_input_path
     write_restart = this%write_restart
     restart_output_path = this%restart_output_path
+    diagnostics_path = this%diagnostics_path
 
     status = nml%open(file, errmsg=errmsg)
     if (status /= NML_OK) return
@@ -248,6 +253,7 @@ contains
     this%restart_input_path = restart_input_path
     this%write_restart = write_restart
     this%restart_output_path = restart_output_path
+    this%diagnostics_path = diagnostics_path
 
     ! mark as configured
     this%is_configured = .true.
@@ -268,6 +274,7 @@ contains
     restart_input_path, &
     write_restart, &
     restart_output_path, &
+    diagnostics_path, &
     errmsg) result(status)
 
     class(nml_config_mrm_t), intent(inout) :: this
@@ -284,6 +291,7 @@ contains
     character(len=*), dimension(:), intent(in), optional :: restart_input_path
     logical, dimension(:), intent(in), optional :: write_restart
     character(len=*), dimension(:), intent(in), optional :: restart_output_path
+    character(len=*), dimension(:), intent(in), optional :: diagnostics_path
     integer :: &
       lb_1, &
       ub_1
@@ -413,6 +421,16 @@ contains
       ub_1 = lb_1 + size(restart_output_path, 1) - 1
       this%restart_output_path(lb_1:ub_1) = restart_output_path
     end if
+    if (present(diagnostics_path)) then
+      if (size(diagnostics_path, 1) > size(this%diagnostics_path, 1)) then
+        status = NML_ERR_INVALID_INDEX
+        if (present(errmsg)) errmsg = "dimension 1 exceeds bounds for 'diagnostics_path'"
+        return
+      end if
+      lb_1 = lbound(this%diagnostics_path, 1)
+      ub_1 = lb_1 + size(diagnostics_path, 1) - 1
+      this%diagnostics_path(lb_1:ub_1) = diagnostics_path
+    end if
 
     ! mark as configured
     this%is_configured = .true.
@@ -524,6 +542,15 @@ contains
         if (this%restart_output_path(idx(1)) == repeat(achar(0), len(this%restart_output_path))) status = NML_ERR_NOT_SET
       else
         if (all(this%restart_output_path == repeat(achar(0), len(this%restart_output_path)))) status = NML_ERR_NOT_SET
+      end if
+    case ("diagnostics_path")
+      if (present(idx)) then
+        status = idx_check(idx, lbound(this%diagnostics_path), ubound(this%diagnostics_path), &
+          "diagnostics_path", errmsg)
+        if (status /= NML_OK) return
+        if (this%diagnostics_path(idx(1)) == repeat(achar(0), len(this%diagnostics_path))) status = NML_ERR_NOT_SET
+      else
+        if (all(this%diagnostics_path == repeat(achar(0), len(this%diagnostics_path)))) status = NML_ERR_NOT_SET
       end if
     case default
       status = NML_ERR_INVALID_NAME
@@ -705,6 +732,32 @@ contains
           return
         end if
       end if
+    case ("diagnostics_path")
+      if (size(filled) /= 1) then
+        status = NML_ERR_INVALID_INDEX
+        if (present(errmsg)) errmsg = "shape rank mismatch for 'diagnostics_path'"
+        return
+      end if
+      do dim = 1, 1
+        filled(dim) = size(this%diagnostics_path, dim)
+      end do
+      filled(1) = 0
+      do idx = ubound(this%diagnostics_path, 1), &
+        lbound(this%diagnostics_path, 1), -1
+        if (.not. (this%diagnostics_path(idx) == repeat(achar(0), len(this%diagnostics_path)))) then
+          filled(1) = idx - lbound(this%diagnostics_path, 1) + 1
+          exit
+        end if
+      end do
+      if (minval(filled) > 0) then
+        lb_1 = lbound(this%diagnostics_path, 1)
+        ub_1 = lb_1 + filled(1) - 1
+        if (any(this%diagnostics_path(lb_1:ub_1) == repeat(achar(0), len(this%diagnostics_path)))) then
+          status = NML_ERR_PARTLY_SET
+          if (present(errmsg)) errmsg = "array partly set: diagnostics_path"
+          return
+        end if
+      end if
     case default
       status = NML_ERR_INVALID_NAME
       if (present(errmsg)) errmsg = "field is not a flexible array: " // trim(name)
@@ -799,6 +852,20 @@ contains
       status = istat
       if (present(errmsg)) then
         if (len_trim(errmsg) == 0) errmsg = "array partly set: restart_output_path"
+      end if
+      return
+    end if
+    if (istat /= NML_OK) then
+      status = istat
+      return
+    end if
+    if (allocated(filled)) deallocate(filled)
+    allocate(filled(1))
+    istat = this%filled_shape("diagnostics_path", filled, errmsg=errmsg)
+    if (istat == NML_ERR_PARTLY_SET) then
+      status = istat
+      if (present(errmsg)) then
+        if (len_trim(errmsg) == 0) errmsg = "array partly set: diagnostics_path"
       end if
       return
     end if

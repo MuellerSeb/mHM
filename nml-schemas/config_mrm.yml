@@ -132,3 +132,14 @@ properties:
     x-fortran-flex-tail-dims: 1
     title: Restart output path
     examples: [["mrm_restart_out.nc"]]
+  diagnostics_path:
+    type: array
+    items:
+      type: string
+      x-fortran-len: buf
+    x-fortran-shape: max_domains
+    x-fortran-flex-tail-dims: 1
+    title: Diagnostics output path
+    description: |-
+      Path for diagnostics output file containing information about the river upscaling and SCC.
+    examples: [["mrm_diagnostics.nc"]]
