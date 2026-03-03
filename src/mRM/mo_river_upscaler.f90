@@ -16,8 +16,9 @@ module mo_river_upscaler
   use mo_river, only: river_t, d8_E, d8_S, d8_W, d8_N, d8_SE, d8_SW, d8_NW, d8_NE
   use mo_grid, only: grid_t, bottom_up, cartesian
   use mo_grid_scaler, only: scaler_t, down_scaling
-  use mo_message, only: error_message
+  use mo_message, only: error_message, message
   use mo_utils, only: optval
+  use mo_string_utils, only: n2s => num2str
 
   implicit none
   private
@@ -91,20 +92,31 @@ contains
     if (this%upscaler%scaling_mode == down_scaling) call error_message("river_upscaler: target grid needs to be coarser then input")
     ! TODO: shortcut for same resolution of fine and coarse river
 
+    ! sanity check to have facc available for upscaling
+    if (.not.allocated(this%fine_river%facc)) then
+      if (.not.allocated(this%fine_river%order%id)) call this%fine_river%calc_order()
+      call this%fine_river%calc_facc()
+    end if
+
     ! initialize scc related variables
+    call message("river_upscaler: initialize scc")
     call this%init_scc(scc_gauges, scc_latlon)
 
     ! find leaving fine cells in every coarse cell
+    call message("river_upscaler: find leaving cells")
     call this%find_leaving_cells()
 
     ! upscale river depending on scc configuration
     if (this%coarse_river%scc) then
+      call message("river_upscaler: upscale river with scc")
       call this%upscale_scc()
     else
+      call message("river_upscaler: upscale river without scc")
       call this%upscale_fdir()
     end if
 
     ! calculate stream features (stream mask, link lengths)
+    call message("river_upscaler: calculate stream features")
     if (stream) call this%calc_stream(length_percentile)
 
   end subroutine river_upscaler_init
@@ -115,19 +127,25 @@ contains
     real(dp), dimension(:,:), intent(in), optional :: scc_gauges !< gauge locations on fine river dim 1: id, dim 2: (x,y)
     logical, optional, intent(in) :: scc_latlon !< Whether the scc gauges coordinates are geographical (default: .true.)
     ! sub-catchment related attributes
-    logical, allocatable :: gauge_mask(:)
-    integer(i8), allocatable :: gauge_facc(:)
-    type(traversal_visit) :: handler
-    integer(i4) :: i, j, n
-    real(dp) :: coords(2)
+    integer(i4) :: i, n
+    integer(i8) :: k
     logical :: aux, latlon
 
     if (.not.present(scc_gauges)) then
+      call message("river_upscaler%init_scc: no scc gauges provided, initialize without scc")
       this%nsub = 1_i4
-      allocate(this%scc_map(this%fine_river%n_nodes), source=1_i4)
       allocate(this%scc_gauges(0))
       allocate(this%scc_coarse_gauges(0))
-      allocate(this%is_scc_gauge(this%fine_river%n_nodes), source=.false.)
+      allocate(this%scc_map(this%fine_river%n_nodes))
+      allocate(this%is_scc_gauge(this%fine_river%n_nodes))
+      ! set default
+      !$omp parallel do default(shared)
+      do k = 1_i8, this%fine_river%n_nodes
+        this%scc_map(k) = 1_i4
+        this%is_scc_gauge(k) = .false.
+      end do
+      !$omp end parallel do
+      this%coarse_river%scc = .false.
       return
     end if
 
@@ -138,40 +156,43 @@ contains
     aux = this%fine_river%grid%has_aux_coords() .and. latlon
 
     n = size(scc_gauges, dim=1)
-    allocate(gauge_mask(n))
-    allocate(gauge_facc(n))
     this%nsub = n + 1_i4
     if (this%fine_river%scc) call error_message("river_upscaler%init_scc: need a D8 river to initialize SCC")
     if (.not.allocated(this%fine_river%facc)) call error_message("river_upscaler%init_scc: facc not available")
     allocate(this%scc_gauges(n))
 
     ! find gauge cell ids
-    do i = 1_i4, n
-      coords = scc_gauges(i,:)
-      this%scc_gauges(i) = this%fine_river%grid%closest_cell_id(coords, use_aux=aux)
-      gauge_facc(i) = this%fine_river%facc(this%scc_gauges(i))
-    end do
+    call message("river_upscaler%init_scc: find gauge cell ids")
+    if (aux) then
+      call message("river_upscaler%init_scc: find gauge cell with aux coordinates (slow)")
+      !$omp parallel do default(shared)
+      do i = 1_i4, n
+        this%scc_gauges(i) = this%fine_river%grid%closest_cell_id(scc_gauges(i,:), use_aux=aux)
+      end do
+      !$omp end parallel do
+    else
+      this%scc_gauges = this%fine_river%grid%closest_cell_id_by_axes(scc_gauges)
+    end if
 
     ! calculate scc map
-    allocate(this%scc_map(this%fine_river%grid%ncells), source=n+1_i4) ! base catchment gets id n+1
-    allocate(handler%visited(this%fine_river%grid%ncells))
-    gauge_mask = .true.
-    do i = 1_i4, n
-      ! sort sub-gauges by facc (high to low)
-      j = maxloc(gauge_facc, mask=gauge_mask, dim=1)
-      gauge_mask(j) = .false.
-      handler%visited = .false. ! reset traverse handler
-      ! delineate catchment
-      call this%fine_river%traverse(handler, [this%scc_gauges(j)])
-      where (handler%visited) this%scc_map = j
-    end do
-    deallocate(handler%visited)
+    if (.not.allocated(this%fine_river%order%id)) call this%fine_river%calc_order()
+    call this%fine_river%label_subcatchments(this%scc_map, this%scc_gauges, default_label=this%nsub) ! base catchment gets id n+1
 
     ! determine gauges
-    allocate(this%is_scc_gauge(this%fine_river%grid%ncells), source=.false.)
+    call message("river_upscaler%init_scc: determine scc gauges on fine grid")
+    allocate(this%is_scc_gauge(this%fine_river%n_nodes))
+    ! set default
+    !$omp parallel do default(shared)
+    do k = 1_i8, this%fine_river%n_nodes
+      this%is_scc_gauge(k) = .false.
+    end do
+    !$omp end parallel do
+    ! fill in gauges
+    !$omp parallel do default(shared)
     do i = 1_i4, n
       this%is_scc_gauge(this%scc_gauges(i)) = .true.
     end do
+    !$omp end parallel do
     this%coarse_river%scc = this%nsub > 1_i4
   end subroutine river_upscaler_init_scc
 
@@ -268,11 +289,11 @@ contains
   subroutine river_upscaler_scc(this)
     implicit none
     class(river_upscaler_t), intent(inout) :: this
-    integer(i8), allocatable :: facc(:,:), down(:)
-    integer(i4), allocatable :: scc_map(:,:)
-    logical, allocatable :: base_mask(:,:)
-    integer(i8) :: i, k, node, next, facc_max, facc_max_i, n_nodes
-    integer(i4) :: j, sub
+    integer(i8), allocatable :: down(:), ids(:,:)
+    integer(i4), allocatable :: facc(:,:), scc_map(:,:)
+    logical, allocatable :: leave_mask(:,:)
+    integer(i8) :: i, k, node, next, facc_max_i, n_nodes
+    integer(i4) :: j, sub, facc_max, ix, iy, loc(2)
     integer(i4) :: yl, yu, xl, xu ! lower and upper bounds for x and y
 
     if (.not.this%coarse_river%scc) call error_message("river_upscaler%upscale_scc: river is not a SCC river")
@@ -287,9 +308,24 @@ contains
     this%n_sub_nodes = count(this%has_sub, dim=2, kind=i4)
     allocate(this%node_sub(n_nodes))
 
+    ! fill defaults
+    allocate(this%is_scc_coarse_gauge(n_nodes))
+    allocate(this%coarse_river%is_sink(n_nodes))
+    allocate(this%sink_map(n_nodes))
+    allocate(this%link_start(n_nodes))
+    allocate(down(n_nodes))
+    !$omp parallel do default(shared)
+    do k = 1_i8, n_nodes
+      this%is_scc_coarse_gauge(k) = .false.
+      this%coarse_river%is_sink(k) = .false.
+      this%sink_map(k) = 0_i8
+      this%link_start(k) = 0_i8 ! initialize with 0 to indicate sink
+      down(k) = 0_i8 ! initialize with 0 to indicate sink
+    end do
+    !$omp end parallel do
+
     ! find scc gauge ids
     allocate(this%scc_coarse_gauges(size(this%scc_gauges)))
-    allocate(this%is_scc_coarse_gauge(n_nodes), source=.false.)
     do j = 1_i4, size(this%scc_gauges)
       this%scc_coarse_gauges(j) = this%node_from_cell_sub(this%upscaler%id_map(this%scc_gauges(j)), j)
       this%is_scc_coarse_gauge(this%scc_coarse_gauges(j)) = .true.
@@ -298,6 +334,7 @@ contains
     ! find containing cell and sub-catchment for each node
     !$omp parallel do default(shared) private(j, k, i)
     do j = 1_i4, this%nsub
+      ! TODO: this can be optimized with a pre-calculated prefix sum
       k = sum(this%sub_size(1_i4:j-1_i4)) ! count of nodes from previous sub-catchments
       do i = 1_i8, this%coarse_river%grid%ncells
         if (.not.this%has_sub(i, j)) cycle
@@ -308,8 +345,9 @@ contains
     end do
     !$omp end parallel do
 
-    ! calcuate scc fractions in parallel
-    scc_map = this%fine_river%grid%unpack(this%scc_map)
+    ! calculate scc fractions in parallel
+    allocate(scc_map(this%fine_river%grid%nx, this%fine_river%grid%ny))
+    call this%fine_river%grid%unpack_into(this%scc_map, scc_map)
     !$omp parallel do default(shared) private(k, i, yl, yu, xl, xu)
     do k = 1_i8, n_nodes
       i = this%coarse_river%node_cell(k)
@@ -318,13 +356,10 @@ contains
       ! this%coarse_river%area_fraction(k) = sum(this%upscaler%weights(xl:xu,yl:yu), mask=(scc_map(xl:xu,yl:yu)==this%node_sub(k)))
     end do
     !$omp end parallel do
-    deallocate(scc_map)
 
     ! find outlets of of coarse grid
-    facc = this%fine_river%grid%unpack(this%fine_river%facc)
-    base_mask = this%fine_river%grid%unpack(this%scc_map==this%nsub)
-    allocate(this%coarse_river%is_sink(n_nodes), source=.false.)
-    allocate(this%sink_map(n_nodes), source=0_i8)
+    allocate(facc(this%fine_river%grid%nx, this%fine_river%grid%ny))
+    call this%fine_river%grid%unpack_into(this%fine_river%facc, facc)
     !$omp parallel do default(shared) private(j, i, k, sub, yl, yu, xl, xu, node)
     do j = 1_i4, size(this%fine_river%sinks)
       i = this%fine_river%sinks(j) ! node ID is cell ID for a D8 river
@@ -334,22 +369,21 @@ contains
       if (sub == this%nsub) then
         call this%upscaler%coarse_bounds(k, xl, xu, yl, yu)
         ! skip if facc is not max
-        if (this%fine_river%facc(i) < maxval(facc(xl:xu,yl:yu), mask=base_mask(xl:xu,yl:yu))) cycle
+        if (this%fine_river%facc(i) < maxval(facc(xl:xu,yl:yu), mask=(scc_map(xl:xu,yl:yu)==this%nsub))) cycle
       end if
       node = this%node_from_cell_sub(k, sub) ! get node ID (respecting scc)
       this%coarse_river%is_sink(node) = .true. ! mark coarse node as sink
       this%sink_map(node) = i ! store corresponding fine sink
     end do
     !$omp end parallel do
-    deallocate(base_mask, facc)
-
-    ! init with 0 to indicate sinks
-    print*, "river_upscaler: determine downstream scc links"
-    allocate(this%link_start(n_nodes), source=0_i8)
-    allocate(down(n_nodes), source=0_i8)
 
     ! construct links by finding coarse down-stream
-    !$omp parallel do default(shared) private(i, k, sub, next)
+    call message("river_upscaler: determine downstream scc links")
+    allocate(leave_mask(this%fine_river%grid%nx, this%fine_river%grid%ny))
+    call this%fine_river%grid%unpack_into(this%leaving_cells, leave_mask)
+    allocate(ids(this%fine_river%grid%nx, this%fine_river%grid%ny))
+    call this%fine_river%grid%gen_id_matrix(ids)
+    !$omp parallel do default(shared) private(i, k, sub, next, xl, xu, yl, yu, loc, ix, iy)
     do i = 1_i8, n_nodes
       if (this%coarse_river%is_sink(i)) cycle ! skip sinks
       sub = this%node_sub(i) ! id of sub-catchment containing this node
@@ -357,25 +391,34 @@ contains
         this%link_start(i) = this%scc_gauges(sub)
       else ! leaving cell to next cell
         k = this%coarse_river%node_cell(i) ! coarse cell ID containing node
+        ! optimized link-start search
+        call this%upscaler%coarse_bounds(k, xl, xu, yl, yu)
+        loc = maxloc(facc(xl:xu,yl:yu), mask=( leave_mask(xl:xu,yl:yu).and.(scc_map(xl:xu,yl:yu)==sub) ))
+        ix = xl + loc(1) - 1_i4
+        iy = yl + loc(2) - 1_i4
+        this%link_start(i) = ids(ix, iy)
         ! location of leaving cell (could be optimized, but is memory efficient)
-        this%link_start(i) = maxloc( &
-          this%fine_river%facc, &
-          mask=this%leaving_cells.and.(this%scc_map==sub).and.(this%upscaler%id_map==k), dim=1)
+        ! this%link_start(i) = maxloc( &
+        !   this%fine_river%facc, &
+        !   mask=this%leaving_cells.and.(this%scc_map==sub).and.(this%upscaler%id_map==k), dim=1)
       end if
       next = this%fine_river%down(this%link_start(i))
       sub = this%scc_map(next) ! id of sub-catchment containing next node
       down(i) = this%node_from_cell_sub(this%upscaler%id_map(next), sub)
     end do
     !$omp end parallel do
+    deallocate(leave_mask, facc, ids, scc_map)
 
-    print*, "river_upscaler: init scc branching DAG"
+    call message("river_upscaler: init scc branching DAG")
     call this%coarse_river%init(down)
     deallocate(down)
 
     ! generate cell_node_select from sub-node with highest flow accumulation
+    call message("river_upscaler: find representative node for each coarse cell")
     allocate(this%coarse_river%cell_node_select(this%coarse_river%grid%ncells))
+    !$omp parallel do default(shared) private(i, j, k, node, facc_max, facc_max_i)
     do i = 1_i8, this%coarse_river%grid%ncells
-      facc_max = 0_i8
+      facc_max = 0_i4
       facc_max_i = 0_i8
       do j = 1_i4, this%nsub
         k = this%node_from_cell_sub(i, j) ! coarse river node-id
@@ -393,6 +436,7 @@ contains
       end do
       this%coarse_river%cell_node_select(i) = facc_max_i
     end do
+    !$omp end parallel do
   end subroutine river_upscaler_scc
 
   !> \brief Setup coarse river from upscaled D8 fdir.
@@ -410,7 +454,7 @@ contains
     if (this%coarse_river%scc) call error_message("river_upscaler%upscale_fdir: river is not a D8 river")
     if (.not.allocated(this%fine_river%facc)) call error_message("river_upscaler%upscale_fdir: facc not available")
 
-    ! sub-catchment attributes when scc is turned of
+    ! sub-catchment attributes when scc is turned off
     allocate(this%sub_size(1), source=this%coarse_river%grid%ncells)
     allocate(this%n_sub_nodes(this%coarse_river%grid%ncells), source=1_i4)
     allocate(this%node_sub(this%coarse_river%grid%ncells), source=1_i4)
@@ -602,7 +646,7 @@ contains
     class(river_upscaler_t), intent(inout) :: this
     real(dp), intent(in) :: gamma !< model parameter: c_i = gamma * sqrt(s_i) or c = gamma
     logical, optional, intent(in) :: constant_celerity !< whether celerity is assumed constant: c = gamma (default: .false.)
-    real(dp), optional, intent(in) :: slope(this%fine_river%n_nodes) !< [%] river slope on fine grid: size(fine\%ncells)
+    real(dp), optional, intent(in) :: slope(:) !< [%] river slope on fine grid: size(fine\%ncells)
     integer(i8) :: i, cell
     real(dp) :: n
     logical :: constant

@@ -1,0 +1,70 @@
+/** \page nml Namelist Reference
+
+\tableofcontents
+
+This section provides an overview of the namelists used in mHM for model configuration.
+Each namelist is documented on a separate page, detailing its parameters and their usage.
+
+\section nml_config Configuration Namelists
+
+The configuration namelists define the model setup and runtime behavior.
+They are all listed below, one page per namelist:
+
+- \subpage config_project : Configuration for the overall project setup `&config_project`.
+- \subpage config_processes : Configuration for process case selection `&config_processes`.
+- \subpage config_optimize : Configuration for optimization settings `&config_optimize`.
+- \subpage config_time : Configuration for time settings `&config_time`.
+- \subpage config_input : Configuration for input data `&config_input`.
+- \subpage config_coupling : Configuration for coupling settings `&config_coupling`.
+- \subpage config_meteo : Configuration for meteorological component `&config_meteo`.
+- \subpage config_mpr : Configuration for the multiscale parameter regionalization (MPR) `&config_mpr`.
+- \subpage config_mhm : Configuration for the hydrological component `&config_mhm`.
+- \subpage config_mrm : Configuration for the routing component (mRM) `&config_mrm`.
+- \subpage config_observations : Configuration for reference observations `&config_observations`.
+
+\section nml_parameters Parameter Namelists
+
+Parameter namelists in `mhm_parameter.nml` use the same five-value layout for every parameter:
+
+`lower_bound, upper_bound, value, FLAG, SCALING`
+
+These fields are used as follows:
+- `lower_bound`: minimum admissible parameter value.
+- `upper_bound`: maximum admissible parameter value.
+- `value`: default or initial parameter value.
+- `FLAG`: calibration switch (1 = calibrate this parameter, 0 = keep fixed).
+- `SCALING`: scaling factor applied to the parameter values.
+
+They are all listed below, one page per namelist:
+
+- \subpage interception1 : Parameters for interception (case 1) `&interception1`.
+- \subpage snow1 : Parameters for snow (case 1) `&snow1`.
+- \subpage soilmoisture1 : Parameters for soil moisture (case 1) `&soilmoisture1`.
+- \subpage soilmoisture2 : Parameters for soil moisture (case 2) `&soilmoisture2`.
+- \subpage soilmoisture3 : Parameters for soil moisture (case 3) `&soilmoisture3`.
+- \subpage soilmoisture4 : Parameters for soil moisture (case 4) `&soilmoisture4`.
+- \subpage directrunoff1 : Parameters for direct runoff (case 1) `&directRunoff1`.
+- \subpage petm2 : Parameters for PET (case -2 - aspect correction) `&PETm2`.
+- \subpage petm1 : Parameters for PET (case -1 - LAI correction) `&PETm1`.
+- \subpage pet1 : Parameters for PET (case 1 - Hargreaves-Samani) `&PET1`.
+- \subpage pet2 : Parameters for PET (case 2 - Priestley-Taylor) `&PET2`.
+- \subpage pet3 : Parameters for PET (case 3 - Penman-Monteith) `&PET3`.
+- \subpage interflow1 : Parameters for interflow (case 1) `&interflow1`.
+- \subpage percolation1 : Parameters for percolation (case 1) `&percolation1`.
+- \subpage routing1 : Parameters for routing (case 1 - Muskingum) `&routing1`.
+- \subpage routing2 : Parameters for routing (case 2 - adaptive timestep) `&routing2`.
+- \subpage routing3 : Parameters for routing (case 3 - varying celerity) `&routing3`.
+- \subpage neutrons1 : Parameters for neutrons (case 1 - Desilets) `&neutrons1`.
+- \subpage neutrons2 : Parameters for neutrons (case 2 - COSMIC) `&neutrons2`.
+- \subpage geoparameter : Parameters for geology `&geoparameter`.
+- \subpage rivertemp1 : Parameters for river temperature (case 1) `&rivertemp1`.
+
+\section nml_outputs Output Namelists
+
+The output namelists define which model outputs are generated during simulation.
+They are all listed below, one page per namelist:
+
+- \subpage output_mhm : Output configuration for mHM `&output_mhm`.
+- \subpage output_mrm : Output configuration for mRM `&output_mrm`.
+
+*/
