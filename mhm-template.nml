@@ -450,6 +450,8 @@
   write_restart(:) = .false.
   ! Restart output path
   restart_output_path(:) = "mrm_restart_out.nc"
+  ! Diagnostics output path
+  diagnostics_path(:) = "mrm_diagnostics.nc"
 /
 
 ! Observations configuration
