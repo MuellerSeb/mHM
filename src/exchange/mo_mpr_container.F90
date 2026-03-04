@@ -13,6 +13,7 @@ module mo_mpr_container
   use mo_logging
   use mo_kind, only: i4
   use mo_exchange_type, only: exchange_t
+  use mo_string_utils, only: n2s => num2str
   use mo_message, only: message, error_message
   use nml_config_mpr, only: nml_config_mpr_t, NML_OK
 
@@ -62,7 +63,117 @@ contains
   !> \brief Connect the MPR process container with other components.
   subroutine mpr_connect(self)
     class(mpr_t), intent(inout), target :: self
+    integer(i4) :: id(1)
+    integer(i4) :: soil_layers
+    integer :: status
+    character(1024) :: errmsg
     log_info(*) "Connect MPR"
+
+    id(1) = self%exchange%domain
+
+    ! declare MPR prerequisites in the exchange contract
+    self%exchange%slope%required = .true.
+    self%exchange%aspect%required = .true.
+    self%exchange%soil_id%required = .true.
+    self%exchange%geo_unit%required = .true.
+    self%exchange%gridded_lai%required = self%config%lai_time_step(id(1)) /= 0_i4
+
+    if (.not.self%exchange%slope%provided) then
+      log_fatal(*) "MPR: slope not provided (check input settings)."
+      error stop 1
+    end if
+    if (.not.associated(self%exchange%slope%data)) then
+      log_fatal(*) "MPR: slope marked as provided but data is not connected."
+      error stop 1
+    end if
+
+    if (.not.self%exchange%aspect%provided) then
+      log_fatal(*) "MPR: aspect not provided (check input settings)."
+      error stop 1
+    end if
+    if (.not.associated(self%exchange%aspect%data)) then
+      log_fatal(*) "MPR: aspect marked as provided but data is not connected."
+      error stop 1
+    end if
+
+    if (.not.self%exchange%geo_unit%provided) then
+      log_fatal(*) "MPR: geo_unit not provided (check geo_class input settings)."
+      error stop 1
+    end if
+    if (.not.associated(self%exchange%geo_unit%data)) then
+      log_fatal(*) "MPR: geo_unit marked as provided but data is not connected."
+      error stop 1
+    end if
+
+    if (.not.self%exchange%soil_id%provided) then
+      log_fatal(*) "MPR: soil_id not provided (check soil_class/soil_horizon_class input settings)."
+      error stop 1
+    end if
+    if (.not.associated(self%exchange%soil_id%data)) then
+      log_fatal(*) "MPR: soil_id marked as provided but data is not connected."
+      error stop 1
+    end if
+
+    soil_layers = size(self%exchange%soil_id%data, 2)
+    select case (self%config%soil_db_mode(id(1)))
+      case (0_i4)
+        if (soil_layers /= 1_i4) then
+          log_fatal(*) "MPR: soil_db_mode=0 expects a single soil class layer, but got ", n2s(soil_layers), "."
+          error stop 1
+        end if
+      case (1_i4)
+        if (self%config%n_horizons(id(1)) < 1_i4) then
+          log_fatal(*) "MPR: n_horizons must be >= 1 for soil_db_mode=1."
+          error stop 1
+        end if
+        if (soil_layers < self%config%n_horizons(id(1))) then
+          log_fatal(*) "MPR: soil horizon input provides ", n2s(soil_layers), " layers, but n_horizons=", &
+            n2s(self%config%n_horizons(id(1))), "."
+          error stop 1
+        end if
+      case default
+        log_fatal(*) "MPR: unsupported soil_db_mode=", n2s(self%config%soil_db_mode(id(1))), "."
+        error stop 1
+    end select
+
+    if (self%exchange%gridded_lai%required) then
+      if (.not.self%exchange%gridded_lai%provided) then
+        log_fatal(*) "MPR: gridded_lai not provided, but required for lai_time_step=", n2s(self%config%lai_time_step(id(1))), "."
+        error stop 1
+      end if
+      if (.not.associated(self%exchange%gridded_lai%data)) then
+        log_fatal(*) "MPR: gridded_lai marked as provided but data is not connected."
+        error stop 1
+      end if
+    end if
+
+    status = self%config%is_set("soil_lut_path", idx=id, errmsg=errmsg)
+    if (status /= NML_OK) then
+      log_fatal(*) "MPR: soil_lut_path not set for domain ", n2s(id(1)), ". Error: ", trim(errmsg)
+      error stop 1
+    end if
+
+    status = self%config%is_set("geo_lut_path", idx=id, errmsg=errmsg)
+    if (status /= NML_OK) then
+      log_fatal(*) "MPR: geo_lut_path not set for domain ", n2s(id(1)), ". Error: ", trim(errmsg)
+      error stop 1
+    end if
+
+    if (self%exchange%gridded_lai%required) then
+      status = self%config%is_set("lai_path", idx=id, errmsg=errmsg)
+      if (status /= NML_OK) then
+        log_fatal(*) "MPR: lai_path not set for domain ", n2s(id(1)), &
+          " while lai_time_step=", n2s(self%config%lai_time_step(id(1))), ". Error: ", trim(errmsg)
+        error stop 1
+      end if
+    else
+      status = self%config%is_set("lai_lut_path", idx=id, errmsg=errmsg)
+      if (status /= NML_OK) then
+        log_fatal(*) "MPR: lai_lut_path not set for domain ", n2s(id(1)), &
+          " while lai_time_step=0. Error: ", trim(errmsg)
+        error stop 1
+      end if
+    end if
   end subroutine mpr_connect
 
   !> \brief Initialize the MPR process container for the simulation.
