@@ -33,6 +33,7 @@ module mo_mpr_container
     procedure :: update => mpr_update
     procedure :: finalize => mpr_finalize
     procedure, private :: check_geo_units_against_lut => mpr_check_geo_units_against_lut
+    procedure, private :: check_geoparameter_consistency => mpr_check_geoparameter_consistency
   end type mpr_t
 
 contains
@@ -251,6 +252,7 @@ contains
       error stop 1
     end if
     call self%check_geo_units_against_lut()
+    call self%check_geoparameter_consistency()
   end subroutine mpr_connect
 
   !> \brief Ensure all geological classes in the input map are represented in the LUT.
@@ -268,6 +270,22 @@ contains
       end if
     end do
   end subroutine mpr_check_geo_units_against_lut
+
+  !> \brief Ensure geoparameter size matches loaded geology LUT when baseflow is active.
+  subroutine mpr_check_geoparameter_consistency(self)
+    class(mpr_t), intent(in), target :: self
+    integer(i4) :: n_geo_param
+    integer(i4) :: n_geo_lut
+
+    if (self%exchange%parameters%process_matrix(9, 1) == 0_i4) return
+
+    n_geo_param = self%exchange%parameters%nGeoUnits
+    n_geo_lut = self%exchange%geo_class_def%nGeo
+    if (n_geo_param /= n_geo_lut) then
+      log_fatal(*) "MPR: geoparameter count (", n2s(n_geo_param), ") does not match geology LUT classes (", n2s(n_geo_lut), ")."
+      error stop 1
+    end if
+  end subroutine mpr_check_geoparameter_consistency
 
   !> \brief Initialize the MPR process container for the simulation.
   subroutine mpr_initialize(self)
