@@ -14,6 +14,7 @@ module mo_mpr_container
   use mo_kind, only: i4
   use mo_exchange_type, only: exchange_t
   use mo_string_utils, only: n2s => num2str
+  use mo_read_lut, only: read_geoformation_lut
   use mo_message, only: message, error_message
   use nml_config_mpr, only: nml_config_mpr_t, NML_OK
 
@@ -143,6 +144,7 @@ contains
     class(mpr_t), intent(inout), target :: self
     integer(i4) :: id(1)
     integer(i4) :: soil_layers
+    integer(i4) :: geo_lut_unit
     log_info(*) "Connect MPR"
 
     id(1) = self%exchange%domain
@@ -236,6 +238,18 @@ contains
     end if
     if (.not.allocated(self%geo_lut_path)) then
       log_fatal(*) "MPR: internal error, geo_lut_path not resolved in configure."
+      error stop 1
+    end if
+
+    if (.not.associated(self%exchange%geo_class_def)) allocate(self%exchange%geo_class_def)
+    call self%exchange%geo_class_def%reset()
+    geo_lut_unit = 100_i4 + id(1)
+    log_info(*) "MPR: read geology LUT: ", self%geo_lut_path
+    call read_geoformation_lut( &
+      filename=trim(self%geo_lut_path), fileunit=geo_lut_unit, nGeo=self%exchange%geo_class_def%nGeo, &
+      geo_unit=self%exchange%geo_class_def%geo_unit, geo_karstic=self%exchange%geo_class_def%geo_karstic)
+    if (self%exchange%geo_class_def%nGeo < 1_i4) then
+      log_fatal(*) "MPR: geology LUT contains no classes: ", self%geo_lut_path
       error stop 1
     end if
   end subroutine mpr_connect
