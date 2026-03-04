@@ -54,7 +54,7 @@ CONTAINS
 
   !    INTENT(IN)
   !>       \param[in] "character(len = *) :: filename" File name of LUT
-  !>       \param[in] "integer(i4) :: fileunit"        Unit to open file
+  !>       \param[in] "integer(i4), optional :: fileunit" Optional unit to open file
 
   !    INTENT(OUT)
   !>       \param[out] "integer(i4) :: nGeo"                      Number of geological formations
@@ -75,8 +75,8 @@ CONTAINS
     ! File name of LUT
     character(len = *), intent(in) :: filename
 
-    ! Unit to open file
-    integer(i4), intent(in) :: fileunit
+    ! Optional unit to open file
+    integer(i4), intent(in), optional :: fileunit
 
     ! Number of geological formations
     integer(i4), intent(out) :: nGeo
@@ -87,17 +87,22 @@ CONTAINS
     ! ID of the Karstic formation (0 == does not exist)
     integer(i4), dimension(:), allocatable, intent(out) :: geo_karstic
 
-    integer(i4) :: i, ios
+    integer(i4) :: i, ios, unit
 
     character(256) :: dummy
 
     !checking whether the file exists
     call check_path_isfile(path = filename, raise=.true.)
-    open(fileunit, file = filename, action = 'read', status = 'old')
+    if (present(fileunit)) then
+      unit = fileunit
+      open(unit=unit, file=filename, action='read', status='old')
+    else
+      open(newunit=unit, file=filename, action='read', status='old')
+    end if
 
     ! read header
-    read(fileunit, *) dummy, nGeo
-    read(fileunit, *) dummy
+    read(unit, *) dummy, nGeo
+    read(unit, *) dummy
     dummy = dummy // ''   ! only to avoid warning
 
     ! allocation of arrays
@@ -106,14 +111,14 @@ CONTAINS
 
     ! read data
     do i = 1, nGeo
-      read(fileunit, *, iostat=ios) dummy, geo_unit(i), geo_karstic(i), dummy
+      read(unit, *, iostat=ios) dummy, geo_unit(i), geo_karstic(i), dummy
       if ( ios /= 0 ) call error_message( &
         "ERROR: nGeo_Formations (", num2str(nGeo), ") in geology_classdefinition.txt ", &
         "seems to be higher than available geology classes!" &
       )
     end do
 
-    close(fileunit)
+    close(unit)
 
   end subroutine read_geoformation_lut
 
@@ -138,7 +143,7 @@ CONTAINS
 
   !    INTENT(IN)
   !>       \param[in] "character(len = *) :: filename" File name of LUT
-  !>       \param[in] "integer(i4) :: fileunit"        Unit to open file
+  !>       \param[in] "integer(i4), optional :: fileunit" Optional unit to open file
 
   !    INTENT(OUT)
   !>       \param[out] "integer(i4) :: nLAI"                    Number of LAI classes
@@ -162,8 +167,8 @@ CONTAINS
     ! File name of LUT
     character(len = *), intent(in) :: filename
 
-    ! Unit to open file
-    integer(i4), intent(in) :: fileunit
+    ! Optional unit to open file
+    integer(i4), intent(in), optional :: fileunit
 
     ! Number of LAI classes
     integer(i4), intent(out) :: nLAI
@@ -174,17 +179,22 @@ CONTAINS
     ! LAI per class (row) and month (col)
     real(dp), dimension(:, :), allocatable, intent(out) :: LAI
 
-    integer(i4) :: i, j, ios
+    integer(i4) :: i, j, ios, unit
 
     character(256) :: dummy
 
     !checking whether the file exists
     call check_path_isfile(path = filename, raise=.true.)
-    open(fileunit, file = filename, action = 'read')
+    if (present(fileunit)) then
+      unit = fileunit
+      open(unit=unit, file=filename, action='read', status='old')
+    else
+      open(newunit=unit, file=filename, action='read', status='old')
+    end if
 
     ! read header
-    read(fileunit, *) dummy, nLAI
-    read(fileunit, *) dummy
+    read(unit, *) dummy, nLAI
+    read(unit, *) dummy
     dummy = dummy // ''   ! only to avoid warning
 
     ! allocate arrays
@@ -193,14 +203,14 @@ CONTAINS
 
     ! read data
     do i = 1, nLAI
-      read(fileunit, *, iostat=ios) LAIIDList(i), dummy, (LAI(i, j), j = 1, int(YearMonths, i4))
+      read(unit, *, iostat=ios) LAIIDList(i), dummy, (LAI(i, j), j = 1, int(YearMonths, i4))
       if ( ios /= 0 ) call error_message( &
         "ERROR: NoLAIclasses (", num2str(nLAI), ") in LAI_classdefinition.txt ", &
         "seems to be higher than available LAI classes!" &
       )
     end do
 
-    close(fileunit)
+    close(unit)
 
   end subroutine read_lai_lut
 
