@@ -15,7 +15,6 @@ module mo_mpr_container
   use mo_exchange_type, only: exchange_t
   use mo_string_utils, only: n2s => num2str
   use mo_read_lut, only: read_geoformation_lut
-  use mo_message, only: message, error_message
   use nml_config_mpr, only: nml_config_mpr_t, NML_OK
 
   !> \class   mpr_t
@@ -33,6 +32,7 @@ module mo_mpr_container
     procedure :: initialize => mpr_initialize
     procedure :: update => mpr_update
     procedure :: finalize => mpr_finalize
+    procedure, private :: check_geo_units_against_lut => mpr_check_geo_units_against_lut
   end type mpr_t
 
 contains
@@ -250,7 +250,24 @@ contains
       log_fatal(*) "MPR: geology LUT contains no classes: ", self%geo_lut_path
       error stop 1
     end if
+    call self%check_geo_units_against_lut()
   end subroutine mpr_connect
+
+  !> \brief Ensure all geological classes in the input map are represented in the LUT.
+  subroutine mpr_check_geo_units_against_lut(self)
+    class(mpr_t), intent(in), target :: self
+    integer(i4) :: i
+    integer(i4) :: geo_id
+
+    do i = 1_i4, size(self%exchange%geo_unit%data)
+      geo_id = self%exchange%geo_unit%data(i)
+      if (.not.any(self%exchange%geo_class_def%geo_unit == geo_id)) then
+        log_fatal(*) "MPR: geological unit ", n2s(geo_id), &
+          " from geo_unit input is not present in geology LUT."
+        error stop 1
+      end if
+    end do
+  end subroutine mpr_check_geo_units_against_lut
 
   !> \brief Initialize the MPR process container for the simulation.
   subroutine mpr_initialize(self)
