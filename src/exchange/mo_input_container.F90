@@ -120,9 +120,14 @@ module mo_input_container
     type(input_var_dp) :: aspect !< input variable for aspect
     type(input_var_i4) :: fdir !< input variable for flow direction
     type(input_var_i4) :: facc !< input variable for flow accumulation
+    type(input_var_i4) :: geo_class !< input variable for geology class
+    type(input_var_i4) :: soil_class !< input variable for soil class
+    type(input_var2d_i4) :: soil_horizon_class !< input variable for soil horizon class
+    type(input_var_dp) :: lai_class !< input variable for LAI class
     ! level 1 inputs
     type(input_var_i4) :: hydro_mask !< input variable for hydro mask
     type(input_var_dp) :: runoff !< input variable for runoff
+    integer(i4), allocatable :: soil_class_one_layer(:,:) !< adapter for single-layer soil class input
   contains
     procedure :: configure => input_configure
     procedure :: connect => input_connect
@@ -181,17 +186,26 @@ contains
     if (present(coupled)) self%coupled = coupled
   end subroutine input_var_init
 
-  subroutine input_var_open_dataset(self, kind, timestamp, grid, init_grid)
+  subroutine input_var_open_dataset(self, kind, timestamp, grid, init_grid, layered)
     class(input_var_abc), intent(inout) :: self
     character(*), intent(in) :: kind !< kind of variable to create dataset for
     integer(i4), intent(in) :: timestamp !< time stamp for the dataset
     type(grid_t), intent(in), pointer :: grid !< grid for the variable
     logical, intent(in) :: init_grid !< whether to initialize the grid
+    logical, intent(in), optional :: layered !< whether the variable has a layer dimension
     character(:), allocatable :: grid_init_var
+    logical :: layered_
     if (.not.self%provided) return
-    if (init_grid) grid_init_var = self%name ! allocate variable name for grid initialization
-    call self%ds%init(path=self%path, vars=[var(name=trim(self%name), kind=kind, static=self%static)], &
-      timestamp=timestamp, grid=grid, grid_init_var=grid_init_var, tol=1.0e-5_dp) ! if grid_init_var is un-allocated, it is "not present"
+    layered_ = .false.
+    if (present(layered)) layered_ = layered
+    if (init_grid) then
+      grid_init_var = self%name ! allocate variable name for grid initialization
+      call self%ds%init(path=self%path, vars=[var(name=trim(self%name), kind=kind, static=self%static, layered=layered_)], &
+        timestamp=timestamp, grid=grid, grid_init_var=grid_init_var, tol=1.0e-5_dp)
+    else
+      call self%ds%init(path=self%path, vars=[var(name=trim(self%name), kind=kind, static=self%static, layered=layered_)], &
+        timestamp=timestamp, grid=grid, tol=1.0e-5_dp)
+    end if
     ! TODO: make tol configurable in case of single precision variables with small values
     self%var_id = self%ds%var_index(self%name)
     if (.not.self%static) self%stepping = self%ds%timestep
@@ -561,6 +575,42 @@ contains
       self%exchange%facc%provided = .true. ! mark as provided in exchange
     end if
 
+    ! geology class (geo_class_var by default "geology_class")
+    status = self%config%input%is_set("geo_class_path", idx=id, errmsg=errmsg)
+    if (status == NML_OK) then
+      call self%geo_class%init( &
+        path=self%config%input%geo_class_path(id(1)), name=self%config%input%geo_class_var(id(1)), static=.true.)
+      self%exchange%geo_unit%provided = .true. ! mark as provided in exchange
+    end if
+
+    ! soil class (soil_class_var by default "soil_class")
+    status = self%config%input%is_set("soil_class_path", idx=id, errmsg=errmsg)
+    if (status == NML_OK) then
+      call self%soil_class%init( &
+        path=self%config%input%soil_class_path(id(1)), name=self%config%input%soil_class_var(id(1)), static=.true.)
+      self%exchange%soil_id%provided = .true. ! mark as provided in exchange
+    end if
+
+    ! soil horizon class (uses soil_class_var by default)
+    status = self%config%input%is_set("soil_horizon_class_path", idx=id, errmsg=errmsg)
+    if (status == NML_OK) then
+      call self%soil_horizon_class%init( &
+        path=self%config%input%soil_horizon_class_path(id(1)), name=self%config%input%soil_class_var(id(1)), static=.true.)
+      self%exchange%soil_id%provided = .true. ! mark as provided in exchange
+    end if
+
+    if (self%soil_class%provided .and. self%soil_horizon_class%provided) then
+      log_warn(*) "Input: both soil_class_path and soil_horizon_class_path are configured. Prefer layered soil horizon class."
+    end if
+
+    ! LAI class (lai_class_var by default "LAI_class")
+    status = self%config%input%is_set("lai_class_path", idx=id, errmsg=errmsg)
+    if (status == NML_OK) then
+      call self%lai_class%init( &
+        path=self%config%input%lai_class_path(id(1)), name=self%config%input%lai_class_var(id(1)), static=.true.)
+      self%exchange%gridded_lai%provided = .true. ! mark as provided in exchange
+    end if
+
     ! hydro mask (hydro_mask_var by default "mask")
     status = self%config%input%is_set("hydro_mask_path", idx=id, errmsg=errmsg)
     if (status == NML_OK) then
@@ -660,6 +710,60 @@ contains
       self%exchange%facc%data => self%facc%cache(:, 1) ! associate exchange variable to input cache
     end if
 
+    ! geology class
+    if (self%geo_class%coupled) then
+      ! TODO: init grid from coupling namelist if needed
+      log_error(*) "Input: geology class is coupled... not yet implemented"
+      stop 1
+    else if (self%geo_class%provided) then
+      init_grid = need_grid(self%tgt_level0, self%exchange%level0) ! associate grid if not yet done
+      call self%geo_class%open_dataset(kind="i4", timestamp=ts, grid=self%exchange%level0, init_grid=init_grid)
+      call self%geo_class%read_static()
+      self%exchange%geo_unit%data => self%geo_class%cache(:, 1) ! associate exchange variable to input cache
+    end if
+
+    ! soil class
+    if (self%soil_class%coupled) then
+      ! TODO: init grid from coupling namelist if needed
+      log_error(*) "Input: soil class is coupled... not yet implemented"
+      stop 1
+    else if (self%soil_class%provided) then
+      init_grid = need_grid(self%tgt_level0, self%exchange%level0) ! associate grid if not yet done
+      call self%soil_class%open_dataset(kind="i4", timestamp=ts, grid=self%exchange%level0, init_grid=init_grid)
+      call self%soil_class%read_static()
+      if (.not.self%soil_horizon_class%provided) then
+        if (allocated(self%soil_class_one_layer)) deallocate(self%soil_class_one_layer)
+        allocate(self%soil_class_one_layer(size(self%soil_class%cache, 1), 1))
+        self%soil_class_one_layer(:, 1) = self%soil_class%cache(:, 1)
+        self%exchange%soil_id%data => self%soil_class_one_layer ! map single-layer soil class to 2D exchange shape
+      end if
+    end if
+
+    ! soil horizon class
+    if (self%soil_horizon_class%coupled) then
+      ! TODO: init grid from coupling namelist if needed
+      log_error(*) "Input: soil horizon class is coupled... not yet implemented"
+      stop 1
+    else if (self%soil_horizon_class%provided) then
+      init_grid = need_grid(self%tgt_level0, self%exchange%level0) ! associate grid if not yet done
+      call self%soil_horizon_class%open_dataset( &
+        kind="i4", timestamp=ts, grid=self%exchange%level0, init_grid=init_grid, layered=.true.)
+      call self%soil_horizon_class%read_static()
+      self%exchange%soil_id%data => self%soil_horizon_class%cache(:, :, 1) ! associate exchange variable to input cache
+    end if
+
+    ! LAI class
+    if (self%lai_class%coupled) then
+      ! TODO: init grid from coupling namelist if needed
+      log_error(*) "Input: LAI class is coupled... not yet implemented"
+      stop 1
+    else if (self%lai_class%provided) then
+      init_grid = need_grid(self%tgt_level0, self%exchange%level0) ! associate grid if not yet done
+      call self%lai_class%open_dataset(kind="dp", timestamp=ts, grid=self%exchange%level0, init_grid=init_grid)
+      call self%lai_class%read_static()
+      self%exchange%gridded_lai%data => self%lai_class%cache(:, 1) ! associate exchange variable to input cache
+    end if
+
     ! hydro mask
     if (self%hydro_mask%coupled) then
       ! TODO: init grid from coupling namelist if needed
@@ -704,6 +808,15 @@ contains
     if (self%aspect%provided .and. .not.self%exchange%aspect%required) then
       log_warn(*) "Input: aspect provided but not required. Check your configuration."
     end if
+    if (self%geo_class%provided .and. .not.self%exchange%geo_unit%required) then
+      log_warn(*) "Input: geology class provided but not required. Check your configuration."
+    end if
+    if ((self%soil_class%provided .or. self%soil_horizon_class%provided) .and. .not.self%exchange%soil_id%required) then
+      log_warn(*) "Input: soil class provided but not required. Check your configuration."
+    end if
+    if (self%lai_class%provided .and. .not.self%exchange%gridded_lai%required) then
+      log_warn(*) "Input: LAI class provided but not required. Check your configuration."
+    end if
     if (self%runoff%provided .and. .not.self%exchange%runoff_total%required) then
       log_warn(*) "Input: runoff provided but not required. Check your configuration."
     end if
@@ -722,6 +835,7 @@ contains
     log_info(*) "Finalize Input"
     ! close datasets
     if (self%runoff%provided) call self%runoff%ds%close()
+    if (allocated(self%soil_class_one_layer)) deallocate(self%soil_class_one_layer)
   end subroutine input_finalize
 
 end module mo_input_container
