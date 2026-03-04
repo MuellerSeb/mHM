@@ -22,6 +22,10 @@ module mo_mpr_container
   type, public :: mpr_t
     type(nml_config_mpr_t) :: config !< configuration of the MPR process container
     type(exchange_t), pointer :: exchange => null() !< exchange container of the domain
+    character(:), allocatable :: soil_lut_path !< resolved soil LUT path
+    character(:), allocatable :: geo_lut_path !< resolved geology LUT path
+    character(:), allocatable :: lai_path !< resolved gridded LAI path
+    character(:), allocatable :: lai_lut_path !< resolved LAI LUT path
   contains
     procedure :: configure => mpr_configure
     procedure :: connect => mpr_connect
@@ -36,6 +40,10 @@ contains
   subroutine mpr_configure(self, file)
     class(mpr_t), intent(inout), target :: self
     character(*), intent(in), optional :: file !< file containing the namelists
+    integer(i4) :: id(1)
+    integer(i4) :: depth_idx(2)
+    integer(i4) :: required_depths
+    integer(i4) :: i
     character(1024) :: errmsg
     character(:), allocatable :: path
     integer :: status
@@ -58,6 +66,76 @@ contains
       log_fatal(*) "MPR config not valid: ", trim(errmsg)
       error stop 1
     end if
+
+    id(1) = self%exchange%domain
+
+    status = self%config%is_set("n_horizons", idx=id, errmsg=errmsg)
+    if (status /= NML_OK) then
+      log_fatal(*) "MPR: n_horizons not set for domain ", n2s(id(1)), ". Error: ", trim(errmsg)
+      error stop 1
+    end if
+    if (self%config%n_horizons(id(1)) < 1_i4) then
+      log_fatal(*) "MPR: n_horizons must be >= 1 for domain ", n2s(id(1)), "."
+      error stop 1
+    end if
+
+    status = self%config%is_set("lai_time_step", idx=id, errmsg=errmsg)
+    if (status /= NML_OK) then
+      log_fatal(*) "MPR: lai_time_step not set for domain ", n2s(id(1)), ". Error: ", trim(errmsg)
+      error stop 1
+    end if
+
+    select case (self%config%soil_db_mode(id(1)))
+      case (0_i4)
+        required_depths = max(0_i4, self%config%n_horizons(id(1)) - 1_i4)
+      case (1_i4)
+        required_depths = self%config%n_horizons(id(1))
+      case default
+        log_fatal(*) "MPR: unsupported soil_db_mode=", n2s(self%config%soil_db_mode(id(1))), "."
+        error stop 1
+    end select
+    do i = 1_i4, required_depths
+      depth_idx = [i, id(1)]
+      status = self%config%is_set("soil_depth", idx=depth_idx, errmsg=errmsg)
+      if (status /= NML_OK) then
+        log_fatal(*) "MPR: soil_depth(", n2s(i), ",", n2s(id(1)), ") not set. Error: ", trim(errmsg)
+        error stop 1
+      end if
+    end do
+
+    status = self%config%is_set("soil_lut_path", idx=id, errmsg=errmsg)
+    if (status /= NML_OK) then
+      log_fatal(*) "MPR: soil_lut_path not set for domain ", n2s(id(1)), ". Error: ", trim(errmsg)
+      error stop 1
+    end if
+    self%soil_lut_path = self%exchange%get_path(self%config%soil_lut_path(id(1)))
+
+    status = self%config%is_set("geo_lut_path", idx=id, errmsg=errmsg)
+    if (status /= NML_OK) then
+      log_fatal(*) "MPR: geo_lut_path not set for domain ", n2s(id(1)), ". Error: ", trim(errmsg)
+      error stop 1
+    end if
+    self%geo_lut_path = self%exchange%get_path(self%config%geo_lut_path(id(1)))
+
+    if (self%config%lai_time_step(id(1)) == 0_i4) then
+      status = self%config%is_set("lai_lut_path", idx=id, errmsg=errmsg)
+      if (status /= NML_OK) then
+        log_fatal(*) "MPR: lai_lut_path not set for domain ", n2s(id(1)), &
+          " while lai_time_step=0. Error: ", trim(errmsg)
+        error stop 1
+      end if
+      self%lai_lut_path = self%exchange%get_path(self%config%lai_lut_path(id(1)))
+      if (allocated(self%lai_path)) deallocate(self%lai_path)
+    else
+      status = self%config%is_set("lai_path", idx=id, errmsg=errmsg)
+      if (status /= NML_OK) then
+        log_fatal(*) "MPR: lai_path not set for domain ", n2s(id(1)), &
+          " while lai_time_step=", n2s(self%config%lai_time_step(id(1))), ". Error: ", trim(errmsg)
+        error stop 1
+      end if
+      self%lai_path = self%exchange%get_path(self%config%lai_path(id(1)))
+      if (allocated(self%lai_lut_path)) deallocate(self%lai_lut_path)
+    end if
   end subroutine mpr_configure
 
   !> \brief Connect the MPR process container with other components.
@@ -65,8 +143,6 @@ contains
     class(mpr_t), intent(inout), target :: self
     integer(i4) :: id(1)
     integer(i4) :: soil_layers
-    integer :: status
-    character(1024) :: errmsg
     log_info(*) "Connect MPR"
 
     id(1) = self%exchange%domain
@@ -145,34 +221,22 @@ contains
         log_fatal(*) "MPR: gridded_lai marked as provided but data is not connected."
         error stop 1
       end if
-    end if
-
-    status = self%config%is_set("soil_lut_path", idx=id, errmsg=errmsg)
-    if (status /= NML_OK) then
-      log_fatal(*) "MPR: soil_lut_path not set for domain ", n2s(id(1)), ". Error: ", trim(errmsg)
+      if (.not.allocated(self%lai_path)) then
+        log_fatal(*) "MPR: internal error, lai_path not resolved in configure."
+        error stop 1
+      end if
+    else if (.not.allocated(self%lai_lut_path)) then
+      log_fatal(*) "MPR: internal error, lai_lut_path not resolved in configure."
       error stop 1
     end if
 
-    status = self%config%is_set("geo_lut_path", idx=id, errmsg=errmsg)
-    if (status /= NML_OK) then
-      log_fatal(*) "MPR: geo_lut_path not set for domain ", n2s(id(1)), ". Error: ", trim(errmsg)
+    if (.not.allocated(self%soil_lut_path)) then
+      log_fatal(*) "MPR: internal error, soil_lut_path not resolved in configure."
       error stop 1
     end if
-
-    if (self%exchange%gridded_lai%required) then
-      status = self%config%is_set("lai_path", idx=id, errmsg=errmsg)
-      if (status /= NML_OK) then
-        log_fatal(*) "MPR: lai_path not set for domain ", n2s(id(1)), &
-          " while lai_time_step=", n2s(self%config%lai_time_step(id(1))), ". Error: ", trim(errmsg)
-        error stop 1
-      end if
-    else
-      status = self%config%is_set("lai_lut_path", idx=id, errmsg=errmsg)
-      if (status /= NML_OK) then
-        log_fatal(*) "MPR: lai_lut_path not set for domain ", n2s(id(1)), &
-          " while lai_time_step=0. Error: ", trim(errmsg)
-        error stop 1
-      end if
+    if (.not.allocated(self%geo_lut_path)) then
+      log_fatal(*) "MPR: internal error, geo_lut_path not resolved in configure."
+      error stop 1
     end if
   end subroutine mpr_connect
 
