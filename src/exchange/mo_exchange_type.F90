@@ -19,6 +19,7 @@
 module mo_exchange_type
   use mo_logging
   use mo_grid, only: grid_t
+  use mo_geology_classdefinition, only: geology_classdefinition_t
   use mo_datetime, only: datetime, timedelta
   use mo_kind, only: dp, i4
   use mo_string_utils, only: n2s=>num2str
@@ -146,6 +147,11 @@ module mo_exchange_type
     type(var_dp) :: aspect              !< aspect [degree] on level l0 (static)
     type(var_i4) :: fdir                !< flow direction [1] on level l0 (static)
     type(var_i4) :: facc                !< flow accumulation [1] on level l0 (static)
+    type(var2d_i4) :: soil_id           !< soil class ID on level l0 (static)
+    type(var_i4) :: geo_unit            !< geological unit ID on level l0 (static)
+    type(var_dp) :: gridded_lai         !< gridded LAI on level l0 (static)
+    type(var_dp) :: slope_emp           !< empirical slope distribution on level l0 (static)
+    type(geology_classdefinition_t), pointer :: geo_class_def => null() !< geology class lookup
 
     ! hydrology (level1)
     ! canopy
@@ -371,6 +377,10 @@ contains
     self%aspect = var_dp(static=.true., grid=l0, name="aspect", units="degree", long_name="aspect", standard_name="ground_slope_direction")
     self%fdir   = var_i4(static=.true., grid=l0, name="fdir",   units="1",      long_name="flow direction")
     self%facc   = var_i4(static=.true., grid=l0, name="facc",   units="1",      long_name="flow accumulation")
+    self%soil_id = var2d_i4(static=.true., grid=l0, name="soil_id", units="1", long_name="soil class ID")
+    self%geo_unit = var_i4(static=.true., grid=l0, name="geo_unit", units="1", long_name="geological unit ID")
+    self%gridded_lai = var_dp(static=.true., grid=l0, name="gridded_lai", units="1", long_name="gridded LAI")
+    self%slope_emp = var_dp(static=.true., grid=l0, name="slope_emp", units="1", long_name="empirical slope distribution")
 
     ! hydrology (level1)
     ! canopy
@@ -545,6 +555,14 @@ contains
         var_pnt => self%fdir
       case("facc")
         var_pnt => self%facc
+      case("soil_id")
+        var_pnt => self%soil_id
+      case("geo_unit")
+        var_pnt => self%geo_unit
+      case("gridded_lai")
+        var_pnt => self%gridded_lai
+      case("slope_emp")
+        var_pnt => self%slope_emp
       ! hydrology (level1)
       ! canopy
       case("interception")
