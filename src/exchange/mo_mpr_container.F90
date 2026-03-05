@@ -307,6 +307,8 @@ contains
           ") conflicts with configured level1_resolution (", n2s(l1_res), ")."
         error stop 1
       end if
+      ! Validate geometric compatibility and that level0 mask fills level1 masked cells.
+      call self%exchange%level1%check_is_filled_by(self%exchange%level0, check_mask=.true.)
       return
     end if
 
