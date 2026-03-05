@@ -12,14 +12,15 @@
 module mo_mpr_container
   use, intrinsic :: ieee_arithmetic, only: ieee_is_finite
   use mo_logging
+  use mo_constants, only: YearMonths
   use mo_kind, only: i4, dp
   use mo_exchange_type, only: exchange_t
   use mo_grid, only: grid_t
   use mo_grid_scaler, only: scaler_t
   use mo_orderpack, only: sort_index
   use mo_string_utils, only: n2s => num2str
-  use mo_utils, only: eq, is_close
-  use mo_read_lut, only: read_geoformation_lut
+  use mo_utils, only: eq, is_close, optval
+  use mo_read_lut, only: read_geoformation_lut, read_lai_lut
   use nml_config_mpr, only: nml_config_mpr_t, NML_OK
 
   !> \class   mpr_t
@@ -31,9 +32,16 @@ module mo_mpr_container
     type(scaler_t) :: upscaler !< scaler from level0 morphology to level1 hydrology
     character(:), allocatable :: soil_lut_path !< resolved soil LUT path
     character(:), allocatable :: geo_lut_path !< resolved geology LUT path
+    character(:), allocatable :: land_cover_path !< resolved land-cover path
     character(:), allocatable :: lai_path !< resolved gridded LAI path
     character(:), allocatable :: lai_lut_path !< resolved LAI LUT path
     real(dp), allocatable :: slope_emp(:) !< empirical slope distribution on level0
+    real(dp), allocatable :: lai_l0_cache(:, :) !< cached LAI on level0 (nCells0, nLAI)
+    real(dp), allocatable :: max_interception_cache(:, :, :) !< cached max interception (nCells1, nLAI, nLC)
+    integer(i4) :: n_lai_periods = 1_i4 !< number of cached LAI periods
+    integer(i4) :: n_land_cover_periods = 1_i4 !< number of cached land-cover periods
+    integer(i4) :: active_lai_idx = 0_i4 !< active cached LAI index
+    integer(i4) :: active_land_cover_idx = 0_i4 !< active cached land-cover index
   contains
     procedure :: configure => mpr_configure
     procedure :: connect => mpr_connect
@@ -43,6 +51,12 @@ module mo_mpr_container
     procedure, private :: ensure_level1_grid => mpr_ensure_level1_grid
     procedure, private :: init_upscaler => mpr_init_upscaler
     procedure, private :: init_slope_emp => mpr_init_slope_emp
+    procedure, private :: init_temporal_cache => mpr_init_temporal_cache
+    procedure, private :: build_lai_l0_cache => mpr_build_lai_l0_cache
+    procedure, private :: init_max_interception_cache => mpr_init_max_interception_cache
+    procedure, private :: update_exchange_slices => mpr_update_exchange_slices
+    procedure, private :: lai_index_for_time => mpr_lai_index_for_time
+    procedure, private :: land_cover_index_for_time => mpr_land_cover_index_for_time
     procedure, private :: check_geo_units_against_lut => mpr_check_geo_units_against_lut
     procedure, private :: check_geoparameter_consistency => mpr_check_geoparameter_consistency
   end type mpr_t
@@ -130,6 +144,13 @@ contains
     end if
     self%geo_lut_path = self%exchange%get_path(self%config%geo_lut_path(id(1)))
 
+    status = self%config%is_set("land_cover_path", idx=id, errmsg=errmsg)
+    if (status /= NML_OK) then
+      log_fatal(*) "MPR: land_cover_path not set for domain ", n2s(id(1)), ". Error: ", trim(errmsg)
+      error stop 1
+    end if
+    self%land_cover_path = self%exchange%get_path(self%config%land_cover_path(id(1)))
+
     if (self%config%lai_time_step(id(1)) == 0_i4) then
       status = self%config%is_set("lai_lut_path", idx=id, errmsg=errmsg)
       if (status /= NML_OK) then
@@ -156,6 +177,7 @@ contains
     class(mpr_t), intent(inout), target :: self
     integer(i4) :: id(1)
     integer(i4) :: soil_layers
+    logical :: require_gridded_lai
     log_info(*) "Connect MPR"
 
     id(1) = self%exchange%domain
@@ -165,7 +187,9 @@ contains
     self%exchange%aspect%required = .true.
     self%exchange%soil_id%required = .true.
     self%exchange%geo_unit%required = .true.
-    self%exchange%gridded_lai%required = self%config%lai_time_step(id(1)) /= 0_i4
+    require_gridded_lai = self%config%lai_time_step(id(1)) /= 0_i4 .or. &
+      self%exchange%parameters%process_matrix(1, 1) /= 0_i4
+    self%exchange%gridded_lai%required = require_gridded_lai
 
     if (.not.self%exchange%slope%provided) then
       log_fatal(*) "MPR: slope not provided (check input settings)."
@@ -225,7 +249,7 @@ contains
         error stop 1
     end select
 
-    if (self%exchange%gridded_lai%required) then
+    if (require_gridded_lai) then
       if (.not.self%exchange%gridded_lai%provided) then
         log_fatal(*) "MPR: gridded_lai not provided, but required for lai_time_step=", n2s(self%config%lai_time_step(id(1))), "."
         error stop 1
@@ -234,13 +258,18 @@ contains
         log_fatal(*) "MPR: gridded_lai marked as provided but data is not connected."
         error stop 1
       end if
+    end if
+
+    if (self%config%lai_time_step(id(1)) == 0_i4) then
+      if (.not.allocated(self%lai_lut_path)) then
+        log_fatal(*) "MPR: internal error, lai_lut_path not resolved in configure."
+        error stop 1
+      end if
+    else
       if (.not.allocated(self%lai_path)) then
         log_fatal(*) "MPR: internal error, lai_path not resolved in configure."
         error stop 1
       end if
-    else if (.not.allocated(self%lai_lut_path)) then
-      log_fatal(*) "MPR: internal error, lai_lut_path not resolved in configure."
-      error stop 1
     end if
 
     if (.not.allocated(self%soil_lut_path)) then
@@ -276,6 +305,8 @@ contains
     call self%init_upscaler()
     call self%check_geo_units_against_lut()
     call self%check_geoparameter_consistency()
+    call self%init_temporal_cache()
+    call self%update_exchange_slices(force=.true.)
   end subroutine mpr_connect
 
   !> \brief Ensure level1 grid is available and consistent with configured level1 resolution.
@@ -362,6 +393,186 @@ contains
     deallocate(slope_sorted_index)
   end subroutine mpr_init_slope_emp
 
+  !> \brief Build MPR temporal caches in connect for later pointer-only switching.
+  subroutine mpr_init_temporal_cache(self)
+    class(mpr_t), intent(inout), target :: self
+
+    self%n_lai_periods = 1_i4
+    self%n_land_cover_periods = 1_i4
+    self%active_lai_idx = 0_i4
+    self%active_land_cover_idx = 0_i4
+
+    ! Start with interception cache as first time-dependent MPR output.
+    if (self%exchange%parameters%process_matrix(1, 1) == 0_i4) return
+
+    if (.not.associated(self%exchange%gridded_lai%data)) then
+      log_fatal(*) "MPR: gridded_lai data must be connected before temporal cache initialization."
+      error stop 1
+    end if
+
+    call self%build_lai_l0_cache()
+    call self%init_max_interception_cache()
+    log_info(*) "MPR: temporal cache initialized (nLAI=", n2s(self%n_lai_periods), &
+      ", nLC=", n2s(self%n_land_cover_periods), ")."
+  end subroutine mpr_init_temporal_cache
+
+  !> \brief Build cached LAI fields on level0 for all currently supported LAI periods.
+  subroutine mpr_build_lai_l0_cache(self)
+    class(mpr_t), intent(inout), target :: self
+    integer(i4) :: id(1)
+    integer(i4) :: i_cell
+    integer(i4) :: i_class
+    integer(i4) :: lai_idx
+    integer(i4) :: class_id
+    integer(i4) :: class_pos
+    integer(i4) :: n_lai_classes
+    real(dp) :: class_value
+    integer(i4), allocatable :: lai_id_list(:)
+    real(dp), allocatable :: lai_lut(:, :)
+
+    id(1) = self%exchange%domain
+
+    if (allocated(self%lai_l0_cache)) deallocate(self%lai_l0_cache)
+
+    select case (self%config%lai_time_step(id(1)))
+      case (0_i4)
+        if (.not.allocated(self%lai_lut_path)) then
+          log_fatal(*) "MPR: internal error, lai_lut_path not resolved in configure."
+          error stop 1
+        end if
+        call read_lai_lut(filename=trim(self%lai_lut_path), nLAI=n_lai_classes, LAIIDlist=lai_id_list, LAI=lai_lut)
+        if (size(lai_lut, 2) < int(YearMonths, i4)) then
+          log_fatal(*) "MPR: LAI LUT provides ", n2s(size(lai_lut, 2)), " periods, expected at least ", n2s(int(YearMonths, i4)), "."
+          error stop 1
+        end if
+
+        self%n_lai_periods = int(YearMonths, i4)
+        allocate(self%lai_l0_cache(size(self%exchange%gridded_lai%data), self%n_lai_periods))
+        do i_cell = 1_i4, size(self%exchange%gridded_lai%data)
+          class_value = self%exchange%gridded_lai%data(i_cell)
+          class_id = nint(class_value)
+          if (.not.is_close(class_value, real(class_id, dp))) then
+            log_fatal(*) "MPR: LAI class map contains non-integer ID at cell ", n2s(i_cell), ": ", n2s(class_value), "."
+            error stop 1
+          end if
+
+          class_pos = 0_i4
+          do i_class = 1_i4, n_lai_classes
+            if (lai_id_list(i_class) == class_id) then
+              class_pos = i_class
+              exit
+            end if
+          end do
+          if (class_pos < 1_i4) then
+            log_fatal(*) "MPR: LAI class ID ", n2s(class_id), " missing in LAI LUT: ", self%lai_lut_path
+            error stop 1
+          end if
+
+          do lai_idx = 1_i4, self%n_lai_periods
+            self%lai_l0_cache(i_cell, lai_idx) = min(30.0_dp, max(1.0e-10_dp, lai_lut(class_pos, lai_idx)))
+          end do
+        end do
+
+      case default
+        ! Current exchange contract carries one active gridded_lai slice.
+        self%n_lai_periods = 1_i4
+        allocate(self%lai_l0_cache(size(self%exchange%gridded_lai%data), 1))
+        self%lai_l0_cache(:, 1) = min(30.0_dp, max(1.0e-10_dp, self%exchange%gridded_lai%data))
+    end select
+  end subroutine mpr_build_lai_l0_cache
+
+  !> \brief Cache max interception on level1 for all LAI/land-cover slices.
+  subroutine mpr_init_max_interception_cache(self)
+    class(mpr_t), intent(inout), target :: self
+    integer(i4) :: lai_idx
+    real(dp), allocatable :: interception_param(:)
+    real(dp), allocatable :: max_interception_l0(:)
+
+    interception_param = self%exchange%parameters%get_process(1_i4)
+    if (size(interception_param) < 1_i4) then
+      log_fatal(*) "MPR: interception parameter set is empty while process 1 is active."
+      error stop 1
+    end if
+    if (.not.allocated(self%lai_l0_cache)) then
+      log_fatal(*) "MPR: LAI level0 cache not available before max interception cache initialization."
+      error stop 1
+    end if
+
+    if (allocated(self%max_interception_cache)) deallocate(self%max_interception_cache)
+    allocate(self%max_interception_cache(self%exchange%level1%ncells, self%n_lai_periods, self%n_land_cover_periods))
+    allocate(max_interception_l0(size(self%lai_l0_cache, 1)))
+    do lai_idx = 1_i4, self%n_lai_periods
+      max_interception_l0 = interception_param(1) * self%lai_l0_cache(:, lai_idx)
+      call self%upscaler%execute(max_interception_l0, self%max_interception_cache(:, lai_idx, 1))
+    end do
+    self%exchange%max_interception%provided = .true.
+  end subroutine mpr_init_max_interception_cache
+
+  !> \brief Switch exchange pointers to active cached MPR slices for current model time.
+  subroutine mpr_update_exchange_slices(self, force)
+    class(mpr_t), intent(inout), target :: self
+    logical, optional, intent(in) :: force
+    logical :: force_
+    integer(i4) :: lai_idx
+    integer(i4) :: land_cover_idx
+
+    force_ = optval(force, .false.)
+
+    if (.not.allocated(self%max_interception_cache)) return
+
+    lai_idx = self%lai_index_for_time()
+    land_cover_idx = self%land_cover_index_for_time()
+    if (lai_idx < 1_i4 .or. lai_idx > self%n_lai_periods) then
+      log_fatal(*) "MPR: LAI index out of bounds: ", n2s(lai_idx), " not in [1,", n2s(self%n_lai_periods), "]."
+      error stop 1
+    end if
+    if (land_cover_idx < 1_i4 .or. land_cover_idx > self%n_land_cover_periods) then
+      log_fatal(*) "MPR: land-cover index out of bounds: ", n2s(land_cover_idx), " not in [1,", n2s(self%n_land_cover_periods), "]."
+      error stop 1
+    end if
+    if (.not.force_ .and. lai_idx == self%active_lai_idx .and. land_cover_idx == self%active_land_cover_idx) return
+
+    self%exchange%max_interception%data => self%max_interception_cache(:, lai_idx, land_cover_idx)
+    self%exchange%max_interception%provided = .true.
+    self%active_lai_idx = lai_idx
+    self%active_land_cover_idx = land_cover_idx
+    log_trace(*) "MPR: active cache slice lai=", n2s(lai_idx), ", land_cover=", n2s(land_cover_idx)
+  end subroutine mpr_update_exchange_slices
+
+  !> \brief Resolve active LAI period index from current exchange time.
+  integer(i4) function mpr_lai_index_for_time(self) result(lai_idx)
+    class(mpr_t), intent(inout), target :: self
+    integer(i4) :: id(1)
+
+    id(1) = self%exchange%domain
+    if (self%n_lai_periods < 1_i4) then
+      log_fatal(*) "MPR: n_lai_periods must be >= 1."
+      error stop 1
+    end if
+
+    lai_idx = 1_i4
+    select case (self%config%lai_time_step(id(1)))
+      case (0_i4, 1_i4)
+        if (self%n_lai_periods >= int(YearMonths, i4)) lai_idx = self%exchange%time%month
+      case default
+        lai_idx = 1_i4
+    end select
+    lai_idx = max(1_i4, min(lai_idx, self%n_lai_periods))
+  end function mpr_lai_index_for_time
+
+  !> \brief Resolve active land-cover period index from current exchange time.
+  integer(i4) function mpr_land_cover_index_for_time(self) result(land_cover_idx)
+    class(mpr_t), intent(inout), target :: self
+
+    if (self%n_land_cover_periods < 1_i4) then
+      log_fatal(*) "MPR: n_land_cover_periods must be >= 1."
+      error stop 1
+    end if
+
+    ! Land-cover period parsing is not integrated yet; use one cached period.
+    land_cover_idx = 1_i4
+  end function mpr_land_cover_index_for_time
+
   !> \brief Ensure all geological classes in the input map are represented in the LUT.
   subroutine mpr_check_geo_units_against_lut(self)
     class(mpr_t), intent(in), target :: self
@@ -398,12 +609,14 @@ contains
   subroutine mpr_initialize(self)
     class(mpr_t), intent(inout), target :: self
     log_info(*) "Initialize MPR for domain ", n2s(self%exchange%domain)
+    call self%update_exchange_slices(force=.true.)
   end subroutine mpr_initialize
 
   !> \brief Update the MPR process container for the current time step.
   subroutine mpr_update(self)
     class(mpr_t), intent(inout), target :: self
     log_trace(*) "Update MPR at step ", n2s(self%exchange%step_count)
+    call self%update_exchange_slices()
   end subroutine mpr_update
 
   !> \brief Finalize the MPR process container after the simulation.
@@ -412,6 +625,14 @@ contains
     nullify(self%exchange%slope_emp%data)
     self%exchange%slope_emp%provided = .false.
     if (allocated(self%slope_emp)) deallocate(self%slope_emp)
+    nullify(self%exchange%max_interception%data)
+    self%exchange%max_interception%provided = .false.
+    if (allocated(self%lai_l0_cache)) deallocate(self%lai_l0_cache)
+    if (allocated(self%max_interception_cache)) deallocate(self%max_interception_cache)
+    self%n_lai_periods = 1_i4
+    self%n_land_cover_periods = 1_i4
+    self%active_lai_idx = 0_i4
+    self%active_land_cover_idx = 0_i4
     log_info(*) "Finalize MPR for domain ", n2s(self%exchange%domain)
   end subroutine mpr_finalize
 end module mo_mpr_container
