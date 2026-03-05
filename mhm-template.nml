@@ -400,6 +400,14 @@
   geo_lut_path(:) = ""
   ! LAI LUT path
   lai_lut_path(:) = ""
+  ! Read restart
+  read_restart(:) = .false.
+  ! Restart input path
+  restart_input_path(:) = "mpr_restart_in.nc"
+  ! Write restart
+  write_restart(:) = .false.
+  ! Restart output path
+  restart_output_path(:) = "mpr_restart_out.nc"
 /
 
 ! mHM model configuration

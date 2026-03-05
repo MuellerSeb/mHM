@@ -1,0 +1,43 @@
+&config_project
+  n_domains = 1
+/
+
+&config_processes
+  interception = 1
+/
+
+&config_time
+  sim_start(1)  = "1990-01-01 00:00"
+  eval_start(1) = "1990-01-01 00:00"
+  sim_end(1)    = "1990-01-01 00:00"
+/
+
+&config_input
+  slope_path(1)     = "test_domain/input/morph/slope.asc"
+  aspect_path(1)    = "test_domain/input/morph/aspect.asc"
+  geo_class_path(1) = "test_domain/input/morph/geology_class.asc"
+  soil_class_path(1)= "test_domain/input/morph/soil_class.asc"
+  lai_class_path(1) = "test_domain/input/morph/LAI_class.asc"
+/
+
+&config_meteo
+/
+
+&config_mpr
+  soil_db_mode(1)          = 0
+  n_horizons(1)            = 2
+  tillage_depth(1)         = 200
+  soil_depth(1, 1)         = 200
+  fracSealed_cityArea(1)   = 0.6
+  land_cover_path(1)       = "test_domain/input/luse/lc_1981.asc"
+  lai_time_step(1)         = 0
+  soil_lut_path(1)         = "test_domain/input/morph/soil_classdefinition.txt"
+  geo_lut_path(1)          = "test_domain/input/morph/geology_classdefinition.txt"
+  lai_lut_path(1)          = "test_domain/input/morph/LAI_classdefinition.txt"
+  write_restart(1)         = .true.
+  restart_output_path(1)   = "mpr_restart.nc"
+/
+
+&config_mhm
+  resolution(1) = 4000.0
+/

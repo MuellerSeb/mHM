@@ -120,3 +120,35 @@ properties:
     x-fortran-flex-tail-dims: 1
     title: LAI LUT path
     description: LAI look-up table path.
+  read_restart:
+    type: array
+    items:
+      type: boolean
+      default: false
+    x-fortran-shape: max_domains
+    title: Read restart
+  restart_input_path:
+    type: array
+    items:
+      type: string
+      x-fortran-len: buf
+    x-fortran-shape: max_domains
+    x-fortran-flex-tail-dims: 1
+    title: Restart input path
+    examples: [["mpr_restart_in.nc"]]
+  write_restart:
+    type: array
+    items:
+      type: boolean
+      default: false
+    x-fortran-shape: max_domains
+    title: Write restart
+  restart_output_path:
+    type: array
+    items:
+      type: string
+      x-fortran-len: buf
+    x-fortran-shape: max_domains
+    x-fortran-flex-tail-dims: 1
+    title: Restart output path
+    examples: [["mpr_restart_out.nc"]]

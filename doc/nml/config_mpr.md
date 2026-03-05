@@ -21,6 +21,10 @@ Configuration for the multiscale parameter regionalization in mHM.
 | [soil_lut_path](#soil_lut_path) | string array | no | Soil LUT path |
 | [geo_lut_path](#geo_lut_path) | string array | no | Geology LUT path |
 | [lai_lut_path](#lai_lut_path) | string array | no | LAI LUT path |
+| [read_restart](#read_restart) | logical array | no | Read restart |
+| [restart_input_path](#restart_input_path) | string array | no | Restart input path |
+| [write_restart](#write_restart) | logical array | no | Write restart |
+| [restart_output_path](#restart_output_path) | string array | no | Restart output path |
 
 ## Field details
 
@@ -160,6 +164,44 @@ Summary:
 - Flexible tail dims: 1
 - Required: no
 
+### read_restart
+
+Read restart `read_restart`
+
+Summary:
+- Type: `logical, dimension(max_domains)`
+- Required: no
+- Default: `.false.`
+
+### restart_input_path
+
+Restart input path `restart_input_path`
+
+Summary:
+- Type: `character(len=buf), dimension(max_domains)`
+- Flexible tail dims: 1
+- Required: no
+- Examples: `["mpr_restart_in.nc"]`
+
+### write_restart
+
+Write restart `write_restart`
+
+Summary:
+- Type: `logical, dimension(max_domains)`
+- Required: no
+- Default: `.false.`
+
+### restart_output_path
+
+Restart output path `restart_output_path`
+
+Summary:
+- Type: `character(len=buf), dimension(max_domains)`
+- Flexible tail dims: 1
+- Required: no
+- Examples: `["mpr_restart_out.nc"]`
+
 ## Example
 
 ```fortran
@@ -175,6 +217,10 @@ Summary:
   soil_lut_path(:) = ""
   geo_lut_path(:) = ""
   lai_lut_path(:) = ""
+  read_restart(:) = .false.
+  restart_input_path(:) = "mpr_restart_in.nc"
+  write_restart(:) = .false.
+  restart_output_path(:) = "mpr_restart_out.nc"
 /
 ```
 

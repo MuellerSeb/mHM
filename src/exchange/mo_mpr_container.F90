@@ -12,11 +12,12 @@
 module mo_mpr_container
   use, intrinsic :: ieee_arithmetic, only: ieee_is_finite
   use mo_logging
-  use mo_constants, only: YearMonths
+  use mo_constants, only: YearMonths, nodata_dp
   use mo_kind, only: i4, dp
   use mo_exchange_type, only: exchange_t
-  use mo_grid, only: grid_t
+  use mo_grid, only: grid_t, cartesian, spherical
   use mo_grid_scaler, only: scaler_t
+  use mo_netcdf, only: NcDataset, NcDimension, NcVariable
   use mo_orderpack, only: sort_index
   use mo_string_utils, only: n2s => num2str
   use mo_utils, only: eq, is_close, optval
@@ -35,6 +36,10 @@ module mo_mpr_container
     character(:), allocatable :: land_cover_path !< resolved land-cover path
     character(:), allocatable :: lai_path !< resolved gridded LAI path
     character(:), allocatable :: lai_lut_path !< resolved LAI LUT path
+    logical :: read_restart = .false. !< whether to read MPR restart file
+    logical :: write_restart = .false. !< whether to write MPR restart file
+    character(:), allocatable :: restart_input_path !< path to restart file to read
+    character(:), allocatable :: restart_output_path !< path to restart file to write
     real(dp), allocatable :: slope_emp(:) !< empirical slope distribution on level0
     real(dp), allocatable :: lai_l0_cache(:, :) !< cached LAI on level0 (nCells0, nLAI)
     real(dp), allocatable :: max_interception_cache(:, :, :) !< cached max interception (nCells1, nLAI, nLC)
@@ -48,6 +53,9 @@ module mo_mpr_container
     procedure :: initialize => mpr_initialize
     procedure :: update => mpr_update
     procedure :: finalize => mpr_finalize
+    procedure, private :: create_restart => mpr_create_restart
+    procedure, private :: write_restart_data => mpr_write_restart_data
+    procedure, private :: read_restart_data => mpr_read_restart_data
     procedure, private :: ensure_level1_grid => mpr_ensure_level1_grid
     procedure, private :: init_upscaler => mpr_init_upscaler
     procedure, private :: init_slope_emp => mpr_init_slope_emp
@@ -178,9 +186,32 @@ contains
     integer(i4) :: id(1)
     integer(i4) :: soil_layers
     logical :: require_gridded_lai
+    integer :: status
+    character(1024) :: errmsg
     log_info(*) "Connect MPR"
 
     id(1) = self%exchange%domain
+
+    ! restart settings
+    self%read_restart = self%config%read_restart(id(1))
+    self%write_restart = self%config%write_restart(id(1))
+    if (self%read_restart) then
+      status = self%config%is_set("restart_input_path", idx=id, errmsg=errmsg)
+      if (status /= NML_OK) then
+        log_fatal(*) "MPR restart input path not set for domain ", n2s(id(1)), ". Error: ", trim(errmsg)
+        error stop 1
+      end if
+      self%restart_input_path = self%exchange%get_path(self%config%restart_input_path(id(1)))
+      call self%read_restart_data()
+    end if
+    if (self%write_restart) then
+      status = self%config%is_set("restart_output_path", idx=id, errmsg=errmsg)
+      if (status /= NML_OK) then
+        log_fatal(*) "MPR restart output path not set for domain ", n2s(id(1)), ". Error: ", trim(errmsg)
+        error stop 1
+      end if
+      self%restart_output_path = self%exchange%get_path(self%config%restart_output_path(id(1)))
+    end if
 
     ! declare MPR prerequisites in the exchange contract
     self%exchange%slope%required = .true.
@@ -308,6 +339,93 @@ contains
     call self%init_temporal_cache()
     call self%update_exchange_slices(force=.true.)
   end subroutine mpr_connect
+
+  !> \brief Create an MPR restart file.
+  subroutine mpr_create_restart(self)
+    class(mpr_t), intent(inout), target :: self
+    type(NcDataset) :: nc
+    type(NcVariable) :: nc_var
+    type(NcDimension) :: dims0(0)
+
+    if (.not.allocated(self%restart_output_path)) then
+      log_fatal(*) "MPR: restart output path is not configured."
+      error stop 1
+    end if
+    if (.not.associated(self%exchange%level1)) then
+      log_fatal(*) "MPR: cannot write restart without a connected level1 grid."
+      error stop 1
+    end if
+
+    log_info(*) "Write MPR restart to file: ", self%restart_output_path
+    nc = NcDataset(self%restart_output_path, "w")
+    call self%exchange%level1%to_restart(nc)
+    call self%write_restart_data(nc)
+
+    nc_var = nc%setVariable("mpr_meta", "i32", dims0(:0))
+    call nc_var%setAttribute("time_stamp", self%exchange%time%str())
+    call nc_var%setAttribute("domain", self%exchange%domain)
+    call nc_var%setAttribute("n_lai_periods", self%n_lai_periods)
+    call nc_var%setAttribute("n_land_cover_periods", self%n_land_cover_periods)
+    call nc%close()
+  end subroutine mpr_create_restart
+
+  !> \brief Write currently cached max interception fields as unpacked L1 data.
+  subroutine mpr_write_restart_data(self, nc)
+    class(mpr_t), intent(inout), target :: self
+    type(NcDataset), intent(inout) :: nc
+    type(NcDimension) :: dims(4)
+    type(NcVariable) :: nc_var
+    real(dp), allocatable :: data_4d(:, :, :, :)
+    integer(i4) :: lai_idx
+    integer(i4) :: land_cover_idx
+
+    if (.not.associated(self%exchange%level1)) then
+      log_fatal(*) "MPR: level1 grid not connected while writing restart."
+      error stop 1
+    end if
+
+    if ( self%exchange%level1%coordsys == cartesian ) then
+      dims(1) = nc%getDimension("x")
+      dims(2) = nc%getDimension("y")
+    else
+      dims(1) = nc%getDimension("lon")
+      dims(2) = nc%getDimension("lat")
+    end if
+    dims(3) = nc%setDimension("L1_LAITimesteps", self%n_lai_periods)
+    dims(4) = nc%setDimension("L1_LandCoverPeriods", self%n_land_cover_periods)
+
+    ! maximum interception
+    if (allocated(self%max_interception_cache)) then
+      allocate(data_4d(self%exchange%level1%nx, self%exchange%level1%ny, self%n_lai_periods, self%n_land_cover_periods))
+      do land_cover_idx = 1_i4, self%n_land_cover_periods
+        do lai_idx = 1_i4, self%n_lai_periods
+          call self%exchange%level1%unpack_into( &
+            self%max_interception_cache(:, lai_idx, land_cover_idx), &
+            data_4d(:, :, lai_idx, land_cover_idx))
+        end do
+      end do
+      nc_var = nc%setVariable("L1_maxInter", "f64", dims)
+      call nc_var%setAttribute("units", "mm")
+      call nc_var%setAttribute("long_name", "Maximum interception at level 1")
+      if (self%exchange%level1%has_aux_coords()) call nc_var%setAttribute("coordinates", "lon lat")
+      call nc_var%setFillValue(nodata_dp)
+      call nc_var%setAttribute("missing_value", nodata_dp)
+      call nc_var%setData(data_4d)
+      deallocate(data_4d)
+    end if
+
+  end subroutine mpr_write_restart_data
+
+  !> \brief Placeholder read restart routine for MPR.
+  subroutine mpr_read_restart_data(self)
+    class(mpr_t), intent(inout), target :: self
+    if (.not.allocated(self%restart_input_path)) then
+      log_fatal(*) "MPR: restart input path is not configured."
+      error stop 1
+    end if
+    log_fatal(*) "MPR: read_restart is configured but restart read is not implemented in new mpr_t yet."
+    error stop 1
+  end subroutine mpr_read_restart_data
 
   !> \brief Ensure level1 grid is available and consistent with configured level1 resolution.
   subroutine mpr_ensure_level1_grid(self)
@@ -624,9 +742,10 @@ contains
     class(mpr_t), intent(inout), target :: self
     nullify(self%exchange%slope_emp%data)
     self%exchange%slope_emp%provided = .false.
-    if (allocated(self%slope_emp)) deallocate(self%slope_emp)
     nullify(self%exchange%max_interception%data)
     self%exchange%max_interception%provided = .false.
+    if (self%write_restart) call self%create_restart()
+    if (allocated(self%slope_emp)) deallocate(self%slope_emp)
     if (allocated(self%lai_l0_cache)) deallocate(self%lai_l0_cache)
     if (allocated(self%max_interception_cache)) deallocate(self%max_interception_cache)
     self%n_lai_periods = 1_i4
