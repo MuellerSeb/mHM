@@ -10,10 +10,15 @@
 !> \ingroup f_exchange
 #include "logging.h"
 module mo_mpr_container
+  use, intrinsic :: ieee_arithmetic, only: ieee_is_finite
   use mo_logging
-  use mo_kind, only: i4
+  use mo_kind, only: i4, dp
   use mo_exchange_type, only: exchange_t
+  use mo_grid, only: grid_t
+  use mo_grid_scaler, only: scaler_t
+  use mo_orderpack, only: sort_index
   use mo_string_utils, only: n2s => num2str
+  use mo_utils, only: eq, is_close
   use mo_read_lut, only: read_geoformation_lut
   use nml_config_mpr, only: nml_config_mpr_t, NML_OK
 
@@ -22,16 +27,22 @@ module mo_mpr_container
   type, public :: mpr_t
     type(nml_config_mpr_t) :: config !< configuration of the MPR process container
     type(exchange_t), pointer :: exchange => null() !< exchange container of the domain
+    type(grid_t) :: tgt_level1 !< internal level1 grid derived from level0 when needed
+    type(scaler_t) :: upscaler !< scaler from level0 morphology to level1 hydrology
     character(:), allocatable :: soil_lut_path !< resolved soil LUT path
     character(:), allocatable :: geo_lut_path !< resolved geology LUT path
     character(:), allocatable :: lai_path !< resolved gridded LAI path
     character(:), allocatable :: lai_lut_path !< resolved LAI LUT path
+    real(dp), allocatable :: slope_emp(:) !< empirical slope distribution on level0
   contains
     procedure :: configure => mpr_configure
     procedure :: connect => mpr_connect
     procedure :: initialize => mpr_initialize
     procedure :: update => mpr_update
     procedure :: finalize => mpr_finalize
+    procedure, private :: ensure_level1_grid => mpr_ensure_level1_grid
+    procedure, private :: init_upscaler => mpr_init_upscaler
+    procedure, private :: init_slope_emp => mpr_init_slope_emp
     procedure, private :: check_geo_units_against_lut => mpr_check_geo_units_against_lut
     procedure, private :: check_geoparameter_consistency => mpr_check_geoparameter_consistency
   end type mpr_t
@@ -240,6 +251,17 @@ contains
       log_fatal(*) "MPR: internal error, geo_lut_path not resolved in configure."
       error stop 1
     end if
+    if (.not.associated(self%exchange%level0)) then
+      log_fatal(*) "MPR: level0 grid not connected."
+      error stop 1
+    end if
+    call self%ensure_level1_grid()
+    if (size(self%exchange%slope%data) /= self%exchange%level0%nCells) then
+      log_fatal(*) "MPR: slope size (", n2s(size(self%exchange%slope%data)), &
+        ") does not match level0 nCells (", n2s(int(self%exchange%level0%nCells, i4)), ")."
+      error stop 1
+    end if
+    call self%init_slope_emp()
 
     if (.not.associated(self%exchange%geo_class_def)) allocate(self%exchange%geo_class_def)
     call self%exchange%geo_class_def%reset()
@@ -251,9 +273,92 @@ contains
       log_fatal(*) "MPR: geology LUT contains no classes: ", self%geo_lut_path
       error stop 1
     end if
+    call self%init_upscaler()
     call self%check_geo_units_against_lut()
     call self%check_geoparameter_consistency()
   end subroutine mpr_connect
+
+  !> \brief Ensure level1 grid is available and consistent with configured level1 resolution.
+  subroutine mpr_ensure_level1_grid(self)
+    class(mpr_t), intent(inout), target :: self
+    real(dp) :: l0_res
+    real(dp) :: l1_res
+
+    if (.not.associated(self%exchange%level0)) then
+      log_fatal(*) "MPR: level0 grid not connected."
+      error stop 1
+    end if
+
+    l1_res = self%exchange%level1_resolution
+    if (.not.ieee_is_finite(l1_res) .or. l1_res <= 0.0_dp) then
+      log_fatal(*) "MPR: level1 resolution not configured (expected from config_mhm/resolution)."
+      error stop 1
+    end if
+
+    l0_res = self%exchange%level0%cellsize
+    if (l1_res < l0_res .and. .not.is_close(l1_res, l0_res)) then
+      log_fatal(*) "MPR: level1 resolution must be >= level0 cellsize."
+      error stop 1
+    end if
+
+    if (associated(self%exchange%level1)) then
+      if (.not.is_close(self%exchange%level1%cellsize, l1_res)) then
+        log_fatal(*) "MPR: level1 grid cellsize (", n2s(self%exchange%level1%cellsize), &
+          ") conflicts with configured level1_resolution (", n2s(l1_res), ")."
+        error stop 1
+      end if
+      return
+    end if
+
+    call self%exchange%level0%gen_grid(self%tgt_level1, target_resolution=l1_res)
+    self%exchange%level1 => self%tgt_level1
+    log_info(*) "MPR: derive level1 grid from level0 with resolution ", n2s(l1_res)
+  end subroutine mpr_ensure_level1_grid
+
+  !> \brief Initialize cached L0->L1 scaler used by MPR upscaling routines.
+  subroutine mpr_init_upscaler(self)
+    class(mpr_t), intent(inout), target :: self
+
+    if (.not.associated(self%upscaler%source_grid, self%exchange%level0) .or. &
+      .not.associated(self%upscaler%target_grid, self%exchange%level1)) then
+      call self%upscaler%init(source_grid=self%exchange%level0, target_grid=self%exchange%level1)
+    end if
+  end subroutine mpr_init_upscaler
+
+  !> \brief Build empirical slope distribution F(slope) on level0 from input slope map.
+  subroutine mpr_init_slope_emp(self)
+    class(mpr_t), intent(inout), target :: self
+    integer(i4), allocatable :: slope_sorted_index(:)
+    integer(i4) :: i
+    integer(i4) :: i_sort
+    integer(i4) :: i_sortpost
+    integer(i4) :: n_cells
+
+    n_cells = size(self%exchange%slope%data)
+    if (n_cells < 1_i4) then
+      log_fatal(*) "MPR: cannot build slope_emp from empty slope input."
+      error stop 1
+    end if
+    if (allocated(self%slope_emp)) deallocate(self%slope_emp)
+    allocate(self%slope_emp(n_cells), slope_sorted_index(n_cells))
+
+    slope_sorted_index = sort_index(self%exchange%slope%data)
+    self%slope_emp(slope_sorted_index(n_cells)) = real(n_cells, dp) / real(n_cells + 1_i4, dp)
+
+    do i = n_cells - 1_i4, 1_i4, -1_i4
+      i_sort = slope_sorted_index(i)
+      i_sortpost = slope_sorted_index(i + 1_i4)
+      if (eq(self%exchange%slope%data(i_sort), self%exchange%slope%data(i_sortpost))) then
+        self%slope_emp(i_sort) = self%slope_emp(i_sortpost)
+      else
+        self%slope_emp(i_sort) = real(i, dp) / real(n_cells + 1_i4, dp)
+      end if
+    end do
+
+    self%exchange%slope_emp%provided = .true.
+    self%exchange%slope_emp%data => self%slope_emp
+    deallocate(slope_sorted_index)
+  end subroutine mpr_init_slope_emp
 
   !> \brief Ensure all geological classes in the input map are represented in the LUT.
   subroutine mpr_check_geo_units_against_lut(self)
@@ -290,18 +395,21 @@ contains
   !> \brief Initialize the MPR process container for the simulation.
   subroutine mpr_initialize(self)
     class(mpr_t), intent(inout), target :: self
-    log_info(*) "Initialize MPR"
+    log_info(*) "Initialize MPR for domain ", n2s(self%exchange%domain)
   end subroutine mpr_initialize
 
   !> \brief Update the MPR process container for the current time step.
   subroutine mpr_update(self)
     class(mpr_t), intent(inout), target :: self
-    log_trace(*) "Update MPR"
+    log_trace(*) "Update MPR at step ", n2s(self%exchange%step_count)
   end subroutine mpr_update
 
   !> \brief Finalize the MPR process container after the simulation.
   subroutine mpr_finalize(self)
     class(mpr_t), intent(inout), target :: self
-    log_info(*) "Finalize MPR"
+    nullify(self%exchange%slope_emp%data)
+    self%exchange%slope_emp%provided = .false.
+    if (allocated(self%slope_emp)) deallocate(self%slope_emp)
+    log_info(*) "Finalize MPR for domain ", n2s(self%exchange%domain)
   end subroutine mpr_finalize
 end module mo_mpr_container
