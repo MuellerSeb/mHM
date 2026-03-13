@@ -67,7 +67,16 @@ properties:
     x-fortran-shape: max_domains
     x-fortran-flex-tail-dims: 1
     title: Land cover path
-    description: Land cover data path (periods derived from time bounds or start time stamp assumed).
+    description: NetCDF land-cover dataset path.
+  land_cover_var:
+    type: array
+    items:
+      type: string
+      x-fortran-len: buf
+      default: land_cover
+    x-fortran-shape: max_domains
+    title: Land cover variable
+    description: Land-cover variable name in the NetCDF dataset.
   lai_time_step:
     type: array
     items:

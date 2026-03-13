@@ -20,10 +20,10 @@
 /
 
 &config_mrm
-  resolution(1)  = 12000.0
+  resolution(1)  = 2000.0
   max_route_step(1) = 3600 ! [s] truncate routing steps to 1 hour
   output_path(1) = "mrm_output.nc"
-  output_node_path(1) = "mrm_output_node.nc"
-  scc_gauges_path(1) = "src/tests/files/scc_gauges.nc"
+  ! output_node_path(1) = "mrm_output_node.nc"
+  ! scc_gauges_path(1) = "src/tests/files/scc_gauges.nc"
   diagnostics_path(1) = "mrm_diagnostics.nc"
 /

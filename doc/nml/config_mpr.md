@@ -16,6 +16,7 @@ Configuration for the multiscale parameter regionalization in mHM.
 | [soil_depth](#soil_depth) | integer array | no | Soil horizon depth |
 | [fracSealed_cityArea](#fracsealed_cityarea) | real array | no | Sealed fraction of city area |
 | [land_cover_path](#land_cover_path) | string array | no | Land cover path |
+| [land_cover_var](#land_cover_var) | string array | no | Land cover variable |
 | [lai_time_step](#lai_time_step) | integer array | no | LAI time step |
 | [lai_path](#lai_path) | string array | no | LAI path |
 | [soil_lut_path](#soil_lut_path) | string array | no | Soil LUT path |
@@ -96,12 +97,23 @@ Summary:
 
 Land cover path `land_cover_path`
 
-Land cover data path (periods derived from time bounds or start time stamp assumed).
+NetCDF land-cover dataset path.
 
 Summary:
 - Type: `character(len=buf), dimension(max_domains)`
 - Flexible tail dims: 1
 - Required: no
+
+### land_cover_var
+
+Land cover variable `land_cover_var`
+
+Land-cover variable name in the NetCDF dataset.
+
+Summary:
+- Type: `character(len=buf), dimension(max_domains)`
+- Required: no
+- Default: `"land_cover"`
 
 ### lai_time_step
 
@@ -212,6 +224,7 @@ Summary:
   soil_depth(:, :) = 0
   fracSealed_cityArea(:) = 0.0
   land_cover_path(:) = ""
+  land_cover_var(:) = "land_cover"
   lai_time_step(:) = -3
   lai_path(:) = ""
   soil_lut_path(:) = ""

@@ -42,6 +42,7 @@ module nml_config_mpr
 
   ! default values
   integer(i4), parameter, public :: soil_db_mode_default = 0_i4
+  character(len=buf), parameter, public :: land_cover_var_default = "land_cover"
   logical, parameter, public :: read_restart_default = .false.
   logical, parameter, public :: write_restart_default = .false.
 
@@ -60,6 +61,7 @@ module nml_config_mpr
     integer(i4), dimension(max_layers, max_domains) :: soil_depth !< Soil horizon depth
     real(dp), dimension(max_domains) :: fracsealed_cityarea !< Sealed fraction of city area
     character(len=buf), dimension(max_domains) :: land_cover_path !< Land cover path
+    character(len=buf), dimension(max_domains) :: land_cover_var !< Land cover variable
     integer(i4), dimension(max_domains) :: lai_time_step !< LAI time step
     character(len=buf), dimension(max_domains) :: lai_path !< LAI path
     character(len=buf), dimension(max_domains) :: soil_lut_path !< Soil LUT path
@@ -136,6 +138,7 @@ contains
     this%restart_output_path = repeat(achar(0), len(this%restart_output_path)) ! sentinel for optional string array
     ! default values
     this%soil_db_mode = soil_db_mode_default
+    this%land_cover_var = land_cover_var_default
     this%read_restart = read_restart_default
     this%write_restart = write_restart_default
   end function nml_config_mpr_init
@@ -152,6 +155,7 @@ contains
     integer(i4), dimension(max_layers, max_domains) :: soil_depth
     real(dp), dimension(max_domains) :: fracsealed_cityarea
     character(len=buf), dimension(max_domains) :: land_cover_path
+    character(len=buf), dimension(max_domains) :: land_cover_var
     integer(i4), dimension(max_domains) :: lai_time_step
     character(len=buf), dimension(max_domains) :: lai_path
     character(len=buf), dimension(max_domains) :: soil_lut_path
@@ -174,6 +178,7 @@ contains
       soil_depth, &
       fracsealed_cityarea, &
       land_cover_path, &
+      land_cover_var, &
       lai_time_step, &
       lai_path, &
       soil_lut_path, &
@@ -192,6 +197,7 @@ contains
     soil_depth = this%soil_depth
     fracsealed_cityarea = this%fracsealed_cityarea
     land_cover_path = this%land_cover_path
+    land_cover_var = this%land_cover_var
     lai_time_step = this%lai_time_step
     lai_path = this%lai_path
     soil_lut_path = this%soil_lut_path
@@ -232,6 +238,7 @@ contains
     this%soil_depth = soil_depth
     this%fracsealed_cityarea = fracsealed_cityarea
     this%land_cover_path = land_cover_path
+    this%land_cover_var = land_cover_var
     this%lai_time_step = lai_time_step
     this%lai_path = lai_path
     this%soil_lut_path = soil_lut_path
@@ -255,6 +262,7 @@ contains
     soil_depth, &
     fracsealed_cityarea, &
     land_cover_path, &
+    land_cover_var, &
     lai_time_step, &
     lai_path, &
     soil_lut_path, &
@@ -274,6 +282,7 @@ contains
     integer(i4), dimension(:, :), intent(in), optional :: soil_depth
     real(dp), dimension(:), intent(in), optional :: fracsealed_cityarea
     character(len=*), dimension(:), intent(in), optional :: land_cover_path
+    character(len=*), dimension(:), intent(in), optional :: land_cover_var
     integer(i4), dimension(:), intent(in), optional :: lai_time_step
     character(len=*), dimension(:), intent(in), optional :: lai_path
     character(len=*), dimension(:), intent(in), optional :: soil_lut_path
@@ -360,6 +369,16 @@ contains
       lb_1 = lbound(this%land_cover_path, 1)
       ub_1 = lb_1 + size(land_cover_path, 1) - 1
       this%land_cover_path(lb_1:ub_1) = land_cover_path
+    end if
+    if (present(land_cover_var)) then
+      if (size(land_cover_var, 1) > size(this%land_cover_var, 1)) then
+        status = NML_ERR_INVALID_INDEX
+        if (present(errmsg)) errmsg = "dimension 1 exceeds bounds for 'land_cover_var'"
+        return
+      end if
+      lb_1 = lbound(this%land_cover_var, 1)
+      ub_1 = lb_1 + size(land_cover_var, 1) - 1
+      this%land_cover_var(lb_1:ub_1) = land_cover_var
     end if
     if (present(lai_time_step)) then
       if (size(lai_time_step, 1) > size(this%lai_time_step, 1)) then
@@ -518,6 +537,13 @@ contains
         if (this%land_cover_path(idx(1)) == repeat(achar(0), len(this%land_cover_path))) status = NML_ERR_NOT_SET
       else
         if (all(this%land_cover_path == repeat(achar(0), len(this%land_cover_path)))) status = NML_ERR_NOT_SET
+      end if
+    case ("land_cover_var")
+      if (present(idx)) then
+        status = idx_check(idx, lbound(this%land_cover_var), ubound(this%land_cover_var), &
+          "land_cover_var", errmsg)
+        if (status /= NML_OK) return
+      else
       end if
     case ("lai_time_step")
       if (present(idx)) then
