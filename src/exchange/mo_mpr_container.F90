@@ -26,6 +26,17 @@ module mo_mpr_container
   use mo_read_lut, only: read_geoformation_lut, read_lai_lut
   use nml_config_mpr, only: nml_config_mpr_t, NML_OK
 
+  type :: mpr_land_cover_state_t
+    character(:), allocatable :: path !< resolved land-cover dataset path
+    character(:), allocatable :: var_name !< configured land-cover variable name
+    type(input_dataset) :: ds !< land-cover dataset input handler
+    logical :: temporal = .false. !< whether land cover has temporal periods in file
+    integer(i4), allocatable :: l0_cache(:, :) !< cached land cover on level0 (nCells0, nLC)
+    type(datetime), allocatable :: period_end(:) !< cached land-cover period end times
+    integer(i4) :: n_periods = 1_i4 !< number of cached land-cover periods
+    integer(i4) :: active_idx = 0_i4 !< active cached land-cover index
+  end type mpr_land_cover_state_t
+
   !> \class   mpr_t
   !> \brief   Class for a single MPR process container.
   type, public :: mpr_t
@@ -35,8 +46,7 @@ module mo_mpr_container
     type(scaler_t) :: upscaler !< scaler from level0 morphology to level1 hydrology
     character(:), allocatable :: soil_lut_path !< resolved soil LUT path
     character(:), allocatable :: geo_lut_path !< resolved geology LUT path
-    character(:), allocatable :: land_cover_path !< resolved land-cover path
-    character(:), allocatable :: land_cover_var !< configured land-cover variable name
+    type(mpr_land_cover_state_t) :: land_cover !< land-cover configuration and cached temporal state
     character(:), allocatable :: lai_path !< resolved gridded LAI path
     character(:), allocatable :: lai_lut_path !< resolved LAI LUT path
     logical :: read_restart = .false. !< whether to read MPR restart file
@@ -44,16 +54,10 @@ module mo_mpr_container
     character(:), allocatable :: restart_input_path !< path to restart file to read
     character(:), allocatable :: restart_output_path !< path to restart file to write
     real(dp), allocatable :: slope_emp(:) !< empirical slope distribution on level0
-    type(input_dataset) :: land_cover_ds !< land-cover dataset input handler
-    logical :: has_temporal_land_cover = .false. !< whether land cover has temporal periods in file
-    integer(i4), allocatable :: land_cover_l0_cache(:, :) !< cached land cover on level0 (nCells0, nLC)
-    type(datetime), allocatable :: land_cover_period_end(:) !< cached land-cover period end times
     real(dp), allocatable :: lai_l0_cache(:, :) !< cached LAI on level0 (nCells0, nLAI)
     real(dp), allocatable :: max_interception_cache(:, :, :) !< cached max interception (nCells1, nLAI, nLC)
     integer(i4) :: n_lai_periods = 1_i4 !< number of cached LAI periods
-    integer(i4) :: n_land_cover_periods = 1_i4 !< number of cached land-cover periods
     integer(i4) :: active_lai_idx = 0_i4 !< active cached LAI index
-    integer(i4) :: active_land_cover_idx = 0_i4 !< active cached land-cover index
   contains
     procedure :: configure => mpr_configure
     procedure :: connect => mpr_connect
@@ -165,9 +169,9 @@ contains
       log_fatal(*) "MPR: land_cover_path not set for domain ", n2s(id(1)), ". Error: ", trim(errmsg)
       error stop 1
     end if
-    self%land_cover_path = self%exchange%get_path(self%config%land_cover_path(id(1)))
-    self%land_cover_var = trim(self%config%land_cover_var(id(1)))
-    if (len_trim(self%land_cover_var) < 1) then
+    self%land_cover%path = self%exchange%get_path(self%config%land_cover_path(id(1)))
+    self%land_cover%var_name = trim(self%config%land_cover_var(id(1)))
+    if (len_trim(self%land_cover%var_name) < 1) then
       log_fatal(*) "MPR: land_cover_var must not be empty for domain ", n2s(id(1)), "."
       error stop 1
     end if
@@ -378,7 +382,7 @@ contains
     call nc_var%setAttribute("time_stamp", self%exchange%time%str())
     call nc_var%setAttribute("domain", self%exchange%domain)
     call nc_var%setAttribute("n_lai_periods", self%n_lai_periods)
-    call nc_var%setAttribute("n_land_cover_periods", self%n_land_cover_periods)
+    call nc_var%setAttribute("n_land_cover_periods", self%land_cover%n_periods)
     call nc%close()
   end subroutine mpr_create_restart
 
@@ -405,12 +409,12 @@ contains
       dims(2) = nc%getDimension("lat")
     end if
     dims(3) = nc%setDimension("L1_LAITimesteps", self%n_lai_periods)
-    dims(4) = nc%setDimension("L1_LandCoverPeriods", self%n_land_cover_periods)
+    dims(4) = nc%setDimension("L1_LandCoverPeriods", self%land_cover%n_periods)
 
     ! maximum interception
     if (allocated(self%max_interception_cache)) then
-      allocate(data_4d(self%exchange%level1%nx, self%exchange%level1%ny, self%n_lai_periods, self%n_land_cover_periods))
-      do land_cover_idx = 1_i4, self%n_land_cover_periods
+      allocate(data_4d(self%exchange%level1%nx, self%exchange%level1%ny, self%n_lai_periods, self%land_cover%n_periods))
+      do land_cover_idx = 1_i4, self%land_cover%n_periods
         do lai_idx = 1_i4, self%n_lai_periods
           call self%exchange%level1%unpack_into( &
             self%max_interception_cache(:, lai_idx, land_cover_idx), &
@@ -529,9 +533,9 @@ contains
     class(mpr_t), intent(inout), target :: self
 
     self%n_lai_periods = 1_i4
-    self%n_land_cover_periods = 1_i4
+    self%land_cover%n_periods = 1_i4
     self%active_lai_idx = 0_i4
-    self%active_land_cover_idx = 0_i4
+    self%land_cover%active_idx = 0_i4
 
     call self%init_land_cover_cache()
 
@@ -546,7 +550,7 @@ contains
     call self%build_lai_l0_cache()
     call self%init_max_interception_cache()
     log_info(*) "MPR: temporal cache initialized (nLAI=", n2s(self%n_lai_periods), &
-      ", nLC=", n2s(self%n_land_cover_periods), ")."
+      ", nLC=", n2s(self%land_cover%n_periods), ")."
   end subroutine mpr_init_temporal_cache
 
   !> \brief Build cached land-cover fields on level0 for static or temporal datasets.
@@ -555,11 +559,11 @@ contains
     type(var) :: land_cover_meta
     integer(i4) :: n_times
 
-    if (.not.allocated(self%land_cover_path)) then
+    if (.not.allocated(self%land_cover%path)) then
       log_fatal(*) "MPR: internal error, land_cover_path not resolved in configure."
       error stop 1
     end if
-    if (.not.allocated(self%land_cover_var)) then
+    if (.not.allocated(self%land_cover%var_name)) then
       log_fatal(*) "MPR: internal error, land_cover_var not resolved in configure."
       error stop 1
     end if
@@ -568,57 +572,57 @@ contains
       error stop 1
     end if
 
-    if (allocated(self%land_cover_ds%vars)) call self%land_cover_ds%close()
-    if (allocated(self%land_cover_l0_cache)) deallocate(self%land_cover_l0_cache)
-    if (allocated(self%land_cover_period_end)) deallocate(self%land_cover_period_end)
-    self%has_temporal_land_cover = .false.
+    if (allocated(self%land_cover%ds%vars)) call self%land_cover%ds%close()
+    if (allocated(self%land_cover%l0_cache)) deallocate(self%land_cover%l0_cache)
+    if (allocated(self%land_cover%period_end)) deallocate(self%land_cover%period_end)
+    self%land_cover%temporal = .false.
 
-    call self%land_cover_ds%init( &
-      path=self%land_cover_path, &
-      vars=[var(name=trim(self%land_cover_var), kind="i4", static=.false., allow_static=.true.)], &
+    call self%land_cover%ds%init( &
+      path=self%land_cover%path, &
+      vars=[var(name=trim(self%land_cover%var_name), kind="i4", static=.false., allow_static=.true.)], &
       grid=self%exchange%level0, &
       timestamp=start_timestamp) ! assume start timestamp for land-cover dataset
 
-    land_cover_meta = self%land_cover_ds%meta(trim(self%land_cover_var))
+    land_cover_meta = self%land_cover%ds%meta(trim(self%land_cover%var_name))
     if (land_cover_meta%static) then
-      self%n_land_cover_periods = 1_i4
-      allocate(self%land_cover_l0_cache(self%exchange%level0%nCells, 1))
-      call self%land_cover_ds%read(trim(self%land_cover_var), self%land_cover_l0_cache(:, 1))
-      allocate(self%land_cover_period_end(1))
-      self%land_cover_period_end(1) = self%exchange%end_time
-      call self%land_cover_ds%close()
+      self%land_cover%n_periods = 1_i4
+      allocate(self%land_cover%l0_cache(self%exchange%level0%nCells, 1))
+      call self%land_cover%ds%read(trim(self%land_cover%var_name), self%land_cover%l0_cache(:, 1))
+      allocate(self%land_cover%period_end(1))
+      self%land_cover%period_end(1) = self%exchange%end_time
+      call self%land_cover%ds%close()
       log_info(*) "MPR: static land-cover dataset initialized (nLC=1)."
       return
     end if
 
-    if (self%exchange%start_time < self%land_cover_ds%start_time) then
-      log_fatal(*) "MPR: temporal land-cover coverage starts at ", self%land_cover_ds%start_time%str(), &
+    if (self%exchange%start_time < self%land_cover%ds%start_time) then
+      log_fatal(*) "MPR: temporal land-cover coverage starts at ", self%land_cover%ds%start_time%str(), &
         ", but simulation starts at ", self%exchange%start_time%str(), "."
       error stop 1
     end if
-    n_times = size(self%land_cover_ds%times)
+    n_times = size(self%land_cover%ds%times)
     if (n_times < 1_i4) then
       log_fatal(*) "MPR: temporal land-cover dataset contains no time steps."
       error stop 1
     end if
-    if (self%exchange%end_time > self%land_cover_ds%times(n_times)) then
-      log_fatal(*) "MPR: temporal land-cover coverage ends at ", self%land_cover_ds%times(n_times)%str(), &
+    if (self%exchange%end_time > self%land_cover%ds%times(n_times)) then
+      log_fatal(*) "MPR: temporal land-cover coverage ends at ", self%land_cover%ds%times(n_times)%str(), &
         ", but simulation ends at ", self%exchange%end_time%str(), "."
       error stop 1
     end if
 
-    call self%land_cover_ds%read_chunk( &
-      trim(self%land_cover_var), self%land_cover_l0_cache, &
-      self%exchange%start_time, self%exchange%end_time, times=self%land_cover_period_end)
-    self%n_land_cover_periods = size(self%land_cover_period_end, kind=i4)
-    if (self%n_land_cover_periods < 1_i4) then
+    call self%land_cover%ds%read_chunk( &
+      trim(self%land_cover%var_name), self%land_cover%l0_cache, &
+      self%exchange%start_time, self%exchange%end_time, times=self%land_cover%period_end)
+    self%land_cover%n_periods = size(self%land_cover%period_end, kind=i4)
+    if (self%land_cover%n_periods < 1_i4) then
       log_fatal(*) "MPR: temporal land-cover read returned no periods for the simulation window."
       error stop 1
     end if
 
-    self%has_temporal_land_cover = .true.
-    call self%land_cover_ds%close()
-    log_info(*) "MPR: temporal land-cover dataset initialized (nLC=", n2s(self%n_land_cover_periods), ")."
+    self%land_cover%temporal = .true.
+    call self%land_cover%ds%close()
+    log_info(*) "MPR: temporal land-cover dataset initialized (nLC=", n2s(self%land_cover%n_periods), ")."
   end subroutine mpr_init_land_cover_cache
 
   !> \brief Build cached LAI fields on level0 for all currently supported LAI periods.
@@ -704,23 +708,23 @@ contains
       log_fatal(*) "MPR: LAI level0 cache not available before max interception cache initialization."
       error stop 1
     end if
-    if (.not.allocated(self%land_cover_l0_cache)) then
+    if (.not.allocated(self%land_cover%l0_cache)) then
       log_fatal(*) "MPR: land-cover level0 cache not available before max interception cache initialization."
       error stop 1
     end if
-    if (size(self%land_cover_l0_cache, 2) /= self%n_land_cover_periods) then
+    if (size(self%land_cover%l0_cache, 2) /= self%land_cover%n_periods) then
       log_fatal(*) "MPR: land-cover cache period count does not match n_land_cover_periods."
       error stop 1
     end if
 
     if (allocated(self%max_interception_cache)) deallocate(self%max_interception_cache)
-    allocate(self%max_interception_cache(self%exchange%level1%ncells, self%n_lai_periods, self%n_land_cover_periods))
+    allocate(self%max_interception_cache(self%exchange%level1%ncells, self%n_lai_periods, self%land_cover%n_periods))
     allocate(max_interception_l0(self%exchange%level0%ncells))
     allocate(max_interception_l1(self%exchange%level1%ncells))
     do lai_idx = 1_i4, self%n_lai_periods
       max_interception_l0 = interception_param(1) * self%lai_l0_cache(:, lai_idx)
       call self%upscaler%execute(max_interception_l0, max_interception_l1, upscaling_operator=up_a_mean)
-      do land_cover_idx = 1_i4, self%n_land_cover_periods
+      do land_cover_idx = 1_i4, self%land_cover%n_periods
         self%max_interception_cache(:, lai_idx, land_cover_idx) = max_interception_l1
       end do
     end do
@@ -745,15 +749,15 @@ contains
       log_fatal(*) "MPR: LAI index out of bounds: ", n2s(lai_idx), " not in [1,", n2s(self%n_lai_periods), "]."
       error stop 1
     end if
-    if (land_cover_idx < 1_i4 .or. land_cover_idx > self%n_land_cover_periods) then
-      log_fatal(*) "MPR: land-cover index out of bounds: ", n2s(land_cover_idx), " not in [1,", n2s(self%n_land_cover_periods), "]."
+    if (land_cover_idx < 1_i4 .or. land_cover_idx > self%land_cover%n_periods) then
+      log_fatal(*) "MPR: land-cover index out of bounds: ", n2s(land_cover_idx), " not in [1,", n2s(self%land_cover%n_periods), "]."
       error stop 1
     end if
-    if (.not.force_ .and. lai_idx == self%active_lai_idx .and. land_cover_idx == self%active_land_cover_idx) return
+    if (.not.force_ .and. lai_idx == self%active_lai_idx .and. land_cover_idx == self%land_cover%active_idx) return
 
     self%exchange%max_interception%data => self%max_interception_cache(:, lai_idx, land_cover_idx)
     self%active_lai_idx = lai_idx
-    self%active_land_cover_idx = land_cover_idx
+    self%land_cover%active_idx = land_cover_idx
     log_trace(*) "MPR: active cache slice lai=", n2s(lai_idx), ", land_cover=", n2s(land_cover_idx)
   end subroutine mpr_update_exchange_slices
 
@@ -782,21 +786,21 @@ contains
   integer(i4) function mpr_land_cover_index_for_time(self) result(land_cover_idx)
     class(mpr_t), intent(inout), target :: self
 
-    if (self%n_land_cover_periods < 1_i4) then
+    if (self%land_cover%n_periods < 1_i4) then
       log_fatal(*) "MPR: n_land_cover_periods must be >= 1."
       error stop 1
     end if
-    if (.not.self%has_temporal_land_cover) then
+    if (.not.self%land_cover%temporal) then
       land_cover_idx = 1_i4
       return
     end if
-    if (.not.allocated(self%land_cover_period_end)) then
+    if (.not.allocated(self%land_cover%period_end)) then
       log_fatal(*) "MPR: temporal land-cover end times are not cached."
       error stop 1
     end if
-    land_cover_idx = max(1_i4, self%active_land_cover_idx)
-    do while (land_cover_idx < self%n_land_cover_periods)
-      if (self%exchange%time <= self%land_cover_period_end(land_cover_idx)) exit
+    land_cover_idx = max(1_i4, self%land_cover%active_idx)
+    do while (land_cover_idx < self%land_cover%n_periods)
+      if (self%exchange%time <= self%land_cover%period_end(land_cover_idx)) exit
       land_cover_idx = land_cover_idx + 1_i4
     end do
   end function mpr_land_cover_index_for_time
@@ -855,17 +859,17 @@ contains
     nullify(self%exchange%max_interception%data)
     self%exchange%max_interception%provided = .false.
     if (self%write_restart) call self%create_restart()
-    if (allocated(self%land_cover_ds%vars)) call self%land_cover_ds%close()
+    if (allocated(self%land_cover%ds%vars)) call self%land_cover%ds%close()
     if (allocated(self%slope_emp)) deallocate(self%slope_emp)
-    if (allocated(self%land_cover_l0_cache)) deallocate(self%land_cover_l0_cache)
-    if (allocated(self%land_cover_period_end)) deallocate(self%land_cover_period_end)
+    if (allocated(self%land_cover%l0_cache)) deallocate(self%land_cover%l0_cache)
+    if (allocated(self%land_cover%period_end)) deallocate(self%land_cover%period_end)
     if (allocated(self%lai_l0_cache)) deallocate(self%lai_l0_cache)
     if (allocated(self%max_interception_cache)) deallocate(self%max_interception_cache)
-    self%has_temporal_land_cover = .false.
+    self%land_cover%temporal = .false.
+    self%land_cover%n_periods = 1_i4
+    self%land_cover%active_idx = 0_i4
     self%n_lai_periods = 1_i4
-    self%n_land_cover_periods = 1_i4
     self%active_lai_idx = 0_i4
-    self%active_land_cover_idx = 0_i4
     log_info(*) "Finalize MPR for domain ", n2s(self%exchange%domain)
   end subroutine mpr_finalize
 end module mo_mpr_container
