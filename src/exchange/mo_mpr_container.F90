@@ -21,6 +21,8 @@ module mo_mpr_container
   use mo_grid_io, only: input_dataset, start_timestamp, var
   use mo_grid_scaler, only: scaler_t, up_a_mean
   use mo_mpr_legacy_bridge, only: mpr_bridge_land_cover_fraction, mpr_bridge_snow_param, mpr_bridge_pet_lai, &
+    mpr_bridge_pet_aspect, mpr_bridge_pet_hargreaves, mpr_bridge_pet_priestley_taylor, &
+    mpr_bridge_pet_penman_monteith, &
     mpr_bridge_setup_soil_database, mpr_bridge_soil_moisture, mpr_bridge_runoff_param, mpr_bridge_karstic_param, &
     mpr_bridge_baseflow_param, mpr_bridge_sealed_threshold
   use mo_netcdf, only: NcDataset, NcDimension, NcVariable
@@ -52,7 +54,12 @@ module mo_mpr_container
   end type mpr_snow_state_t
 
   type :: mpr_pet_state_t
+    real(dp), allocatable :: pet_fac_aspect_cache(:) !< cached PET aspect correction (nCells1)
+    real(dp), allocatable :: pet_coeff_hs_cache(:) !< cached Hargreaves-Samani coefficient (nCells1)
+    real(dp), allocatable :: pet_coeff_pt_cache(:, :) !< cached Priestley-Taylor coefficient (nCells1, nLAI)
     real(dp), allocatable :: pet_fac_lai_cache(:, :, :) !< cached PET-LAI correction (nCells1, nLAI, nLC)
+    real(dp), allocatable :: resist_aero_cache(:, :, :) !< cached aerodynamic resistance (nCells1, nLAI, nLC)
+    real(dp), allocatable :: resist_surf_cache(:, :) !< cached bulk surface resistance (nCells1, nLAI)
   end type mpr_pet_state_t
 
   type :: mpr_soil_state_t
@@ -121,7 +128,12 @@ module mo_mpr_container
     procedure, private :: build_lai_l0_cache => mpr_build_lai_l0_cache
     procedure, private :: init_max_interception_cache => mpr_init_max_interception_cache
     procedure, private :: init_snow_cache => mpr_init_snow_cache
+    procedure, private :: init_pet_cache => mpr_init_pet_cache
+    procedure, private :: init_pet_aspect_cache => mpr_init_pet_aspect_cache
+    procedure, private :: init_pet_hargreaves_cache => mpr_init_pet_hargreaves_cache
     procedure, private :: init_pet_lai_cache => mpr_init_pet_lai_cache
+    procedure, private :: init_pet_priestley_taylor_cache => mpr_init_pet_priestley_taylor_cache
+    procedure, private :: init_pet_penman_cache => mpr_init_pet_penman_cache
     procedure, private :: init_soil_cache => mpr_init_soil_cache
     procedure, private :: init_runoff_cache => mpr_init_runoff_cache
     procedure, private :: update_exchange_slices => mpr_update_exchange_slices
@@ -471,6 +483,35 @@ contains
         self%max_interception_cache(:, :, 1))
     end if
 
+    if (allocated(self%pet%pet_fac_lai_cache)) then
+      call mpr_write_restart_field_4d( &
+        self, nc, dims_xy, lai_dim, land_cover_dim, "L1_petLAIcorFactor", &
+        "PET correction factor based on LAI at level 1", self%pet%pet_fac_lai_cache)
+    end if
+    if (allocated(self%pet%pet_fac_aspect_cache)) then
+      call mpr_write_restart_field_2d( &
+        self, nc, dims_xy, "L1_fAsp", "PET correction factor due to terrain aspect at level 1", &
+        self%pet%pet_fac_aspect_cache)
+    end if
+    if (allocated(self%pet%pet_coeff_hs_cache)) then
+      call mpr_write_restart_field_2d( &
+        self, nc, dims_xy, "L1_HarSamCoeff", "Hargreaves-Samani coefficient", self%pet%pet_coeff_hs_cache)
+    end if
+    if (allocated(self%pet%pet_coeff_pt_cache)) then
+      call mpr_write_restart_field_3d( &
+        self, nc, dims_xy, lai_dim, "L1_PrieTayAlpha", "Priestley Taylor coefficient (alpha)", &
+        self%pet%pet_coeff_pt_cache)
+    end if
+    if (allocated(self%pet%resist_aero_cache)) then
+      call mpr_write_restart_field_4d( &
+        self, nc, dims_xy, lai_dim, land_cover_dim, "L1_aeroResist", "aerodynamical resistance", &
+        self%pet%resist_aero_cache)
+    end if
+    if (allocated(self%pet%resist_surf_cache)) then
+      call mpr_write_restart_field_3d( &
+        self, nc, dims_xy, lai_dim, "L1_surfResist", "bulk surface resistance", self%pet%resist_surf_cache)
+    end if
+
     if (allocated(self%soil%f_roots_cache)) then
       call mpr_write_restart_field_4d( &
         self, nc, dims_xy, soil_dim, land_cover_dim, "L1_fRoots", &
@@ -732,6 +773,7 @@ contains
     class(mpr_t), intent(inout), target :: self
     logical :: need_lai_cache
     logical :: need_runoff_cache
+    integer(i4) :: pet_process
 
     self%n_lai_periods = 1_i4
     self%land_cover%n_periods = 1_i4
@@ -741,8 +783,9 @@ contains
     call self%init_land_cover_cache()
     call self%init_land_cover_fraction_cache()
 
+    pet_process = self%exchange%parameters%process_matrix(5, 1)
     need_lai_cache = self%exchange%parameters%process_matrix(1, 1) /= 0_i4 .or. &
-      self%exchange%parameters%process_matrix(5, 1) == -1_i4
+      any(pet_process == [-1_i4, 2_i4, 3_i4])
     if (need_lai_cache) then
       if (.not.associated(self%exchange%gridded_lai%data)) then
         log_fatal(*) "MPR: gridded_lai data must be connected before temporal cache initialization."
@@ -753,7 +796,7 @@ contains
 
     if (self%exchange%parameters%process_matrix(1, 1) /= 0_i4) call self%init_max_interception_cache()
     if (self%exchange%parameters%process_matrix(2, 1) /= 0_i4) call self%init_snow_cache()
-    if (self%exchange%parameters%process_matrix(5, 1) == -1_i4) call self%init_pet_lai_cache()
+    if (pet_process /= 0_i4) call self%init_pet_cache()
     if (self%exchange%parameters%process_matrix(3, 1) /= 0_i4) call self%init_soil_cache()
     need_runoff_cache = self%exchange%parameters%process_matrix(4, 1) /= 0_i4 .or. &
       self%exchange%parameters%process_matrix(6, 1) /= 0_i4 .or. &
@@ -1025,6 +1068,78 @@ contains
     self%exchange%degday_max%provided = .true.
   end subroutine mpr_init_snow_cache
 
+  !> \brief Cache PET parameter fields on level1 for the active PET process.
+  subroutine mpr_init_pet_cache(self)
+    class(mpr_t), intent(inout), target :: self
+    integer(i4) :: pet_process
+
+    pet_process = self%exchange%parameters%process_matrix(5, 1)
+    select case (pet_process)
+      case (-2_i4)
+        call self%init_pet_aspect_cache()
+      case (-1_i4)
+        call self%init_pet_lai_cache()
+      case (1_i4)
+        call self%init_pet_hargreaves_cache()
+      case (2_i4)
+        call self%init_pet_priestley_taylor_cache()
+      case (3_i4)
+        call self%init_pet_penman_cache()
+      case default
+        log_fatal(*) "MPR: unsupported PET process case ", n2s(pet_process), "."
+        error stop 1
+    end select
+  end subroutine mpr_init_pet_cache
+
+  !> \brief Cache static PET aspect correction on level1.
+  subroutine mpr_init_pet_aspect_cache(self)
+    class(mpr_t), intent(inout), target :: self
+    real(dp), allocatable :: pet_param(:)
+
+    pet_param = self%exchange%parameters%get_process(5_i4)
+    if (size(pet_param) < 3_i4) then
+      log_fatal(*) "MPR: PET aspect parameter set must contain 3 values while PET process -2 is active."
+      error stop 1
+    end if
+    if (.not.associated(self%exchange%aspect%data)) then
+      log_fatal(*) "MPR: aspect data must be connected before PET aspect cache initialization."
+      error stop 1
+    end if
+
+    if (allocated(self%pet%pet_fac_aspect_cache)) deallocate(self%pet%pet_fac_aspect_cache)
+    allocate(self%pet%pet_fac_aspect_cache(self%exchange%level1%ncells))
+    call mpr_bridge_pet_aspect(self%exchange%level0, self%exchange%aspect%data, pet_param, self%upscaler, &
+      self%pet%pet_fac_aspect_cache)
+
+    self%exchange%pet_fac_aspect%provided = .true.
+  end subroutine mpr_init_pet_aspect_cache
+
+  !> \brief Cache Hargreaves-Samani PET coefficients on level1.
+  subroutine mpr_init_pet_hargreaves_cache(self)
+    class(mpr_t), intent(inout), target :: self
+    real(dp), allocatable :: pet_param(:)
+
+    pet_param = self%exchange%parameters%get_process(5_i4)
+    if (size(pet_param) < 4_i4) then
+      log_fatal(*) "MPR: PET Hargreaves parameter set must contain 4 values while PET process 1 is active."
+      error stop 1
+    end if
+    if (.not.associated(self%exchange%aspect%data)) then
+      log_fatal(*) "MPR: aspect data must be connected before PET Hargreaves cache initialization."
+      error stop 1
+    end if
+
+    if (allocated(self%pet%pet_fac_aspect_cache)) deallocate(self%pet%pet_fac_aspect_cache)
+    if (allocated(self%pet%pet_coeff_hs_cache)) deallocate(self%pet%pet_coeff_hs_cache)
+    allocate(self%pet%pet_fac_aspect_cache(self%exchange%level1%ncells))
+    allocate(self%pet%pet_coeff_hs_cache(self%exchange%level1%ncells))
+    call mpr_bridge_pet_hargreaves(self%exchange%level0, self%exchange%aspect%data, pet_param, self%upscaler, &
+      self%pet%pet_fac_aspect_cache, self%pet%pet_coeff_hs_cache)
+
+    self%exchange%pet_fac_aspect%provided = .true.
+    self%exchange%pet_coeff_hs%provided = .true.
+  end subroutine mpr_init_pet_hargreaves_cache
+
   !> \brief Cache PET LAI correction on level1 for all LAI/land-cover slices.
   subroutine mpr_init_pet_lai_cache(self)
     class(mpr_t), intent(inout), target :: self
@@ -1058,6 +1173,67 @@ contains
 
     self%exchange%pet_fac_lai%provided = .true.
   end subroutine mpr_init_pet_lai_cache
+
+  !> \brief Cache Priestley-Taylor PET coefficients on level1 for all LAI slices.
+  subroutine mpr_init_pet_priestley_taylor_cache(self)
+    class(mpr_t), intent(inout), target :: self
+    real(dp), allocatable :: pet_param(:)
+
+    pet_param = self%exchange%parameters%get_process(5_i4)
+    if (size(pet_param) < 2_i4) then
+      log_fatal(*) "MPR: PET Priestley-Taylor parameter set must contain 2 values while PET process 2 is active."
+      error stop 1
+    end if
+    if (.not.allocated(self%lai_l0_cache)) then
+      log_fatal(*) "MPR: LAI level0 cache not available before PET Priestley-Taylor cache initialization."
+      error stop 1
+    end if
+
+    if (allocated(self%pet%pet_coeff_pt_cache)) deallocate(self%pet%pet_coeff_pt_cache)
+    allocate(self%pet%pet_coeff_pt_cache(self%exchange%level1%ncells, self%n_lai_periods))
+    call mpr_bridge_pet_priestley_taylor(self%exchange%level0, self%lai_l0_cache, pet_param, self%upscaler, &
+      self%pet%pet_coeff_pt_cache)
+
+    self%exchange%pet_coeff_pt%provided = .true.
+  end subroutine mpr_init_pet_priestley_taylor_cache
+
+  !> \brief Cache Penman-Monteith PET resistance fields on level1 for all LAI/land-cover slices.
+  subroutine mpr_init_pet_penman_cache(self)
+    class(mpr_t), intent(inout), target :: self
+    integer(i4) :: land_cover_idx
+    real(dp), allocatable :: pet_param(:)
+    real(dp), allocatable :: resist_surf_l1(:, :)
+
+    pet_param = self%exchange%parameters%get_process(5_i4)
+    if (size(pet_param) < 7_i4) then
+      log_fatal(*) "MPR: PET Penman-Monteith parameter set must contain 7 values while PET process 3 is active."
+      error stop 1
+    end if
+    if (.not.allocated(self%lai_l0_cache)) then
+      log_fatal(*) "MPR: LAI level0 cache not available before PET Penman-Monteith cache initialization."
+      error stop 1
+    end if
+    if (.not.allocated(self%land_cover%l0_cache)) then
+      log_fatal(*) "MPR: land-cover level0 cache not available before PET Penman-Monteith cache initialization."
+      error stop 1
+    end if
+
+    if (allocated(self%pet%resist_aero_cache)) deallocate(self%pet%resist_aero_cache)
+    if (allocated(self%pet%resist_surf_cache)) deallocate(self%pet%resist_surf_cache)
+    allocate(self%pet%resist_aero_cache(self%exchange%level1%ncells, self%n_lai_periods, self%land_cover%n_periods))
+    allocate(self%pet%resist_surf_cache(self%exchange%level1%ncells, self%n_lai_periods))
+    allocate(resist_surf_l1(self%exchange%level1%ncells, self%n_lai_periods))
+
+    do land_cover_idx = 1_i4, self%land_cover%n_periods
+      call mpr_bridge_pet_penman_monteith(self%exchange%level0, self%land_cover%l0_cache(:, land_cover_idx), &
+        self%lai_l0_cache, pet_param, self%upscaler, self%pet%resist_aero_cache(:, :, land_cover_idx), resist_surf_l1)
+      if (land_cover_idx == 1_i4) self%pet%resist_surf_cache = resist_surf_l1
+    end do
+    deallocate(resist_surf_l1)
+
+    self%exchange%resist_aero%provided = .true.
+    self%exchange%resist_surf%provided = .true.
+  end subroutine mpr_init_pet_penman_cache
 
   !> \brief Cache soil-moisture parameter fields on level1 for all land-cover slices.
   subroutine mpr_init_soil_cache(self)
@@ -1226,7 +1402,12 @@ contains
     if (.not.allocated(self%land_cover%sealed_fraction_l1) .and. &
       .not.allocated(self%max_interception_cache) .and. &
       .not.allocated(self%snow%thresh_temp_cache) .and. &
+      .not.allocated(self%pet%pet_fac_aspect_cache) .and. &
+      .not.allocated(self%pet%pet_coeff_hs_cache) .and. &
+      .not.allocated(self%pet%pet_coeff_pt_cache) .and. &
       .not.allocated(self%pet%pet_fac_lai_cache) .and. &
+      .not.allocated(self%pet%resist_aero_cache) .and. &
+      .not.allocated(self%pet%resist_surf_cache) .and. &
       .not.allocated(self%soil%sm_exponent_cache) .and. &
       .not.allocated(self%soil%thresh_jarvis_cache) .and. &
       .not.allocated(self%runoff%alpha_cache) .and. &
@@ -1257,8 +1438,23 @@ contains
       self%exchange%degday_inc%data => self%snow%degday_inc_cache(:, land_cover_idx)
       self%exchange%degday_max%data => self%snow%degday_max_cache(:, land_cover_idx)
     end if
+    if (allocated(self%pet%pet_fac_aspect_cache)) then
+      self%exchange%pet_fac_aspect%data => self%pet%pet_fac_aspect_cache
+    end if
+    if (allocated(self%pet%pet_coeff_hs_cache)) then
+      self%exchange%pet_coeff_hs%data => self%pet%pet_coeff_hs_cache
+    end if
+    if (allocated(self%pet%pet_coeff_pt_cache)) then
+      self%exchange%pet_coeff_pt%data => self%pet%pet_coeff_pt_cache(:, lai_idx)
+    end if
     if (allocated(self%pet%pet_fac_lai_cache)) then
       self%exchange%pet_fac_lai%data => self%pet%pet_fac_lai_cache(:, lai_idx, land_cover_idx)
+    end if
+    if (allocated(self%pet%resist_aero_cache)) then
+      self%exchange%resist_aero%data => self%pet%resist_aero_cache(:, lai_idx, land_cover_idx)
+    end if
+    if (allocated(self%pet%resist_surf_cache)) then
+      self%exchange%resist_surf%data => self%pet%resist_surf_cache(:, lai_idx)
     end if
     if (allocated(self%soil%sm_exponent_cache)) then
       self%exchange%f_roots%data => self%soil%f_roots_cache(:, :, land_cover_idx)
@@ -1400,8 +1596,18 @@ contains
     self%exchange%degday_inc%provided = .false.
     nullify(self%exchange%degday_max%data)
     self%exchange%degday_max%provided = .false.
+    nullify(self%exchange%pet_fac_aspect%data)
+    self%exchange%pet_fac_aspect%provided = .false.
+    nullify(self%exchange%pet_coeff_hs%data)
+    self%exchange%pet_coeff_hs%provided = .false.
+    nullify(self%exchange%pet_coeff_pt%data)
+    self%exchange%pet_coeff_pt%provided = .false.
     nullify(self%exchange%pet_fac_lai%data)
     self%exchange%pet_fac_lai%provided = .false.
+    nullify(self%exchange%resist_aero%data)
+    self%exchange%resist_aero%provided = .false.
+    nullify(self%exchange%resist_surf%data)
+    self%exchange%resist_surf%provided = .false.
     nullify(self%exchange%f_roots%data)
     self%exchange%f_roots%provided = .false.
     nullify(self%exchange%sm_saturation%data)
@@ -1444,7 +1650,12 @@ contains
     if (allocated(self%snow%degday_dry_cache)) deallocate(self%snow%degday_dry_cache)
     if (allocated(self%snow%degday_inc_cache)) deallocate(self%snow%degday_inc_cache)
     if (allocated(self%snow%degday_max_cache)) deallocate(self%snow%degday_max_cache)
+    if (allocated(self%pet%pet_fac_aspect_cache)) deallocate(self%pet%pet_fac_aspect_cache)
+    if (allocated(self%pet%pet_coeff_hs_cache)) deallocate(self%pet%pet_coeff_hs_cache)
+    if (allocated(self%pet%pet_coeff_pt_cache)) deallocate(self%pet%pet_coeff_pt_cache)
     if (allocated(self%pet%pet_fac_lai_cache)) deallocate(self%pet%pet_fac_lai_cache)
+    if (allocated(self%pet%resist_aero_cache)) deallocate(self%pet%resist_aero_cache)
+    if (allocated(self%pet%resist_surf_cache)) deallocate(self%pet%resist_surf_cache)
     if (allocated(self%soil%sm_exponent_cache)) deallocate(self%soil%sm_exponent_cache)
     if (allocated(self%soil%sm_saturation_cache)) deallocate(self%soil%sm_saturation_cache)
     if (allocated(self%soil%sm_field_capacity_cache)) deallocate(self%soil%sm_field_capacity_cache)

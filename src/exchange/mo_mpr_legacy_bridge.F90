@@ -12,13 +12,15 @@
 module mo_mpr_legacy_bridge
   use mo_logging
   use mo_constants, only: nodata_dp, nodata_i4
-  use mo_grid, only: grid_t
+  use mo_grid, only: grid_t, cartesian
   use mo_kind, only: i4, i8, dp
   use mo_grid_scaler, only: scaler_t, up_fraction, up_h_mean, up_a_mean
   use mo_mpr_global_variables, only: soilDB, HorizonDepth_mHM, iFlag_soilDB, nSoilHorizons_mHM, nSoilTypes, tillageDepth
+  use mo_mpr_pet, only: pet_correctbyASP, priestley_taylor_alpha, bulksurface_resistance
   use mo_mpr_runoff, only: mpr_runoff
   use mo_mpr_smhorizons, only: mpr_SMhorizons
   use mo_mpr_soilmoist, only: mpr_sm
+  use mo_multi_param_reg, only: aerodynamical_resistance
   use mo_soil_database, only: read_soil_LUT, generate_soil_database
   use mo_string_utils, only: n2s => num2str
   use nml_config_mpr, only: nml_config_mpr_t
@@ -29,6 +31,10 @@ module mo_mpr_legacy_bridge
   public :: mpr_bridge_land_cover_fraction
   public :: mpr_bridge_snow_param
   public :: mpr_bridge_pet_lai
+  public :: mpr_bridge_pet_aspect
+  public :: mpr_bridge_pet_hargreaves
+  public :: mpr_bridge_pet_priestley_taylor
+  public :: mpr_bridge_pet_penman_monteith
   public :: mpr_bridge_setup_soil_database
   public :: mpr_bridge_soil_moisture
   public :: mpr_bridge_runoff_param
@@ -37,6 +43,66 @@ module mo_mpr_legacy_bridge
   public :: mpr_bridge_sealed_threshold
 
 contains
+
+  subroutine mpr_bridge_build_l0_to_l1_indices(level0, upscaler, id0, upper_bound1, lower_bound1, left_bound1, right_bound1)
+    type(grid_t), intent(in), target :: level0
+    class(scaler_t), intent(inout), target :: upscaler
+    integer(i4), allocatable, intent(out) :: id0(:)
+    integer(i4), allocatable, intent(out) :: upper_bound1(:)
+    integer(i4), allocatable, intent(out) :: lower_bound1(:)
+    integer(i4), allocatable, intent(out) :: left_bound1(:)
+    integer(i4), allocatable, intent(out) :: right_bound1(:)
+    integer(i4) :: i
+    integer(i4) :: x_lb
+    integer(i4) :: x_ub
+    integer(i4) :: y_lb
+    integer(i4) :: y_ub
+
+    allocate(id0(level0%ncells))
+    do i = 1_i4, level0%ncells
+      id0(i) = i
+    end do
+
+    allocate(upper_bound1(upscaler%target_grid%ncells))
+    allocate(lower_bound1(upscaler%target_grid%ncells))
+    allocate(left_bound1(upscaler%target_grid%ncells))
+    allocate(right_bound1(upscaler%target_grid%ncells))
+    do i = 1_i4, upscaler%target_grid%ncells
+      call upscaler%coarse_bounds(int(i, i8), x_lb, x_ub, y_lb, y_ub)
+      ! Legacy PET routines expect the first bound pair on the x index and the second on the y index.
+      upper_bound1(i) = x_lb
+      lower_bound1(i) = x_ub
+      left_bound1(i) = y_lb
+      right_bound1(i) = y_ub
+    end do
+  end subroutine mpr_bridge_build_l0_to_l1_indices
+
+  subroutine mpr_bridge_get_level0_latitude(level0, latitude_l0)
+    type(grid_t), intent(in), target :: level0
+    real(dp), allocatable, intent(out) :: latitude_l0(:)
+    real(dp), allocatable :: y_axis(:)
+    integer(i4) :: i
+    integer(i4) :: ix
+    integer(i4) :: iy
+
+    allocate(latitude_l0(level0%ncells))
+    if (level0%coordsys == cartesian) then
+      if (.not.level0%has_aux_coords()) then
+        log_fatal(*) "MPR bridge: PET aspect correction on a cartesian grid requires auxiliary latitude coordinates."
+        error stop 1
+      end if
+      do i = 1_i4, level0%ncells
+        ix = level0%cell_ij(i, 1)
+        iy = level0%cell_ij(i, 2)
+        latitude_l0(i) = level0%lat(ix, iy)
+      end do
+    else
+      y_axis = level0%y_axis()
+      do i = 1_i4, level0%ncells
+        latitude_l0(i) = y_axis(level0%cell_ij(i, 2))
+      end do
+    end if
+  end subroutine mpr_bridge_get_level0_latitude
 
   subroutine mpr_bridge_reset_soil_database()
     if (allocated(HorizonDepth_mHM)) deallocate(HorizonDepth_mHM)
@@ -228,6 +294,151 @@ contains
     call upscaler%execute(pet_fac_lai_l0, pet_fac_lai_l1, upscaling_operator=up_h_mean)
     deallocate(pet_fac_lai_l0)
   end subroutine mpr_bridge_pet_lai
+
+  !> \brief Bridge PET aspect correction through the legacy aspect routine.
+  subroutine mpr_bridge_pet_aspect(level0, aspect_l0, param, upscaler, pet_fac_aspect_l1)
+    type(grid_t), intent(in), target :: level0
+    real(dp), dimension(:), intent(in) :: aspect_l0
+    real(dp), dimension(:), intent(in) :: param
+    class(scaler_t), intent(inout), target :: upscaler
+    real(dp), dimension(:), intent(out) :: pet_fac_aspect_l1
+    integer(i4), allocatable :: id0(:)
+    real(dp), allocatable :: latitude_l0(:)
+    real(dp), allocatable :: pet_fac_aspect_l0(:)
+    integer(i4) :: i
+
+    if (size(param) < 3_i4) then
+      log_fatal(*) "MPR bridge: PET aspect parameter set must contain 3 values, got ", n2s(size(param, kind=i4)), "."
+      error stop 1
+    end if
+    if (size(aspect_l0) /= level0%ncells) then
+      log_fatal(*) "MPR bridge: PET aspect input size does not match packed level0 cells."
+      error stop 1
+    end if
+    if (size(pet_fac_aspect_l1) /= upscaler%target_grid%ncells) then
+      log_fatal(*) "MPR bridge: PET aspect output size does not match packed level1 cells."
+      error stop 1
+    end if
+
+    allocate(id0(level0%ncells))
+    id0 = [(i, i = 1_i4, level0%ncells)]
+    call mpr_bridge_get_level0_latitude(level0, latitude_l0)
+    allocate(pet_fac_aspect_l0(level0%ncells))
+
+    call pet_correctbyASP(id0, latitude_l0, aspect_l0, param(1:3), nodata_dp, pet_fac_aspect_l0)
+    call upscaler%execute(pet_fac_aspect_l0, pet_fac_aspect_l1, upscaling_operator=up_a_mean)
+
+    deallocate(id0)
+    deallocate(latitude_l0)
+    deallocate(pet_fac_aspect_l0)
+  end subroutine mpr_bridge_pet_aspect
+
+  !> \brief Bridge Hargreaves-Samani PET coefficients.
+  subroutine mpr_bridge_pet_hargreaves(level0, aspect_l0, param, upscaler, pet_fac_aspect_l1, pet_coeff_hs_l1)
+    type(grid_t), intent(in), target :: level0
+    real(dp), dimension(:), intent(in) :: aspect_l0
+    real(dp), dimension(:), intent(in) :: param
+    class(scaler_t), intent(inout), target :: upscaler
+    real(dp), dimension(:), intent(out) :: pet_fac_aspect_l1
+    real(dp), dimension(:), intent(out) :: pet_coeff_hs_l1
+
+    if (size(param) < 4_i4) then
+      log_fatal(*) "MPR bridge: PET Hargreaves parameter set must contain 4 values, got ", n2s(size(param, kind=i4)), "."
+      error stop 1
+    end if
+    if (size(pet_coeff_hs_l1) /= size(pet_fac_aspect_l1)) then
+      log_fatal(*) "MPR bridge: PET Hargreaves outputs must have matching packed L1 sizes."
+      error stop 1
+    end if
+
+    call mpr_bridge_pet_aspect(level0, aspect_l0, param(1:3), upscaler, pet_fac_aspect_l1)
+    pet_coeff_hs_l1 = param(4)
+  end subroutine mpr_bridge_pet_hargreaves
+
+  !> \brief Bridge Priestley-Taylor PET coefficients.
+  subroutine mpr_bridge_pet_priestley_taylor(level0, lai_l0, param, upscaler, pet_coeff_pt_l1)
+    type(grid_t), intent(in), target :: level0
+    real(dp), dimension(:, :), intent(in) :: lai_l0
+    real(dp), dimension(:), intent(in) :: param
+    class(scaler_t), intent(inout), target :: upscaler
+    real(dp), dimension(:, :), intent(out) :: pet_coeff_pt_l1
+    integer(i4), allocatable :: id0(:)
+    integer(i4), allocatable :: upper_bound1(:)
+    integer(i4), allocatable :: lower_bound1(:)
+    integer(i4), allocatable :: left_bound1(:)
+    integer(i4), allocatable :: right_bound1(:)
+
+    if (size(param) < 2_i4) then
+      log_fatal(*) "MPR bridge: PET Priestley-Taylor parameter set must contain 2 values, got ", n2s(size(param, kind=i4)), "."
+      error stop 1
+    end if
+    if (size(lai_l0, 1) /= level0%ncells) then
+      log_fatal(*) "MPR bridge: PET Priestley-Taylor LAI input size does not match packed level0 cells."
+      error stop 1
+    end if
+    if (size(pet_coeff_pt_l1, 1) /= upscaler%target_grid%ncells) then
+      log_fatal(*) "MPR bridge: PET Priestley-Taylor output size does not match packed level1 cells."
+      error stop 1
+    end if
+    if (size(pet_coeff_pt_l1, 2) /= size(lai_l0, 2)) then
+      log_fatal(*) "MPR bridge: PET Priestley-Taylor output LAI dimension does not match LAI cache."
+      error stop 1
+    end if
+
+    call mpr_bridge_build_l0_to_l1_indices(level0, upscaler, id0, upper_bound1, lower_bound1, left_bound1, right_bound1)
+    call priestley_taylor_alpha(lai_l0, param(1:2), level0%mask, nodata_dp, id0, upscaler%n_subcells, &
+      upper_bound1, lower_bound1, left_bound1, right_bound1, pet_coeff_pt_l1)
+
+    deallocate(id0)
+    deallocate(upper_bound1)
+    deallocate(lower_bound1)
+    deallocate(left_bound1)
+    deallocate(right_bound1)
+  end subroutine mpr_bridge_pet_priestley_taylor
+
+  !> \brief Bridge Penman-Monteith PET resistances.
+  subroutine mpr_bridge_pet_penman_monteith(level0, land_cover_l0, lai_l0, param, upscaler, resist_aero_l1, resist_surf_l1)
+    type(grid_t), intent(in), target :: level0
+    integer(i4), dimension(:), intent(in) :: land_cover_l0
+    real(dp), dimension(:, :), intent(in) :: lai_l0
+    real(dp), dimension(:), intent(in) :: param
+    class(scaler_t), intent(inout), target :: upscaler
+    real(dp), dimension(:, :), intent(out) :: resist_aero_l1
+    real(dp), dimension(:, :), intent(out) :: resist_surf_l1
+    integer(i4), allocatable :: id0(:)
+    integer(i4), allocatable :: upper_bound1(:)
+    integer(i4), allocatable :: lower_bound1(:)
+    integer(i4), allocatable :: left_bound1(:)
+    integer(i4), allocatable :: right_bound1(:)
+    if (size(param) < 7_i4) then
+      log_fatal(*) "MPR bridge: PET Penman-Monteith parameter set must contain 7 values, got ", n2s(size(param, kind=i4)), "."
+      error stop 1
+    end if
+    if (size(land_cover_l0) /= level0%ncells .or. size(lai_l0, 1) /= level0%ncells) then
+      log_fatal(*) "MPR bridge: PET Penman-Monteith L0 inputs must match packed level0 cells."
+      error stop 1
+    end if
+    if (size(resist_aero_l1, 1) /= upscaler%target_grid%ncells .or. size(resist_surf_l1, 1) /= upscaler%target_grid%ncells) then
+      log_fatal(*) "MPR bridge: PET Penman-Monteith outputs must match packed level1 cells."
+      error stop 1
+    end if
+    if (size(resist_aero_l1, 2) /= size(lai_l0, 2) .or. size(resist_surf_l1, 2) /= size(lai_l0, 2)) then
+      log_fatal(*) "MPR bridge: PET Penman-Monteith output LAI dimensions must match the LAI cache."
+      error stop 1
+    end if
+
+    call mpr_bridge_build_l0_to_l1_indices(level0, upscaler, id0, upper_bound1, lower_bound1, left_bound1, right_bound1)
+    call aerodynamical_resistance(lai_l0, land_cover_l0, param(1:6), level0%mask, id0, upscaler%n_subcells, &
+      upper_bound1, lower_bound1, left_bound1, right_bound1, resist_aero_l1)
+    call bulksurface_resistance(lai_l0, param(7), level0%mask, nodata_dp, id0, upscaler%n_subcells, &
+      upper_bound1, lower_bound1, left_bound1, right_bound1, resist_surf_l1)
+
+    deallocate(id0)
+    deallocate(upper_bound1)
+    deallocate(lower_bound1)
+    deallocate(left_bound1)
+    deallocate(right_bound1)
+  end subroutine mpr_bridge_pet_penman_monteith
 
   !> \brief Bridge soil-moisture parameter generation through the legacy soil routines.
   subroutine mpr_bridge_soil_moisture(process_matrix, param, land_cover_l0, soil_id_l0, level0, upscaler, &
