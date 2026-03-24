@@ -19,6 +19,7 @@ module mo_mpr_container
   use mo_grid, only: grid_t, cartesian, spherical
   use mo_grid_io, only: input_dataset, start_timestamp, var
   use mo_grid_scaler, only: scaler_t, up_a_mean
+  use mo_mpr_legacy_bridge, only: mpr_bridge_land_cover_fraction, mpr_bridge_snow_param, mpr_bridge_pet_lai
   use mo_netcdf, only: NcDataset, NcDimension, NcVariable
   use mo_orderpack, only: sort_index
   use mo_string_utils, only: n2s => num2str
@@ -32,10 +33,24 @@ module mo_mpr_container
     type(input_dataset) :: ds !< land-cover dataset input handler
     logical :: temporal = .false. !< whether land cover has temporal periods in file
     integer(i4), allocatable :: l0_cache(:, :) !< cached land cover on level0 (nCells0, nLC)
+    real(dp), allocatable :: forest_fraction_l1(:, :) !< cached forest fraction at level1 (nCells1, nLC)
+    real(dp), allocatable :: sealed_fraction_l1(:, :) !< cached sealed fraction at level1 (nCells1, nLC)
+    real(dp), allocatable :: pervious_fraction_l1(:, :) !< cached pervious fraction at level1 (nCells1, nLC)
     type(datetime), allocatable :: period_end(:) !< cached land-cover period end times
     integer(i4) :: n_periods = 1_i4 !< number of cached land-cover periods
     integer(i4) :: active_idx = 0_i4 !< active cached land-cover index
   end type mpr_land_cover_state_t
+
+  type :: mpr_snow_state_t
+    real(dp), allocatable :: thresh_temp_cache(:, :) !< cached temperature threshold (nCells1, nLC)
+    real(dp), allocatable :: degday_dry_cache(:, :) !< cached dry degree-day factor (nCells1, nLC)
+    real(dp), allocatable :: degday_inc_cache(:, :) !< cached degree-day precipitation increment (nCells1, nLC)
+    real(dp), allocatable :: degday_max_cache(:, :) !< cached maximum degree-day factor (nCells1, nLC)
+  end type mpr_snow_state_t
+
+  type :: mpr_pet_state_t
+    real(dp), allocatable :: pet_fac_lai_cache(:, :, :) !< cached PET-LAI correction (nCells1, nLAI, nLC)
+  end type mpr_pet_state_t
 
   !> \class   mpr_t
   !> \brief   Class for a single MPR process container.
@@ -56,6 +71,8 @@ module mo_mpr_container
     real(dp), allocatable :: slope_emp(:) !< empirical slope distribution on level0
     real(dp), allocatable :: lai_l0_cache(:, :) !< cached LAI on level0 (nCells0, nLAI)
     real(dp), allocatable :: max_interception_cache(:, :, :) !< cached max interception (nCells1, nLAI, nLC)
+    type(mpr_snow_state_t) :: snow !< cached snow parameter fields
+    type(mpr_pet_state_t) :: pet !< cached PET parameter fields
     integer(i4) :: n_lai_periods = 1_i4 !< number of cached LAI periods
     integer(i4) :: active_lai_idx = 0_i4 !< active cached LAI index
   contains
@@ -72,8 +89,11 @@ module mo_mpr_container
     procedure, private :: init_slope_emp => mpr_init_slope_emp
     procedure, private :: init_temporal_cache => mpr_init_temporal_cache
     procedure, private :: init_land_cover_cache => mpr_init_land_cover_cache
+    procedure, private :: init_land_cover_fraction_cache => mpr_init_land_cover_fraction_cache
     procedure, private :: build_lai_l0_cache => mpr_build_lai_l0_cache
     procedure, private :: init_max_interception_cache => mpr_init_max_interception_cache
+    procedure, private :: init_snow_cache => mpr_init_snow_cache
+    procedure, private :: init_pet_lai_cache => mpr_init_pet_lai_cache
     procedure, private :: update_exchange_slices => mpr_update_exchange_slices
     procedure, private :: lai_index_for_time => mpr_lai_index_for_time
     procedure, private :: land_cover_index_for_time => mpr_land_cover_index_for_time
@@ -203,6 +223,7 @@ contains
     integer(i4) :: id(1)
     integer(i4) :: soil_layers
     logical :: require_gridded_lai
+    integer(i4) :: pet_process
     integer :: status
     character(1024) :: errmsg
     log_info(*) "Connect MPR"
@@ -235,8 +256,10 @@ contains
     self%exchange%aspect%required = .true.
     self%exchange%soil_id%required = .true.
     self%exchange%geo_unit%required = .true.
+    pet_process = self%exchange%parameters%process_matrix(5, 1)
     require_gridded_lai = self%config%lai_time_step(id(1)) /= 0_i4 .or. &
-      self%exchange%parameters%process_matrix(1, 1) /= 0_i4
+      self%exchange%parameters%process_matrix(1, 1) /= 0_i4 .or. &
+      pet_process == -1_i4 .or. pet_process == 2_i4 .or. pet_process == 3_i4
     self%exchange%gridded_lai%required = require_gridded_lai
 
     if (.not.self%exchange%slope%provided) then
@@ -531,6 +554,7 @@ contains
   !> \brief Build MPR temporal caches in connect for later pointer-only switching.
   subroutine mpr_init_temporal_cache(self)
     class(mpr_t), intent(inout), target :: self
+    logical :: need_lai_cache
 
     self%n_lai_periods = 1_i4
     self%land_cover%n_periods = 1_i4
@@ -538,17 +562,21 @@ contains
     self%land_cover%active_idx = 0_i4
 
     call self%init_land_cover_cache()
+    call self%init_land_cover_fraction_cache()
 
-    ! Start with interception cache as first time-dependent MPR output.
-    if (self%exchange%parameters%process_matrix(1, 1) == 0_i4) return
-
-    if (.not.associated(self%exchange%gridded_lai%data)) then
-      log_fatal(*) "MPR: gridded_lai data must be connected before temporal cache initialization."
-      error stop 1
+    need_lai_cache = self%exchange%parameters%process_matrix(1, 1) /= 0_i4 .or. &
+      self%exchange%parameters%process_matrix(5, 1) == -1_i4
+    if (need_lai_cache) then
+      if (.not.associated(self%exchange%gridded_lai%data)) then
+        log_fatal(*) "MPR: gridded_lai data must be connected before temporal cache initialization."
+        error stop 1
+      end if
+      call self%build_lai_l0_cache()
     end if
 
-    call self%build_lai_l0_cache()
-    call self%init_max_interception_cache()
+    if (self%exchange%parameters%process_matrix(1, 1) /= 0_i4) call self%init_max_interception_cache()
+    if (self%exchange%parameters%process_matrix(2, 1) /= 0_i4) call self%init_snow_cache()
+    if (self%exchange%parameters%process_matrix(5, 1) == -1_i4) call self%init_pet_lai_cache()
     log_info(*) "MPR: temporal cache initialized (nLAI=", n2s(self%n_lai_periods), &
       ", nLC=", n2s(self%land_cover%n_periods), ")."
   end subroutine mpr_init_temporal_cache
@@ -624,6 +652,40 @@ contains
     call self%land_cover%ds%close()
     log_info(*) "MPR: temporal land-cover dataset initialized (nLC=", n2s(self%land_cover%n_periods), ")."
   end subroutine mpr_init_land_cover_cache
+
+  !> \brief Upscale cached land-cover scenes to level1 area fractions for downstream MPR groups.
+  subroutine mpr_init_land_cover_fraction_cache(self)
+    class(mpr_t), intent(inout), target :: self
+    integer(i4) :: land_cover_idx
+    integer(i4) :: id(1)
+    real(dp) :: frac_sealed_cityarea
+
+    if (.not.allocated(self%land_cover%l0_cache)) then
+      log_fatal(*) "MPR: land-cover level0 cache not available before land-cover fraction initialization."
+      error stop 1
+    end if
+
+    id(1) = self%exchange%domain
+    frac_sealed_cityarea = self%config%fracsealed_cityarea(id(1))
+    if (.not.ieee_is_finite(frac_sealed_cityarea)) frac_sealed_cityarea = 0.0_dp
+
+    if (allocated(self%land_cover%forest_fraction_l1)) deallocate(self%land_cover%forest_fraction_l1)
+    if (allocated(self%land_cover%sealed_fraction_l1)) deallocate(self%land_cover%sealed_fraction_l1)
+    if (allocated(self%land_cover%pervious_fraction_l1)) deallocate(self%land_cover%pervious_fraction_l1)
+    allocate(self%land_cover%forest_fraction_l1(self%exchange%level1%ncells, self%land_cover%n_periods))
+    allocate(self%land_cover%sealed_fraction_l1(self%exchange%level1%ncells, self%land_cover%n_periods))
+    allocate(self%land_cover%pervious_fraction_l1(self%exchange%level1%ncells, self%land_cover%n_periods))
+
+    do land_cover_idx = 1_i4, self%land_cover%n_periods
+      call mpr_bridge_land_cover_fraction( &
+        self%upscaler, self%land_cover%l0_cache(:, land_cover_idx), frac_sealed_cityarea, &
+        self%land_cover%forest_fraction_l1(:, land_cover_idx), &
+        self%land_cover%sealed_fraction_l1(:, land_cover_idx), &
+        self%land_cover%pervious_fraction_l1(:, land_cover_idx))
+    end do
+
+    self%exchange%f_sealed%provided = .true.
+  end subroutine mpr_init_land_cover_fraction_cache
 
   !> \brief Build cached LAI fields on level0 for all currently supported LAI periods.
   subroutine mpr_build_lai_l0_cache(self)
@@ -731,6 +793,83 @@ contains
     self%exchange%max_interception%provided = .true.
   end subroutine mpr_init_max_interception_cache
 
+  !> \brief Cache snow parameter fields on level1 for all land-cover slices.
+  subroutine mpr_init_snow_cache(self)
+    class(mpr_t), intent(inout), target :: self
+    integer(i4) :: land_cover_idx
+    real(dp), allocatable :: snow_param(:)
+
+    snow_param = self%exchange%parameters%get_process(2_i4)
+    if (size(snow_param) < 8_i4) then
+      log_fatal(*) "MPR: snow parameter set must contain 8 values while process 2 is active."
+      error stop 1
+    end if
+    if (.not.allocated(self%land_cover%forest_fraction_l1)) then
+      log_fatal(*) "MPR: land-cover fractions not available before snow cache initialization."
+      error stop 1
+    end if
+
+    if (allocated(self%snow%thresh_temp_cache)) deallocate(self%snow%thresh_temp_cache)
+    if (allocated(self%snow%degday_dry_cache)) deallocate(self%snow%degday_dry_cache)
+    if (allocated(self%snow%degday_inc_cache)) deallocate(self%snow%degday_inc_cache)
+    if (allocated(self%snow%degday_max_cache)) deallocate(self%snow%degday_max_cache)
+    allocate(self%snow%thresh_temp_cache(self%exchange%level1%ncells, self%land_cover%n_periods))
+    allocate(self%snow%degday_dry_cache(self%exchange%level1%ncells, self%land_cover%n_periods))
+    allocate(self%snow%degday_inc_cache(self%exchange%level1%ncells, self%land_cover%n_periods))
+    allocate(self%snow%degday_max_cache(self%exchange%level1%ncells, self%land_cover%n_periods))
+
+    do land_cover_idx = 1_i4, self%land_cover%n_periods
+      call mpr_bridge_snow_param( &
+        snow_param, &
+        self%land_cover%forest_fraction_l1(:, land_cover_idx), &
+        self%land_cover%sealed_fraction_l1(:, land_cover_idx), &
+        self%land_cover%pervious_fraction_l1(:, land_cover_idx), &
+        self%snow%thresh_temp_cache(:, land_cover_idx), &
+        self%snow%degday_dry_cache(:, land_cover_idx), &
+        self%snow%degday_inc_cache(:, land_cover_idx), &
+        self%snow%degday_max_cache(:, land_cover_idx))
+    end do
+
+    self%exchange%thresh_temp%provided = .true.
+    self%exchange%degday_dry%provided = .true.
+    self%exchange%degday_inc%provided = .true.
+    self%exchange%degday_max%provided = .true.
+  end subroutine mpr_init_snow_cache
+
+  !> \brief Cache PET LAI correction on level1 for all LAI/land-cover slices.
+  subroutine mpr_init_pet_lai_cache(self)
+    class(mpr_t), intent(inout), target :: self
+    integer(i4) :: land_cover_idx
+    integer(i4) :: lai_idx
+    real(dp), allocatable :: pet_param(:)
+
+    pet_param = self%exchange%parameters%get_process(5_i4)
+    if (size(pet_param) < 5_i4) then
+      log_fatal(*) "MPR: PET-LAI parameter set must contain 5 values while PET process -1 is active."
+      error stop 1
+    end if
+    if (.not.allocated(self%lai_l0_cache)) then
+      log_fatal(*) "MPR: LAI level0 cache not available before PET-LAI cache initialization."
+      error stop 1
+    end if
+    if (.not.allocated(self%land_cover%l0_cache)) then
+      log_fatal(*) "MPR: land-cover level0 cache not available before PET-LAI cache initialization."
+      error stop 1
+    end if
+
+    if (allocated(self%pet%pet_fac_lai_cache)) deallocate(self%pet%pet_fac_lai_cache)
+    allocate(self%pet%pet_fac_lai_cache(self%exchange%level1%ncells, self%n_lai_periods, self%land_cover%n_periods))
+    do land_cover_idx = 1_i4, self%land_cover%n_periods
+      do lai_idx = 1_i4, self%n_lai_periods
+        call mpr_bridge_pet_lai( &
+          pet_param, self%land_cover%l0_cache(:, land_cover_idx), self%lai_l0_cache(:, lai_idx), &
+          self%upscaler, self%pet%pet_fac_lai_cache(:, lai_idx, land_cover_idx))
+      end do
+    end do
+
+    self%exchange%pet_fac_lai%provided = .true.
+  end subroutine mpr_init_pet_lai_cache
+
   !> \brief Switch exchange pointers to active cached MPR slices for current model time.
   subroutine mpr_update_exchange_slices(self, force)
     class(mpr_t), intent(inout), target :: self
@@ -741,7 +880,10 @@ contains
 
     force_ = optval(force, .false.)
 
-    if (.not.allocated(self%max_interception_cache)) return
+    if (.not.allocated(self%land_cover%sealed_fraction_l1) .and. &
+      .not.allocated(self%max_interception_cache) .and. &
+      .not.allocated(self%snow%thresh_temp_cache) .and. &
+      .not.allocated(self%pet%pet_fac_lai_cache)) return
 
     lai_idx = self%lai_index_for_time()
     land_cover_idx = self%land_cover_index_for_time()
@@ -755,7 +897,21 @@ contains
     end if
     if (.not.force_ .and. lai_idx == self%active_lai_idx .and. land_cover_idx == self%land_cover%active_idx) return
 
-    self%exchange%max_interception%data => self%max_interception_cache(:, lai_idx, land_cover_idx)
+    if (allocated(self%land_cover%sealed_fraction_l1)) then
+      self%exchange%f_sealed%data => self%land_cover%sealed_fraction_l1(:, land_cover_idx)
+    end if
+    if (allocated(self%max_interception_cache)) then
+      self%exchange%max_interception%data => self%max_interception_cache(:, lai_idx, land_cover_idx)
+    end if
+    if (allocated(self%snow%thresh_temp_cache)) then
+      self%exchange%thresh_temp%data => self%snow%thresh_temp_cache(:, land_cover_idx)
+      self%exchange%degday_dry%data => self%snow%degday_dry_cache(:, land_cover_idx)
+      self%exchange%degday_inc%data => self%snow%degday_inc_cache(:, land_cover_idx)
+      self%exchange%degday_max%data => self%snow%degday_max_cache(:, land_cover_idx)
+    end if
+    if (allocated(self%pet%pet_fac_lai_cache)) then
+      self%exchange%pet_fac_lai%data => self%pet%pet_fac_lai_cache(:, lai_idx, land_cover_idx)
+    end if
     self%active_lai_idx = lai_idx
     self%land_cover%active_idx = land_cover_idx
     log_trace(*) "MPR: active cache slice lai=", n2s(lai_idx), ", land_cover=", n2s(land_cover_idx)
@@ -856,15 +1012,35 @@ contains
     class(mpr_t), intent(inout), target :: self
     nullify(self%exchange%slope_emp%data)
     self%exchange%slope_emp%provided = .false.
+    nullify(self%exchange%f_sealed%data)
+    self%exchange%f_sealed%provided = .false.
     nullify(self%exchange%max_interception%data)
     self%exchange%max_interception%provided = .false.
+    nullify(self%exchange%thresh_temp%data)
+    self%exchange%thresh_temp%provided = .false.
+    nullify(self%exchange%degday_dry%data)
+    self%exchange%degday_dry%provided = .false.
+    nullify(self%exchange%degday_inc%data)
+    self%exchange%degday_inc%provided = .false.
+    nullify(self%exchange%degday_max%data)
+    self%exchange%degday_max%provided = .false.
+    nullify(self%exchange%pet_fac_lai%data)
+    self%exchange%pet_fac_lai%provided = .false.
     if (self%write_restart) call self%create_restart()
     if (allocated(self%land_cover%ds%vars)) call self%land_cover%ds%close()
     if (allocated(self%slope_emp)) deallocate(self%slope_emp)
     if (allocated(self%land_cover%l0_cache)) deallocate(self%land_cover%l0_cache)
+    if (allocated(self%land_cover%forest_fraction_l1)) deallocate(self%land_cover%forest_fraction_l1)
+    if (allocated(self%land_cover%sealed_fraction_l1)) deallocate(self%land_cover%sealed_fraction_l1)
+    if (allocated(self%land_cover%pervious_fraction_l1)) deallocate(self%land_cover%pervious_fraction_l1)
     if (allocated(self%land_cover%period_end)) deallocate(self%land_cover%period_end)
     if (allocated(self%lai_l0_cache)) deallocate(self%lai_l0_cache)
     if (allocated(self%max_interception_cache)) deallocate(self%max_interception_cache)
+    if (allocated(self%snow%thresh_temp_cache)) deallocate(self%snow%thresh_temp_cache)
+    if (allocated(self%snow%degday_dry_cache)) deallocate(self%snow%degday_dry_cache)
+    if (allocated(self%snow%degday_inc_cache)) deallocate(self%snow%degday_inc_cache)
+    if (allocated(self%snow%degday_max_cache)) deallocate(self%snow%degday_max_cache)
+    if (allocated(self%pet%pet_fac_lai_cache)) deallocate(self%pet%pet_fac_lai_cache)
     self%land_cover%temporal = .false.
     self%land_cover%n_periods = 1_i4
     self%land_cover%active_idx = 0_i4
