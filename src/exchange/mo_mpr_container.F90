@@ -15,6 +15,7 @@ module mo_mpr_container
   use mo_constants, only: YearMonths, nodata_dp
   use mo_datetime, only: datetime
   use mo_kind, only: i4, dp
+  use mo_common_constants, only: soilHorizonsVarName, landCoverPeriodsVarName, LAIVarName
   use mo_exchange_type, only: exchange_t
   use mo_grid, only: grid_t, cartesian, spherical
   use mo_grid_io, only: input_dataset, start_timestamp, var
@@ -421,15 +422,15 @@ contains
     call nc%close()
   end subroutine mpr_create_restart
 
-  !> \brief Write currently cached max interception fields as unpacked L1 data.
+  !> \brief Write currently cached MPR effective parameters as unpacked L1 restart data.
   subroutine mpr_write_restart_data(self, nc)
     class(mpr_t), intent(inout), target :: self
     type(NcDataset), intent(inout) :: nc
-    type(NcDimension) :: dims(4)
-    type(NcVariable) :: nc_var
-    real(dp), allocatable :: data_4d(:, :, :, :)
-    integer(i4) :: lai_idx
-    integer(i4) :: land_cover_idx
+    type(NcDimension) :: dims_xy(2)
+    type(NcDimension) :: lai_dim
+    type(NcDimension) :: land_cover_dim
+    type(NcDimension) :: soil_dim
+    integer(i4) :: process_case
 
     if (.not.associated(self%exchange%level1)) then
       log_fatal(*) "MPR: level1 grid not connected while writing restart."
@@ -437,36 +438,143 @@ contains
     end if
 
     if ( self%exchange%level1%coordsys == cartesian ) then
-      dims(1) = nc%getDimension("x")
-      dims(2) = nc%getDimension("y")
+      dims_xy(1) = nc%getDimension("x")
+      dims_xy(2) = nc%getDimension("y")
     else
-      dims(1) = nc%getDimension("lon")
-      dims(2) = nc%getDimension("lat")
+      dims_xy(1) = nc%getDimension("lon")
+      dims_xy(2) = nc%getDimension("lat")
     end if
-    dims(3) = nc%setDimension("L1_LAITimesteps", self%n_lai_periods)
-    dims(4) = nc%setDimension("L1_LandCoverPeriods", self%land_cover%n_periods)
+    lai_dim = nc%setDimension(trim(LAIVarName), self%n_lai_periods)
+    land_cover_dim = nc%setDimension(trim(landCoverPeriodsVarName), self%land_cover%n_periods)
+    soil_dim = nc%setDimension(trim(soilHorizonsVarName), self%config%n_horizons(self%exchange%domain))
 
-    ! maximum interception
     if (allocated(self%max_interception_cache)) then
-      allocate(data_4d(self%exchange%level1%nx, self%exchange%level1%ny, self%n_lai_periods, self%land_cover%n_periods))
-      do land_cover_idx = 1_i4, self%land_cover%n_periods
-        do lai_idx = 1_i4, self%n_lai_periods
-          call self%exchange%level1%unpack_into( &
-            self%max_interception_cache(:, lai_idx, land_cover_idx), &
-            data_4d(:, :, lai_idx, land_cover_idx))
-        end do
-      end do
-      nc_var = nc%setVariable("L1_maxInter", "f64", dims)
-      call nc_var%setAttribute("units", "mm")
-      call nc_var%setAttribute("long_name", "Maximum interception at level 1")
-      if (self%exchange%level1%has_aux_coords()) call nc_var%setAttribute("coordinates", "lon lat")
-      call nc_var%setFillValue(nodata_dp)
-      call nc_var%setAttribute("missing_value", nodata_dp)
-      call nc_var%setData(data_4d)
-      deallocate(data_4d)
+      call mpr_write_restart_field_3d( &
+        self, nc, dims_xy, lai_dim, "L1_maxInter", "Maximum interception at level 1", &
+        self%max_interception_cache(:, :, 1))
+    end if
+
+    if (allocated(self%soil%f_roots_cache)) then
+      call mpr_write_restart_field_4d( &
+        self, nc, dims_xy, soil_dim, land_cover_dim, "L1_fRoots", &
+        "Fraction of roots in soil horizons at level 1", self%soil%f_roots_cache)
+    end if
+    if (allocated(self%soil%sm_saturation_cache)) then
+      call mpr_write_restart_field_4d( &
+        self, nc, dims_xy, soil_dim, land_cover_dim, "L1_soilMoistSat", &
+        "Saturation soil moisture for each horizon [mm] at level 1", self%soil%sm_saturation_cache)
+    end if
+    if (allocated(self%soil%sm_exponent_cache)) then
+      call mpr_write_restart_field_4d( &
+        self, nc, dims_xy, soil_dim, land_cover_dim, "L1_soilMoistExp", &
+        "Exponential parameter to how non-linear is the soil water retention at level 1", &
+        self%soil%sm_exponent_cache)
+    end if
+    if (allocated(self%soil%sm_field_capacity_cache)) then
+      call mpr_write_restart_field_4d( &
+        self, nc, dims_xy, soil_dim, land_cover_dim, "L1_soilMoistFC", &
+        "SM below which actual ET is reduced linearly till PWP at level 1 for processCase(3)=1", &
+        self%soil%sm_field_capacity_cache)
+    end if
+    if (allocated(self%soil%wilting_point_cache)) then
+      call mpr_write_restart_field_4d( &
+        self, nc, dims_xy, soil_dim, land_cover_dim, "L1_wiltingPoint", &
+        "Permanent wilting point at level 1", self%soil%wilting_point_cache)
+    end if
+
+    process_case = self%exchange%parameters%process_matrix(3, 1)
+    if (allocated(self%soil%thresh_jarvis_cache) .and. any(process_case == [2_i4, 3_i4])) then
+      call mpr_write_restart_field_2d( &
+        self, nc, dims_xy, "L1_jarvis_thresh_c1", &
+        "jarvis critical value for normalized soil water content", self%soil%thresh_jarvis_cache)
     end if
 
   end subroutine mpr_write_restart_data
+
+  !> \brief Write a packed L1 scalar field as unpacked 2D restart data.
+  subroutine mpr_write_restart_field_2d(self, nc, dims_xy, var_name, long_name, data_packed)
+    class(mpr_t), intent(inout), target :: self
+    type(NcDataset), intent(inout) :: nc
+    type(NcDimension), intent(in) :: dims_xy(2)
+    character(*), intent(in) :: var_name
+    character(*), intent(in) :: long_name
+    real(dp), intent(in) :: data_packed(:)
+    type(NcVariable) :: nc_var
+    real(dp), allocatable :: data_2d(:, :)
+
+    allocate(data_2d(self%exchange%level1%nx, self%exchange%level1%ny))
+    call self%exchange%level1%unpack_into(data_packed, data_2d)
+    nc_var = nc%setVariable(trim(var_name), "f64", dims_xy)
+    call nc_var%setFillValue(nodata_dp)
+    call nc_var%setAttribute("missing_value", nodata_dp)
+    call nc_var%setAttribute("long_name", trim(long_name))
+    if (self%exchange%level1%has_aux_coords()) call nc_var%setAttribute("coordinates", "lon lat")
+    call nc_var%setData(data_2d)
+    deallocate(data_2d)
+  end subroutine mpr_write_restart_field_2d
+
+  !> \brief Write a packed L1 field with one auxiliary dimension as unpacked 3D restart data.
+  subroutine mpr_write_restart_field_3d(self, nc, dims_xy, dim3, var_name, long_name, data_packed)
+    class(mpr_t), intent(inout), target :: self
+    type(NcDataset), intent(inout) :: nc
+    type(NcDimension), intent(in) :: dims_xy(2)
+    type(NcDimension), intent(in) :: dim3
+    character(*), intent(in) :: var_name
+    character(*), intent(in) :: long_name
+    real(dp), intent(in) :: data_packed(:, :)
+    type(NcDimension) :: dims(3)
+    type(NcVariable) :: nc_var
+    real(dp), allocatable :: data_3d(:, :, :)
+    integer(i4) :: idx
+
+    dims(1:2) = dims_xy
+    dims(3) = dim3
+    allocate(data_3d(self%exchange%level1%nx, self%exchange%level1%ny, size(data_packed, 2)))
+    do idx = 1_i4, size(data_packed, 2)
+      call self%exchange%level1%unpack_into(data_packed(:, idx), data_3d(:, :, idx))
+    end do
+    nc_var = nc%setVariable(trim(var_name), "f64", dims)
+    call nc_var%setFillValue(nodata_dp)
+    call nc_var%setAttribute("missing_value", nodata_dp)
+    call nc_var%setAttribute("long_name", trim(long_name))
+    if (self%exchange%level1%has_aux_coords()) call nc_var%setAttribute("coordinates", "lon lat")
+    call nc_var%setData(data_3d)
+    deallocate(data_3d)
+  end subroutine mpr_write_restart_field_3d
+
+  !> \brief Write a packed L1 field with two auxiliary dimensions as unpacked 4D restart data.
+  subroutine mpr_write_restart_field_4d(self, nc, dims_xy, dim3, dim4, var_name, long_name, data_packed)
+    class(mpr_t), intent(inout), target :: self
+    type(NcDataset), intent(inout) :: nc
+    type(NcDimension), intent(in) :: dims_xy(2)
+    type(NcDimension), intent(in) :: dim3
+    type(NcDimension), intent(in) :: dim4
+    character(*), intent(in) :: var_name
+    character(*), intent(in) :: long_name
+    real(dp), intent(in) :: data_packed(:, :, :)
+    type(NcDimension) :: dims(4)
+    type(NcVariable) :: nc_var
+    real(dp), allocatable :: data_4d(:, :, :, :)
+    integer(i4) :: idx3
+    integer(i4) :: idx4
+
+    dims(1:2) = dims_xy
+    dims(3) = dim3
+    dims(4) = dim4
+    allocate(data_4d(self%exchange%level1%nx, self%exchange%level1%ny, size(data_packed, 2), size(data_packed, 3)))
+    do idx4 = 1_i4, size(data_packed, 3)
+      do idx3 = 1_i4, size(data_packed, 2)
+        call self%exchange%level1%unpack_into(data_packed(:, idx3, idx4), data_4d(:, :, idx3, idx4))
+      end do
+    end do
+    nc_var = nc%setVariable(trim(var_name), "f64", dims)
+    call nc_var%setFillValue(nodata_dp)
+    call nc_var%setAttribute("missing_value", nodata_dp)
+    call nc_var%setAttribute("long_name", trim(long_name))
+    if (self%exchange%level1%has_aux_coords()) call nc_var%setAttribute("coordinates", "lon lat")
+    call nc_var%setData(data_4d)
+    deallocate(data_4d)
+  end subroutine mpr_write_restart_field_4d
 
   !> \brief Placeholder read restart routine for MPR.
   subroutine mpr_read_restart_data(self)
