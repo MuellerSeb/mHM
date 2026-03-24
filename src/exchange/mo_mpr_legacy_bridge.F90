@@ -14,8 +14,9 @@ module mo_mpr_legacy_bridge
   use mo_constants, only: nodata_dp, nodata_i4
   use mo_grid, only: grid_t
   use mo_kind, only: i4, i8, dp
-  use mo_grid_scaler, only: scaler_t, up_fraction, up_h_mean
+  use mo_grid_scaler, only: scaler_t, up_fraction, up_h_mean, up_a_mean
   use mo_mpr_global_variables, only: soilDB, HorizonDepth_mHM, iFlag_soilDB, nSoilHorizons_mHM, nSoilTypes, tillageDepth
+  use mo_mpr_runoff, only: mpr_runoff
   use mo_mpr_smhorizons, only: mpr_SMhorizons
   use mo_mpr_soilmoist, only: mpr_sm
   use mo_soil_database, only: read_soil_LUT, generate_soil_database
@@ -30,6 +31,10 @@ module mo_mpr_legacy_bridge
   public :: mpr_bridge_pet_lai
   public :: mpr_bridge_setup_soil_database
   public :: mpr_bridge_soil_moisture
+  public :: mpr_bridge_runoff_param
+  public :: mpr_bridge_karstic_param
+  public :: mpr_bridge_baseflow_param
+  public :: mpr_bridge_sealed_threshold
 
 contains
 
@@ -226,19 +231,23 @@ contains
 
   !> \brief Bridge soil-moisture parameter generation through the legacy soil routines.
   subroutine mpr_bridge_soil_moisture(process_matrix, param, land_cover_l0, soil_id_l0, level0, upscaler, &
-      thresh_jarvis_l1, sm_exponent_l1, sm_saturation_l1, sm_field_capacity_l1, wilting_point_l1, f_roots_l1)
+      thresh_jarvis_l1, sm_exponent_l1, sm_saturation_l1, sm_field_capacity_l1, wilting_point_l1, f_roots_l1, &
+      sm_deficit_fc_l0, ks_var_h_l0, ks_var_v_l0)
     integer(i4), dimension(:, :), intent(in) :: process_matrix
     real(dp), dimension(:), intent(in) :: param
     integer(i4), dimension(:), intent(in) :: land_cover_l0
     integer(i4), dimension(:, :), intent(in) :: soil_id_l0
     type(grid_t), intent(in), target :: level0
-    class(scaler_t), intent(in), target :: upscaler
+    class(scaler_t), intent(inout), target :: upscaler
     real(dp), dimension(:), intent(out) :: thresh_jarvis_l1
     real(dp), dimension(:, :), intent(out) :: sm_exponent_l1
     real(dp), dimension(:, :), intent(out) :: sm_saturation_l1
     real(dp), dimension(:, :), intent(out) :: sm_field_capacity_l1
     real(dp), dimension(:, :), intent(out) :: wilting_point_l1
     real(dp), dimension(:, :), intent(out) :: f_roots_l1
+    real(dp), dimension(:), intent(out), optional :: sm_deficit_fc_l0
+    real(dp), dimension(:), intent(out), optional :: ks_var_h_l0
+    real(dp), dimension(:), intent(out), optional :: ks_var_v_l0
     integer(i4), allocatable :: id0(:)
     integer(i4) :: i
     integer(i4) :: process_case
@@ -405,6 +414,28 @@ contains
       soilDB%sand, soilDB%clay, soilDB%DbM, id0, soil_id_l0, land_cover_l0, &
       thetaS_till, thetaFC_till, thetaPW_till, thetaS, thetaFC, thetaPW, Ks, Db, KsVar_H0, KsVar_V0, SMs_FC0)
 
+    if (present(sm_deficit_fc_l0)) then
+      if (size(sm_deficit_fc_l0) /= size(SMs_FC0)) then
+        log_fatal(*) "MPR bridge: sm_deficit_fc_l0 output has wrong size."
+        error stop 1
+      end if
+      sm_deficit_fc_l0 = SMs_FC0
+    end if
+    if (present(ks_var_h_l0)) then
+      if (size(ks_var_h_l0) /= size(KsVar_H0)) then
+        log_fatal(*) "MPR bridge: ks_var_h_l0 output has wrong size."
+        error stop 1
+      end if
+      ks_var_h_l0 = KsVar_H0
+    end if
+    if (present(ks_var_v_l0)) then
+      if (size(ks_var_v_l0) /= size(KsVar_V0)) then
+        log_fatal(*) "MPR bridge: ks_var_v_l0 output has wrong size."
+        error stop 1
+      end if
+      ks_var_v_l0 = KsVar_V0
+    end if
+
     call mpr_SMhorizons(param(horizon_param_start:horizon_param_end), process_matrix, &
       iFlag_soilDB, nSoilHorizons_mHM, HorizonDepth_mHM, land_cover_l0, soil_id_l0, &
       soilDB%nHorizons, soilDB%nTillHorizons, thetaS_till, thetaFC_till, thetaPW_till, thetaS, thetaFC, thetaPW, &
@@ -437,5 +468,174 @@ contains
     deallocate(left_bound1)
     deallocate(right_bound1)
   end subroutine mpr_bridge_soil_moisture
+
+  !> \brief Bridge runoff/interflow parameter generation with legacy mpr_runoff.
+  subroutine mpr_bridge_runoff_param(land_cover_l0, slope_emp_l0, sm_deficit_fc_l0, ks_var_h_l0, level0, upscaler, &
+      param, thresh_unsat_l1, k_fastflow_l1, k_slowflow_l1, alpha_l1)
+    integer(i4), dimension(:), intent(in) :: land_cover_l0
+    real(dp), dimension(:), intent(in) :: slope_emp_l0
+    real(dp), dimension(:), intent(in) :: sm_deficit_fc_l0
+    real(dp), dimension(:), intent(in) :: ks_var_h_l0
+    type(grid_t), intent(in), target :: level0
+    class(scaler_t), intent(inout), target :: upscaler
+    real(dp), dimension(:), intent(in) :: param
+    real(dp), dimension(:), intent(out) :: thresh_unsat_l1
+    real(dp), dimension(:), intent(out) :: k_fastflow_l1
+    real(dp), dimension(:), intent(out) :: k_slowflow_l1
+    real(dp), dimension(:), intent(out) :: alpha_l1
+    integer(i4), allocatable :: id0(:)
+    integer(i4), allocatable :: upper_bound1(:)
+    integer(i4), allocatable :: lower_bound1(:)
+    integer(i4), allocatable :: left_bound1(:)
+    integer(i4), allocatable :: right_bound1(:)
+    integer(i4) :: i
+    integer(i4) :: x_lb
+    integer(i4) :: x_ub
+    integer(i4) :: y_lb
+    integer(i4) :: y_ub
+    integer(i4) :: n_cells0
+    integer(i4) :: n_cells1
+
+    if (size(param) < 5_i4) then
+      log_fatal(*) "MPR bridge: interflow parameter set must contain 5 values, got ", n2s(size(param, kind=i4)), "."
+      error stop 1
+    end if
+
+    n_cells0 = size(land_cover_l0)
+    if (size(slope_emp_l0) /= n_cells0 .or. size(sm_deficit_fc_l0) /= n_cells0 .or. size(ks_var_h_l0) /= n_cells0) then
+      log_fatal(*) "MPR bridge: runoff L0 inputs must have matching packed sizes."
+      error stop 1
+    end if
+    n_cells1 = size(alpha_l1)
+    if (size(thresh_unsat_l1) /= n_cells1 .or. size(k_fastflow_l1) /= n_cells1 .or. size(k_slowflow_l1) /= n_cells1) then
+      log_fatal(*) "MPR bridge: runoff L1 outputs must have matching sizes."
+      error stop 1
+    end if
+
+    allocate(id0(n_cells0))
+    do i = 1_i4, n_cells0
+      id0(i) = i
+    end do
+    allocate(upper_bound1(n_cells1), lower_bound1(n_cells1), left_bound1(n_cells1), right_bound1(n_cells1))
+    do i = 1_i4, n_cells1
+      call upscaler%coarse_bounds(int(i, i8), x_lb, x_ub, y_lb, y_ub)
+      upper_bound1(i) = x_lb
+      lower_bound1(i) = x_ub
+      left_bound1(i) = y_lb
+      right_bound1(i) = y_ub
+    end do
+
+    call mpr_runoff( &
+      land_cover_l0, level0%mask, sm_deficit_fc_l0, slope_emp_l0, ks_var_h_l0, param(:5), id0, &
+      upper_bound1, lower_bound1, left_bound1, right_bound1, upscaler%n_subcells, &
+      thresh_unsat_l1, k_fastflow_l1, k_slowflow_l1, alpha_l1)
+
+    deallocate(id0)
+    deallocate(upper_bound1)
+    deallocate(lower_bound1)
+    deallocate(left_bound1)
+    deallocate(right_bound1)
+  end subroutine mpr_bridge_runoff_param
+
+  !> \brief Bridge percolation and karst-loss parameter generation with legacy-compatible formulas.
+  subroutine mpr_bridge_karstic_param(param, geo_unit_l0, geo_unit_list, geo_karstic, sm_deficit_fc_l0, ks_var_v_l0, &
+      upscaler, f_karst_loss_l1, k_percolation_l1)
+    real(dp), dimension(:), intent(in) :: param
+    integer(i4), dimension(:), intent(in) :: geo_unit_l0
+    integer(i4), dimension(:), intent(in) :: geo_unit_list
+    integer(i4), dimension(:), intent(in) :: geo_karstic
+    real(dp), dimension(:), intent(in) :: sm_deficit_fc_l0
+    real(dp), dimension(:), intent(in) :: ks_var_v_l0
+    class(scaler_t), intent(inout), target :: upscaler
+    real(dp), dimension(:), intent(out) :: f_karst_loss_l1
+    real(dp), dimension(:), intent(out) :: k_percolation_l1
+    real(dp), allocatable :: percolation_l0(:)
+    real(dp), allocatable :: karst_fraction_l1(:)
+    real(dp), allocatable :: karst_class_fraction_l1(:)
+    integer(i4) :: i
+
+    if (size(param) < 3_i4) then
+      log_fatal(*) "MPR bridge: percolation parameter set must contain 3 values, got ", n2s(size(param, kind=i4)), "."
+      error stop 1
+    end if
+    if (size(geo_unit_l0) /= size(sm_deficit_fc_l0) .or. size(geo_unit_l0) /= size(ks_var_v_l0)) then
+      log_fatal(*) "MPR bridge: karst/percolation L0 inputs must have matching packed sizes."
+      error stop 1
+    end if
+    if (size(geo_unit_list) /= size(geo_karstic)) then
+      log_fatal(*) "MPR bridge: geo_unit and geo_karstic LUT sizes do not match."
+      error stop 1
+    end if
+
+    allocate(percolation_l0(size(geo_unit_l0)))
+    allocate(karst_fraction_l1(size(f_karst_loss_l1)))
+    allocate(karst_class_fraction_l1(size(f_karst_loss_l1)))
+
+    percolation_l0 = param(1) * (1.0_dp + sm_deficit_fc_l0) / (1.0_dp + ks_var_v_l0)
+    call upscaler%execute(percolation_l0, k_percolation_l1, upscaling_operator=up_a_mean)
+    k_percolation_l1 = merge(2.0_dp, k_percolation_l1, k_percolation_l1 < 2.0_dp)
+
+    karst_fraction_l1 = 0.0_dp
+    do i = 1_i4, size(geo_unit_list)
+      if (geo_karstic(i) == 0_i4) cycle
+      call upscaler%execute(geo_unit_l0, karst_class_fraction_l1, upscaling_operator=up_fraction, class_id=geo_unit_list(i))
+      karst_fraction_l1 = karst_fraction_l1 + karst_class_fraction_l1
+    end do
+    f_karst_loss_l1 = 1.0_dp - karst_fraction_l1 * param(2)
+
+    deallocate(percolation_l0)
+    deallocate(karst_fraction_l1)
+    deallocate(karst_class_fraction_l1)
+  end subroutine mpr_bridge_karstic_param
+
+  !> \brief Bridge the sealed-surface runoff threshold parameter.
+  subroutine mpr_bridge_sealed_threshold(param, thresh_sealed_l1)
+    real(dp), dimension(:), intent(in) :: param
+    real(dp), dimension(:), intent(out) :: thresh_sealed_l1
+
+    if (size(param) < 1_i4) then
+      log_fatal(*) "MPR bridge: direct-runoff parameter set must contain at least 1 value."
+      error stop 1
+    end if
+    thresh_sealed_l1 = param(1)
+  end subroutine mpr_bridge_sealed_threshold
+
+  !> \brief Bridge geological baseflow parameter generation with legacy-compatible class mapping.
+  subroutine mpr_bridge_baseflow_param(param, geo_unit_l0, geo_unit_list, upscaler, k_baseflow_l1)
+    real(dp), dimension(:), intent(in) :: param
+    integer(i4), dimension(:), intent(in) :: geo_unit_l0
+    integer(i4), dimension(:), intent(in) :: geo_unit_list
+    class(scaler_t), intent(inout), target :: upscaler
+    real(dp), dimension(:), intent(out) :: k_baseflow_l1
+    real(dp), allocatable :: baseflow_l0(:)
+    integer(i4) :: i
+    integer(i4) :: j
+    integer(i4) :: class_pos
+
+    if (size(param) /= size(geo_unit_list)) then
+      log_fatal(*) "MPR bridge: baseflow parameter count ", n2s(size(param, kind=i4)), &
+        " does not match geology LUT classes ", n2s(size(geo_unit_list, kind=i4)), "."
+      error stop 1
+    end if
+
+    allocate(baseflow_l0(size(geo_unit_l0)))
+    do i = 1_i4, size(geo_unit_l0)
+      class_pos = 0_i4
+      do j = 1_i4, size(geo_unit_list)
+        if (geo_unit_list(j) == geo_unit_l0(i)) then
+          class_pos = j
+          exit
+        end if
+      end do
+      if (class_pos < 1_i4) then
+        log_fatal(*) "MPR bridge: geological unit ", n2s(geo_unit_l0(i)), " missing in geology LUT."
+        error stop 1
+      end if
+      baseflow_l0(i) = param(class_pos)
+    end do
+
+    call upscaler%execute(baseflow_l0, k_baseflow_l1, upscaling_operator=up_a_mean)
+    deallocate(baseflow_l0)
+  end subroutine mpr_bridge_baseflow_param
 
 end module mo_mpr_legacy_bridge

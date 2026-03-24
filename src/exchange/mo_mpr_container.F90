@@ -21,7 +21,8 @@ module mo_mpr_container
   use mo_grid_io, only: input_dataset, start_timestamp, var
   use mo_grid_scaler, only: scaler_t, up_a_mean
   use mo_mpr_legacy_bridge, only: mpr_bridge_land_cover_fraction, mpr_bridge_snow_param, mpr_bridge_pet_lai, &
-    mpr_bridge_setup_soil_database, mpr_bridge_soil_moisture
+    mpr_bridge_setup_soil_database, mpr_bridge_soil_moisture, mpr_bridge_runoff_param, mpr_bridge_karstic_param, &
+    mpr_bridge_baseflow_param, mpr_bridge_sealed_threshold
   use mo_netcdf, only: NcDataset, NcDimension, NcVariable
   use mo_orderpack, only: sort_index
   use mo_string_utils, only: n2s => num2str
@@ -61,7 +62,21 @@ module mo_mpr_container
     real(dp), allocatable :: wilting_point_cache(:, :, :) !< cached wilting point (nCells1, nHorizons, nLC)
     real(dp), allocatable :: f_roots_cache(:, :, :) !< cached root fractions (nCells1, nHorizons, nLC)
     real(dp), allocatable :: thresh_jarvis_cache(:) !< cached Jarvis threshold field (nCells1)
+    real(dp), allocatable :: sm_deficit_fc_l0(:, :) !< cached saturation deficit from field capacity on L0 (nCells0, nLC)
+    real(dp), allocatable :: ks_var_h_l0(:, :) !< cached horizontal Ks variability on L0 (nCells0, nLC)
+    real(dp), allocatable :: ks_var_v_l0(:, :) !< cached vertical Ks variability on L0 (nCells0, nLC)
   end type mpr_soil_state_t
+
+  type :: mpr_runoff_state_t
+    real(dp), allocatable :: alpha_cache(:, :) !< cached alpha field (nCells1, nLC)
+    real(dp), allocatable :: k_fastflow_cache(:, :) !< cached fast interflow recession (nCells1, nLC)
+    real(dp), allocatable :: k_slowflow_cache(:, :) !< cached slow interflow recession (nCells1, nLC)
+    real(dp), allocatable :: k_baseflow_cache(:, :) !< cached baseflow recession (nCells1, nLC)
+    real(dp), allocatable :: k_percolation_cache(:, :) !< cached percolation coefficient (nCells1, nLC)
+    real(dp), allocatable :: f_karst_loss_cache(:) !< cached karst loss field (nCells1)
+    real(dp), allocatable :: thresh_unsat_cache(:) !< cached unsaturated storage threshold (nCells1)
+    real(dp), allocatable :: thresh_sealed_cache(:) !< cached sealed runoff threshold (nCells1)
+  end type mpr_runoff_state_t
 
   !> \class   mpr_t
   !> \brief   Class for a single MPR process container.
@@ -85,6 +100,7 @@ module mo_mpr_container
     type(mpr_snow_state_t) :: snow !< cached snow parameter fields
     type(mpr_pet_state_t) :: pet !< cached PET parameter fields
     type(mpr_soil_state_t) :: soil !< cached soil moisture parameter fields
+    type(mpr_runoff_state_t) :: runoff !< cached runoff/baseflow parameter fields
     integer(i4) :: n_lai_periods = 1_i4 !< number of cached LAI periods
     integer(i4) :: active_lai_idx = 0_i4 !< active cached LAI index
   contains
@@ -107,6 +123,7 @@ module mo_mpr_container
     procedure, private :: init_snow_cache => mpr_init_snow_cache
     procedure, private :: init_pet_lai_cache => mpr_init_pet_lai_cache
     procedure, private :: init_soil_cache => mpr_init_soil_cache
+    procedure, private :: init_runoff_cache => mpr_init_runoff_cache
     procedure, private :: update_exchange_slices => mpr_update_exchange_slices
     procedure, private :: lai_index_for_time => mpr_lai_index_for_time
     procedure, private :: land_cover_index_for_time => mpr_land_cover_index_for_time
@@ -481,6 +498,45 @@ contains
         self, nc, dims_xy, soil_dim, land_cover_dim, "L1_wiltingPoint", &
         "Permanent wilting point at level 1", self%soil%wilting_point_cache)
     end if
+    if (allocated(self%runoff%alpha_cache)) then
+      call mpr_write_restart_field_3d( &
+        self, nc, dims_xy, land_cover_dim, "L1_alpha", "Exponent for the upper reservoir at level 1", &
+        self%runoff%alpha_cache)
+    end if
+    if (allocated(self%runoff%f_karst_loss_cache)) then
+      call mpr_write_restart_field_2d( &
+        self, nc, dims_xy, "L1_karstLoss", "Karstic percolation loss at level 1", self%runoff%f_karst_loss_cache)
+    end if
+    if (allocated(self%runoff%k_fastflow_cache)) then
+      call mpr_write_restart_field_3d( &
+        self, nc, dims_xy, land_cover_dim, "L1_kfastFlow", &
+        "Fast interflow recession coefficient at level 1", self%runoff%k_fastflow_cache)
+    end if
+    if (allocated(self%runoff%k_slowflow_cache)) then
+      call mpr_write_restart_field_3d( &
+        self, nc, dims_xy, land_cover_dim, "L1_kSlowFlow", &
+        "Slow interflow recession coefficient at level 1", self%runoff%k_slowflow_cache)
+    end if
+    if (allocated(self%runoff%k_baseflow_cache)) then
+      call mpr_write_restart_field_3d( &
+        self, nc, dims_xy, land_cover_dim, "L1_kBaseFlow", &
+        "Baseflow recession coefficient at level 1", self%runoff%k_baseflow_cache)
+    end if
+    if (allocated(self%runoff%k_percolation_cache)) then
+      call mpr_write_restart_field_3d( &
+        self, nc, dims_xy, land_cover_dim, "L1_kPerco", &
+        "Percolation coefficient at level 1", self%runoff%k_percolation_cache)
+    end if
+    if (allocated(self%runoff%thresh_unsat_cache)) then
+      call mpr_write_restart_field_2d( &
+        self, nc, dims_xy, "L1_unsatThresh", &
+        "Threshold water depth controlling fast interflow at level 1", self%runoff%thresh_unsat_cache)
+    end if
+    if (allocated(self%runoff%thresh_sealed_cache)) then
+      call mpr_write_restart_field_2d( &
+        self, nc, dims_xy, "L1_sealedThresh", &
+        "Threshold water depth for runoff on sealed surfaces at level 1", self%runoff%thresh_sealed_cache)
+    end if
 
     process_case = self%exchange%parameters%process_matrix(3, 1)
     if (allocated(self%soil%thresh_jarvis_cache) .and. any(process_case == [2_i4, 3_i4])) then
@@ -675,6 +731,7 @@ contains
   subroutine mpr_init_temporal_cache(self)
     class(mpr_t), intent(inout), target :: self
     logical :: need_lai_cache
+    logical :: need_runoff_cache
 
     self%n_lai_periods = 1_i4
     self%land_cover%n_periods = 1_i4
@@ -698,6 +755,17 @@ contains
     if (self%exchange%parameters%process_matrix(2, 1) /= 0_i4) call self%init_snow_cache()
     if (self%exchange%parameters%process_matrix(5, 1) == -1_i4) call self%init_pet_lai_cache()
     if (self%exchange%parameters%process_matrix(3, 1) /= 0_i4) call self%init_soil_cache()
+    need_runoff_cache = self%exchange%parameters%process_matrix(4, 1) /= 0_i4 .or. &
+      self%exchange%parameters%process_matrix(6, 1) /= 0_i4 .or. &
+      self%exchange%parameters%process_matrix(7, 1) /= 0_i4 .or. &
+      self%exchange%parameters%process_matrix(9, 1) /= 0_i4
+    if (need_runoff_cache) then
+      if (self%exchange%parameters%process_matrix(3, 1) == 0_i4) then
+        log_fatal(*) "MPR: runoff/baseflow parameter generation requires the soil-moisture process to be active."
+        error stop 1
+      end if
+      call self%init_runoff_cache()
+    end if
     log_info(*) "MPR: temporal cache initialized (nLAI=", n2s(self%n_lai_periods), &
       ", nLC=", n2s(self%land_cover%n_periods), ")."
   end subroutine mpr_init_temporal_cache
@@ -1031,12 +1099,18 @@ contains
     if (allocated(self%soil%wilting_point_cache)) deallocate(self%soil%wilting_point_cache)
     if (allocated(self%soil%f_roots_cache)) deallocate(self%soil%f_roots_cache)
     if (allocated(self%soil%thresh_jarvis_cache)) deallocate(self%soil%thresh_jarvis_cache)
+    if (allocated(self%soil%sm_deficit_fc_l0)) deallocate(self%soil%sm_deficit_fc_l0)
+    if (allocated(self%soil%ks_var_h_l0)) deallocate(self%soil%ks_var_h_l0)
+    if (allocated(self%soil%ks_var_v_l0)) deallocate(self%soil%ks_var_v_l0)
     allocate(self%soil%sm_exponent_cache(self%exchange%level1%ncells, n_horizons, self%land_cover%n_periods))
     allocate(self%soil%sm_saturation_cache(self%exchange%level1%ncells, n_horizons, self%land_cover%n_periods))
     allocate(self%soil%sm_field_capacity_cache(self%exchange%level1%ncells, n_horizons, self%land_cover%n_periods))
     allocate(self%soil%wilting_point_cache(self%exchange%level1%ncells, n_horizons, self%land_cover%n_periods))
     allocate(self%soil%f_roots_cache(self%exchange%level1%ncells, n_horizons, self%land_cover%n_periods))
     allocate(self%soil%thresh_jarvis_cache(self%exchange%level1%ncells))
+    allocate(self%soil%sm_deficit_fc_l0(self%exchange%level0%ncells, self%land_cover%n_periods))
+    allocate(self%soil%ks_var_h_l0(self%exchange%level0%ncells, self%land_cover%n_periods))
+    allocate(self%soil%ks_var_v_l0(self%exchange%level0%ncells, self%land_cover%n_periods))
 
     do land_cover_idx = 1_i4, self%land_cover%n_periods
       call mpr_bridge_soil_moisture( &
@@ -1044,7 +1118,9 @@ contains
         self%exchange%soil_id%data(:, :n_soil_layers), self%exchange%level0, self%upscaler, &
         self%soil%thresh_jarvis_cache, self%soil%sm_exponent_cache(:, :, land_cover_idx), &
         self%soil%sm_saturation_cache(:, :, land_cover_idx), self%soil%sm_field_capacity_cache(:, :, land_cover_idx), &
-        self%soil%wilting_point_cache(:, :, land_cover_idx), self%soil%f_roots_cache(:, :, land_cover_idx))
+        self%soil%wilting_point_cache(:, :, land_cover_idx), self%soil%f_roots_cache(:, :, land_cover_idx), &
+        self%soil%sm_deficit_fc_l0(:, land_cover_idx), self%soil%ks_var_h_l0(:, land_cover_idx), &
+        self%soil%ks_var_v_l0(:, land_cover_idx))
     end do
 
     self%exchange%f_roots%provided = .true.
@@ -1054,6 +1130,88 @@ contains
     self%exchange%wilting_point%provided = .true.
     self%exchange%thresh_jarvis%provided = .true.
   end subroutine mpr_init_soil_cache
+
+  !> \brief Cache runoff and baseflow parameter fields on level1.
+  subroutine mpr_init_runoff_cache(self)
+    class(mpr_t), intent(inout), target :: self
+    integer(i4) :: land_cover_idx
+    real(dp), allocatable :: direct_runoff_param(:)
+    real(dp), allocatable :: interflow_param(:)
+    real(dp), allocatable :: percolation_param(:)
+    real(dp), allocatable :: baseflow_param(:)
+
+    if (.not.allocated(self%soil%sm_deficit_fc_l0) .or. .not.allocated(self%soil%ks_var_h_l0) .or. &
+      .not.allocated(self%soil%ks_var_v_l0)) then
+      log_fatal(*) "MPR: soil L0 intermediates are not available before runoff/baseflow cache initialization."
+      error stop 1
+    end if
+
+    if (allocated(self%runoff%alpha_cache)) deallocate(self%runoff%alpha_cache)
+    if (allocated(self%runoff%k_fastflow_cache)) deallocate(self%runoff%k_fastflow_cache)
+    if (allocated(self%runoff%k_slowflow_cache)) deallocate(self%runoff%k_slowflow_cache)
+    if (allocated(self%runoff%k_baseflow_cache)) deallocate(self%runoff%k_baseflow_cache)
+    if (allocated(self%runoff%k_percolation_cache)) deallocate(self%runoff%k_percolation_cache)
+    if (allocated(self%runoff%f_karst_loss_cache)) deallocate(self%runoff%f_karst_loss_cache)
+    if (allocated(self%runoff%thresh_unsat_cache)) deallocate(self%runoff%thresh_unsat_cache)
+    if (allocated(self%runoff%thresh_sealed_cache)) deallocate(self%runoff%thresh_sealed_cache)
+
+    if (self%exchange%parameters%process_matrix(6, 1) /= 0_i4) then
+      allocate(self%runoff%alpha_cache(self%exchange%level1%ncells, self%land_cover%n_periods))
+      allocate(self%runoff%k_fastflow_cache(self%exchange%level1%ncells, self%land_cover%n_periods))
+      allocate(self%runoff%k_slowflow_cache(self%exchange%level1%ncells, self%land_cover%n_periods))
+      allocate(self%runoff%thresh_unsat_cache(self%exchange%level1%ncells))
+      interflow_param = self%exchange%parameters%get_process(6_i4)
+      do land_cover_idx = 1_i4, self%land_cover%n_periods
+        call mpr_bridge_runoff_param( &
+          self%land_cover%l0_cache(:, land_cover_idx), self%slope_emp, self%soil%sm_deficit_fc_l0(:, land_cover_idx), &
+          self%soil%ks_var_h_l0(:, land_cover_idx), self%exchange%level0, self%upscaler, interflow_param, &
+          self%runoff%thresh_unsat_cache, self%runoff%k_fastflow_cache(:, land_cover_idx), &
+          self%runoff%k_slowflow_cache(:, land_cover_idx), self%runoff%alpha_cache(:, land_cover_idx))
+      end do
+      self%exchange%alpha%provided = .true.
+      self%exchange%k_fastflow%provided = .true.
+      self%exchange%k_slowflow%provided = .true.
+      self%exchange%thresh_unsat%provided = .true.
+    end if
+
+    if (self%exchange%parameters%process_matrix(7, 1) /= 0_i4) then
+      allocate(self%runoff%k_percolation_cache(self%exchange%level1%ncells, self%land_cover%n_periods))
+      allocate(self%runoff%f_karst_loss_cache(self%exchange%level1%ncells))
+      percolation_param = self%exchange%parameters%get_process(7_i4)
+      do land_cover_idx = 1_i4, self%land_cover%n_periods
+        call mpr_bridge_karstic_param( &
+          percolation_param, self%exchange%geo_unit%data, self%exchange%geo_class_def%geo_unit, &
+          self%exchange%geo_class_def%geo_karstic, self%soil%sm_deficit_fc_l0(:, land_cover_idx), &
+          self%soil%ks_var_v_l0(:, land_cover_idx), self%upscaler, self%runoff%f_karst_loss_cache, &
+          self%runoff%k_percolation_cache(:, land_cover_idx))
+      end do
+      self%exchange%k_percolation%provided = .true.
+      self%exchange%f_karst_loss%provided = .true.
+    end if
+
+    if (self%exchange%parameters%process_matrix(4, 1) /= 0_i4) then
+      allocate(self%runoff%thresh_sealed_cache(self%exchange%level1%ncells))
+      direct_runoff_param = self%exchange%parameters%get_process(4_i4)
+      call mpr_bridge_sealed_threshold(direct_runoff_param, self%runoff%thresh_sealed_cache)
+      self%exchange%thresh_sealed%provided = .true.
+    end if
+
+    if (self%exchange%parameters%process_matrix(9, 1) /= 0_i4) then
+      allocate(self%runoff%k_baseflow_cache(self%exchange%level1%ncells, self%land_cover%n_periods))
+      baseflow_param = self%exchange%parameters%get_process(9_i4)
+      call mpr_bridge_baseflow_param( &
+        baseflow_param, self%exchange%geo_unit%data, self%exchange%geo_class_def%geo_unit, self%upscaler, &
+        self%runoff%k_baseflow_cache(:, 1))
+      do land_cover_idx = 2_i4, self%land_cover%n_periods
+        self%runoff%k_baseflow_cache(:, land_cover_idx) = self%runoff%k_baseflow_cache(:, 1)
+      end do
+      if (allocated(self%runoff%k_slowflow_cache) .and. self%exchange%parameters%process_matrix(7, 1) > 0_i4) then
+        self%runoff%k_baseflow_cache = merge(self%runoff%k_slowflow_cache, self%runoff%k_baseflow_cache, &
+          self%runoff%k_baseflow_cache < self%runoff%k_slowflow_cache)
+      end if
+      self%exchange%k_baseflow%provided = .true.
+    end if
+  end subroutine mpr_init_runoff_cache
 
   !> \brief Switch exchange pointers to active cached MPR slices for current model time.
   subroutine mpr_update_exchange_slices(self, force)
@@ -1070,7 +1228,10 @@ contains
       .not.allocated(self%snow%thresh_temp_cache) .and. &
       .not.allocated(self%pet%pet_fac_lai_cache) .and. &
       .not.allocated(self%soil%sm_exponent_cache) .and. &
-      .not.allocated(self%soil%thresh_jarvis_cache)) return
+      .not.allocated(self%soil%thresh_jarvis_cache) .and. &
+      .not.allocated(self%runoff%alpha_cache) .and. &
+      .not.allocated(self%runoff%f_karst_loss_cache) .and. &
+      .not.allocated(self%runoff%thresh_sealed_cache)) return
 
     lai_idx = self%lai_index_for_time()
     land_cover_idx = self%land_cover_index_for_time()
@@ -1108,6 +1269,24 @@ contains
     end if
     if (allocated(self%soil%thresh_jarvis_cache)) then
       self%exchange%thresh_jarvis%data => self%soil%thresh_jarvis_cache
+    end if
+    if (allocated(self%runoff%alpha_cache)) then
+      self%exchange%alpha%data => self%runoff%alpha_cache(:, land_cover_idx)
+      self%exchange%k_fastflow%data => self%runoff%k_fastflow_cache(:, land_cover_idx)
+      self%exchange%k_slowflow%data => self%runoff%k_slowflow_cache(:, land_cover_idx)
+      self%exchange%thresh_unsat%data => self%runoff%thresh_unsat_cache
+    end if
+    if (allocated(self%runoff%k_baseflow_cache)) then
+      self%exchange%k_baseflow%data => self%runoff%k_baseflow_cache(:, land_cover_idx)
+    end if
+    if (allocated(self%runoff%k_percolation_cache)) then
+      self%exchange%k_percolation%data => self%runoff%k_percolation_cache(:, land_cover_idx)
+    end if
+    if (allocated(self%runoff%f_karst_loss_cache)) then
+      self%exchange%f_karst_loss%data => self%runoff%f_karst_loss_cache
+    end if
+    if (allocated(self%runoff%thresh_sealed_cache)) then
+      self%exchange%thresh_sealed%data => self%runoff%thresh_sealed_cache
     end if
     self%active_lai_idx = lai_idx
     self%land_cover%active_idx = land_cover_idx
@@ -1235,6 +1414,22 @@ contains
     self%exchange%wilting_point%provided = .false.
     nullify(self%exchange%thresh_jarvis%data)
     self%exchange%thresh_jarvis%provided = .false.
+    nullify(self%exchange%alpha%data)
+    self%exchange%alpha%provided = .false.
+    nullify(self%exchange%k_fastflow%data)
+    self%exchange%k_fastflow%provided = .false.
+    nullify(self%exchange%k_slowflow%data)
+    self%exchange%k_slowflow%provided = .false.
+    nullify(self%exchange%k_baseflow%data)
+    self%exchange%k_baseflow%provided = .false.
+    nullify(self%exchange%k_percolation%data)
+    self%exchange%k_percolation%provided = .false.
+    nullify(self%exchange%f_karst_loss%data)
+    self%exchange%f_karst_loss%provided = .false.
+    nullify(self%exchange%thresh_unsat%data)
+    self%exchange%thresh_unsat%provided = .false.
+    nullify(self%exchange%thresh_sealed%data)
+    self%exchange%thresh_sealed%provided = .false.
     if (self%write_restart) call self%create_restart()
     if (allocated(self%land_cover%ds%vars)) call self%land_cover%ds%close()
     if (allocated(self%slope_emp)) deallocate(self%slope_emp)
@@ -1256,6 +1451,17 @@ contains
     if (allocated(self%soil%wilting_point_cache)) deallocate(self%soil%wilting_point_cache)
     if (allocated(self%soil%f_roots_cache)) deallocate(self%soil%f_roots_cache)
     if (allocated(self%soil%thresh_jarvis_cache)) deallocate(self%soil%thresh_jarvis_cache)
+    if (allocated(self%soil%sm_deficit_fc_l0)) deallocate(self%soil%sm_deficit_fc_l0)
+    if (allocated(self%soil%ks_var_h_l0)) deallocate(self%soil%ks_var_h_l0)
+    if (allocated(self%soil%ks_var_v_l0)) deallocate(self%soil%ks_var_v_l0)
+    if (allocated(self%runoff%alpha_cache)) deallocate(self%runoff%alpha_cache)
+    if (allocated(self%runoff%k_fastflow_cache)) deallocate(self%runoff%k_fastflow_cache)
+    if (allocated(self%runoff%k_slowflow_cache)) deallocate(self%runoff%k_slowflow_cache)
+    if (allocated(self%runoff%k_baseflow_cache)) deallocate(self%runoff%k_baseflow_cache)
+    if (allocated(self%runoff%k_percolation_cache)) deallocate(self%runoff%k_percolation_cache)
+    if (allocated(self%runoff%f_karst_loss_cache)) deallocate(self%runoff%f_karst_loss_cache)
+    if (allocated(self%runoff%thresh_unsat_cache)) deallocate(self%runoff%thresh_unsat_cache)
+    if (allocated(self%runoff%thresh_sealed_cache)) deallocate(self%runoff%thresh_sealed_cache)
     self%land_cover%temporal = .false.
     self%land_cover%n_periods = 1_i4
     self%land_cover%active_idx = 0_i4
