@@ -11,9 +11,16 @@
 #include "logging.h"
 module mo_mpr_legacy_bridge
   use mo_logging
-  use mo_kind, only: i4, dp
+  use mo_constants, only: nodata_dp, nodata_i4
+  use mo_grid, only: grid_t
+  use mo_kind, only: i4, i8, dp
   use mo_grid_scaler, only: scaler_t, up_fraction, up_h_mean
+  use mo_mpr_global_variables, only: soilDB, HorizonDepth_mHM, iFlag_soilDB, nSoilHorizons_mHM, nSoilTypes, tillageDepth
+  use mo_mpr_smhorizons, only: mpr_SMhorizons
+  use mo_mpr_soilmoist, only: mpr_sm
+  use mo_soil_database, only: read_soil_LUT, generate_soil_database
   use mo_string_utils, only: n2s => num2str
+  use nml_config_mpr, only: nml_config_mpr_t
 
   implicit none
   private
@@ -21,8 +28,109 @@ module mo_mpr_legacy_bridge
   public :: mpr_bridge_land_cover_fraction
   public :: mpr_bridge_snow_param
   public :: mpr_bridge_pet_lai
+  public :: mpr_bridge_setup_soil_database
+  public :: mpr_bridge_soil_moisture
 
 contains
+
+  subroutine mpr_bridge_reset_soil_database()
+    if (allocated(HorizonDepth_mHM)) deallocate(HorizonDepth_mHM)
+    if (allocated(soilDB%id)) deallocate(soilDB%id)
+    if (allocated(soilDB%nHorizons)) deallocate(soilDB%nHorizons)
+    if (allocated(soilDB%is_present)) deallocate(soilDB%is_present)
+    if (allocated(soilDB%UD)) deallocate(soilDB%UD)
+    if (allocated(soilDB%LD)) deallocate(soilDB%LD)
+    if (allocated(soilDB%clay)) deallocate(soilDB%clay)
+    if (allocated(soilDB%sand)) deallocate(soilDB%sand)
+    if (allocated(soilDB%DbM)) deallocate(soilDB%DbM)
+    if (allocated(soilDB%depth)) deallocate(soilDB%depth)
+    if (allocated(soilDB%RZdepth)) deallocate(soilDB%RZdepth)
+    if (allocated(soilDB%Wd)) deallocate(soilDB%Wd)
+    if (allocated(soilDB%nTillHorizons)) deallocate(soilDB%nTillHorizons)
+    if (allocated(soilDB%thetaS_till)) deallocate(soilDB%thetaS_till)
+    if (allocated(soilDB%thetaS)) deallocate(soilDB%thetaS)
+    if (allocated(soilDB%Db)) deallocate(soilDB%Db)
+    if (allocated(soilDB%thetaFC_till)) deallocate(soilDB%thetaFC_till)
+    if (allocated(soilDB%thetaFC)) deallocate(soilDB%thetaFC)
+    if (allocated(soilDB%thetaPW_till)) deallocate(soilDB%thetaPW_till)
+    if (allocated(soilDB%thetaPW)) deallocate(soilDB%thetaPW)
+    if (allocated(soilDB%Ks)) deallocate(soilDB%Ks)
+    nSoilTypes = 0_i4
+    iFlag_soilDB = 0_i4
+    nSoilHorizons_mHM = 0_i4
+    tillageDepth = 0.0_dp
+  end subroutine mpr_bridge_reset_soil_database
+
+  !> \brief Initialize the legacy soil database from the new MPR configuration and packed L0 soil ids.
+  subroutine mpr_bridge_setup_soil_database(config, domain, soil_lut_path, soil_id_l0)
+    type(nml_config_mpr_t), intent(in) :: config
+    integer(i4), intent(in) :: domain
+    character(*), intent(in) :: soil_lut_path
+    integer(i4), dimension(:, :), intent(in) :: soil_id_l0
+    integer(i4) :: soil_layers
+    integer(i4) :: required_depths
+    integer(i4) :: i
+    integer(i4) :: j
+    integer(i4) :: k
+
+    if (domain < 1_i4) then
+      log_fatal(*) "MPR bridge: invalid domain for soil database setup: ", n2s(domain), "."
+      error stop 1
+    end if
+
+    call mpr_bridge_reset_soil_database()
+
+    iFlag_soilDB = config%soil_db_mode(domain)
+    nSoilHorizons_mHM = config%n_horizons(domain)
+    tillageDepth = real(config%tillage_depth(domain), dp)
+    if (nSoilHorizons_mHM < 1_i4) then
+      log_fatal(*) "MPR bridge: n_horizons must be >= 1 for soil database setup."
+      error stop 1
+    end if
+
+    allocate(HorizonDepth_mHM(nSoilHorizons_mHM))
+    HorizonDepth_mHM = 0.0_dp
+    select case (iFlag_soilDB)
+      case (0_i4)
+        required_depths = max(0_i4, nSoilHorizons_mHM - 1_i4)
+      case (1_i4)
+        required_depths = nSoilHorizons_mHM
+      case default
+        log_fatal(*) "MPR bridge: unsupported soil_db_mode=", n2s(iFlag_soilDB), "."
+        error stop 1
+    end select
+    do i = 1_i4, required_depths
+      HorizonDepth_mHM(i) = real(config%soil_depth(i, domain), dp)
+    end do
+
+    call read_soil_LUT(trim(soil_lut_path))
+    call generate_soil_database()
+
+    if (allocated(soilDB%is_present)) deallocate(soilDB%is_present)
+    allocate(soilDB%is_present(nSoilTypes))
+    soilDB%is_present = 0_i4
+
+    soil_layers = 1_i4
+    if (iFlag_soilDB == 1_i4) soil_layers = nSoilHorizons_mHM
+    if (size(soil_id_l0, 2) < soil_layers) then
+      log_fatal(*) "MPR bridge: soil_id input provides ", n2s(size(soil_id_l0, 2)), &
+        " layers, expected at least ", n2s(soil_layers), "."
+      error stop 1
+    end if
+
+    do i = 1_i4, soil_layers
+      do k = 1_i4, size(soil_id_l0, 1)
+        j = soil_id_l0(k, i)
+        if (j == nodata_i4) cycle
+        if (j < 1_i4 .or. j > nSoilTypes) then
+          log_fatal(*) "MPR bridge: soil ID ", n2s(j), " at packed L0 cell ", n2s(k), &
+            " and layer ", n2s(i), " is outside the soil LUT range 1..", n2s(nSoilTypes), "."
+          error stop 1
+        end if
+        soilDB%is_present(j) = 1_i4
+      end do
+    end do
+  end subroutine mpr_bridge_setup_soil_database
 
   !> \brief Upscale land-cover fractions from packed L0 ids to packed L1 fractions.
   subroutine mpr_bridge_land_cover_fraction(upscaler, land_cover_l0, frac_sealed_cityarea, forest_l1, sealed_l1, pervious_l1)
@@ -115,5 +223,219 @@ contains
     call upscaler%execute(pet_fac_lai_l0, pet_fac_lai_l1, upscaling_operator=up_h_mean)
     deallocate(pet_fac_lai_l0)
   end subroutine mpr_bridge_pet_lai
+
+  !> \brief Bridge soil-moisture parameter generation through the legacy soil routines.
+  subroutine mpr_bridge_soil_moisture(process_matrix, param, land_cover_l0, soil_id_l0, level0, upscaler, &
+      thresh_jarvis_l1, sm_exponent_l1, sm_saturation_l1, sm_field_capacity_l1, wilting_point_l1, f_roots_l1)
+    integer(i4), dimension(:, :), intent(in) :: process_matrix
+    real(dp), dimension(:), intent(in) :: param
+    integer(i4), dimension(:), intent(in) :: land_cover_l0
+    integer(i4), dimension(:, :), intent(in) :: soil_id_l0
+    type(grid_t), intent(in), target :: level0
+    class(scaler_t), intent(in), target :: upscaler
+    real(dp), dimension(:), intent(out) :: thresh_jarvis_l1
+    real(dp), dimension(:, :), intent(out) :: sm_exponent_l1
+    real(dp), dimension(:, :), intent(out) :: sm_saturation_l1
+    real(dp), dimension(:, :), intent(out) :: sm_field_capacity_l1
+    real(dp), dimension(:, :), intent(out) :: wilting_point_l1
+    real(dp), dimension(:, :), intent(out) :: f_roots_l1
+    integer(i4), allocatable :: id0(:)
+    integer(i4) :: i
+    integer(i4) :: process_case
+    integer(i4) :: msoil
+    integer(i4) :: m_lc
+    integer(i4) :: mtill
+    integer(i4) :: m_hor
+    integer(i4) :: n_cells0
+    integer(i4) :: n_cells1
+    integer(i4) :: soil_param_end
+    integer(i4) :: horizon_param_start
+    integer(i4) :: horizon_param_end
+    integer(i4) :: x_lb
+    integer(i4) :: x_ub
+    integer(i4) :: y_lb
+    integer(i4) :: y_ub
+    real(dp), allocatable :: thetaS_till(:, :, :)
+    real(dp), allocatable :: thetaFC_till(:, :, :)
+    real(dp), allocatable :: thetaPW_till(:, :, :)
+    real(dp), allocatable :: thetaS(:, :)
+    real(dp), allocatable :: thetaFC(:, :)
+    real(dp), allocatable :: thetaPW(:, :)
+    real(dp), allocatable :: Ks(:, :, :)
+    real(dp), allocatable :: Db(:, :, :)
+    real(dp), allocatable :: KsVar_H0(:)
+    real(dp), allocatable :: KsVar_V0(:)
+    real(dp), allocatable :: SMs_FC0(:)
+    real(dp), allocatable :: latWat_till(:, :, :)
+    real(dp), allocatable :: COSMIC_L3_till(:, :, :)
+    real(dp), allocatable :: latWat(:, :)
+    real(dp), allocatable :: COSMIC_L3(:, :)
+    real(dp), allocatable :: bulk_dens_l1(:, :)
+    real(dp), allocatable :: lattice_water_l1(:, :)
+    real(dp), allocatable :: cosmic_l3_l1(:, :)
+    integer(i4), allocatable :: upper_bound1(:)
+    integer(i4), allocatable :: lower_bound1(:)
+    integer(i4), allocatable :: left_bound1(:)
+    integer(i4), allocatable :: right_bound1(:)
+
+    if (.not.allocated(soilDB%is_present)) then
+      log_fatal(*) "MPR bridge: soil database not initialized before soil-moisture generation."
+      error stop 1
+    end if
+
+    process_case = process_matrix(3, 1)
+    select case (process_case)
+      case (1_i4)
+        if (size(param) < 17_i4) then
+          log_fatal(*) "MPR bridge: soil moisture case 1 expects 17 parameters, got ", n2s(size(param, kind=i4)), "."
+          error stop 1
+        end if
+        soil_param_end = 13_i4
+        horizon_param_start = 14_i4
+        horizon_param_end = 17_i4
+        thresh_jarvis_l1 = nodata_dp
+      case (2_i4)
+        if (size(param) < 18_i4) then
+          log_fatal(*) "MPR bridge: soil moisture case 2 expects 18 parameters, got ", n2s(size(param, kind=i4)), "."
+          error stop 1
+        end if
+        soil_param_end = 13_i4
+        horizon_param_start = 14_i4
+        horizon_param_end = 17_i4
+        thresh_jarvis_l1 = param(18)
+      case (3_i4)
+        if (size(param) < 22_i4) then
+          log_fatal(*) "MPR bridge: soil moisture case 3 expects 22 parameters, got ", n2s(size(param, kind=i4)), "."
+          error stop 1
+        end if
+        soil_param_end = 13_i4
+        horizon_param_start = 14_i4
+        horizon_param_end = 21_i4
+        thresh_jarvis_l1 = param(22)
+      case (4_i4)
+        if (size(param) < 21_i4) then
+          log_fatal(*) "MPR bridge: soil moisture case 4 expects 21 parameters, got ", n2s(size(param, kind=i4)), "."
+          error stop 1
+        end if
+        soil_param_end = 13_i4
+        horizon_param_start = 14_i4
+        horizon_param_end = 21_i4
+        thresh_jarvis_l1 = nodata_dp
+      case default
+        log_fatal(*) "MPR bridge: unsupported soil moisture process case ", n2s(process_case), "."
+        error stop 1
+    end select
+
+    n_cells0 = size(land_cover_l0)
+    if (size(soil_id_l0, 1) /= n_cells0) then
+      log_fatal(*) "MPR bridge: soil_id and land_cover inputs must have matching packed L0 sizes."
+      error stop 1
+    end if
+    n_cells1 = size(sm_exponent_l1, 1)
+    if (size(sm_exponent_l1, 2) /= nSoilHorizons_mHM) then
+      log_fatal(*) "MPR bridge: soil cache horizon dimension ", n2s(size(sm_exponent_l1, 2)), &
+        " does not match n_horizons=", n2s(nSoilHorizons_mHM), "."
+      error stop 1
+    end if
+
+    msoil = size(soilDB%is_present)
+    m_lc = maxval(land_cover_l0, land_cover_l0 /= nodata_i4)
+    if (m_lc < 1_i4) then
+      log_fatal(*) "MPR bridge: land-cover map contains no valid IDs for soil-moisture generation."
+      error stop 1
+    end if
+    if (iFlag_soilDB == 0_i4) then
+      mtill = maxval(soilDB%nTillHorizons, soilDB%nTillHorizons /= nodata_i4)
+      m_hor = maxval(soilDB%nHorizons, soilDB%nHorizons /= nodata_i4)
+    else if (iFlag_soilDB == 1_i4) then
+      mtill = 1_i4
+      m_hor = 1_i4
+    else
+      log_fatal(*) "MPR bridge: unsupported legacy soil_db_mode=", n2s(iFlag_soilDB), "."
+      error stop 1
+    end if
+
+    allocate(id0(n_cells0))
+    do i = 1_i4, n_cells0
+      id0(i) = i
+    end do
+
+    allocate(thetaS_till(msoil, mtill, m_lc))
+    allocate(thetaFC_till(msoil, mtill, m_lc))
+    allocate(thetaPW_till(msoil, mtill, m_lc))
+    allocate(thetaS(msoil, m_hor))
+    allocate(thetaFC(msoil, m_hor))
+    allocate(thetaPW(msoil, m_hor))
+    allocate(Ks(msoil, m_hor, m_lc))
+    allocate(Db(msoil, m_hor, m_lc))
+    allocate(KsVar_H0(n_cells0))
+    allocate(KsVar_V0(n_cells0))
+    allocate(SMs_FC0(n_cells0))
+    allocate(latWat_till(msoil, mtill, m_lc))
+    allocate(COSMIC_L3_till(msoil, mtill, m_lc))
+    allocate(latWat(msoil, m_hor))
+    allocate(COSMIC_L3(msoil, m_hor))
+    allocate(bulk_dens_l1(n_cells1, size(sm_exponent_l1, 2)))
+    allocate(lattice_water_l1(n_cells1, size(sm_exponent_l1, 2)))
+    allocate(cosmic_l3_l1(n_cells1, size(sm_exponent_l1, 2)))
+    allocate(upper_bound1(n_cells1))
+    allocate(lower_bound1(n_cells1))
+    allocate(left_bound1(n_cells1))
+    allocate(right_bound1(n_cells1))
+
+    latWat_till = 1.0e-6_dp
+    COSMIC_L3_till = 1.0e-6_dp
+    latWat = 1.0e-6_dp
+    COSMIC_L3 = 1.0e-6_dp
+    bulk_dens_l1 = nodata_dp
+    lattice_water_l1 = nodata_dp
+    cosmic_l3_l1 = nodata_dp
+    do i = 1_i4, n_cells1
+      call upscaler%coarse_bounds(int(i, i8), x_lb, x_ub, y_lb, y_ub)
+      ! Legacy MPR upscaling routines slice arrays as (dim1, dim2). The new forces grid stores data as (x, y),
+      ! so feed x bounds into the first legacy index pair and y bounds into the second one.
+      upper_bound1(i) = x_lb
+      lower_bound1(i) = x_ub
+      left_bound1(i) = y_lb
+      right_bound1(i) = y_ub
+    end do
+
+    call mpr_sm(param(:soil_param_end), process_matrix, &
+      soilDB%is_present, soilDB%nHorizons, soilDB%nTillHorizons, &
+      soilDB%sand, soilDB%clay, soilDB%DbM, id0, soil_id_l0, land_cover_l0, &
+      thetaS_till, thetaFC_till, thetaPW_till, thetaS, thetaFC, thetaPW, Ks, Db, KsVar_H0, KsVar_V0, SMs_FC0)
+
+    call mpr_SMhorizons(param(horizon_param_start:horizon_param_end), process_matrix, &
+      iFlag_soilDB, nSoilHorizons_mHM, HorizonDepth_mHM, land_cover_l0, soil_id_l0, &
+      soilDB%nHorizons, soilDB%nTillHorizons, thetaS_till, thetaFC_till, thetaPW_till, thetaS, thetaFC, thetaPW, &
+      soilDB%Wd, Db, soilDB%DbM, soilDB%RZdepth, level0%mask, id0, &
+      upper_bound1, lower_bound1, left_bound1, right_bound1, upscaler%n_subcells, &
+      sm_exponent_l1, sm_saturation_l1, sm_field_capacity_l1, wilting_point_l1, f_roots_l1, &
+      latWat_till, COSMIC_L3_till, latWat, COSMIC_L3, bulk_dens_l1, lattice_water_l1, cosmic_l3_l1)
+
+    deallocate(id0)
+    deallocate(thetaS_till)
+    deallocate(thetaFC_till)
+    deallocate(thetaPW_till)
+    deallocate(thetaS)
+    deallocate(thetaFC)
+    deallocate(thetaPW)
+    deallocate(Ks)
+    deallocate(Db)
+    deallocate(KsVar_H0)
+    deallocate(KsVar_V0)
+    deallocate(SMs_FC0)
+    deallocate(latWat_till)
+    deallocate(COSMIC_L3_till)
+    deallocate(latWat)
+    deallocate(COSMIC_L3)
+    deallocate(bulk_dens_l1)
+    deallocate(lattice_water_l1)
+    deallocate(cosmic_l3_l1)
+    deallocate(upper_bound1)
+    deallocate(lower_bound1)
+    deallocate(left_bound1)
+    deallocate(right_bound1)
+  end subroutine mpr_bridge_soil_moisture
 
 end module mo_mpr_legacy_bridge

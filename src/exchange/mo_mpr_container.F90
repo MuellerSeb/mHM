@@ -19,7 +19,8 @@ module mo_mpr_container
   use mo_grid, only: grid_t, cartesian, spherical
   use mo_grid_io, only: input_dataset, start_timestamp, var
   use mo_grid_scaler, only: scaler_t, up_a_mean
-  use mo_mpr_legacy_bridge, only: mpr_bridge_land_cover_fraction, mpr_bridge_snow_param, mpr_bridge_pet_lai
+  use mo_mpr_legacy_bridge, only: mpr_bridge_land_cover_fraction, mpr_bridge_snow_param, mpr_bridge_pet_lai, &
+    mpr_bridge_setup_soil_database, mpr_bridge_soil_moisture
   use mo_netcdf, only: NcDataset, NcDimension, NcVariable
   use mo_orderpack, only: sort_index
   use mo_string_utils, only: n2s => num2str
@@ -52,6 +53,15 @@ module mo_mpr_container
     real(dp), allocatable :: pet_fac_lai_cache(:, :, :) !< cached PET-LAI correction (nCells1, nLAI, nLC)
   end type mpr_pet_state_t
 
+  type :: mpr_soil_state_t
+    real(dp), allocatable :: sm_exponent_cache(:, :, :) !< cached soil moisture exponent (nCells1, nHorizons, nLC)
+    real(dp), allocatable :: sm_saturation_cache(:, :, :) !< cached saturated soil moisture (nCells1, nHorizons, nLC)
+    real(dp), allocatable :: sm_field_capacity_cache(:, :, :) !< cached soil moisture field capacity (nCells1, nHorizons, nLC)
+    real(dp), allocatable :: wilting_point_cache(:, :, :) !< cached wilting point (nCells1, nHorizons, nLC)
+    real(dp), allocatable :: f_roots_cache(:, :, :) !< cached root fractions (nCells1, nHorizons, nLC)
+    real(dp), allocatable :: thresh_jarvis_cache(:) !< cached Jarvis threshold field (nCells1)
+  end type mpr_soil_state_t
+
   !> \class   mpr_t
   !> \brief   Class for a single MPR process container.
   type, public :: mpr_t
@@ -73,6 +83,7 @@ module mo_mpr_container
     real(dp), allocatable :: max_interception_cache(:, :, :) !< cached max interception (nCells1, nLAI, nLC)
     type(mpr_snow_state_t) :: snow !< cached snow parameter fields
     type(mpr_pet_state_t) :: pet !< cached PET parameter fields
+    type(mpr_soil_state_t) :: soil !< cached soil moisture parameter fields
     integer(i4) :: n_lai_periods = 1_i4 !< number of cached LAI periods
     integer(i4) :: active_lai_idx = 0_i4 !< active cached LAI index
   contains
@@ -94,6 +105,7 @@ module mo_mpr_container
     procedure, private :: init_max_interception_cache => mpr_init_max_interception_cache
     procedure, private :: init_snow_cache => mpr_init_snow_cache
     procedure, private :: init_pet_lai_cache => mpr_init_pet_lai_cache
+    procedure, private :: init_soil_cache => mpr_init_soil_cache
     procedure, private :: update_exchange_slices => mpr_update_exchange_slices
     procedure, private :: lai_index_for_time => mpr_lai_index_for_time
     procedure, private :: land_cover_index_for_time => mpr_land_cover_index_for_time
@@ -577,6 +589,7 @@ contains
     if (self%exchange%parameters%process_matrix(1, 1) /= 0_i4) call self%init_max_interception_cache()
     if (self%exchange%parameters%process_matrix(2, 1) /= 0_i4) call self%init_snow_cache()
     if (self%exchange%parameters%process_matrix(5, 1) == -1_i4) call self%init_pet_lai_cache()
+    if (self%exchange%parameters%process_matrix(3, 1) /= 0_i4) call self%init_soil_cache()
     log_info(*) "MPR: temporal cache initialized (nLAI=", n2s(self%n_lai_periods), &
       ", nLC=", n2s(self%land_cover%n_periods), ")."
   end subroutine mpr_init_temporal_cache
@@ -870,6 +883,70 @@ contains
     self%exchange%pet_fac_lai%provided = .true.
   end subroutine mpr_init_pet_lai_cache
 
+  !> \brief Cache soil-moisture parameter fields on level1 for all land-cover slices.
+  subroutine mpr_init_soil_cache(self)
+    class(mpr_t), intent(inout), target :: self
+    integer(i4) :: domain_id
+    integer(i4) :: n_horizons
+    integer(i4) :: n_soil_layers
+    integer(i4) :: land_cover_idx
+    real(dp), allocatable :: soil_param(:)
+
+    domain_id = self%exchange%domain
+    n_horizons = self%config%n_horizons(domain_id)
+    if (n_horizons < 1_i4) then
+      log_fatal(*) "MPR: n_horizons must be >= 1 before soil cache initialization."
+      error stop 1
+    end if
+    if (.not.allocated(self%soil_lut_path)) then
+      log_fatal(*) "MPR: internal error, soil_lut_path not resolved in configure."
+      error stop 1
+    end if
+    if (.not.allocated(self%land_cover%l0_cache)) then
+      log_fatal(*) "MPR: land-cover level0 cache not available before soil cache initialization."
+      error stop 1
+    end if
+    if (.not.associated(self%exchange%soil_id%data)) then
+      log_fatal(*) "MPR: soil_id data not connected before soil cache initialization."
+      error stop 1
+    end if
+
+    n_soil_layers = 1_i4
+    if (self%config%soil_db_mode(domain_id) == 1_i4) n_soil_layers = n_horizons
+    call mpr_bridge_setup_soil_database( &
+      self%config, domain_id, self%soil_lut_path, self%exchange%soil_id%data(:, :n_soil_layers))
+
+    soil_param = self%exchange%parameters%get_process(3_i4)
+    if (allocated(self%soil%sm_exponent_cache)) deallocate(self%soil%sm_exponent_cache)
+    if (allocated(self%soil%sm_saturation_cache)) deallocate(self%soil%sm_saturation_cache)
+    if (allocated(self%soil%sm_field_capacity_cache)) deallocate(self%soil%sm_field_capacity_cache)
+    if (allocated(self%soil%wilting_point_cache)) deallocate(self%soil%wilting_point_cache)
+    if (allocated(self%soil%f_roots_cache)) deallocate(self%soil%f_roots_cache)
+    if (allocated(self%soil%thresh_jarvis_cache)) deallocate(self%soil%thresh_jarvis_cache)
+    allocate(self%soil%sm_exponent_cache(self%exchange%level1%ncells, n_horizons, self%land_cover%n_periods))
+    allocate(self%soil%sm_saturation_cache(self%exchange%level1%ncells, n_horizons, self%land_cover%n_periods))
+    allocate(self%soil%sm_field_capacity_cache(self%exchange%level1%ncells, n_horizons, self%land_cover%n_periods))
+    allocate(self%soil%wilting_point_cache(self%exchange%level1%ncells, n_horizons, self%land_cover%n_periods))
+    allocate(self%soil%f_roots_cache(self%exchange%level1%ncells, n_horizons, self%land_cover%n_periods))
+    allocate(self%soil%thresh_jarvis_cache(self%exchange%level1%ncells))
+
+    do land_cover_idx = 1_i4, self%land_cover%n_periods
+      call mpr_bridge_soil_moisture( &
+        self%exchange%parameters%process_matrix, soil_param, self%land_cover%l0_cache(:, land_cover_idx), &
+        self%exchange%soil_id%data(:, :n_soil_layers), self%exchange%level0, self%upscaler, &
+        self%soil%thresh_jarvis_cache, self%soil%sm_exponent_cache(:, :, land_cover_idx), &
+        self%soil%sm_saturation_cache(:, :, land_cover_idx), self%soil%sm_field_capacity_cache(:, :, land_cover_idx), &
+        self%soil%wilting_point_cache(:, :, land_cover_idx), self%soil%f_roots_cache(:, :, land_cover_idx))
+    end do
+
+    self%exchange%f_roots%provided = .true.
+    self%exchange%sm_saturation%provided = .true.
+    self%exchange%sm_exponent%provided = .true.
+    self%exchange%sm_field_capacity%provided = .true.
+    self%exchange%wilting_point%provided = .true.
+    self%exchange%thresh_jarvis%provided = .true.
+  end subroutine mpr_init_soil_cache
+
   !> \brief Switch exchange pointers to active cached MPR slices for current model time.
   subroutine mpr_update_exchange_slices(self, force)
     class(mpr_t), intent(inout), target :: self
@@ -883,7 +960,9 @@ contains
     if (.not.allocated(self%land_cover%sealed_fraction_l1) .and. &
       .not.allocated(self%max_interception_cache) .and. &
       .not.allocated(self%snow%thresh_temp_cache) .and. &
-      .not.allocated(self%pet%pet_fac_lai_cache)) return
+      .not.allocated(self%pet%pet_fac_lai_cache) .and. &
+      .not.allocated(self%soil%sm_exponent_cache) .and. &
+      .not.allocated(self%soil%thresh_jarvis_cache)) return
 
     lai_idx = self%lai_index_for_time()
     land_cover_idx = self%land_cover_index_for_time()
@@ -911,6 +990,16 @@ contains
     end if
     if (allocated(self%pet%pet_fac_lai_cache)) then
       self%exchange%pet_fac_lai%data => self%pet%pet_fac_lai_cache(:, lai_idx, land_cover_idx)
+    end if
+    if (allocated(self%soil%sm_exponent_cache)) then
+      self%exchange%f_roots%data => self%soil%f_roots_cache(:, :, land_cover_idx)
+      self%exchange%sm_saturation%data => self%soil%sm_saturation_cache(:, :, land_cover_idx)
+      self%exchange%sm_exponent%data => self%soil%sm_exponent_cache(:, :, land_cover_idx)
+      self%exchange%sm_field_capacity%data => self%soil%sm_field_capacity_cache(:, :, land_cover_idx)
+      self%exchange%wilting_point%data => self%soil%wilting_point_cache(:, :, land_cover_idx)
+    end if
+    if (allocated(self%soil%thresh_jarvis_cache)) then
+      self%exchange%thresh_jarvis%data => self%soil%thresh_jarvis_cache
     end if
     self%active_lai_idx = lai_idx
     self%land_cover%active_idx = land_cover_idx
@@ -1026,6 +1115,18 @@ contains
     self%exchange%degday_max%provided = .false.
     nullify(self%exchange%pet_fac_lai%data)
     self%exchange%pet_fac_lai%provided = .false.
+    nullify(self%exchange%f_roots%data)
+    self%exchange%f_roots%provided = .false.
+    nullify(self%exchange%sm_saturation%data)
+    self%exchange%sm_saturation%provided = .false.
+    nullify(self%exchange%sm_exponent%data)
+    self%exchange%sm_exponent%provided = .false.
+    nullify(self%exchange%sm_field_capacity%data)
+    self%exchange%sm_field_capacity%provided = .false.
+    nullify(self%exchange%wilting_point%data)
+    self%exchange%wilting_point%provided = .false.
+    nullify(self%exchange%thresh_jarvis%data)
+    self%exchange%thresh_jarvis%provided = .false.
     if (self%write_restart) call self%create_restart()
     if (allocated(self%land_cover%ds%vars)) call self%land_cover%ds%close()
     if (allocated(self%slope_emp)) deallocate(self%slope_emp)
@@ -1041,6 +1142,12 @@ contains
     if (allocated(self%snow%degday_inc_cache)) deallocate(self%snow%degday_inc_cache)
     if (allocated(self%snow%degday_max_cache)) deallocate(self%snow%degday_max_cache)
     if (allocated(self%pet%pet_fac_lai_cache)) deallocate(self%pet%pet_fac_lai_cache)
+    if (allocated(self%soil%sm_exponent_cache)) deallocate(self%soil%sm_exponent_cache)
+    if (allocated(self%soil%sm_saturation_cache)) deallocate(self%soil%sm_saturation_cache)
+    if (allocated(self%soil%sm_field_capacity_cache)) deallocate(self%soil%sm_field_capacity_cache)
+    if (allocated(self%soil%wilting_point_cache)) deallocate(self%soil%wilting_point_cache)
+    if (allocated(self%soil%f_roots_cache)) deallocate(self%soil%f_roots_cache)
+    if (allocated(self%soil%thresh_jarvis_cache)) deallocate(self%soil%thresh_jarvis_cache)
     self%land_cover%temporal = .false.
     self%land_cover%n_periods = 1_i4
     self%land_cover%active_idx = 0_i4
