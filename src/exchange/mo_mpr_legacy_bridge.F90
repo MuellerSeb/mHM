@@ -134,11 +134,12 @@ contains
   end subroutine mpr_bridge_reset_soil_database
 
   !> \brief Initialize the legacy soil database from the new MPR configuration and packed L0 soil ids.
-  subroutine mpr_bridge_setup_soil_database(config, domain, soil_lut_path, soil_id_l0)
+  subroutine mpr_bridge_setup_soil_database(config, domain, soil_lut_path, soil_id_l0, horizon_bounds)
     type(nml_config_mpr_t), intent(in) :: config
     integer(i4), intent(in) :: domain
     character(*), intent(in) :: soil_lut_path
     integer(i4), dimension(:, :), intent(in) :: soil_id_l0
+    real(dp), allocatable, intent(out), optional :: horizon_bounds(:)
     integer(i4) :: soil_layers
     integer(i4) :: required_depths
     integer(i4) :: i
@@ -202,6 +203,12 @@ contains
         soilDB%is_present(j) = 1_i4
       end do
     end do
+
+    if (present(horizon_bounds)) then
+      allocate(horizon_bounds(nSoilHorizons_mHM + 1_i4))
+      horizon_bounds(1) = 0.0_dp
+      horizon_bounds(2:) = HorizonDepth_mHM(:)
+    end if
   end subroutine mpr_bridge_setup_soil_database
 
   !> \brief Upscale land-cover fractions from packed L0 ids to packed L1 fractions.

@@ -69,6 +69,7 @@ module mo_mpr_container
     real(dp), allocatable :: wilting_point_cache(:, :, :) !< cached wilting point (nCells1, nHorizons, nLC)
     real(dp), allocatable :: f_roots_cache(:, :, :) !< cached root fractions (nCells1, nHorizons, nLC)
     real(dp), allocatable :: thresh_jarvis_cache(:) !< cached Jarvis threshold field (nCells1)
+    real(dp), allocatable :: horizon_bounds(:) !< cached soil-horizon boundaries for restart metadata (nHorizons+1)
     real(dp), allocatable :: sm_deficit_fc_l0(:, :) !< cached saturation deficit from field capacity on L0 (nCells0, nLC)
     real(dp), allocatable :: ks_var_h_l0(:, :) !< cached horizontal Ks variability on L0 (nCells0, nLC)
     real(dp), allocatable :: ks_var_v_l0(:, :) !< cached vertical Ks variability on L0 (nCells0, nLC)
@@ -131,6 +132,7 @@ module mo_mpr_container
     procedure, private :: init_upscaler                   => mpr_init_upscaler
     procedure, private :: init_slope_emp                  => mpr_init_slope_emp
     procedure, private :: init_temporal_cache             => mpr_init_temporal_cache
+    procedure, private :: init_land_cover_timing          => mpr_init_land_cover_timing
     procedure, private :: init_land_cover_cache           => mpr_init_land_cover_cache
     procedure, private :: init_land_cover_fraction_cache  => mpr_init_land_cover_fraction_cache
     procedure, private :: build_lai_l0_cache              => mpr_build_lai_l0_cache
@@ -149,6 +151,7 @@ module mo_mpr_container
     procedure, private :: land_cover_index_for_time       => mpr_land_cover_index_for_time
     procedure, private :: check_geo_units_against_lut     => mpr_check_geo_units_against_lut
     procedure, private :: check_geoparameter_consistency  => mpr_check_geoparameter_consistency
+    procedure, private :: validate_restart_grid           => mpr_validate_restart_grid
   end type mpr_t
 
 contains
@@ -290,7 +293,6 @@ contains
         error stop 1
       end if
       self%restart_input_path = self%exchange%get_path(self%config%restart_input_path(id(1)))
-      call self%read_restart_data()
     end if
     if (self%write_restart) then
       status = self%config%is_set("restart_output_path", idx=id, errmsg=errmsg)
@@ -302,15 +304,27 @@ contains
     end if
 
     ! declare MPR prerequisites in the exchange contract
-    self%exchange%slope%required = .true.
-    self%exchange%aspect%required = .true.
-    self%exchange%soil_id%required = .true.
-    self%exchange%geo_unit%required = .true.
+    self%exchange%slope%required = .not.self%read_restart
+    self%exchange%aspect%required = .not.self%read_restart
+    self%exchange%soil_id%required = .not.self%read_restart
+    self%exchange%geo_unit%required = .not.self%read_restart
     pet_process = self%exchange%parameters%process_matrix(5, 1)
     require_gridded_lai = self%config%lai_time_step(id(1)) /= 0_i4 .or. &
       self%exchange%parameters%process_matrix(1, 1) /= 0_i4 .or. &
       pet_process == -1_i4 .or. pet_process == 2_i4 .or. pet_process == 3_i4
-    self%exchange%gridded_lai%required = require_gridded_lai
+    self%exchange%gridded_lai%required = require_gridded_lai .and. .not.self%read_restart
+
+    if (self%read_restart) then
+      if (.not.associated(self%exchange%level0)) then
+        log_fatal(*) "MPR: level0 grid not connected."
+        error stop 1
+      end if
+      call self%ensure_level1_grid()
+      call self%init_land_cover_timing()
+      call self%read_restart_data()
+      call self%update_exchange_slices(force=.true.)
+      return
+    end if
 
     if (.not.self%exchange%slope%provided) then
       log_fatal(*) "MPR: slope not provided (check input settings)."
@@ -468,7 +482,10 @@ contains
     type(NcDimension) :: lai_dim
     type(NcDimension) :: land_cover_dim
     type(NcDimension) :: soil_dim
+    real(dp), allocatable :: land_cover_bounds(:)
+    real(dp), allocatable :: soil_bounds(:)
     integer(i4) :: process_case
+    integer(i4) :: i
 
     if (.not.associated(self%exchange%level1)) then
       log_fatal(*) "MPR: level1 grid not connected while writing restart."
@@ -483,13 +500,51 @@ contains
       dims_xy(2) = nc%getDimension("lat")
     end if
     lai_dim = nc%setDimension(trim(LAIVarName), self%n_lai_periods)
-    land_cover_dim = nc%setDimension(trim(landCoverPeriodsVarName), self%land_cover%n_periods)
-    soil_dim = nc%setDimension(trim(soilHorizonsVarName), self%config%n_horizons(self%exchange%domain))
+    allocate(land_cover_bounds(self%land_cover%n_periods + 1_i4))
+    do i = 1_i4, size(land_cover_bounds)
+      land_cover_bounds(i) = real(i, dp)
+    end do
+    land_cover_dim = nc%setCoordinate(trim(landCoverPeriodsVarName), self%land_cover%n_periods, &
+      bounds=land_cover_bounds, reference=0_i4)
+    deallocate(land_cover_bounds)
+    if (allocated(self%soil%horizon_bounds)) then
+      allocate(soil_bounds(size(self%soil%horizon_bounds)))
+      soil_bounds = self%soil%horizon_bounds
+    else
+      allocate(soil_bounds(self%config%n_horizons(self%exchange%domain) + 1_i4))
+      do i = 1_i4, size(soil_bounds)
+        soil_bounds(i) = real(i - 1_i4, dp)
+      end do
+    end if
+    soil_dim = nc%setCoordinate(trim(soilHorizonsVarName), self%config%n_horizons(self%exchange%domain), &
+      bounds=soil_bounds, reference=2_i4)
+    deallocate(soil_bounds)
+
+    if (allocated(self%land_cover%sealed_fraction_l1)) then
+      call mpr_write_restart_field_3d( &
+        self, nc, dims_xy, land_cover_dim, "L1_fSealed", "fraction of Sealed area at level 1", &
+        self%land_cover%sealed_fraction_l1)
+    end if
 
     if (allocated(self%max_interception_cache)) then
       call mpr_write_restart_field_3d( &
         self, nc, dims_xy, lai_dim, "L1_maxInter", "Maximum interception at level 1", &
         self%max_interception_cache(:, :, 1))
+    end if
+
+    if (allocated(self%snow%thresh_temp_cache)) then
+      call mpr_write_restart_field_3d( &
+        self, nc, dims_xy, land_cover_dim, "L1_tempThresh", "Threshold temperature for snow/rain at level 1", &
+        self%snow%thresh_temp_cache)
+      call mpr_write_restart_field_3d( &
+        self, nc, dims_xy, land_cover_dim, "L1_degDayNoPre", &
+        "Degree-day factor with no precipitation at level 1", self%snow%degday_dry_cache)
+      call mpr_write_restart_field_3d( &
+        self, nc, dims_xy, land_cover_dim, "L1_degDayInc", &
+        "Increase of the degree-day factor per mm precipitation at level 1", self%snow%degday_inc_cache)
+      call mpr_write_restart_field_3d( &
+        self, nc, dims_xy, land_cover_dim, "L1_degDayMax", &
+        "Maximum degree-day factor at level 1", self%snow%degday_max_cache)
     end if
 
     if (allocated(self%pet%pet_fac_lai_cache)) then
@@ -616,6 +671,102 @@ contains
 
   end subroutine mpr_write_restart_data
 
+  !> \brief Read a packed L1 scalar field from unpacked 2D restart data.
+  subroutine mpr_read_restart_field_2d(self, nc, var_name, data_packed)
+    class(mpr_t), intent(inout), target :: self
+    type(NcDataset), intent(in) :: nc
+    character(*), intent(in) :: var_name
+    real(dp), allocatable, intent(out) :: data_packed(:)
+    type(NcVariable) :: nc_var
+    integer(i4), allocatable :: var_shape(:)
+    real(dp), allocatable :: data_2d(:, :)
+
+    if (.not.nc%hasVariable(trim(var_name))) then
+      log_fatal(*) "MPR restart: required variable missing: ", trim(var_name)
+      error stop 1
+    end if
+    nc_var = nc%getVariable(trim(var_name))
+    var_shape = nc_var%getShape()
+    if (size(var_shape) /= 2) then
+      log_fatal(*) "MPR restart: variable ", trim(var_name), " has rank ", n2s(size(var_shape)), ", expected 2."
+      error stop 1
+    end if
+    if (any(var_shape /= [self%exchange%level1%nx, self%exchange%level1%ny])) then
+      log_fatal(*) "MPR restart: variable ", trim(var_name), " has incompatible x/y shape."
+      error stop 1
+    end if
+    call nc_var%getData(data_2d)
+    allocate(data_packed(self%exchange%level1%ncells))
+    call self%exchange%level1%pack_into(data_2d, data_packed)
+  end subroutine mpr_read_restart_field_2d
+
+  !> \brief Read a packed L1 field with one auxiliary dimension from unpacked 3D restart data.
+  subroutine mpr_read_restart_field_3d(self, nc, var_name, data_packed)
+    class(mpr_t), intent(inout), target :: self
+    type(NcDataset), intent(in) :: nc
+    character(*), intent(in) :: var_name
+    real(dp), allocatable, intent(out) :: data_packed(:, :)
+    type(NcVariable) :: nc_var
+    integer(i4), allocatable :: var_shape(:)
+    real(dp), allocatable :: data_3d(:, :, :)
+    integer(i4) :: idx
+
+    if (.not.nc%hasVariable(trim(var_name))) then
+      log_fatal(*) "MPR restart: required variable missing: ", trim(var_name)
+      error stop 1
+    end if
+    nc_var = nc%getVariable(trim(var_name))
+    var_shape = nc_var%getShape()
+    if (size(var_shape) /= 3) then
+      log_fatal(*) "MPR restart: variable ", trim(var_name), " has rank ", n2s(size(var_shape)), ", expected 3."
+      error stop 1
+    end if
+    if (any(var_shape(1:2) /= [self%exchange%level1%nx, self%exchange%level1%ny])) then
+      log_fatal(*) "MPR restart: variable ", trim(var_name), " has incompatible x/y shape."
+      error stop 1
+    end if
+    call nc_var%getData(data_3d)
+    allocate(data_packed(self%exchange%level1%ncells, var_shape(3)))
+    do idx = 1_i4, var_shape(3)
+      call self%exchange%level1%pack_into(data_3d(:, :, idx), data_packed(:, idx))
+    end do
+  end subroutine mpr_read_restart_field_3d
+
+  !> \brief Read a packed L1 field with two auxiliary dimensions from unpacked 4D restart data.
+  subroutine mpr_read_restart_field_4d(self, nc, var_name, data_packed)
+    class(mpr_t), intent(inout), target :: self
+    type(NcDataset), intent(in) :: nc
+    character(*), intent(in) :: var_name
+    real(dp), allocatable, intent(out) :: data_packed(:, :, :)
+    type(NcVariable) :: nc_var
+    integer(i4), allocatable :: var_shape(:)
+    real(dp), allocatable :: data_4d(:, :, :, :)
+    integer(i4) :: idx3
+    integer(i4) :: idx4
+
+    if (.not.nc%hasVariable(trim(var_name))) then
+      log_fatal(*) "MPR restart: required variable missing: ", trim(var_name)
+      error stop 1
+    end if
+    nc_var = nc%getVariable(trim(var_name))
+    var_shape = nc_var%getShape()
+    if (size(var_shape) /= 4) then
+      log_fatal(*) "MPR restart: variable ", trim(var_name), " has rank ", n2s(size(var_shape)), ", expected 4."
+      error stop 1
+    end if
+    if (any(var_shape(1:2) /= [self%exchange%level1%nx, self%exchange%level1%ny])) then
+      log_fatal(*) "MPR restart: variable ", trim(var_name), " has incompatible x/y shape."
+      error stop 1
+    end if
+    call nc_var%getData(data_4d)
+    allocate(data_packed(self%exchange%level1%ncells, var_shape(3), var_shape(4)))
+    do idx4 = 1_i4, var_shape(4)
+      do idx3 = 1_i4, var_shape(3)
+        call self%exchange%level1%pack_into(data_4d(:, :, idx3, idx4), data_packed(:, idx3, idx4))
+      end do
+    end do
+  end subroutine mpr_read_restart_field_4d
+
   !> \brief Write a packed L1 scalar field as unpacked 2D restart data.
   subroutine mpr_write_restart_field_2d(self, nc, dims_xy, var_name, long_name, data_packed)
     class(mpr_t), intent(inout), target :: self
@@ -701,15 +852,296 @@ contains
     deallocate(data_4d)
   end subroutine mpr_write_restart_field_4d
 
-  !> \brief Placeholder read restart routine for MPR.
   subroutine mpr_read_restart_data(self)
     class(mpr_t), intent(inout), target :: self
+    type(NcDataset) :: nc
+    type(NcDimension) :: nc_dim
+    type(NcVariable) :: nc_var
+    type(grid_t) :: restart_grid
+    integer(i4) :: pet_process
+    integer(i4) :: soil_process
+    integer(i4) :: neutron_process
+    integer(i4) :: n_lai_restart
+    integer(i4) :: n_land_cover_restart
+    integer(i4) :: n_soil_restart
+    integer(i4) :: land_cover_idx
+    real(dp), allocatable :: field_3d(:, :)
+    real(dp), allocatable :: bounds_2d(:, :)
+
     if (.not.allocated(self%restart_input_path)) then
       log_fatal(*) "MPR: restart input path is not configured."
       error stop 1
     end if
-    log_fatal(*) "MPR: read_restart is configured but restart read is not implemented in new mpr_t yet."
-    error stop 1
+    if (.not.associated(self%exchange%level1)) then
+      log_fatal(*) "MPR restart: level1 grid not connected before restart read."
+      error stop 1
+    end if
+    if (self%exchange%parameters%process_matrix(10, 1) > 0_i4 .and. self%exchange%parameters%process_matrix(3, 1) == 0_i4) then
+      log_fatal(*) "MPR: neutron regionalization requires an active soil-moisture process."
+      error stop 1
+    end if
+
+    nc = NcDataset(self%restart_input_path, "r")
+    call restart_grid%from_restart(nc)
+    call self%validate_restart_grid(restart_grid)
+
+    if (.not.nc%hasDimension(trim(landCoverPeriodsVarName))) then
+      log_fatal(*) "MPR restart: required land-cover dimension missing: ", trim(landCoverPeriodsVarName)
+      error stop 1
+    end if
+    nc_dim = nc%getDimension(trim(landCoverPeriodsVarName))
+    n_land_cover_restart = nc_dim%getLength()
+    if (n_land_cover_restart /= self%land_cover%n_periods) then
+      log_fatal(*) "MPR restart: land-cover period count ", n2s(n_land_cover_restart), &
+        " does not match current timing configuration ", n2s(self%land_cover%n_periods), "."
+      error stop 1
+    end if
+
+    pet_process = self%exchange%parameters%process_matrix(5, 1)
+    soil_process = self%exchange%parameters%process_matrix(3, 1)
+    neutron_process = self%exchange%parameters%process_matrix(10, 1)
+    if (self%exchange%parameters%process_matrix(1, 1) /= 0_i4 .or. any(pet_process == [-1_i4, 2_i4, 3_i4])) then
+      if (.not.nc%hasDimension(trim(LAIVarName))) then
+        log_fatal(*) "MPR restart: required LAI dimension missing: ", trim(LAIVarName)
+        error stop 1
+      end if
+      nc_dim = nc%getDimension(trim(LAIVarName))
+      n_lai_restart = nc_dim%getLength()
+      if (n_lai_restart < 1_i4) then
+        log_fatal(*) "MPR restart: LAI dimension length must be >= 1."
+        error stop 1
+      end if
+      self%n_lai_periods = n_lai_restart
+    else
+      self%n_lai_periods = 1_i4
+    end if
+
+    if (soil_process /= 0_i4 .or. neutron_process > 0_i4) then
+      if (.not.nc%hasDimension(trim(soilHorizonsVarName))) then
+        log_fatal(*) "MPR restart: required soil-horizon dimension missing: ", trim(soilHorizonsVarName)
+        error stop 1
+      end if
+      nc_dim = nc%getDimension(trim(soilHorizonsVarName))
+      n_soil_restart = nc_dim%getLength()
+      if (n_soil_restart /= self%config%n_horizons(self%exchange%domain)) then
+        log_fatal(*) "MPR restart: soil-horizon count ", n2s(n_soil_restart), &
+          " does not match current config ", n2s(self%config%n_horizons(self%exchange%domain)), "."
+        error stop 1
+      end if
+      if (allocated(self%soil%horizon_bounds)) deallocate(self%soil%horizon_bounds)
+      if (nc%hasVariable(trim(soilHorizonsVarName)//"_bnds")) then
+        nc_var = nc%getVariable(trim(soilHorizonsVarName)//"_bnds")
+        call nc_var%getData(bounds_2d)
+        if (size(bounds_2d, 1) == 2_i4 .and. size(bounds_2d, 2) == n_soil_restart) then
+          allocate(self%soil%horizon_bounds(n_soil_restart + 1_i4))
+          self%soil%horizon_bounds(1) = bounds_2d(1, 1)
+          self%soil%horizon_bounds(2:) = bounds_2d(2, :)
+        end if
+      end if
+    end if
+
+    if (allocated(self%land_cover%sealed_fraction_l1)) deallocate(self%land_cover%sealed_fraction_l1)
+    call mpr_read_restart_field_3d(self, nc, "L1_fSealed", field_3d)
+    if (size(field_3d, 2) /= self%land_cover%n_periods) then
+      log_fatal(*) "MPR restart: L1_fSealed land-cover dimension does not match current timing configuration."
+      error stop 1
+    end if
+    allocate(self%land_cover%sealed_fraction_l1(self%exchange%level1%ncells, self%land_cover%n_periods))
+    self%land_cover%sealed_fraction_l1 = field_3d
+    deallocate(field_3d)
+    self%exchange%f_sealed%provided = .true.
+
+    if (self%exchange%parameters%process_matrix(1, 1) /= 0_i4) then
+      if (allocated(self%max_interception_cache)) deallocate(self%max_interception_cache)
+      call mpr_read_restart_field_3d(self, nc, "L1_maxInter", field_3d)
+      if (size(field_3d, 2) /= self%n_lai_periods) then
+        log_fatal(*) "MPR restart: L1_maxInter LAI dimension does not match restart LAI periods."
+        error stop 1
+      end if
+      allocate(self%max_interception_cache(self%exchange%level1%ncells, self%n_lai_periods, self%land_cover%n_periods))
+      do land_cover_idx = 1_i4, self%land_cover%n_periods
+        self%max_interception_cache(:, :, land_cover_idx) = field_3d
+      end do
+      deallocate(field_3d)
+      self%exchange%max_interception%provided = .true.
+    end if
+
+    if (self%exchange%parameters%process_matrix(2, 1) /= 0_i4) then
+      if (allocated(self%snow%thresh_temp_cache)) deallocate(self%snow%thresh_temp_cache)
+      if (allocated(self%snow%degday_dry_cache)) deallocate(self%snow%degday_dry_cache)
+      if (allocated(self%snow%degday_inc_cache)) deallocate(self%snow%degday_inc_cache)
+      if (allocated(self%snow%degday_max_cache)) deallocate(self%snow%degday_max_cache)
+      call mpr_read_restart_field_3d(self, nc, "L1_tempThresh", self%snow%thresh_temp_cache)
+      call mpr_read_restart_field_3d(self, nc, "L1_degDayNoPre", self%snow%degday_dry_cache)
+      call mpr_read_restart_field_3d(self, nc, "L1_degDayInc", self%snow%degday_inc_cache)
+      call mpr_read_restart_field_3d(self, nc, "L1_degDayMax", self%snow%degday_max_cache)
+      if (any([size(self%snow%thresh_temp_cache, 2), size(self%snow%degday_dry_cache, 2), &
+        size(self%snow%degday_inc_cache, 2), size(self%snow%degday_max_cache, 2)] /= self%land_cover%n_periods)) then
+        log_fatal(*) "MPR restart: snow restart land-cover dimensions do not match current timing configuration."
+        error stop 1
+      end if
+      self%exchange%thresh_temp%provided = .true.
+      self%exchange%degday_dry%provided = .true.
+      self%exchange%degday_inc%provided = .true.
+      self%exchange%degday_max%provided = .true.
+    end if
+
+    select case (pet_process)
+      case (-2_i4)
+        if (allocated(self%pet%pet_fac_aspect_cache)) deallocate(self%pet%pet_fac_aspect_cache)
+        call mpr_read_restart_field_2d(self, nc, "L1_fAsp", self%pet%pet_fac_aspect_cache)
+        self%exchange%pet_fac_aspect%provided = .true.
+      case (-1_i4)
+        if (allocated(self%pet%pet_fac_lai_cache)) deallocate(self%pet%pet_fac_lai_cache)
+        call mpr_read_restart_field_4d(self, nc, "L1_petLAIcorFactor", self%pet%pet_fac_lai_cache)
+        if (size(self%pet%pet_fac_lai_cache, 2) /= self%n_lai_periods .or. &
+          size(self%pet%pet_fac_lai_cache, 3) /= self%land_cover%n_periods) then
+          log_fatal(*) "MPR restart: PET-LAI restart dimensions do not match current LAI/land-cover configuration."
+          error stop 1
+        end if
+        self%exchange%pet_fac_lai%provided = .true.
+      case (1_i4)
+        if (allocated(self%pet%pet_fac_aspect_cache)) deallocate(self%pet%pet_fac_aspect_cache)
+        if (allocated(self%pet%pet_coeff_hs_cache)) deallocate(self%pet%pet_coeff_hs_cache)
+        call mpr_read_restart_field_2d(self, nc, "L1_fAsp", self%pet%pet_fac_aspect_cache)
+        call mpr_read_restart_field_2d(self, nc, "L1_HarSamCoeff", self%pet%pet_coeff_hs_cache)
+        self%exchange%pet_fac_aspect%provided = .true.
+        self%exchange%pet_coeff_hs%provided = .true.
+      case (2_i4)
+        if (allocated(self%pet%pet_coeff_pt_cache)) deallocate(self%pet%pet_coeff_pt_cache)
+        call mpr_read_restart_field_3d(self, nc, "L1_PrieTayAlpha", self%pet%pet_coeff_pt_cache)
+        if (size(self%pet%pet_coeff_pt_cache, 2) /= self%n_lai_periods) then
+          log_fatal(*) "MPR restart: Priestley-Taylor restart LAI dimension does not match restart LAI periods."
+          error stop 1
+        end if
+        self%exchange%pet_coeff_pt%provided = .true.
+      case (3_i4)
+        if (allocated(self%pet%resist_aero_cache)) deallocate(self%pet%resist_aero_cache)
+        if (allocated(self%pet%resist_surf_cache)) deallocate(self%pet%resist_surf_cache)
+        call mpr_read_restart_field_4d(self, nc, "L1_aeroResist", self%pet%resist_aero_cache)
+        call mpr_read_restart_field_3d(self, nc, "L1_surfResist", self%pet%resist_surf_cache)
+        if (size(self%pet%resist_aero_cache, 2) /= self%n_lai_periods .or. &
+          size(self%pet%resist_aero_cache, 3) /= self%land_cover%n_periods) then
+          log_fatal(*) "MPR restart: aerodynamic resistance dimensions do not match current LAI/land-cover configuration."
+          error stop 1
+        end if
+        if (size(self%pet%resist_surf_cache, 2) /= self%n_lai_periods) then
+          log_fatal(*) "MPR restart: surface resistance LAI dimension does not match restart LAI periods."
+          error stop 1
+        end if
+        self%exchange%resist_aero%provided = .true.
+        self%exchange%resist_surf%provided = .true.
+    end select
+
+    if (soil_process /= 0_i4) then
+      if (allocated(self%soil%sm_exponent_cache)) deallocate(self%soil%sm_exponent_cache)
+      if (allocated(self%soil%sm_saturation_cache)) deallocate(self%soil%sm_saturation_cache)
+      if (allocated(self%soil%sm_field_capacity_cache)) deallocate(self%soil%sm_field_capacity_cache)
+      if (allocated(self%soil%wilting_point_cache)) deallocate(self%soil%wilting_point_cache)
+      if (allocated(self%soil%f_roots_cache)) deallocate(self%soil%f_roots_cache)
+      if (allocated(self%soil%thresh_jarvis_cache)) deallocate(self%soil%thresh_jarvis_cache)
+      call mpr_read_restart_field_4d(self, nc, "L1_fRoots", self%soil%f_roots_cache)
+      call mpr_read_restart_field_4d(self, nc, "L1_soilMoistSat", self%soil%sm_saturation_cache)
+      call mpr_read_restart_field_4d(self, nc, "L1_soilMoistExp", self%soil%sm_exponent_cache)
+      call mpr_read_restart_field_4d(self, nc, "L1_soilMoistFC", self%soil%sm_field_capacity_cache)
+      call mpr_read_restart_field_4d(self, nc, "L1_wiltingPoint", self%soil%wilting_point_cache)
+      if (any([size(self%soil%f_roots_cache, 2), size(self%soil%sm_saturation_cache, 2), size(self%soil%sm_exponent_cache, 2), &
+        size(self%soil%sm_field_capacity_cache, 2), size(self%soil%wilting_point_cache, 2)] /= n_soil_restart) .or. &
+        any([size(self%soil%f_roots_cache, 3), size(self%soil%sm_saturation_cache, 3), size(self%soil%sm_exponent_cache, 3), &
+        size(self%soil%sm_field_capacity_cache, 3), size(self%soil%wilting_point_cache, 3)] /= self%land_cover%n_periods)) then
+        log_fatal(*) "MPR restart: soil-moisture restart dimensions do not match current soil/land-cover configuration."
+        error stop 1
+      end if
+      allocate(self%soil%thresh_jarvis_cache(self%exchange%level1%ncells))
+      if (any(soil_process == [2_i4, 3_i4])) then
+        call mpr_read_restart_field_2d(self, nc, "L1_jarvis_thresh_c1", self%soil%thresh_jarvis_cache)
+      else
+        self%soil%thresh_jarvis_cache = nodata_dp
+      end if
+      self%exchange%f_roots%provided = .true.
+      self%exchange%sm_saturation%provided = .true.
+      self%exchange%sm_exponent%provided = .true.
+      self%exchange%sm_field_capacity%provided = .true.
+      self%exchange%wilting_point%provided = .true.
+      self%exchange%thresh_jarvis%provided = .true.
+    end if
+
+    if (self%exchange%parameters%process_matrix(6, 1) /= 0_i4) then
+      if (allocated(self%runoff%alpha_cache)) deallocate(self%runoff%alpha_cache)
+      if (allocated(self%runoff%k_fastflow_cache)) deallocate(self%runoff%k_fastflow_cache)
+      if (allocated(self%runoff%k_slowflow_cache)) deallocate(self%runoff%k_slowflow_cache)
+      if (allocated(self%runoff%thresh_unsat_cache)) deallocate(self%runoff%thresh_unsat_cache)
+      call mpr_read_restart_field_3d(self, nc, "L1_alpha", self%runoff%alpha_cache)
+      call mpr_read_restart_field_3d(self, nc, "L1_kfastFlow", self%runoff%k_fastflow_cache)
+      call mpr_read_restart_field_3d(self, nc, "L1_kSlowFlow", self%runoff%k_slowflow_cache)
+      call mpr_read_restart_field_2d(self, nc, "L1_unsatThresh", self%runoff%thresh_unsat_cache)
+      if (any([size(self%runoff%alpha_cache, 2), size(self%runoff%k_fastflow_cache, 2), &
+        size(self%runoff%k_slowflow_cache, 2)] /= self%land_cover%n_periods)) then
+        log_fatal(*) "MPR restart: runoff restart land-cover dimensions do not match current timing configuration."
+        error stop 1
+      end if
+      self%exchange%alpha%provided = .true.
+      self%exchange%k_fastflow%provided = .true.
+      self%exchange%k_slowflow%provided = .true.
+      self%exchange%thresh_unsat%provided = .true.
+    end if
+    if (self%exchange%parameters%process_matrix(7, 1) /= 0_i4) then
+      if (allocated(self%runoff%k_percolation_cache)) deallocate(self%runoff%k_percolation_cache)
+      if (allocated(self%runoff%f_karst_loss_cache)) deallocate(self%runoff%f_karst_loss_cache)
+      call mpr_read_restart_field_3d(self, nc, "L1_kPerco", self%runoff%k_percolation_cache)
+      call mpr_read_restart_field_2d(self, nc, "L1_karstLoss", self%runoff%f_karst_loss_cache)
+      if (size(self%runoff%k_percolation_cache, 2) /= self%land_cover%n_periods) then
+        log_fatal(*) "MPR restart: percolation restart land-cover dimension does not match current timing configuration."
+        error stop 1
+      end if
+      self%exchange%k_percolation%provided = .true.
+      self%exchange%f_karst_loss%provided = .true.
+    end if
+    if (self%exchange%parameters%process_matrix(4, 1) /= 0_i4) then
+      if (allocated(self%runoff%thresh_sealed_cache)) deallocate(self%runoff%thresh_sealed_cache)
+      call mpr_read_restart_field_2d(self, nc, "L1_sealedThresh", self%runoff%thresh_sealed_cache)
+      self%exchange%thresh_sealed%provided = .true.
+    end if
+    if (self%exchange%parameters%process_matrix(9, 1) /= 0_i4) then
+      if (allocated(self%runoff%k_baseflow_cache)) deallocate(self%runoff%k_baseflow_cache)
+      call mpr_read_restart_field_3d(self, nc, "L1_kBaseFlow", self%runoff%k_baseflow_cache)
+      if (size(self%runoff%k_baseflow_cache, 2) /= self%land_cover%n_periods) then
+        log_fatal(*) "MPR restart: baseflow restart land-cover dimension does not match current timing configuration."
+        error stop 1
+      end if
+      self%exchange%k_baseflow%provided = .true.
+    end if
+
+    if (neutron_process > 0_i4) then
+      if (allocated(self%neutron%desilets_n0_cache)) deallocate(self%neutron%desilets_n0_cache)
+      if (allocated(self%neutron%bulk_density_cache)) deallocate(self%neutron%bulk_density_cache)
+      if (allocated(self%neutron%lattice_water_cache)) deallocate(self%neutron%lattice_water_cache)
+      if (allocated(self%neutron%cosmic_l3_cache)) deallocate(self%neutron%cosmic_l3_cache)
+      call mpr_read_restart_field_2d(self, nc, "L1_No_Count", self%neutron%desilets_n0_cache)
+      call mpr_read_restart_field_4d(self, nc, "L1_bulkDens", self%neutron%bulk_density_cache)
+      call mpr_read_restart_field_4d(self, nc, "L1_latticeWater", self%neutron%lattice_water_cache)
+      if (any([size(self%neutron%bulk_density_cache, 2), size(self%neutron%lattice_water_cache, 2)] /= n_soil_restart) .or. &
+        any([size(self%neutron%bulk_density_cache, 3), size(self%neutron%lattice_water_cache, 3)] /= self%land_cover%n_periods)) then
+        log_fatal(*) "MPR restart: neutron restart dimensions do not match current soil/land-cover configuration."
+        error stop 1
+      end if
+      if (neutron_process == 2_i4) then
+        call mpr_read_restart_field_4d(self, nc, "L1_COSMICL3", self%neutron%cosmic_l3_cache)
+        if (size(self%neutron%cosmic_l3_cache, 2) /= n_soil_restart .or. &
+          size(self%neutron%cosmic_l3_cache, 3) /= self%land_cover%n_periods) then
+          log_fatal(*) "MPR restart: COSMIC L3 restart dimensions do not match current soil/land-cover configuration."
+          error stop 1
+        end if
+      end if
+      self%exchange%desilets_n0%provided = .true.
+      self%exchange%bulk_density%provided = .true.
+      self%exchange%lattice_water%provided = .true.
+      if (allocated(self%neutron%cosmic_l3_cache)) self%exchange%cosmic_l3%provided = .true.
+    end if
+
+    self%active_lai_idx = 0_i4
+    self%land_cover%active_idx = 0_i4
+    call nc%close()
   end subroutine mpr_read_restart_data
 
   !> \brief Ensure level1 grid is available and consistent with configured level1 resolution.
@@ -750,6 +1182,54 @@ contains
     self%exchange%level1 => self%tgt_level1
     log_info(*) "MPR: derive level1 grid from level0 with resolution ", n2s(l1_res)
   end subroutine mpr_ensure_level1_grid
+
+  !> \brief Validate that the restart grid matches the currently configured level1 grid.
+  subroutine mpr_validate_restart_grid(self, restart_grid)
+    class(mpr_t), intent(inout), target :: self
+    type(grid_t), intent(in), target :: restart_grid
+
+    if (.not.associated(self%exchange%level1)) then
+      log_fatal(*) "MPR restart: level1 grid not connected before restart-grid validation."
+      error stop 1
+    end if
+    if (restart_grid%coordsys /= self%exchange%level1%coordsys) then
+      log_fatal(*) "MPR restart: restart grid coordinate system does not match current level1 grid."
+      error stop 1
+    end if
+    if (restart_grid%nx /= self%exchange%level1%nx .or. restart_grid%ny /= self%exchange%level1%ny) then
+      log_fatal(*) "MPR restart: restart grid dimensions do not match current level1 grid."
+      error stop 1
+    end if
+    if (.not.is_close(restart_grid%cellsize, self%exchange%level1%cellsize) .or. &
+      .not.is_close(restart_grid%xllcorner, self%exchange%level1%xllcorner) .or. &
+      .not.is_close(restart_grid%yllcorner, self%exchange%level1%yllcorner)) then
+      log_fatal(*) "MPR restart: restart grid geometry does not match current level1 grid."
+      error stop 1
+    end if
+    if (restart_grid%y_direction /= self%exchange%level1%y_direction) then
+      log_fatal(*) "MPR restart: restart grid y-direction does not match current level1 grid."
+      error stop 1
+    end if
+    if (.not.allocated(restart_grid%mask) .or. .not.allocated(self%exchange%level1%mask)) then
+      log_fatal(*) "MPR restart: mask information missing during restart-grid validation."
+      error stop 1
+    end if
+    if (any(restart_grid%mask .neqv. self%exchange%level1%mask)) then
+      log_fatal(*) "MPR restart: restart grid mask does not match current level1 grid."
+      error stop 1
+    end if
+    if (self%exchange%level1%has_aux_coords()) then
+      if (.not.restart_grid%has_aux_coords()) then
+        log_fatal(*) "MPR restart: current level1 grid has auxiliary coordinates, but restart grid does not."
+        error stop 1
+      end if
+      if (any(.not.is_close(restart_grid%lon, self%exchange%level1%lon)) .or. &
+        any(.not.is_close(restart_grid%lat, self%exchange%level1%lat))) then
+        log_fatal(*) "MPR restart: restart grid auxiliary coordinates do not match current level1 grid."
+        error stop 1
+      end if
+    end if
+  end subroutine mpr_validate_restart_grid
 
   !> \brief Initialize cached L0->L1 scaler used by MPR upscaling routines.
   subroutine mpr_init_upscaler(self)
@@ -846,8 +1326,8 @@ contains
       ", nLC=", n2s(self%land_cover%n_periods), ")."
   end subroutine mpr_init_temporal_cache
 
-  !> \brief Build cached land-cover fields on level0 for static or temporal datasets.
-  subroutine mpr_init_land_cover_cache(self)
+  !> \brief Initialize only the land-cover timing state without caching land-cover input fields.
+  subroutine mpr_init_land_cover_timing(self)
     class(mpr_t), intent(inout), target :: self
     type(var) :: land_cover_meta
     integer(i4) :: n_times
@@ -861,30 +1341,26 @@ contains
       error stop 1
     end if
     if (.not.associated(self%exchange%level0)) then
-      log_fatal(*) "MPR: level0 grid not connected before land-cover cache initialization."
+      log_fatal(*) "MPR: level0 grid not connected before land-cover timing initialization."
       error stop 1
     end if
 
     if (allocated(self%land_cover%ds%vars)) call self%land_cover%ds%close()
-    if (allocated(self%land_cover%l0_cache)) deallocate(self%land_cover%l0_cache)
     if (allocated(self%land_cover%period_end)) deallocate(self%land_cover%period_end)
     self%land_cover%temporal = .false.
+    self%land_cover%n_periods = 1_i4
 
     call self%land_cover%ds%init( &
       path=self%land_cover%path, &
       vars=[var(name=trim(self%land_cover%var_name), kind="i4", static=.false., allow_static=.true.)], &
       grid=self%exchange%level0, &
-      timestamp=start_timestamp) ! assume start timestamp for land-cover dataset
+      timestamp=start_timestamp)
 
     land_cover_meta = self%land_cover%ds%meta(trim(self%land_cover%var_name))
     if (land_cover_meta%static) then
-      self%land_cover%n_periods = 1_i4
-      allocate(self%land_cover%l0_cache(self%exchange%level0%nCells, 1))
-      call self%land_cover%ds%read(trim(self%land_cover%var_name), self%land_cover%l0_cache(:, 1))
       allocate(self%land_cover%period_end(1))
       self%land_cover%period_end(1) = self%exchange%end_time
       call self%land_cover%ds%close()
-      log_info(*) "MPR: static land-cover dataset initialized (nLC=1)."
       return
     end if
 
@@ -904,16 +1380,40 @@ contains
       error stop 1
     end if
 
-    call self%land_cover%ds%read_chunk( &
-      trim(self%land_cover%var_name), self%land_cover%l0_cache, &
-      self%exchange%start_time, self%exchange%end_time, times=self%land_cover%period_end)
+    call self%land_cover%ds%chunk_times(self%exchange%start_time, self%exchange%end_time, times=self%land_cover%period_end)
     self%land_cover%n_periods = size(self%land_cover%period_end, kind=i4)
     if (self%land_cover%n_periods < 1_i4) then
-      log_fatal(*) "MPR: temporal land-cover read returned no periods for the simulation window."
+      log_fatal(*) "MPR: temporal land-cover timing returned no periods for the simulation window."
       error stop 1
     end if
 
     self%land_cover%temporal = .true.
+    call self%land_cover%ds%close()
+  end subroutine mpr_init_land_cover_timing
+
+  !> \brief Build cached land-cover fields on level0 for static or temporal datasets.
+  subroutine mpr_init_land_cover_cache(self)
+    class(mpr_t), intent(inout), target :: self
+
+    if (allocated(self%land_cover%l0_cache)) deallocate(self%land_cover%l0_cache)
+    call self%init_land_cover_timing()
+
+    call self%land_cover%ds%init( &
+      path=self%land_cover%path, &
+      vars=[var(name=trim(self%land_cover%var_name), kind="i4", static=.false., allow_static=.true.)], &
+      grid=self%exchange%level0, &
+      timestamp=start_timestamp)
+    if (.not.self%land_cover%temporal) then
+      allocate(self%land_cover%l0_cache(self%exchange%level0%nCells, 1))
+      call self%land_cover%ds%read(trim(self%land_cover%var_name), self%land_cover%l0_cache(:, 1))
+      call self%land_cover%ds%close()
+      log_info(*) "MPR: static land-cover dataset initialized (nLC=1)."
+      return
+    end if
+
+    call self%land_cover%ds%read_chunk( &
+      trim(self%land_cover%var_name), self%land_cover%l0_cache, &
+      self%exchange%start_time, self%exchange%end_time, times=self%land_cover%period_end)
     call self%land_cover%ds%close()
     log_info(*) "MPR: temporal land-cover dataset initialized (nLC=", n2s(self%land_cover%n_periods), ")."
   end subroutine mpr_init_land_cover_cache
@@ -1301,8 +1801,10 @@ contains
 
     n_soil_layers = 1_i4
     if (self%config%soil_db_mode(domain_id) == 1_i4) n_soil_layers = n_horizons
+    if (allocated(self%soil%horizon_bounds)) deallocate(self%soil%horizon_bounds)
     call mpr_bridge_setup_soil_database( &
-      self%config, domain_id, self%soil_lut_path, self%exchange%soil_id%data(:, :n_soil_layers))
+      self%config, domain_id, self%soil_lut_path, self%exchange%soil_id%data(:, :n_soil_layers), &
+      self%soil%horizon_bounds)
 
     soil_param = self%exchange%parameters%get_process(3_i4)
     if (allocated(self%soil%sm_exponent_cache)) deallocate(self%soil%sm_exponent_cache)
@@ -1311,6 +1813,7 @@ contains
     if (allocated(self%soil%wilting_point_cache)) deallocate(self%soil%wilting_point_cache)
     if (allocated(self%soil%f_roots_cache)) deallocate(self%soil%f_roots_cache)
     if (allocated(self%soil%thresh_jarvis_cache)) deallocate(self%soil%thresh_jarvis_cache)
+    if (allocated(self%soil%horizon_bounds)) deallocate(self%soil%horizon_bounds)
     if (allocated(self%soil%sm_deficit_fc_l0)) deallocate(self%soil%sm_deficit_fc_l0)
     if (allocated(self%soil%ks_var_h_l0)) deallocate(self%soil%ks_var_h_l0)
     if (allocated(self%soil%ks_var_v_l0)) deallocate(self%soil%ks_var_v_l0)
