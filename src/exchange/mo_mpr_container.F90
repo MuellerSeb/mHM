@@ -130,6 +130,14 @@ module mo_mpr_container
     procedure :: finalize   => mpr_finalize
     procedure, private :: create_restart                  => mpr_create_restart
     procedure, private :: write_restart_data              => mpr_write_restart_data
+    procedure, private :: write_restart_land_cover_timing => mpr_write_restart_land_cover_timing
+    procedure, private :: read_restart_land_cover_timing  => mpr_read_restart_land_cover_timing
+    procedure, private :: read_restart_field_2d           => mpr_read_restart_field_2d
+    procedure, private :: read_restart_field_3d           => mpr_read_restart_field_3d
+    procedure, private :: read_restart_field_4d           => mpr_read_restart_field_4d
+    procedure, private :: write_restart_field_2d          => mpr_write_restart_field_2d
+    procedure, private :: write_restart_field_3d          => mpr_write_restart_field_3d
+    procedure, private :: write_restart_field_4d          => mpr_write_restart_field_4d
     procedure, private :: read_restart_data               => mpr_read_restart_data
     procedure, private :: ensure_level1_grid              => mpr_ensure_level1_grid
     procedure, private :: init_upscaler                   => mpr_init_upscaler
@@ -139,6 +147,7 @@ module mo_mpr_container
     procedure, private :: init_land_cover_cache           => mpr_init_land_cover_cache
     procedure, private :: init_land_cover_fraction_cache  => mpr_init_land_cover_fraction_cache
     procedure, private :: build_lai_l0_cache              => mpr_build_lai_l0_cache
+    procedure, private :: load_process_params             => mpr_load_process_params
     procedure, private :: init_max_interception_cache     => mpr_init_max_interception_cache
     procedure, private :: init_snow_cache                 => mpr_init_snow_cache
     procedure, private :: init_pet_cache                  => mpr_init_pet_cache
@@ -498,7 +507,7 @@ contains
     end if
     lai_dim = nc%setDimension(trim(LAIVarName), self%n_lai_periods)
     land_cover_dim = nc%setDimension(trim(landCoverPeriodsVarName), self%land_cover%n_periods)
-    call mpr_write_restart_land_cover_timing(self, nc, land_cover_dim)
+    call self%write_restart_land_cover_timing(nc, land_cover_dim)
     if (allocated(self%soil%horizon_bounds)) then
       allocate(soil_bounds(size(self%soil%horizon_bounds)))
       soil_bounds = self%soil%horizon_bounds
@@ -513,151 +522,151 @@ contains
     deallocate(soil_bounds)
 
     if (allocated(self%land_cover%sealed_fraction_l1)) then
-      call mpr_write_restart_field_3d( &
-        self, nc, dims_xy, land_cover_dim, "L1_fSealed", "fraction of Sealed area at level 1", &
+      call self%write_restart_field_3d( &
+        nc, dims_xy, land_cover_dim, "L1_fSealed", "fraction of Sealed area at level 1", &
         self%land_cover%sealed_fraction_l1)
     end if
 
     if (allocated(self%max_interception_cache)) then
-      call mpr_write_restart_field_3d( &
-        self, nc, dims_xy, lai_dim, "L1_maxInter", "Maximum interception at level 1", &
+      call self%write_restart_field_3d( &
+        nc, dims_xy, lai_dim, "L1_maxInter", "Maximum interception at level 1", &
         self%max_interception_cache(:, :, 1))
     end if
 
     if (allocated(self%snow%thresh_temp_cache)) then
-      call mpr_write_restart_field_3d( &
-        self, nc, dims_xy, land_cover_dim, "L1_tempThresh", "Threshold temperature for snow/rain at level 1", &
+      call self%write_restart_field_3d( &
+        nc, dims_xy, land_cover_dim, "L1_tempThresh", "Threshold temperature for snow/rain at level 1", &
         self%snow%thresh_temp_cache)
-      call mpr_write_restart_field_3d( &
-        self, nc, dims_xy, land_cover_dim, "L1_degDayNoPre", &
+      call self%write_restart_field_3d( &
+        nc, dims_xy, land_cover_dim, "L1_degDayNoPre", &
         "Degree-day factor with no precipitation at level 1", self%snow%degday_dry_cache)
-      call mpr_write_restart_field_3d( &
-        self, nc, dims_xy, land_cover_dim, "L1_degDayInc", &
+      call self%write_restart_field_3d( &
+        nc, dims_xy, land_cover_dim, "L1_degDayInc", &
         "Increase of the degree-day factor per mm precipitation at level 1", self%snow%degday_inc_cache)
-      call mpr_write_restart_field_3d( &
-        self, nc, dims_xy, land_cover_dim, "L1_degDayMax", &
+      call self%write_restart_field_3d( &
+        nc, dims_xy, land_cover_dim, "L1_degDayMax", &
         "Maximum degree-day factor at level 1", self%snow%degday_max_cache)
     end if
 
     if (allocated(self%pet%pet_fac_lai_cache)) then
-      call mpr_write_restart_field_4d( &
-        self, nc, dims_xy, lai_dim, land_cover_dim, "L1_petLAIcorFactor", &
+      call self%write_restart_field_4d( &
+        nc, dims_xy, lai_dim, land_cover_dim, "L1_petLAIcorFactor", &
         "PET correction factor based on LAI at level 1", self%pet%pet_fac_lai_cache)
     end if
     if (allocated(self%pet%pet_fac_aspect_cache)) then
-      call mpr_write_restart_field_2d( &
-        self, nc, dims_xy, "L1_fAsp", "PET correction factor due to terrain aspect at level 1", &
+      call self%write_restart_field_2d( &
+        nc, dims_xy, "L1_fAsp", "PET correction factor due to terrain aspect at level 1", &
         self%pet%pet_fac_aspect_cache)
     end if
     if (allocated(self%pet%pet_coeff_hs_cache)) then
-      call mpr_write_restart_field_2d( &
-        self, nc, dims_xy, "L1_HarSamCoeff", "Hargreaves-Samani coefficient", self%pet%pet_coeff_hs_cache)
+      call self%write_restart_field_2d( &
+        nc, dims_xy, "L1_HarSamCoeff", "Hargreaves-Samani coefficient", self%pet%pet_coeff_hs_cache)
     end if
     if (allocated(self%pet%pet_coeff_pt_cache)) then
-      call mpr_write_restart_field_3d( &
-        self, nc, dims_xy, lai_dim, "L1_PrieTayAlpha", "Priestley Taylor coefficient (alpha)", &
+      call self%write_restart_field_3d( &
+        nc, dims_xy, lai_dim, "L1_PrieTayAlpha", "Priestley Taylor coefficient (alpha)", &
         self%pet%pet_coeff_pt_cache)
     end if
     if (allocated(self%pet%resist_aero_cache)) then
-      call mpr_write_restart_field_4d( &
-        self, nc, dims_xy, lai_dim, land_cover_dim, "L1_aeroResist", "aerodynamical resistance", &
+      call self%write_restart_field_4d( &
+        nc, dims_xy, lai_dim, land_cover_dim, "L1_aeroResist", "aerodynamical resistance", &
         self%pet%resist_aero_cache)
     end if
     if (allocated(self%pet%resist_surf_cache)) then
-      call mpr_write_restart_field_3d( &
-        self, nc, dims_xy, lai_dim, "L1_surfResist", "bulk surface resistance", self%pet%resist_surf_cache)
+      call self%write_restart_field_3d( &
+        nc, dims_xy, lai_dim, "L1_surfResist", "bulk surface resistance", self%pet%resist_surf_cache)
     end if
 
     if (allocated(self%soil%f_roots_cache)) then
-      call mpr_write_restart_field_4d( &
-        self, nc, dims_xy, soil_dim, land_cover_dim, "L1_fRoots", &
+      call self%write_restart_field_4d( &
+        nc, dims_xy, soil_dim, land_cover_dim, "L1_fRoots", &
         "Fraction of roots in soil horizons at level 1", self%soil%f_roots_cache)
     end if
     if (allocated(self%soil%sm_saturation_cache)) then
-      call mpr_write_restart_field_4d( &
-        self, nc, dims_xy, soil_dim, land_cover_dim, "L1_soilMoistSat", &
+      call self%write_restart_field_4d( &
+        nc, dims_xy, soil_dim, land_cover_dim, "L1_soilMoistSat", &
         "Saturation soil moisture for each horizon [mm] at level 1", self%soil%sm_saturation_cache)
     end if
     if (allocated(self%soil%sm_exponent_cache)) then
-      call mpr_write_restart_field_4d( &
-        self, nc, dims_xy, soil_dim, land_cover_dim, "L1_soilMoistExp", &
+      call self%write_restart_field_4d( &
+        nc, dims_xy, soil_dim, land_cover_dim, "L1_soilMoistExp", &
         "Exponential parameter to how non-linear is the soil water retention at level 1", &
         self%soil%sm_exponent_cache)
     end if
     if (allocated(self%soil%sm_field_capacity_cache)) then
-      call mpr_write_restart_field_4d( &
-        self, nc, dims_xy, soil_dim, land_cover_dim, "L1_soilMoistFC", &
+      call self%write_restart_field_4d( &
+        nc, dims_xy, soil_dim, land_cover_dim, "L1_soilMoistFC", &
         "SM below which actual ET is reduced linearly till PWP at level 1 for processCase(3)=1", &
         self%soil%sm_field_capacity_cache)
     end if
     if (allocated(self%soil%wilting_point_cache)) then
-      call mpr_write_restart_field_4d( &
-        self, nc, dims_xy, soil_dim, land_cover_dim, "L1_wiltingPoint", &
+      call self%write_restart_field_4d( &
+        nc, dims_xy, soil_dim, land_cover_dim, "L1_wiltingPoint", &
         "Permanent wilting point at level 1", self%soil%wilting_point_cache)
     end if
     if (allocated(self%runoff%alpha_cache)) then
-      call mpr_write_restart_field_3d( &
-        self, nc, dims_xy, land_cover_dim, "L1_alpha", "Exponent for the upper reservoir at level 1", &
+      call self%write_restart_field_3d( &
+        nc, dims_xy, land_cover_dim, "L1_alpha", "Exponent for the upper reservoir at level 1", &
         self%runoff%alpha_cache)
     end if
     if (allocated(self%runoff%f_karst_loss_cache)) then
-      call mpr_write_restart_field_2d( &
-        self, nc, dims_xy, "L1_karstLoss", "Karstic percolation loss at level 1", self%runoff%f_karst_loss_cache)
+      call self%write_restart_field_2d( &
+        nc, dims_xy, "L1_karstLoss", "Karstic percolation loss at level 1", self%runoff%f_karst_loss_cache)
     end if
     if (allocated(self%runoff%k_fastflow_cache)) then
-      call mpr_write_restart_field_3d( &
-        self, nc, dims_xy, land_cover_dim, "L1_kfastFlow", &
+      call self%write_restart_field_3d( &
+        nc, dims_xy, land_cover_dim, "L1_kfastFlow", &
         "Fast interflow recession coefficient at level 1", self%runoff%k_fastflow_cache)
     end if
     if (allocated(self%runoff%k_slowflow_cache)) then
-      call mpr_write_restart_field_3d( &
-        self, nc, dims_xy, land_cover_dim, "L1_kSlowFlow", &
+      call self%write_restart_field_3d( &
+        nc, dims_xy, land_cover_dim, "L1_kSlowFlow", &
         "Slow interflow recession coefficient at level 1", self%runoff%k_slowflow_cache)
     end if
     if (allocated(self%runoff%k_baseflow_cache)) then
-      call mpr_write_restart_field_3d( &
-        self, nc, dims_xy, land_cover_dim, "L1_kBaseFlow", &
+      call self%write_restart_field_3d( &
+        nc, dims_xy, land_cover_dim, "L1_kBaseFlow", &
         "Baseflow recession coefficient at level 1", self%runoff%k_baseflow_cache)
     end if
     if (allocated(self%runoff%k_percolation_cache)) then
-      call mpr_write_restart_field_3d( &
-        self, nc, dims_xy, land_cover_dim, "L1_kPerco", &
+      call self%write_restart_field_3d( &
+        nc, dims_xy, land_cover_dim, "L1_kPerco", &
         "Percolation coefficient at level 1", self%runoff%k_percolation_cache)
     end if
     if (allocated(self%runoff%thresh_unsat_cache)) then
-      call mpr_write_restart_field_2d( &
-        self, nc, dims_xy, "L1_unsatThresh", &
+      call self%write_restart_field_2d( &
+        nc, dims_xy, "L1_unsatThresh", &
         "Threshold water depth controlling fast interflow at level 1", self%runoff%thresh_unsat_cache)
     end if
     if (allocated(self%runoff%thresh_sealed_cache)) then
-      call mpr_write_restart_field_2d( &
-        self, nc, dims_xy, "L1_sealedThresh", &
+      call self%write_restart_field_2d( &
+        nc, dims_xy, "L1_sealedThresh", &
         "Threshold water depth for runoff on sealed surfaces at level 1", self%runoff%thresh_sealed_cache)
     end if
     if (allocated(self%neutron%desilets_n0_cache)) then
-      call mpr_write_restart_field_2d( &
-        self, nc, dims_xy, "L1_No_Count", "N0 count at level 1", self%neutron%desilets_n0_cache)
+      call self%write_restart_field_2d( &
+        nc, dims_xy, "L1_No_Count", "N0 count at level 1", self%neutron%desilets_n0_cache)
     end if
     if (allocated(self%neutron%bulk_density_cache)) then
-      call mpr_write_restart_field_4d( &
-        self, nc, dims_xy, soil_dim, land_cover_dim, "L1_bulkDens", &
+      call self%write_restart_field_4d( &
+        nc, dims_xy, soil_dim, land_cover_dim, "L1_bulkDens", &
         "Bulk density at level 1 for processCase(10)", self%neutron%bulk_density_cache)
     end if
     if (allocated(self%neutron%lattice_water_cache)) then
-      call mpr_write_restart_field_4d( &
-        self, nc, dims_xy, soil_dim, land_cover_dim, "L1_latticeWater", &
+      call self%write_restart_field_4d( &
+        nc, dims_xy, soil_dim, land_cover_dim, "L1_latticeWater", &
         "Lattice water content at level 1 for processCase(10)", self%neutron%lattice_water_cache)
     end if
     if (allocated(self%neutron%cosmic_l3_cache)) then
-      call mpr_write_restart_field_4d( &
-        self, nc, dims_xy, soil_dim, land_cover_dim, "L1_COSMICL3", &
+      call self%write_restart_field_4d( &
+        nc, dims_xy, soil_dim, land_cover_dim, "L1_COSMICL3", &
         "COSMIC L3 parameter at level 1 for processCase(10)", self%neutron%cosmic_l3_cache)
     end if
 
     process_case = self%exchange%parameters%process_matrix(3, 1)
     if (allocated(self%soil%thresh_jarvis_cache) .and. any(process_case == [2_i4, 3_i4])) then
-      call mpr_write_restart_field_2d( &
-        self, nc, dims_xy, "L1_jarvis_thresh_c1", &
+      call self%write_restart_field_2d( &
+        nc, dims_xy, "L1_jarvis_thresh_c1", &
         "jarvis critical value for normalized soil water content", self%soil%thresh_jarvis_cache)
     end if
 
@@ -1108,7 +1117,7 @@ contains
       self%exchange%level1 => self%tgt_level1
       log_info(*) "MPR restart: bootstrap level1 grid from restart file."
     end if
-    call mpr_read_restart_land_cover_timing(self, nc)
+    call self%read_restart_land_cover_timing(nc)
     n_land_cover_restart = self%land_cover%n_periods
 
     pet_process = self%exchange%parameters%process_matrix(5, 1)
@@ -1155,7 +1164,7 @@ contains
     end if
 
     if (allocated(self%land_cover%sealed_fraction_l1)) deallocate(self%land_cover%sealed_fraction_l1)
-    call mpr_read_restart_field_3d(self, nc, "L1_fSealed", field_3d)
+    call self%read_restart_field_3d(nc, "L1_fSealed", field_3d)
     if (size(field_3d, 2) /= self%land_cover%n_periods) then
       log_fatal(*) "MPR restart: L1_fSealed land-cover dimension does not match current timing configuration."
       error stop 1
@@ -1167,7 +1176,7 @@ contains
 
     if (self%exchange%parameters%process_matrix(1, 1) /= 0_i4) then
       if (allocated(self%max_interception_cache)) deallocate(self%max_interception_cache)
-      call mpr_read_restart_field_3d(self, nc, "L1_maxInter", field_3d)
+      call self%read_restart_field_3d(nc, "L1_maxInter", field_3d)
       if (size(field_3d, 2) /= self%n_lai_periods) then
         log_fatal(*) "MPR restart: L1_maxInter LAI dimension does not match restart LAI periods."
         error stop 1
@@ -1185,10 +1194,10 @@ contains
       if (allocated(self%snow%degday_dry_cache)) deallocate(self%snow%degday_dry_cache)
       if (allocated(self%snow%degday_inc_cache)) deallocate(self%snow%degday_inc_cache)
       if (allocated(self%snow%degday_max_cache)) deallocate(self%snow%degday_max_cache)
-      call mpr_read_restart_field_3d(self, nc, "L1_tempThresh", self%snow%thresh_temp_cache)
-      call mpr_read_restart_field_3d(self, nc, "L1_degDayNoPre", self%snow%degday_dry_cache)
-      call mpr_read_restart_field_3d(self, nc, "L1_degDayInc", self%snow%degday_inc_cache)
-      call mpr_read_restart_field_3d(self, nc, "L1_degDayMax", self%snow%degday_max_cache)
+      call self%read_restart_field_3d(nc, "L1_tempThresh", self%snow%thresh_temp_cache)
+      call self%read_restart_field_3d(nc, "L1_degDayNoPre", self%snow%degday_dry_cache)
+      call self%read_restart_field_3d(nc, "L1_degDayInc", self%snow%degday_inc_cache)
+      call self%read_restart_field_3d(nc, "L1_degDayMax", self%snow%degday_max_cache)
       if (any([size(self%snow%thresh_temp_cache, 2), size(self%snow%degday_dry_cache, 2), &
         size(self%snow%degday_inc_cache, 2), size(self%snow%degday_max_cache, 2)] /= self%land_cover%n_periods)) then
         log_fatal(*) "MPR restart: snow restart land-cover dimensions do not match current timing configuration."
@@ -1203,11 +1212,11 @@ contains
     select case (pet_process)
       case (-2_i4)
         if (allocated(self%pet%pet_fac_aspect_cache)) deallocate(self%pet%pet_fac_aspect_cache)
-        call mpr_read_restart_field_2d(self, nc, "L1_fAsp", self%pet%pet_fac_aspect_cache)
+        call self%read_restart_field_2d(nc, "L1_fAsp", self%pet%pet_fac_aspect_cache)
         self%exchange%pet_fac_aspect%provided = .true.
       case (-1_i4)
         if (allocated(self%pet%pet_fac_lai_cache)) deallocate(self%pet%pet_fac_lai_cache)
-        call mpr_read_restart_field_4d(self, nc, "L1_petLAIcorFactor", self%pet%pet_fac_lai_cache)
+        call self%read_restart_field_4d(nc, "L1_petLAIcorFactor", self%pet%pet_fac_lai_cache)
         if (size(self%pet%pet_fac_lai_cache, 2) /= self%n_lai_periods .or. &
           size(self%pet%pet_fac_lai_cache, 3) /= self%land_cover%n_periods) then
           log_fatal(*) "MPR restart: PET-LAI restart dimensions do not match current LAI/land-cover configuration."
@@ -1217,13 +1226,13 @@ contains
       case (1_i4)
         if (allocated(self%pet%pet_fac_aspect_cache)) deallocate(self%pet%pet_fac_aspect_cache)
         if (allocated(self%pet%pet_coeff_hs_cache)) deallocate(self%pet%pet_coeff_hs_cache)
-        call mpr_read_restart_field_2d(self, nc, "L1_fAsp", self%pet%pet_fac_aspect_cache)
-        call mpr_read_restart_field_2d(self, nc, "L1_HarSamCoeff", self%pet%pet_coeff_hs_cache)
+        call self%read_restart_field_2d(nc, "L1_fAsp", self%pet%pet_fac_aspect_cache)
+        call self%read_restart_field_2d(nc, "L1_HarSamCoeff", self%pet%pet_coeff_hs_cache)
         self%exchange%pet_fac_aspect%provided = .true.
         self%exchange%pet_coeff_hs%provided = .true.
       case (2_i4)
         if (allocated(self%pet%pet_coeff_pt_cache)) deallocate(self%pet%pet_coeff_pt_cache)
-        call mpr_read_restart_field_3d(self, nc, "L1_PrieTayAlpha", self%pet%pet_coeff_pt_cache)
+        call self%read_restart_field_3d(nc, "L1_PrieTayAlpha", self%pet%pet_coeff_pt_cache)
         if (size(self%pet%pet_coeff_pt_cache, 2) /= self%n_lai_periods) then
           log_fatal(*) "MPR restart: Priestley-Taylor restart LAI dimension does not match restart LAI periods."
           error stop 1
@@ -1232,8 +1241,8 @@ contains
       case (3_i4)
         if (allocated(self%pet%resist_aero_cache)) deallocate(self%pet%resist_aero_cache)
         if (allocated(self%pet%resist_surf_cache)) deallocate(self%pet%resist_surf_cache)
-        call mpr_read_restart_field_4d(self, nc, "L1_aeroResist", self%pet%resist_aero_cache)
-        call mpr_read_restart_field_3d(self, nc, "L1_surfResist", self%pet%resist_surf_cache)
+        call self%read_restart_field_4d(nc, "L1_aeroResist", self%pet%resist_aero_cache)
+        call self%read_restart_field_3d(nc, "L1_surfResist", self%pet%resist_surf_cache)
         if (size(self%pet%resist_aero_cache, 2) /= self%n_lai_periods .or. &
           size(self%pet%resist_aero_cache, 3) /= self%land_cover%n_periods) then
           log_fatal(*) "MPR restart: aerodynamic resistance dimensions do not match current LAI/land-cover configuration."
@@ -1254,11 +1263,11 @@ contains
       if (allocated(self%soil%wilting_point_cache)) deallocate(self%soil%wilting_point_cache)
       if (allocated(self%soil%f_roots_cache)) deallocate(self%soil%f_roots_cache)
       if (allocated(self%soil%thresh_jarvis_cache)) deallocate(self%soil%thresh_jarvis_cache)
-      call mpr_read_restart_field_4d(self, nc, "L1_fRoots", self%soil%f_roots_cache)
-      call mpr_read_restart_field_4d(self, nc, "L1_soilMoistSat", self%soil%sm_saturation_cache)
-      call mpr_read_restart_field_4d(self, nc, "L1_soilMoistExp", self%soil%sm_exponent_cache)
-      call mpr_read_restart_field_4d(self, nc, "L1_soilMoistFC", self%soil%sm_field_capacity_cache)
-      call mpr_read_restart_field_4d(self, nc, "L1_wiltingPoint", self%soil%wilting_point_cache)
+      call self%read_restart_field_4d(nc, "L1_fRoots", self%soil%f_roots_cache)
+      call self%read_restart_field_4d(nc, "L1_soilMoistSat", self%soil%sm_saturation_cache)
+      call self%read_restart_field_4d(nc, "L1_soilMoistExp", self%soil%sm_exponent_cache)
+      call self%read_restart_field_4d(nc, "L1_soilMoistFC", self%soil%sm_field_capacity_cache)
+      call self%read_restart_field_4d(nc, "L1_wiltingPoint", self%soil%wilting_point_cache)
       if (any([size(self%soil%f_roots_cache, 2), size(self%soil%sm_saturation_cache, 2), size(self%soil%sm_exponent_cache, 2), &
         size(self%soil%sm_field_capacity_cache, 2), size(self%soil%wilting_point_cache, 2)] /= n_soil_restart) .or. &
         any([size(self%soil%f_roots_cache, 3), size(self%soil%sm_saturation_cache, 3), size(self%soil%sm_exponent_cache, 3), &
@@ -1268,7 +1277,7 @@ contains
       end if
       allocate(self%soil%thresh_jarvis_cache(self%exchange%level1%ncells))
       if (any(soil_process == [2_i4, 3_i4])) then
-        call mpr_read_restart_field_2d(self, nc, "L1_jarvis_thresh_c1", self%soil%thresh_jarvis_cache)
+        call self%read_restart_field_2d(nc, "L1_jarvis_thresh_c1", self%soil%thresh_jarvis_cache)
       else
         self%soil%thresh_jarvis_cache = nodata_dp
       end if
@@ -1285,10 +1294,10 @@ contains
       if (allocated(self%runoff%k_fastflow_cache)) deallocate(self%runoff%k_fastflow_cache)
       if (allocated(self%runoff%k_slowflow_cache)) deallocate(self%runoff%k_slowflow_cache)
       if (allocated(self%runoff%thresh_unsat_cache)) deallocate(self%runoff%thresh_unsat_cache)
-      call mpr_read_restart_field_3d(self, nc, "L1_alpha", self%runoff%alpha_cache)
-      call mpr_read_restart_field_3d(self, nc, "L1_kfastFlow", self%runoff%k_fastflow_cache)
-      call mpr_read_restart_field_3d(self, nc, "L1_kSlowFlow", self%runoff%k_slowflow_cache)
-      call mpr_read_restart_field_2d(self, nc, "L1_unsatThresh", self%runoff%thresh_unsat_cache)
+      call self%read_restart_field_3d(nc, "L1_alpha", self%runoff%alpha_cache)
+      call self%read_restart_field_3d(nc, "L1_kfastFlow", self%runoff%k_fastflow_cache)
+      call self%read_restart_field_3d(nc, "L1_kSlowFlow", self%runoff%k_slowflow_cache)
+      call self%read_restart_field_2d(nc, "L1_unsatThresh", self%runoff%thresh_unsat_cache)
       if (any([size(self%runoff%alpha_cache, 2), size(self%runoff%k_fastflow_cache, 2), &
         size(self%runoff%k_slowflow_cache, 2)] /= self%land_cover%n_periods)) then
         log_fatal(*) "MPR restart: runoff restart land-cover dimensions do not match current timing configuration."
@@ -1302,8 +1311,8 @@ contains
     if (self%exchange%parameters%process_matrix(7, 1) /= 0_i4) then
       if (allocated(self%runoff%k_percolation_cache)) deallocate(self%runoff%k_percolation_cache)
       if (allocated(self%runoff%f_karst_loss_cache)) deallocate(self%runoff%f_karst_loss_cache)
-      call mpr_read_restart_field_3d(self, nc, "L1_kPerco", self%runoff%k_percolation_cache)
-      call mpr_read_restart_field_2d(self, nc, "L1_karstLoss", self%runoff%f_karst_loss_cache)
+      call self%read_restart_field_3d(nc, "L1_kPerco", self%runoff%k_percolation_cache)
+      call self%read_restart_field_2d(nc, "L1_karstLoss", self%runoff%f_karst_loss_cache)
       if (size(self%runoff%k_percolation_cache, 2) /= self%land_cover%n_periods) then
         log_fatal(*) "MPR restart: percolation restart land-cover dimension does not match current timing configuration."
         error stop 1
@@ -1313,12 +1322,12 @@ contains
     end if
     if (self%exchange%parameters%process_matrix(4, 1) /= 0_i4) then
       if (allocated(self%runoff%thresh_sealed_cache)) deallocate(self%runoff%thresh_sealed_cache)
-      call mpr_read_restart_field_2d(self, nc, "L1_sealedThresh", self%runoff%thresh_sealed_cache)
+      call self%read_restart_field_2d(nc, "L1_sealedThresh", self%runoff%thresh_sealed_cache)
       self%exchange%thresh_sealed%provided = .true.
     end if
     if (self%exchange%parameters%process_matrix(9, 1) /= 0_i4) then
       if (allocated(self%runoff%k_baseflow_cache)) deallocate(self%runoff%k_baseflow_cache)
-      call mpr_read_restart_field_3d(self, nc, "L1_kBaseFlow", self%runoff%k_baseflow_cache)
+      call self%read_restart_field_3d(nc, "L1_kBaseFlow", self%runoff%k_baseflow_cache)
       if (size(self%runoff%k_baseflow_cache, 2) /= self%land_cover%n_periods) then
         log_fatal(*) "MPR restart: baseflow restart land-cover dimension does not match current timing configuration."
         error stop 1
@@ -1331,16 +1340,16 @@ contains
       if (allocated(self%neutron%bulk_density_cache)) deallocate(self%neutron%bulk_density_cache)
       if (allocated(self%neutron%lattice_water_cache)) deallocate(self%neutron%lattice_water_cache)
       if (allocated(self%neutron%cosmic_l3_cache)) deallocate(self%neutron%cosmic_l3_cache)
-      call mpr_read_restart_field_2d(self, nc, "L1_No_Count", self%neutron%desilets_n0_cache)
-      call mpr_read_restart_field_4d(self, nc, "L1_bulkDens", self%neutron%bulk_density_cache)
-      call mpr_read_restart_field_4d(self, nc, "L1_latticeWater", self%neutron%lattice_water_cache)
+      call self%read_restart_field_2d(nc, "L1_No_Count", self%neutron%desilets_n0_cache)
+      call self%read_restart_field_4d(nc, "L1_bulkDens", self%neutron%bulk_density_cache)
+      call self%read_restart_field_4d(nc, "L1_latticeWater", self%neutron%lattice_water_cache)
       if (any([size(self%neutron%bulk_density_cache, 2), size(self%neutron%lattice_water_cache, 2)] /= n_soil_restart) .or. &
         any([size(self%neutron%bulk_density_cache, 3), size(self%neutron%lattice_water_cache, 3)] /= self%land_cover%n_periods)) then
         log_fatal(*) "MPR restart: neutron restart dimensions do not match current soil/land-cover configuration."
         error stop 1
       end if
       if (neutron_process == 2_i4) then
-        call mpr_read_restart_field_4d(self, nc, "L1_COSMICL3", self%neutron%cosmic_l3_cache)
+        call self%read_restart_field_4d(nc, "L1_COSMICL3", self%neutron%cosmic_l3_cache)
         if (size(self%neutron%cosmic_l3_cache, 2) /= n_soil_restart .or. &
           size(self%neutron%cosmic_l3_cache, 3) /= self%land_cover%n_periods) then
           log_fatal(*) "MPR restart: COSMIC L3 restart dimensions do not match current soil/land-cover configuration."
@@ -1735,6 +1744,27 @@ contains
     end select
   end subroutine mpr_build_lai_l0_cache
 
+  !> \brief Load one configured process parameter block into an allocated local array.
+  subroutine mpr_load_process_params(self, process_id, params)
+    class(mpr_t), intent(in), target :: self
+    integer(i4), intent(in) :: process_id
+    real(dp), allocatable, intent(out) :: params(:)
+    integer(i4) :: n_param
+
+    n_param = self%exchange%parameters%process_matrix(process_id, 2)
+    if (n_param < 0_i4) then
+      log_fatal(*) "MPR: configured parameter count for process ", n2s(process_id), " must be >= 0."
+      error stop 1
+    end if
+    if (n_param == 0_i4) then
+      allocate(params(0))
+      return
+    end if
+
+    allocate(params(n_param))
+    params = self%exchange%parameters%get_process(process_id)
+  end subroutine mpr_load_process_params
+
   !> \brief Cache max interception on level1 for all LAI/land-cover slices.
   subroutine mpr_init_max_interception_cache(self)
     class(mpr_t), intent(inout), target :: self
@@ -1744,7 +1774,7 @@ contains
     real(dp), allocatable :: max_interception_l0(:)
     real(dp), allocatable :: max_interception_l1(:)
 
-    interception_param = self%exchange%parameters%get_process(1_i4)
+    call self%load_process_params(1_i4, interception_param)
     if (size(interception_param) < 1_i4) then
       log_fatal(*) "MPR: interception parameter set is empty while process 1 is active."
       error stop 1
@@ -1782,7 +1812,7 @@ contains
     integer(i4) :: land_cover_idx
     real(dp), allocatable :: snow_param(:)
 
-    snow_param = self%exchange%parameters%get_process(2_i4)
+    call self%load_process_params(2_i4, snow_param)
     if (size(snow_param) < 8_i4) then
       log_fatal(*) "MPR: snow parameter set must contain 8 values while process 2 is active."
       error stop 1
@@ -1847,7 +1877,7 @@ contains
     class(mpr_t), intent(inout), target :: self
     real(dp), allocatable :: pet_param(:)
 
-    pet_param = self%exchange%parameters%get_process(5_i4)
+    call self%load_process_params(5_i4, pet_param)
     if (size(pet_param) < 3_i4) then
       log_fatal(*) "MPR: PET aspect parameter set must contain 3 values while PET process -2 is active."
       error stop 1
@@ -1870,7 +1900,7 @@ contains
     class(mpr_t), intent(inout), target :: self
     real(dp), allocatable :: pet_param(:)
 
-    pet_param = self%exchange%parameters%get_process(5_i4)
+    call self%load_process_params(5_i4, pet_param)
     if (size(pet_param) < 4_i4) then
       log_fatal(*) "MPR: PET Hargreaves parameter set must contain 4 values while PET process 1 is active."
       error stop 1
@@ -1898,7 +1928,7 @@ contains
     integer(i4) :: lai_idx
     real(dp), allocatable :: pet_param(:)
 
-    pet_param = self%exchange%parameters%get_process(5_i4)
+    call self%load_process_params(5_i4, pet_param)
     if (size(pet_param) < 5_i4) then
       log_fatal(*) "MPR: PET-LAI parameter set must contain 5 values while PET process -1 is active."
       error stop 1
@@ -1930,7 +1960,7 @@ contains
     class(mpr_t), intent(inout), target :: self
     real(dp), allocatable :: pet_param(:)
 
-    pet_param = self%exchange%parameters%get_process(5_i4)
+    call self%load_process_params(5_i4, pet_param)
     if (size(pet_param) < 2_i4) then
       log_fatal(*) "MPR: PET Priestley-Taylor parameter set must contain 2 values while PET process 2 is active."
       error stop 1
@@ -1955,7 +1985,7 @@ contains
     real(dp), allocatable :: pet_param(:)
     real(dp), allocatable :: resist_surf_l1(:, :)
 
-    pet_param = self%exchange%parameters%get_process(5_i4)
+    call self%load_process_params(5_i4, pet_param)
     if (size(pet_param) < 7_i4) then
       log_fatal(*) "MPR: PET Penman-Monteith parameter set must contain 7 values while PET process 3 is active."
       error stop 1
@@ -2024,14 +2054,13 @@ contains
       self%config, domain_id, self%soil_lut_path, self%exchange%soil_id%data(:, :n_soil_layers), &
       self%soil%horizon_bounds)
 
-    soil_param = self%exchange%parameters%get_process(3_i4)
+    call self%load_process_params(3_i4, soil_param)
     if (allocated(self%soil%sm_exponent_cache)) deallocate(self%soil%sm_exponent_cache)
     if (allocated(self%soil%sm_saturation_cache)) deallocate(self%soil%sm_saturation_cache)
     if (allocated(self%soil%sm_field_capacity_cache)) deallocate(self%soil%sm_field_capacity_cache)
     if (allocated(self%soil%wilting_point_cache)) deallocate(self%soil%wilting_point_cache)
     if (allocated(self%soil%f_roots_cache)) deallocate(self%soil%f_roots_cache)
     if (allocated(self%soil%thresh_jarvis_cache)) deallocate(self%soil%thresh_jarvis_cache)
-    if (allocated(self%soil%horizon_bounds)) deallocate(self%soil%horizon_bounds)
     if (allocated(self%soil%sm_deficit_fc_l0)) deallocate(self%soil%sm_deficit_fc_l0)
     if (allocated(self%soil%ks_var_h_l0)) deallocate(self%soil%ks_var_h_l0)
     if (allocated(self%soil%ks_var_v_l0)) deallocate(self%soil%ks_var_v_l0)
@@ -2049,7 +2078,7 @@ contains
     allocate(self%soil%ks_var_h_l0(self%exchange%level0%ncells, self%land_cover%n_periods))
     allocate(self%soil%ks_var_v_l0(self%exchange%level0%ncells, self%land_cover%n_periods))
     if (neutron_process > 0_i4) then
-      neutron_param = self%exchange%parameters%get_process(10_i4)
+      call self%load_process_params(10_i4, neutron_param)
       if (size(neutron_param) < 1_i4) then
         log_fatal(*) "MPR: neutron process definition is empty."
         error stop 1
@@ -2138,7 +2167,7 @@ contains
       allocate(self%runoff%k_fastflow_cache(self%exchange%level1%ncells, self%land_cover%n_periods))
       allocate(self%runoff%k_slowflow_cache(self%exchange%level1%ncells, self%land_cover%n_periods))
       allocate(self%runoff%thresh_unsat_cache(self%exchange%level1%ncells))
-      interflow_param = self%exchange%parameters%get_process(6_i4)
+      call self%load_process_params(6_i4, interflow_param)
       do land_cover_idx = 1_i4, self%land_cover%n_periods
         call mpr_bridge_runoff_param( &
           self%land_cover%l0_cache(:, land_cover_idx), self%slope_emp, self%soil%sm_deficit_fc_l0(:, land_cover_idx), &
@@ -2155,7 +2184,7 @@ contains
     if (self%exchange%parameters%process_matrix(7, 1) /= 0_i4) then
       allocate(self%runoff%k_percolation_cache(self%exchange%level1%ncells, self%land_cover%n_periods))
       allocate(self%runoff%f_karst_loss_cache(self%exchange%level1%ncells))
-      percolation_param = self%exchange%parameters%get_process(7_i4)
+      call self%load_process_params(7_i4, percolation_param)
       do land_cover_idx = 1_i4, self%land_cover%n_periods
         call mpr_bridge_karstic_param( &
           percolation_param, self%exchange%geo_unit%data, self%exchange%geo_class_def%geo_unit, &
@@ -2169,14 +2198,14 @@ contains
 
     if (self%exchange%parameters%process_matrix(4, 1) /= 0_i4) then
       allocate(self%runoff%thresh_sealed_cache(self%exchange%level1%ncells))
-      direct_runoff_param = self%exchange%parameters%get_process(4_i4)
+      call self%load_process_params(4_i4, direct_runoff_param)
       call mpr_bridge_sealed_threshold(direct_runoff_param, self%runoff%thresh_sealed_cache)
       self%exchange%thresh_sealed%provided = .true.
     end if
 
     if (self%exchange%parameters%process_matrix(9, 1) /= 0_i4) then
       allocate(self%runoff%k_baseflow_cache(self%exchange%level1%ncells, self%land_cover%n_periods))
-      baseflow_param = self%exchange%parameters%get_process(9_i4)
+      call self%load_process_params(9_i4, baseflow_param)
       call mpr_bridge_baseflow_param( &
         baseflow_param, self%exchange%geo_unit%data, self%exchange%geo_class_def%geo_unit, self%upscaler, &
         self%runoff%k_baseflow_cache(:, 1))
