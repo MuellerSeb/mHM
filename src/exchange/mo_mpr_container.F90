@@ -1,10 +1,48 @@
 !> \file    mo_mpr_container.f90
 !> \copydoc mo_mpr_container
 
-!> \brief   Module for a mpr process container.
-!> \version 0.1
+!> \brief   Container-side multiscale parameter regionalization (MPR) for the exchange runtime.
+!> \details This module owns the MPR implementation on the refactored
+!! exchange/domain path. It resolves MPR configuration, prepares grouped
+!! effective-parameter caches during `connect`, switches active parameter slices
+!! during `initialize` and `update`, and serializes/deserializes the cached MPR
+!! state through the new restart path.
+!> \changelog
+!! - Stephan Thober (Dec 2012)
+!!   - laid out the original MPR orchestration and process-regionalization workflow
+!! - Juliane Mai (Oct 2013)
+!!   - updated PET and soil-moisture parameterization interfaces used by the current cache groups
+!! - Luis Samaniego (Sep 2015)
+!!   - refined PET mapping semantics and separated routing-specific work from core MPR
+!! - Rohini Kumar (Mar 2016)
+!!   - added support for multiple soil database options
+!! - Matthias Zink (Jun 2017)
+!!   - consolidated PET functionality into the dedicated MPR PET module
+!! - Mehmet Cuneyd Demirel, Simon Stisen (Apr 2017 / Jun 2020)
+!!   - added Jarvis/Feddes soil-stress variants and FC/root coupling used by the soil cache path
+!! - Maren Kaluza (Dec 2017)
+!!   - added neutron regionalization functionality
+!! - Robert Schweppe (Dec 2017 / Jun 2018)
+!!   - introduced land-cover-scene-aware looping and refactored the legacy MPR implementation
+!! - Sebastian Mueller (Mar 2023)
+!!   - made runoff and baseflow parameter groups land-cover dependent in legacy MPR
+!! - Sebastian Mueller (Aug 2025)
+!!   - introduced the exchange-side MPR container on v6alpha
+!! - Sebastian Mueller (Mar 2026)
+!!   - completed container parity with dataset-backed land cover, grouped process caches,
+!!     and self-contained restart write/read support
+!> \authors Stephan Thober
+!> \authors Rohini Kumar
+!> \authors Juliane Mai
+!> \authors Luis Samaniego
+!> \authors David Schaefer
+!> \authors Matthias Zink
+!> \authors Mehmet Cuneyd Demirel
+!> \authors Simon Stisen
+!> \authors Maren Kaluza
+!> \authors Robert Schweppe
 !> \authors Sebastian Mueller
-!> \date    Aug 2025
+!> \date    2012 - 2026
 !> \copyright Copyright 2005-\today, the mHM Developers, Luis Samaniego, Sabine Attinger: All rights reserved.
 !! mHM is released under the LGPLv3+ license \license_note
 !> \ingroup f_exchange
@@ -32,8 +70,10 @@ module mo_mpr_container
   use mo_read_lut, only: read_geoformation_lut, read_lai_lut
   use nml_config_mpr, only: nml_config_mpr_t, NML_OK
 
-  character(len=*), parameter :: lc_restart_calendar = "proleptic_gregorian"
+  character(len=*), parameter :: lc_restart_calendar = "proleptic_gregorian" !< calendar to use for land-cover timing in restart
 
+  !> \class   mpr_land_cover_state_t
+  !> \brief   Grouped land-cover dataset state and cached temporal land-cover slices for MPR.
   type :: mpr_land_cover_state_t
     character(:), allocatable :: path !< resolved land-cover dataset path
     character(:), allocatable :: var_name !< configured land-cover variable name
@@ -49,6 +89,8 @@ module mo_mpr_container
     integer(i4) :: active_idx = 0_i4 !< active cached land-cover index
   end type mpr_land_cover_state_t
 
+  !> \class   mpr_snow_state_t
+  !> \brief   Grouped cached snow parameter fields published by the MPR container.
   type :: mpr_snow_state_t
     real(dp), allocatable :: thresh_temp_cache(:, :) !< cached temperature threshold (nCells1, nLC)
     real(dp), allocatable :: degday_dry_cache(:, :) !< cached dry degree-day factor (nCells1, nLC)
@@ -56,6 +98,8 @@ module mo_mpr_container
     real(dp), allocatable :: degday_max_cache(:, :) !< cached maximum degree-day factor (nCells1, nLC)
   end type mpr_snow_state_t
 
+  !> \class   mpr_pet_state_t
+  !> \brief   Grouped cached PET parameter fields for the active PET process variants.
   type :: mpr_pet_state_t
     real(dp), allocatable :: pet_fac_aspect_cache(:) !< cached PET aspect correction (nCells1)
     real(dp), allocatable :: pet_coeff_hs_cache(:) !< cached Hargreaves-Samani coefficient (nCells1)
@@ -65,6 +109,8 @@ module mo_mpr_container
     real(dp), allocatable :: resist_surf_cache(:, :) !< cached bulk surface resistance (nCells1, nLAI)
   end type mpr_pet_state_t
 
+  !> \class   mpr_soil_state_t
+  !> \brief   Grouped cached soil-moisture fields and soil-horizon intermediates for MPR.
   type :: mpr_soil_state_t
     real(dp), allocatable :: sm_exponent_cache(:, :, :) !< cached soil moisture exponent (nCells1, nHorizons, nLC)
     real(dp), allocatable :: sm_saturation_cache(:, :, :) !< cached saturated soil moisture (nCells1, nHorizons, nLC)
@@ -78,6 +124,8 @@ module mo_mpr_container
     real(dp), allocatable :: ks_var_v_l0(:, :) !< cached vertical Ks variability on L0 (nCells0, nLC)
   end type mpr_soil_state_t
 
+  !> \class   mpr_neutron_state_t
+  !> \brief   Grouped cached neutron regionalization fields derived from the soil cache path.
   type :: mpr_neutron_state_t
     real(dp), allocatable :: desilets_n0_cache(:) !< cached dry neutron count (nCells1)
     real(dp), allocatable :: bulk_density_cache(:, :, :) !< cached bulk density (nCells1, nHorizons, nLC)
@@ -85,6 +133,8 @@ module mo_mpr_container
     real(dp), allocatable :: cosmic_l3_cache(:, :, :) !< cached COSMIC L3 parameter (nCells1, nHorizons, nLC)
   end type mpr_neutron_state_t
 
+  !> \class   mpr_runoff_state_t
+  !> \brief   Grouped cached runoff and baseflow parameter fields for land-cover-dependent routing inputs.
   type :: mpr_runoff_state_t
     real(dp), allocatable :: alpha_cache(:, :) !< cached alpha field (nCells1, nLC)
     real(dp), allocatable :: k_fastflow_cache(:, :) !< cached fast interflow recession (nCells1, nLC)
@@ -448,6 +498,7 @@ contains
     call self%init_upscaler()
     call self%check_geo_units_against_lut()
     call self%check_geoparameter_consistency()
+    ! Build all MPR caches before the first timestep so update only switches pointers.
     call self%init_temporal_cache()
     call self%update_exchange_slices(force=.true.)
   end subroutine mpr_connect
@@ -521,6 +572,7 @@ contains
       bounds=soil_bounds, reference=2_i4)
     deallocate(soil_bounds)
 
+    ! Persist the cached MPR state in the same grouped layout used to restore exchange slices later.
     if (allocated(self%land_cover%sealed_fraction_l1)) then
       call self%write_restart_field_3d( &
         nc, dims_xy, land_cover_dim, "L1_fSealed", "fraction of Sealed area at level 1", &
@@ -1083,6 +1135,7 @@ contains
     deallocate(data_4d)
   end subroutine mpr_write_restart_field_4d
 
+  !> \brief Restore grouped MPR caches from a restart file without recomputing MPR inputs.
   subroutine mpr_read_restart_data(self)
     class(mpr_t), intent(inout), target :: self
     type(NcDataset) :: nc
@@ -1110,6 +1163,7 @@ contains
 
     nc = NcDataset(self%restart_input_path, "r")
     call restart_grid%from_restart(nc)
+    ! Restart mode either validates the existing level1 grid or bootstraps it from the restart payload.
     if (associated(self%exchange%level1)) then
       call self%validate_restart_grid(restart_grid)
     else
@@ -1120,6 +1174,7 @@ contains
     call self%read_restart_land_cover_timing(nc)
     n_land_cover_restart = self%land_cover%n_periods
 
+    ! Read restart dimensions first so grouped caches can be allocated with the current active-process layout.
     pet_process = self%exchange%parameters%process_matrix(5, 1)
     soil_process = self%exchange%parameters%process_matrix(3, 1)
     neutron_process = self%exchange%parameters%process_matrix(10, 1)
@@ -1163,6 +1218,7 @@ contains
       end if
     end if
 
+    ! Restore each process-group cache in the same grouped shape that connect-time initialization uses.
     if (allocated(self%land_cover%sealed_fraction_l1)) deallocate(self%land_cover%sealed_fraction_l1)
     call self%read_restart_field_3d(nc, "L1_fSealed", field_3d)
     if (size(field_3d, 2) /= self%land_cover%n_periods) then
@@ -1362,6 +1418,7 @@ contains
       if (allocated(self%neutron%cosmic_l3_cache)) self%exchange%cosmic_l3%provided = .true.
     end if
 
+    ! Force the first initialize/update cycle to reattach active exchange pointers from the restored caches.
     self%active_lai_idx = 0_i4
     self%land_cover%active_idx = 0_i4
     call nc%close()
@@ -1511,6 +1568,7 @@ contains
     self%active_lai_idx = 0_i4
     self%land_cover%active_idx = 0_i4
 
+    ! Land-cover timing drives every land-cover-dependent cache, so initialize it first.
     call self%init_land_cover_cache()
     call self%init_land_cover_fraction_cache()
 
@@ -1530,6 +1588,7 @@ contains
       error stop 1
     end if
 
+    ! Generate grouped cache families once during connect and expose only active slices afterwards.
     if (self%exchange%parameters%process_matrix(1, 1) /= 0_i4) call self%init_max_interception_cache()
     if (self%exchange%parameters%process_matrix(2, 1) /= 0_i4) call self%init_snow_cache()
     if (pet_process /= 0_i4) call self%init_pet_cache()
@@ -1575,6 +1634,7 @@ contains
     self%land_cover%temporal = .false.
     self%land_cover%n_periods = 1_i4
 
+    ! Open the dataset only to recover land-cover timing; field values are cached in the dedicated cache path.
     call self%land_cover%ds%init( &
       path=self%land_cover%path, &
       vars=[var(name=trim(self%land_cover%var_name), kind="i4", static=.false., allow_static=.true.)], &
@@ -1605,6 +1665,7 @@ contains
       error stop 1
     end if
 
+    ! Cache the full dataset timeline so restart files can resume into later land-cover periods.
     self%land_cover%n_periods = n_times
     allocate(self%land_cover%period_start(self%land_cover%n_periods))
     allocate(self%land_cover%period_end(self%land_cover%n_periods))
@@ -1638,6 +1699,7 @@ contains
       return
     end if
 
+    ! Read the complete temporal land-cover stack once so later updates only switch cached slices.
     call self%land_cover%ds%read_chunk( &
       trim(self%land_cover%var_name), self%land_cover%l0_cache, &
       self%land_cover%period_start(1), self%land_cover%period_end(self%land_cover%n_periods))
@@ -2047,6 +2109,7 @@ contains
       error stop 1
     end if
 
+    ! Mirror the legacy soil-database setup once before caching per-land-cover soil outputs.
     n_soil_layers = 1_i4
     if (self%config%soil_db_mode(domain_id) == 1_i4) n_soil_layers = n_horizons
     if (allocated(self%soil%horizon_bounds)) deallocate(self%soil%horizon_bounds)
@@ -2092,6 +2155,7 @@ contains
       end if
     end if
 
+    ! Cache one soil/neutron slice per land-cover period so runtime updates only switch the active slice.
     do land_cover_idx = 1_i4, self%land_cover%n_periods
       if (neutron_process == 2_i4) then
         call mpr_bridge_soil_moisture( &
@@ -2261,6 +2325,7 @@ contains
     end if
     if (.not.force_ .and. lai_idx == self%active_lai_idx .and. land_cover_idx == self%land_cover%active_idx) return
 
+    ! Reattach only the active slices; the grouped caches stay owned by mpr_t.
     if (allocated(self%land_cover%sealed_fraction_l1)) then
       self%exchange%f_sealed%data => self%land_cover%sealed_fraction_l1(:, land_cover_idx)
     end if

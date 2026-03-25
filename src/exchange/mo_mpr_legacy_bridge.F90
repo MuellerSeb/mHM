@@ -2,9 +2,43 @@
 !> \copydoc mo_mpr_legacy_bridge
 
 !> \brief   Bridge helpers between the exchange MPR container and legacy MPR routines.
-!> \version 0.1
+!> \details This module isolates the compatibility boundary between the new
+!! exchange-side MPR container and the legacy MPR science routines. It reshapes
+!! grids and packed fields into the conventions expected by the older code,
+!! reuses the legacy PET/soil/runoff/neutron implementations, and keeps the
+!! remaining legacy-global interaction scoped to this bridge layer.
+!> \changelog
+!! - Juliane Mai          Dec 2012
+!!   - implemented the soil-database and LUT readers that now sit behind the bridge setup helpers
+!! - Stephan Thober, Rohini Kumar
+!!   Dec 2012 / Jan 2013
+!!   - established the core MPR PET, soil-moisture, runoff, and upscaling helper routines reused here
+!! - Luis Samaniego       Sep 2015
+!!   - refined PET aspect handling, including southern-hemisphere support
+!! - Rohini Kumar         Mar 2016
+!!   - added support for multiple soil database options
+!! - Matthias Zink        Jun 2017
+!!   - moved PET helper functionality into the dedicated MPR PET module
+!! - Mehmet Cuneyd Demirel, Simon Stisen
+!!   Apr 2017 / Jun 2020 / Feb 2021
+!!   - extended PET and soil-moisture helper routines with Jarvis/Feddes and FC/root variants
+!! - Maren Kaluza         Dec 2017
+!!   - added neutron helper functionality
+!! - Robert Schweppe      Jun 2018
+!!   - refactored and reformatted the donor MPR helper modules
+!! - Sebastian Mueller    Mar 2026
+!!   - wrapped the legacy helper routines behind the exchange-side bridge API used by mpr_t
+!> \authors Juliane Mai
+!> \authors Stephan Thober
+!> \authors Rohini Kumar
+!> \authors Luis Samaniego
+!> \authors Matthias Zink
+!> \authors Mehmet Cuneyd Demirel
+!> \authors Simon Stisen
+!> \authors Maren Kaluza
+!> \authors Robert Schweppe
 !> \authors Sebastian Mueller
-!> \date    Mar 2026
+!> \date    2012 - 2026
 !> \copyright Copyright 2005-\today, the mHM Developers, Luis Samaniego, Sabine Attinger: All rights reserved.
 !! mHM is released under the LGPLv3+ license \license_note
 !> \ingroup f_exchange
@@ -45,6 +79,7 @@ module mo_mpr_legacy_bridge
 
 contains
 
+  !> \brief Build packed L0 ids and packed L1 coarse bounds in the legacy x/y index convention.
   subroutine mpr_bridge_build_l0_to_l1_indices(level0, upscaler, id0, upper_bound1, lower_bound1, left_bound1, right_bound1)
     type(grid_t), intent(in), target :: level0
     class(scaler_t), intent(inout), target :: upscaler
@@ -70,7 +105,7 @@ contains
     allocate(right_bound1(upscaler%target_grid%ncells))
     do i = 1_i4, upscaler%target_grid%ncells
       call upscaler%coarse_bounds(int(i, i8), x_lb, x_ub, y_lb, y_ub)
-      ! Legacy PET routines expect the first bound pair on the x index and the second on the y index.
+      ! Reorder the new coarse bounds into the legacy PET routine convention.
       upper_bound1(i) = x_lb
       lower_bound1(i) = x_ub
       left_bound1(i) = y_lb
@@ -78,6 +113,7 @@ contains
     end do
   end subroutine mpr_bridge_build_l0_to_l1_indices
 
+  !> \brief Resolve packed level0 latitude values for legacy PET helpers.
   subroutine mpr_bridge_get_level0_latitude(level0, latitude_l0)
     type(grid_t), intent(in), target :: level0
     real(dp), allocatable, intent(out) :: latitude_l0(:)
@@ -92,6 +128,7 @@ contains
         log_fatal(*) "MPR bridge: PET aspect correction on a cartesian grid requires auxiliary latitude coordinates."
         error stop 1
       end if
+      ! PET aspect correction needs physical latitude even on projected input grids.
       do i = 1_i4, level0%ncells
         ix = level0%cell_ij(i, 1)
         iy = level0%cell_ij(i, 2)
@@ -105,6 +142,7 @@ contains
     end if
   end subroutine mpr_bridge_get_level0_latitude
 
+  !> \brief Clear the legacy-global soil database state before rebuilding it from exchange inputs.
   subroutine mpr_bridge_reset_soil_database()
     if (allocated(HorizonDepth_mHM)) deallocate(HorizonDepth_mHM)
     if (allocated(soilDB%id)) deallocate(soilDB%id)
@@ -153,6 +191,7 @@ contains
 
     call mpr_bridge_reset_soil_database()
 
+    ! Translate the new config into the legacy-global soil database controls before reading the LUT.
     iFlag_soilDB = config%soil_db_mode(domain)
     nSoilHorizons_mHM = config%n_horizons(domain)
     tillageDepth = real(config%tillage_depth(domain), dp)
@@ -179,6 +218,7 @@ contains
     call read_soil_LUT(trim(soil_lut_path))
     call generate_soil_database()
 
+    ! Mark only the soil classes that are actually present in the packed L0 input.
     if (allocated(soilDB%is_present)) deallocate(soilDB%is_present)
     allocate(soilDB%is_present(nSoilTypes))
     soilDB%is_present = 0_i4
