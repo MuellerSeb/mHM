@@ -13,7 +13,7 @@ module mo_mpr_container
   use, intrinsic :: ieee_arithmetic, only: ieee_is_finite
   use mo_logging
   use mo_constants, only: nodata_dp
-  use mo_datetime, only: datetime, YEAR_MONTHS
+  use mo_datetime, only: datetime, YEAR_MONTHS, one_hour
   use mo_kind, only: i4, dp
   use mo_common_constants, only: soilHorizonsVarName, landCoverPeriodsVarName, LAIVarName
   use mo_exchange_type, only: exchange_t
@@ -32,6 +32,8 @@ module mo_mpr_container
   use mo_read_lut, only: read_geoformation_lut, read_lai_lut
   use nml_config_mpr, only: nml_config_mpr_t, NML_OK
 
+  character(len=*), parameter :: lc_restart_calendar = "proleptic_gregorian"
+
   type :: mpr_land_cover_state_t
     character(:), allocatable :: path !< resolved land-cover dataset path
     character(:), allocatable :: var_name !< configured land-cover variable name
@@ -41,6 +43,7 @@ module mo_mpr_container
     real(dp), allocatable :: forest_fraction_l1(:, :) !< cached forest fraction at level1 (nCells1, nLC)
     real(dp), allocatable :: sealed_fraction_l1(:, :) !< cached sealed fraction at level1 (nCells1, nLC)
     real(dp), allocatable :: pervious_fraction_l1(:, :) !< cached pervious fraction at level1 (nCells1, nLC)
+    type(datetime), allocatable :: period_start(:) !< cached land-cover period start times
     type(datetime), allocatable :: period_end(:) !< cached land-cover period end times
     integer(i4) :: n_periods = 1_i4 !< number of cached land-cover periods
     integer(i4) :: active_idx = 0_i4 !< active cached land-cover index
@@ -237,15 +240,16 @@ contains
     end if
     self%geo_lut_path = self%exchange%get_path(self%config%geo_lut_path(id(1)))
 
-    status = self%config%is_set("land_cover_path", idx=id, errmsg=errmsg)
-    if (status /= NML_OK) then
-      log_fatal(*) "MPR: land_cover_path not set for domain ", n2s(id(1)), ". Error: ", trim(errmsg)
-      error stop 1
-    end if
-    self%land_cover%path = self%exchange%get_path(self%config%land_cover_path(id(1)))
     self%land_cover%var_name = trim(self%config%land_cover_var(id(1)))
     if (len_trim(self%land_cover%var_name) < 1) then
       log_fatal(*) "MPR: land_cover_var must not be empty for domain ", n2s(id(1)), "."
+      error stop 1
+    end if
+    status = self%config%is_set("land_cover_path", idx=id, errmsg=errmsg)
+    if (status == NML_OK) then
+      self%land_cover%path = self%exchange%get_path(self%config%land_cover_path(id(1)))
+    else if (.not.self%config%read_restart(id(1))) then
+      log_fatal(*) "MPR: land_cover_path not set for domain ", n2s(id(1)), ". Error: ", trim(errmsg)
       error stop 1
     end if
 
@@ -315,12 +319,6 @@ contains
     self%exchange%gridded_lai%required = require_gridded_lai .and. .not.self%read_restart
 
     if (self%read_restart) then
-      if (.not.associated(self%exchange%level0)) then
-        log_fatal(*) "MPR: level0 grid not connected."
-        error stop 1
-      end if
-      call self%ensure_level1_grid()
-      call self%init_land_cover_timing()
       call self%read_restart_data()
       call self%update_exchange_slices(force=.true.)
       return
@@ -482,7 +480,6 @@ contains
     type(NcDimension) :: lai_dim
     type(NcDimension) :: land_cover_dim
     type(NcDimension) :: soil_dim
-    real(dp), allocatable :: land_cover_bounds(:)
     real(dp), allocatable :: soil_bounds(:)
     integer(i4) :: process_case
     integer(i4) :: i
@@ -500,13 +497,8 @@ contains
       dims_xy(2) = nc%getDimension("lat")
     end if
     lai_dim = nc%setDimension(trim(LAIVarName), self%n_lai_periods)
-    allocate(land_cover_bounds(self%land_cover%n_periods + 1_i4))
-    do i = 1_i4, size(land_cover_bounds)
-      land_cover_bounds(i) = real(i, dp)
-    end do
-    land_cover_dim = nc%setCoordinate(trim(landCoverPeriodsVarName), self%land_cover%n_periods, &
-      bounds=land_cover_bounds, reference=0_i4)
-    deallocate(land_cover_bounds)
+    land_cover_dim = nc%setDimension(trim(landCoverPeriodsVarName), self%land_cover%n_periods)
+    call mpr_write_restart_land_cover_timing(self, nc, land_cover_dim)
     if (allocated(self%soil%horizon_bounds)) then
       allocate(soil_bounds(size(self%soil%horizon_bounds)))
       soil_bounds = self%soil%horizon_bounds
@@ -670,6 +662,236 @@ contains
     end if
 
   end subroutine mpr_write_restart_data
+
+  !> \brief Build the CF units string for temporal land-cover restart metadata.
+  function mpr_land_cover_restart_units(start_time) result(units)
+    type(datetime), intent(in) :: start_time
+    character(:), allocatable :: units
+
+    units = "hours since " // start_time%str()
+  end function mpr_land_cover_restart_units
+
+  !> \brief Convert a datetime to an integer hour stamp in CF units.
+  integer(i4) function mpr_restart_hour_stamp(ref_time, current_time) result(stamp)
+    type(datetime), intent(in) :: ref_time
+    type(datetime), intent(in) :: current_time
+    real(dp) :: hours_dp
+    real(dp) :: rounded_dp
+
+    hours_dp = (current_time - ref_time) / one_hour()
+    if (abs(hours_dp) > real(huge(0_i4), dp)) then
+      log_fatal(*) "MPR restart: hour offset from ", ref_time%str(), " exceeds i32 range."
+      error stop 1
+    end if
+    rounded_dp = real(nint(hours_dp, kind=i4), dp)
+    if (.not.is_close(hours_dp, rounded_dp)) then
+      log_fatal(*) "MPR restart: time ", current_time%str(), &
+        " is not representable as a whole-hour offset from ", ref_time%str(), "."
+      error stop 1
+    end if
+    stamp = nint(hours_dp, kind=i4)
+  end function mpr_restart_hour_stamp
+
+  !> \brief Convert an integer restart time value in CF units to datetime.
+  type(datetime) function mpr_datetime_from_restart_time(units, value) result(dt)
+    character(*), intent(in) :: units
+    integer(i4), intent(in) :: value
+
+    dt = datetime(trim(units), value)
+  end function mpr_datetime_from_restart_time
+
+  !> \brief Write temporal land-cover restart timing metadata as an integer CF time axis with bounds.
+  subroutine mpr_write_restart_land_cover_timing(self, nc, land_cover_dim)
+    class(mpr_t), intent(inout), target :: self
+    type(NcDataset), intent(inout) :: nc
+    type(NcDimension), intent(in) :: land_cover_dim
+    type(NcDimension) :: bounds_dim
+    type(NcVariable) :: coord_var
+    type(NcVariable) :: bounds_var
+    character(:), allocatable :: units
+    integer(i4), allocatable :: coord_data(:)
+    integer(i4), allocatable :: bounds_data(:, :)
+    integer(i4) :: i
+
+    if (.not.self%land_cover%temporal) return
+    if (.not.allocated(self%land_cover%period_start) .or. .not.allocated(self%land_cover%period_end)) then
+      log_fatal(*) "MPR: temporal land-cover bounds are not cached while writing restart."
+      error stop 1
+    end if
+    if (size(self%land_cover%period_start) /= self%land_cover%n_periods .or. &
+      size(self%land_cover%period_end) /= self%land_cover%n_periods) then
+      log_fatal(*) "MPR: cached temporal land-cover bounds are inconsistent with n_land_cover_periods."
+      error stop 1
+    end if
+
+    units = mpr_land_cover_restart_units(self%land_cover%period_start(1))
+    allocate(coord_data(self%land_cover%n_periods))
+    allocate(bounds_data(2, self%land_cover%n_periods))
+    do i = 1_i4, self%land_cover%n_periods
+      coord_data(i) = mpr_restart_hour_stamp(self%land_cover%period_start(1), self%land_cover%period_start(i))
+      bounds_data(1, i) = coord_data(i)
+      bounds_data(2, i) = mpr_restart_hour_stamp(self%land_cover%period_start(1), self%land_cover%period_end(i))
+    end do
+
+    coord_var = nc%setVariable(trim(landCoverPeriodsVarName), "i32", [land_cover_dim])
+    call coord_var%setAttribute("standard_name", "time")
+    call coord_var%setAttribute("axis", "T")
+    call coord_var%setAttribute("units", trim(units))
+    call coord_var%setAttribute("calendar", lc_restart_calendar)
+    call coord_var%setAttribute("bounds", trim(landCoverPeriodsVarName) // "_bnds")
+    call coord_var%setData(coord_data)
+
+    if (nc%hasDimension("bnds")) then
+      bounds_dim = nc%getDimension("bnds")
+    else
+      bounds_dim = nc%setDimension("bnds", 2_i4)
+    end if
+    bounds_var = nc%setVariable(trim(landCoverPeriodsVarName) // "_bnds", "i32", [bounds_dim, land_cover_dim])
+    call bounds_var%setData(bounds_data)
+
+    deallocate(coord_data)
+    deallocate(bounds_data)
+  end subroutine mpr_write_restart_land_cover_timing
+
+  !> \brief Read land-cover time bounds from the restart file and rebuild cached timing state.
+  subroutine mpr_read_restart_land_cover_timing(self, nc)
+    class(mpr_t), intent(inout), target :: self
+    type(NcDataset), intent(inout) :: nc
+    type(NcDimension) :: nc_dim
+    type(NcVariable) :: nc_var
+    integer(i4), allocatable :: var_shape(:)
+    integer(i4), allocatable :: coord_values(:)
+    integer(i4), allocatable :: bounds_in(:, :)
+    integer(i4), allocatable :: bounds_2d(:, :)
+    character(256) :: bounds_name
+    character(256) :: units
+    character(256) :: calendar
+    integer(i4) :: n_land_cover_restart
+    integer(i4) :: i
+
+    if (.not.nc%hasDimension(trim(landCoverPeriodsVarName))) then
+      log_fatal(*) "MPR restart: required land-cover dimension missing: ", trim(landCoverPeriodsVarName)
+      error stop 1
+    end if
+    nc_dim = nc%getDimension(trim(landCoverPeriodsVarName))
+    n_land_cover_restart = nc_dim%getLength()
+    if (n_land_cover_restart < 1_i4) then
+      log_fatal(*) "MPR restart: land-cover period count must be >= 1."
+      error stop 1
+    end if
+
+    if (allocated(self%land_cover%period_start)) deallocate(self%land_cover%period_start)
+    if (allocated(self%land_cover%period_end)) deallocate(self%land_cover%period_end)
+    self%land_cover%n_periods = n_land_cover_restart
+    self%land_cover%temporal = .false.
+
+    if (.not.nc%hasVariable(trim(landCoverPeriodsVarName))) then
+      if (nc%hasVariable(trim(landCoverPeriodsVarName) // "_bnds")) then
+        log_fatal(*) "MPR restart: static land-cover restart must not carry temporal bounds metadata."
+        error stop 1
+      end if
+      if (n_land_cover_restart /= 1_i4) then
+        log_fatal(*) "MPR restart: land-cover dimension length ", n2s(n_land_cover_restart), &
+          " requires temporal land-cover metadata."
+        error stop 1
+      end if
+      return
+    end if
+
+    nc_var = nc%getVariable(trim(landCoverPeriodsVarName))
+    if (trim(nc_var%getDtype()) /= "i32") then
+      log_fatal(*) "MPR restart: land-cover time coordinate must use i32 CF time values."
+      error stop 1
+    end if
+    if (.not.nc_var%hasAttribute("units") .or. .not.nc_var%hasAttribute("bounds")) then
+      log_fatal(*) "MPR restart: ", trim(landCoverPeriodsVarName), &
+        " must use the new time-bounded restart format; re-write the restart with the updated MPR container."
+      error stop 1
+    end if
+    call nc_var%getAttribute("units", units)
+    if (index(trim(units), "hours since ") /= 1) then
+      log_fatal(*) "MPR restart: unsupported land-cover time units '", trim(units), "'."
+      error stop 1
+    end if
+    if (.not.nc_var%hasAttribute("calendar")) then
+      log_fatal(*) "MPR restart: ", trim(landCoverPeriodsVarName), " is missing the calendar attribute."
+      error stop 1
+    end if
+    call nc_var%getAttribute("calendar", calendar)
+    if (trim(calendar) /= lc_restart_calendar) then
+      log_fatal(*) "MPR restart: unsupported land-cover calendar '", trim(calendar), "'."
+      error stop 1
+    end if
+    call nc_var%getAttribute("bounds", bounds_name)
+    bounds_name = trim(bounds_name)
+    if (len_trim(bounds_name) < 1) then
+      log_fatal(*) "MPR restart: land-cover time coordinate has an empty bounds attribute."
+      error stop 1
+    end if
+    if (.not.nc%hasVariable(bounds_name)) then
+      log_fatal(*) "MPR restart: required land-cover bounds variable missing: ", trim(bounds_name)
+      error stop 1
+    end if
+    call nc_var%getData(coord_values)
+    if (size(coord_values) /= n_land_cover_restart) then
+      log_fatal(*) "MPR restart: land-cover time coordinate length does not match its dimension."
+      error stop 1
+    end if
+
+    nc_var = nc%getVariable(bounds_name)
+    if (trim(nc_var%getDtype()) /= "i32") then
+      log_fatal(*) "MPR restart: land-cover bounds variable must use i32 CF time values."
+      error stop 1
+    end if
+    var_shape = nc_var%getShape()
+    if (size(var_shape) /= 2_i4) then
+      log_fatal(*) "MPR restart: land-cover bounds variable ", trim(bounds_name), " has rank ", &
+        n2s(size(var_shape)), ", expected 2."
+      error stop 1
+    end if
+    call nc_var%getData(bounds_in)
+    if (size(bounds_in, 1) == 2_i4 .and. size(bounds_in, 2) == n_land_cover_restart) then
+      allocate(bounds_2d(2, n_land_cover_restart))
+      bounds_2d = bounds_in
+    else if (size(bounds_in, 2) == 2_i4 .and. size(bounds_in, 1) == n_land_cover_restart) then
+      allocate(bounds_2d(2, n_land_cover_restart))
+      bounds_2d = transpose(bounds_in)
+    else
+      log_fatal(*) "MPR restart: land-cover bounds variable ", trim(bounds_name), " has incompatible shape."
+      error stop 1
+    end if
+    deallocate(bounds_in)
+
+    allocate(self%land_cover%period_start(n_land_cover_restart))
+    allocate(self%land_cover%period_end(n_land_cover_restart))
+    do i = 1_i4, n_land_cover_restart
+      if (bounds_2d(2, i) <= bounds_2d(1, i)) then
+        log_fatal(*) "MPR restart: invalid land-cover time bounds for period ", n2s(i), "."
+        error stop 1
+      end if
+      if (coord_values(i) /= bounds_2d(1, i)) then
+        log_fatal(*) "MPR restart: land-cover time coordinate does not match lower bounds for period ", n2s(i), "."
+        error stop 1
+      end if
+      self%land_cover%period_start(i) = mpr_datetime_from_restart_time(trim(units), bounds_2d(1, i))
+      self%land_cover%period_end(i) = mpr_datetime_from_restart_time(trim(units), bounds_2d(2, i))
+    end do
+    deallocate(coord_values)
+    deallocate(bounds_2d)
+
+    if (self%exchange%start_time < self%land_cover%period_start(1)) then
+      log_fatal(*) "MPR restart: land-cover time bounds start at ", self%land_cover%period_start(1)%str(), &
+        ", but simulation starts at ", self%exchange%start_time%str(), "."
+      error stop 1
+    end if
+    if (self%exchange%end_time > self%land_cover%period_end(n_land_cover_restart)) then
+      log_fatal(*) "MPR restart: land-cover time bounds end at ", self%land_cover%period_end(n_land_cover_restart)%str(), &
+        ", but simulation ends at ", self%exchange%end_time%str(), "."
+      error stop 1
+    end if
+
+    self%land_cover%temporal = .true.
+  end subroutine mpr_read_restart_land_cover_timing
 
   !> \brief Read a packed L1 scalar field from unpacked 2D restart data.
   subroutine mpr_read_restart_field_2d(self, nc, var_name, data_packed)
@@ -872,10 +1094,6 @@ contains
       log_fatal(*) "MPR: restart input path is not configured."
       error stop 1
     end if
-    if (.not.associated(self%exchange%level1)) then
-      log_fatal(*) "MPR restart: level1 grid not connected before restart read."
-      error stop 1
-    end if
     if (self%exchange%parameters%process_matrix(10, 1) > 0_i4 .and. self%exchange%parameters%process_matrix(3, 1) == 0_i4) then
       log_fatal(*) "MPR: neutron regionalization requires an active soil-moisture process."
       error stop 1
@@ -883,19 +1101,15 @@ contains
 
     nc = NcDataset(self%restart_input_path, "r")
     call restart_grid%from_restart(nc)
-    call self%validate_restart_grid(restart_grid)
-
-    if (.not.nc%hasDimension(trim(landCoverPeriodsVarName))) then
-      log_fatal(*) "MPR restart: required land-cover dimension missing: ", trim(landCoverPeriodsVarName)
-      error stop 1
+    if (associated(self%exchange%level1)) then
+      call self%validate_restart_grid(restart_grid)
+    else
+      self%tgt_level1 = restart_grid
+      self%exchange%level1 => self%tgt_level1
+      log_info(*) "MPR restart: bootstrap level1 grid from restart file."
     end if
-    nc_dim = nc%getDimension(trim(landCoverPeriodsVarName))
-    n_land_cover_restart = nc_dim%getLength()
-    if (n_land_cover_restart /= self%land_cover%n_periods) then
-      log_fatal(*) "MPR restart: land-cover period count ", n2s(n_land_cover_restart), &
-        " does not match current timing configuration ", n2s(self%land_cover%n_periods), "."
-      error stop 1
-    end if
+    call mpr_read_restart_land_cover_timing(self, nc)
+    n_land_cover_restart = self%land_cover%n_periods
 
     pet_process = self%exchange%parameters%process_matrix(5, 1)
     soil_process = self%exchange%parameters%process_matrix(3, 1)
@@ -1331,6 +1545,7 @@ contains
     class(mpr_t), intent(inout), target :: self
     type(var) :: land_cover_meta
     integer(i4) :: n_times
+    integer(i4) :: i
 
     if (.not.allocated(self%land_cover%path)) then
       log_fatal(*) "MPR: internal error, land_cover_path not resolved in configure."
@@ -1346,6 +1561,7 @@ contains
     end if
 
     if (allocated(self%land_cover%ds%vars)) call self%land_cover%ds%close()
+    if (allocated(self%land_cover%period_start)) deallocate(self%land_cover%period_start)
     if (allocated(self%land_cover%period_end)) deallocate(self%land_cover%period_end)
     self%land_cover%temporal = .false.
     self%land_cover%n_periods = 1_i4
@@ -1358,8 +1574,8 @@ contains
 
     land_cover_meta = self%land_cover%ds%meta(trim(self%land_cover%var_name))
     if (land_cover_meta%static) then
-      allocate(self%land_cover%period_end(1))
-      self%land_cover%period_end(1) = self%exchange%end_time
+      self%land_cover%temporal = .false.
+      self%land_cover%n_periods = 1_i4
       call self%land_cover%ds%close()
       return
     end if
@@ -1380,12 +1596,14 @@ contains
       error stop 1
     end if
 
-    call self%land_cover%ds%chunk_times(self%exchange%start_time, self%exchange%end_time, times=self%land_cover%period_end)
-    self%land_cover%n_periods = size(self%land_cover%period_end, kind=i4)
-    if (self%land_cover%n_periods < 1_i4) then
-      log_fatal(*) "MPR: temporal land-cover timing returned no periods for the simulation window."
-      error stop 1
-    end if
+    self%land_cover%n_periods = n_times
+    allocate(self%land_cover%period_start(self%land_cover%n_periods))
+    allocate(self%land_cover%period_end(self%land_cover%n_periods))
+    self%land_cover%period_start(1) = self%land_cover%ds%start_time
+    self%land_cover%period_end = self%land_cover%ds%times
+    do i = 2_i4, self%land_cover%n_periods
+      self%land_cover%period_start(i) = self%land_cover%ds%times(i - 1_i4)
+    end do
 
     self%land_cover%temporal = .true.
     call self%land_cover%ds%close()
@@ -1413,7 +1631,7 @@ contains
 
     call self%land_cover%ds%read_chunk( &
       trim(self%land_cover%var_name), self%land_cover%l0_cache, &
-      self%exchange%start_time, self%exchange%end_time, times=self%land_cover%period_end)
+      self%land_cover%period_start(1), self%land_cover%period_end(self%land_cover%n_periods))
     call self%land_cover%ds%close()
     log_info(*) "MPR: temporal land-cover dataset initialized (nLC=", n2s(self%land_cover%n_periods), ")."
   end subroutine mpr_init_land_cover_cache
@@ -2122,8 +2340,17 @@ contains
       land_cover_idx = 1_i4
       return
     end if
+    if (.not.allocated(self%land_cover%period_start)) then
+      log_fatal(*) "MPR: temporal land-cover start times are not cached."
+      error stop 1
+    end if
     if (.not.allocated(self%land_cover%period_end)) then
       log_fatal(*) "MPR: temporal land-cover end times are not cached."
+      error stop 1
+    end if
+    if (self%exchange%time < self%land_cover%period_start(1)) then
+      log_fatal(*) "MPR: current time ", self%exchange%time%str(), &
+        " is before the first cached land-cover period start ", self%land_cover%period_start(1)%str(), "."
       error stop 1
     end if
     land_cover_idx = max(1_i4, self%land_cover%active_idx)
@@ -2251,6 +2478,7 @@ contains
     if (allocated(self%land_cover%forest_fraction_l1)) deallocate(self%land_cover%forest_fraction_l1)
     if (allocated(self%land_cover%sealed_fraction_l1)) deallocate(self%land_cover%sealed_fraction_l1)
     if (allocated(self%land_cover%pervious_fraction_l1)) deallocate(self%land_cover%pervious_fraction_l1)
+    if (allocated(self%land_cover%period_start)) deallocate(self%land_cover%period_start)
     if (allocated(self%land_cover%period_end)) deallocate(self%land_cover%period_end)
     if (allocated(self%lai_l0_cache)) deallocate(self%lai_l0_cache)
     if (allocated(self%max_interception_cache)) deallocate(self%max_interception_cache)
