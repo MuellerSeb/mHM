@@ -89,6 +89,22 @@ module mo_mpr_container
     integer(i4) :: active_idx = 0_i4 !< active cached land-cover index
   end type mpr_land_cover_state_t
 
+  !> \class   mpr_lai_state_t
+  !> \brief   Grouped LAI input paths, cached L0 slices, and active LAI timing state for MPR.
+  type :: mpr_lai_state_t
+    character(:), allocatable :: path !< resolved gridded LAI path
+    character(:), allocatable :: lut_path !< resolved LAI LUT path
+    real(dp), allocatable :: l0_cache(:, :) !< cached LAI on level0 (nCells0, nLAI)
+    integer(i4) :: n_periods = 1_i4 !< number of cached LAI periods
+    integer(i4) :: active_idx = 0_i4 !< active cached LAI index
+  end type mpr_lai_state_t
+
+  !> \class   mpr_canopy_state_t
+  !> \brief   Grouped canopy interception cache owned by the MPR container.
+  type :: mpr_canopy_state_t
+    real(dp), allocatable :: max_interception_cache(:, :, :) !< cached max interception (nCells1, nLAI, nLC)
+  end type mpr_canopy_state_t
+
   !> \class   mpr_snow_state_t
   !> \brief   Grouped cached snow parameter fields published by the MPR container.
   type :: mpr_snow_state_t
@@ -155,23 +171,19 @@ module mo_mpr_container
     type(scaler_t) :: upscaler !< scaler from level0 morphology to level1 hydrology
     character(:), allocatable :: soil_lut_path !< resolved soil LUT path
     character(:), allocatable :: geo_lut_path !< resolved geology LUT path
-    character(:), allocatable :: lai_path !< resolved gridded LAI path
-    character(:), allocatable :: lai_lut_path !< resolved LAI LUT path
     logical :: read_restart = .false. !< whether to read MPR restart file
     logical :: write_restart = .false. !< whether to write MPR restart file
     character(:), allocatable :: restart_input_path !< path to restart file to read
     character(:), allocatable :: restart_output_path !< path to restart file to write
     real(dp), allocatable :: slope_emp(:) !< empirical slope distribution on level0
-    real(dp), allocatable :: lai_l0_cache(:, :) !< cached LAI on level0 (nCells0, nLAI)
-    real(dp), allocatable :: max_interception_cache(:, :, :) !< cached max interception (nCells1, nLAI, nLC)
     type(mpr_land_cover_state_t) :: land_cover !< land-cover configuration and cached temporal state
+    type(mpr_lai_state_t) :: lai !< LAI configuration, cached L0 fields, and active timing state
+    type(mpr_canopy_state_t) :: canopy !< canopy interception cache state
     type(mpr_snow_state_t) :: snow !< cached snow parameter fields
     type(mpr_pet_state_t) :: pet !< cached PET parameter fields
     type(mpr_soil_state_t) :: soil !< cached soil moisture parameter fields
     type(mpr_neutron_state_t) :: neutron !< cached neutron parameter fields
     type(mpr_runoff_state_t) :: runoff !< cached runoff/baseflow parameter fields
-    integer(i4) :: n_lai_periods = 1_i4 !< number of cached LAI periods
-    integer(i4) :: active_lai_idx = 0_i4 !< active cached LAI index
   contains
     procedure :: configure  => mpr_configure
     procedure :: connect    => mpr_connect
@@ -319,8 +331,8 @@ contains
           " while lai_time_step=0. Error: ", trim(errmsg)
         error stop 1
       end if
-      self%lai_lut_path = self%exchange%get_path(self%config%lai_lut_path(id(1)))
-      if (allocated(self%lai_path)) deallocate(self%lai_path)
+      self%lai%lut_path = self%exchange%get_path(self%config%lai_lut_path(id(1)))
+      if (allocated(self%lai%path)) deallocate(self%lai%path)
     else
       status = self%config%is_set("lai_path", idx=id, errmsg=errmsg)
       if (status /= NML_OK) then
@@ -328,8 +340,8 @@ contains
           " while lai_time_step=", n2s(self%config%lai_time_step(id(1))), ". Error: ", trim(errmsg)
         error stop 1
       end if
-      self%lai_path = self%exchange%get_path(self%config%lai_path(id(1)))
-      if (allocated(self%lai_lut_path)) deallocate(self%lai_lut_path)
+      self%lai%path = self%exchange%get_path(self%config%lai_path(id(1)))
+      if (allocated(self%lai%lut_path)) deallocate(self%lai%lut_path)
     end if
   end subroutine mpr_configure
 
@@ -454,12 +466,12 @@ contains
     end if
 
     if (self%config%lai_time_step(id(1)) == 0_i4) then
-      if (.not.allocated(self%lai_lut_path)) then
+      if (.not.allocated(self%lai%lut_path)) then
         log_fatal(*) "MPR: internal error, lai_lut_path not resolved in configure."
         error stop 1
       end if
     else
-      if (.not.allocated(self%lai_path)) then
+      if (.not.allocated(self%lai%path)) then
         log_fatal(*) "MPR: internal error, lai_path not resolved in configure."
         error stop 1
       end if
@@ -527,7 +539,7 @@ contains
     nc_var = nc%setVariable("mpr_meta", "i32", dims0(:0))
     call nc_var%setAttribute("time_stamp", self%exchange%time%str())
     call nc_var%setAttribute("domain", self%exchange%domain)
-    call nc_var%setAttribute("n_lai_periods", self%n_lai_periods)
+    call nc_var%setAttribute("n_lai_periods", self%lai%n_periods)
     call nc_var%setAttribute("n_land_cover_periods", self%land_cover%n_periods)
     call nc%close()
   end subroutine mpr_create_restart
@@ -556,7 +568,7 @@ contains
       dims_xy(1) = nc%getDimension("lon")
       dims_xy(2) = nc%getDimension("lat")
     end if
-    lai_dim = nc%setDimension(trim(LAIVarName), self%n_lai_periods)
+    lai_dim = nc%setDimension(trim(LAIVarName), self%lai%n_periods)
     land_cover_dim = nc%setDimension(trim(landCoverPeriodsVarName), self%land_cover%n_periods)
     call self%write_restart_land_cover_timing(nc, land_cover_dim)
     if (allocated(self%soil%horizon_bounds)) then
@@ -579,10 +591,10 @@ contains
         self%land_cover%sealed_fraction_l1)
     end if
 
-    if (allocated(self%max_interception_cache)) then
+    if (allocated(self%canopy%max_interception_cache)) then
       call self%write_restart_field_3d( &
         nc, dims_xy, lai_dim, "L1_maxInter", "Maximum interception at level 1", &
-        self%max_interception_cache(:, :, 1))
+        self%canopy%max_interception_cache(:, :, 1))
     end if
 
     if (allocated(self%snow%thresh_temp_cache)) then
@@ -1189,9 +1201,9 @@ contains
         log_fatal(*) "MPR restart: LAI dimension length must be >= 1."
         error stop 1
       end if
-      self%n_lai_periods = n_lai_restart
+      self%lai%n_periods = n_lai_restart
     else
-      self%n_lai_periods = 1_i4
+      self%lai%n_periods = 1_i4
     end if
 
     if (soil_process /= 0_i4 .or. neutron_process > 0_i4) then
@@ -1231,15 +1243,15 @@ contains
     self%exchange%f_sealed%provided = .true.
 
     if (self%exchange%parameters%process_matrix(1, 1) /= 0_i4) then
-      if (allocated(self%max_interception_cache)) deallocate(self%max_interception_cache)
+      if (allocated(self%canopy%max_interception_cache)) deallocate(self%canopy%max_interception_cache)
       call self%read_restart_field_3d(nc, "L1_maxInter", field_3d)
-      if (size(field_3d, 2) /= self%n_lai_periods) then
+      if (size(field_3d, 2) /= self%lai%n_periods) then
         log_fatal(*) "MPR restart: L1_maxInter LAI dimension does not match restart LAI periods."
         error stop 1
       end if
-      allocate(self%max_interception_cache(self%exchange%level1%ncells, self%n_lai_periods, self%land_cover%n_periods))
+      allocate(self%canopy%max_interception_cache(self%exchange%level1%ncells, self%lai%n_periods, self%land_cover%n_periods))
       do land_cover_idx = 1_i4, self%land_cover%n_periods
-        self%max_interception_cache(:, :, land_cover_idx) = field_3d
+        self%canopy%max_interception_cache(:, :, land_cover_idx) = field_3d
       end do
       deallocate(field_3d)
       self%exchange%max_interception%provided = .true.
@@ -1273,7 +1285,7 @@ contains
       case (-1_i4)
         if (allocated(self%pet%pet_fac_lai_cache)) deallocate(self%pet%pet_fac_lai_cache)
         call self%read_restart_field_4d(nc, "L1_petLAIcorFactor", self%pet%pet_fac_lai_cache)
-        if (size(self%pet%pet_fac_lai_cache, 2) /= self%n_lai_periods .or. &
+        if (size(self%pet%pet_fac_lai_cache, 2) /= self%lai%n_periods .or. &
           size(self%pet%pet_fac_lai_cache, 3) /= self%land_cover%n_periods) then
           log_fatal(*) "MPR restart: PET-LAI restart dimensions do not match current LAI/land-cover configuration."
           error stop 1
@@ -1289,7 +1301,7 @@ contains
       case (2_i4)
         if (allocated(self%pet%pet_coeff_pt_cache)) deallocate(self%pet%pet_coeff_pt_cache)
         call self%read_restart_field_3d(nc, "L1_PrieTayAlpha", self%pet%pet_coeff_pt_cache)
-        if (size(self%pet%pet_coeff_pt_cache, 2) /= self%n_lai_periods) then
+        if (size(self%pet%pet_coeff_pt_cache, 2) /= self%lai%n_periods) then
           log_fatal(*) "MPR restart: Priestley-Taylor restart LAI dimension does not match restart LAI periods."
           error stop 1
         end if
@@ -1299,12 +1311,12 @@ contains
         if (allocated(self%pet%resist_surf_cache)) deallocate(self%pet%resist_surf_cache)
         call self%read_restart_field_4d(nc, "L1_aeroResist", self%pet%resist_aero_cache)
         call self%read_restart_field_3d(nc, "L1_surfResist", self%pet%resist_surf_cache)
-        if (size(self%pet%resist_aero_cache, 2) /= self%n_lai_periods .or. &
+        if (size(self%pet%resist_aero_cache, 2) /= self%lai%n_periods .or. &
           size(self%pet%resist_aero_cache, 3) /= self%land_cover%n_periods) then
           log_fatal(*) "MPR restart: aerodynamic resistance dimensions do not match current LAI/land-cover configuration."
           error stop 1
         end if
-        if (size(self%pet%resist_surf_cache, 2) /= self%n_lai_periods) then
+        if (size(self%pet%resist_surf_cache, 2) /= self%lai%n_periods) then
           log_fatal(*) "MPR restart: surface resistance LAI dimension does not match restart LAI periods."
           error stop 1
         end if
@@ -1419,7 +1431,7 @@ contains
     end if
 
     ! Force the first initialize/update cycle to reattach active exchange pointers from the restored caches.
-    self%active_lai_idx = 0_i4
+    self%lai%active_idx = 0_i4
     self%land_cover%active_idx = 0_i4
     call nc%close()
   end subroutine mpr_read_restart_data
@@ -1563,9 +1575,9 @@ contains
     logical :: need_runoff_cache
     integer(i4) :: pet_process
 
-    self%n_lai_periods = 1_i4
+    self%lai%n_periods = 1_i4
     self%land_cover%n_periods = 1_i4
-    self%active_lai_idx = 0_i4
+    self%lai%active_idx = 0_i4
     self%land_cover%active_idx = 0_i4
 
     ! Land-cover timing drives every land-cover-dependent cache, so initialize it first.
@@ -1604,7 +1616,7 @@ contains
       end if
       call self%init_runoff_cache()
     end if
-    log_info(*) "MPR: temporal cache initialized (nLAI=", n2s(self%n_lai_periods), &
+    log_info(*) "MPR: temporal cache initialized (nLAI=", n2s(self%lai%n_periods), &
       ", nLC=", n2s(self%land_cover%n_periods), ")."
   end subroutine mpr_init_temporal_cache
 
@@ -1757,22 +1769,22 @@ contains
 
     id(1) = self%exchange%domain
 
-    if (allocated(self%lai_l0_cache)) deallocate(self%lai_l0_cache)
+    if (allocated(self%lai%l0_cache)) deallocate(self%lai%l0_cache)
 
     select case (self%config%lai_time_step(id(1)))
       case (0_i4)
-        if (.not.allocated(self%lai_lut_path)) then
+        if (.not.allocated(self%lai%lut_path)) then
           log_fatal(*) "MPR: internal error, lai_lut_path not resolved in configure."
           error stop 1
         end if
-        call read_lai_lut(filename=trim(self%lai_lut_path), nLAI=n_lai_classes, LAIIDlist=lai_id_list, LAI=lai_lut)
+        call read_lai_lut(filename=trim(self%lai%lut_path), nLAI=n_lai_classes, LAIIDlist=lai_id_list, LAI=lai_lut)
         if (size(lai_lut, 2) < YEAR_MONTHS) then
           log_fatal(*) "MPR: LAI LUT provides ", n2s(size(lai_lut, 2)), " periods, expected at least ", n2s(YEAR_MONTHS), "."
           error stop 1
         end if
 
-        self%n_lai_periods = YEAR_MONTHS
-        allocate(self%lai_l0_cache(size(self%exchange%gridded_lai%data), self%n_lai_periods))
+        self%lai%n_periods = YEAR_MONTHS
+        allocate(self%lai%l0_cache(size(self%exchange%gridded_lai%data), self%lai%n_periods))
         do i_cell = 1_i4, size(self%exchange%gridded_lai%data)
           class_value = self%exchange%gridded_lai%data(i_cell)
           class_id = nint(class_value)
@@ -1789,20 +1801,20 @@ contains
             end if
           end do
           if (class_pos < 1_i4) then
-            log_fatal(*) "MPR: LAI class ID ", n2s(class_id), " missing in LAI LUT: ", self%lai_lut_path
+            log_fatal(*) "MPR: LAI class ID ", n2s(class_id), " missing in LAI LUT: ", self%lai%lut_path
             error stop 1
           end if
 
-          do lai_idx = 1_i4, self%n_lai_periods
-            self%lai_l0_cache(i_cell, lai_idx) = min(30.0_dp, max(1.0e-10_dp, lai_lut(class_pos, lai_idx)))
+          do lai_idx = 1_i4, self%lai%n_periods
+            self%lai%l0_cache(i_cell, lai_idx) = min(30.0_dp, max(1.0e-10_dp, lai_lut(class_pos, lai_idx)))
           end do
         end do
 
       case default
         ! Current exchange contract carries one active gridded_lai slice.
-        self%n_lai_periods = 1_i4
-        allocate(self%lai_l0_cache(size(self%exchange%gridded_lai%data), 1))
-        self%lai_l0_cache(:, 1) = min(30.0_dp, max(1.0e-10_dp, self%exchange%gridded_lai%data))
+        self%lai%n_periods = 1_i4
+        allocate(self%lai%l0_cache(size(self%exchange%gridded_lai%data), 1))
+        self%lai%l0_cache(:, 1) = min(30.0_dp, max(1.0e-10_dp, self%exchange%gridded_lai%data))
     end select
   end subroutine mpr_build_lai_l0_cache
 
@@ -1841,7 +1853,7 @@ contains
       log_fatal(*) "MPR: interception parameter set is empty while process 1 is active."
       error stop 1
     end if
-    if (.not.allocated(self%lai_l0_cache)) then
+    if (.not.allocated(self%lai%l0_cache)) then
       log_fatal(*) "MPR: LAI level0 cache not available before max interception cache initialization."
       error stop 1
     end if
@@ -1854,15 +1866,15 @@ contains
       error stop 1
     end if
 
-    if (allocated(self%max_interception_cache)) deallocate(self%max_interception_cache)
-    allocate(self%max_interception_cache(self%exchange%level1%ncells, self%n_lai_periods, self%land_cover%n_periods))
+    if (allocated(self%canopy%max_interception_cache)) deallocate(self%canopy%max_interception_cache)
+    allocate(self%canopy%max_interception_cache(self%exchange%level1%ncells, self%lai%n_periods, self%land_cover%n_periods))
     allocate(max_interception_l0(self%exchange%level0%ncells))
     allocate(max_interception_l1(self%exchange%level1%ncells))
-    do lai_idx = 1_i4, self%n_lai_periods
-      max_interception_l0 = interception_param(1) * self%lai_l0_cache(:, lai_idx)
+    do lai_idx = 1_i4, self%lai%n_periods
+      max_interception_l0 = interception_param(1) * self%lai%l0_cache(:, lai_idx)
       call self%upscaler%execute(max_interception_l0, max_interception_l1, upscaling_operator=up_a_mean)
       do land_cover_idx = 1_i4, self%land_cover%n_periods
-        self%max_interception_cache(:, lai_idx, land_cover_idx) = max_interception_l1
+        self%canopy%max_interception_cache(:, lai_idx, land_cover_idx) = max_interception_l1
       end do
     end do
     self%exchange%max_interception%provided = .true.
@@ -1995,7 +2007,7 @@ contains
       log_fatal(*) "MPR: PET-LAI parameter set must contain 5 values while PET process -1 is active."
       error stop 1
     end if
-    if (.not.allocated(self%lai_l0_cache)) then
+    if (.not.allocated(self%lai%l0_cache)) then
       log_fatal(*) "MPR: LAI level0 cache not available before PET-LAI cache initialization."
       error stop 1
     end if
@@ -2005,11 +2017,11 @@ contains
     end if
 
     if (allocated(self%pet%pet_fac_lai_cache)) deallocate(self%pet%pet_fac_lai_cache)
-    allocate(self%pet%pet_fac_lai_cache(self%exchange%level1%ncells, self%n_lai_periods, self%land_cover%n_periods))
+    allocate(self%pet%pet_fac_lai_cache(self%exchange%level1%ncells, self%lai%n_periods, self%land_cover%n_periods))
     do land_cover_idx = 1_i4, self%land_cover%n_periods
-      do lai_idx = 1_i4, self%n_lai_periods
+      do lai_idx = 1_i4, self%lai%n_periods
         call mpr_bridge_pet_lai( &
-          pet_param, self%land_cover%l0_cache(:, land_cover_idx), self%lai_l0_cache(:, lai_idx), &
+          pet_param, self%land_cover%l0_cache(:, land_cover_idx), self%lai%l0_cache(:, lai_idx), &
           self%upscaler, self%pet%pet_fac_lai_cache(:, lai_idx, land_cover_idx))
       end do
     end do
@@ -2027,14 +2039,14 @@ contains
       log_fatal(*) "MPR: PET Priestley-Taylor parameter set must contain 2 values while PET process 2 is active."
       error stop 1
     end if
-    if (.not.allocated(self%lai_l0_cache)) then
+    if (.not.allocated(self%lai%l0_cache)) then
       log_fatal(*) "MPR: LAI level0 cache not available before PET Priestley-Taylor cache initialization."
       error stop 1
     end if
 
     if (allocated(self%pet%pet_coeff_pt_cache)) deallocate(self%pet%pet_coeff_pt_cache)
-    allocate(self%pet%pet_coeff_pt_cache(self%exchange%level1%ncells, self%n_lai_periods))
-    call mpr_bridge_pet_priestley_taylor(self%exchange%level0, self%lai_l0_cache, pet_param, self%upscaler, &
+    allocate(self%pet%pet_coeff_pt_cache(self%exchange%level1%ncells, self%lai%n_periods))
+    call mpr_bridge_pet_priestley_taylor(self%exchange%level0, self%lai%l0_cache, pet_param, self%upscaler, &
       self%pet%pet_coeff_pt_cache)
 
     self%exchange%pet_coeff_pt%provided = .true.
@@ -2052,7 +2064,7 @@ contains
       log_fatal(*) "MPR: PET Penman-Monteith parameter set must contain 7 values while PET process 3 is active."
       error stop 1
     end if
-    if (.not.allocated(self%lai_l0_cache)) then
+    if (.not.allocated(self%lai%l0_cache)) then
       log_fatal(*) "MPR: LAI level0 cache not available before PET Penman-Monteith cache initialization."
       error stop 1
     end if
@@ -2063,13 +2075,13 @@ contains
 
     if (allocated(self%pet%resist_aero_cache)) deallocate(self%pet%resist_aero_cache)
     if (allocated(self%pet%resist_surf_cache)) deallocate(self%pet%resist_surf_cache)
-    allocate(self%pet%resist_aero_cache(self%exchange%level1%ncells, self%n_lai_periods, self%land_cover%n_periods))
-    allocate(self%pet%resist_surf_cache(self%exchange%level1%ncells, self%n_lai_periods))
-    allocate(resist_surf_l1(self%exchange%level1%ncells, self%n_lai_periods))
+    allocate(self%pet%resist_aero_cache(self%exchange%level1%ncells, self%lai%n_periods, self%land_cover%n_periods))
+    allocate(self%pet%resist_surf_cache(self%exchange%level1%ncells, self%lai%n_periods))
+    allocate(resist_surf_l1(self%exchange%level1%ncells, self%lai%n_periods))
 
     do land_cover_idx = 1_i4, self%land_cover%n_periods
       call mpr_bridge_pet_penman_monteith(self%exchange%level0, self%land_cover%l0_cache(:, land_cover_idx), &
-        self%lai_l0_cache, pet_param, self%upscaler, self%pet%resist_aero_cache(:, :, land_cover_idx), resist_surf_l1)
+        self%lai%l0_cache, pet_param, self%upscaler, self%pet%resist_aero_cache(:, :, land_cover_idx), resist_surf_l1)
       if (land_cover_idx == 1_i4) self%pet%resist_surf_cache = resist_surf_l1
     end do
     deallocate(resist_surf_l1)
@@ -2295,7 +2307,7 @@ contains
     force_ = optval(force, .false.)
 
     if (.not.allocated(self%land_cover%sealed_fraction_l1) .and. &
-      .not.allocated(self%max_interception_cache) .and. &
+      .not.allocated(self%canopy%max_interception_cache) .and. &
       .not.allocated(self%snow%thresh_temp_cache) .and. &
       .not.allocated(self%pet%pet_fac_aspect_cache) .and. &
       .not.allocated(self%pet%pet_coeff_hs_cache) .and. &
@@ -2315,22 +2327,22 @@ contains
 
     lai_idx = self%lai_index_for_time()
     land_cover_idx = self%land_cover_index_for_time()
-    if (lai_idx < 1_i4 .or. lai_idx > self%n_lai_periods) then
-      log_fatal(*) "MPR: LAI index out of bounds: ", n2s(lai_idx), " not in [1,", n2s(self%n_lai_periods), "]."
+    if (lai_idx < 1_i4 .or. lai_idx > self%lai%n_periods) then
+      log_fatal(*) "MPR: LAI index out of bounds: ", n2s(lai_idx), " not in [1,", n2s(self%lai%n_periods), "]."
       error stop 1
     end if
     if (land_cover_idx < 1_i4 .or. land_cover_idx > self%land_cover%n_periods) then
       log_fatal(*) "MPR: land-cover index out of bounds: ", n2s(land_cover_idx), " not in [1,", n2s(self%land_cover%n_periods), "]."
       error stop 1
     end if
-    if (.not.force_ .and. lai_idx == self%active_lai_idx .and. land_cover_idx == self%land_cover%active_idx) return
+    if (.not.force_ .and. lai_idx == self%lai%active_idx .and. land_cover_idx == self%land_cover%active_idx) return
 
     ! Reattach only the active slices; the grouped caches stay owned by mpr_t.
     if (allocated(self%land_cover%sealed_fraction_l1)) then
       self%exchange%f_sealed%data => self%land_cover%sealed_fraction_l1(:, land_cover_idx)
     end if
-    if (allocated(self%max_interception_cache)) then
-      self%exchange%max_interception%data => self%max_interception_cache(:, lai_idx, land_cover_idx)
+    if (allocated(self%canopy%max_interception_cache)) then
+      self%exchange%max_interception%data => self%canopy%max_interception_cache(:, lai_idx, land_cover_idx)
     end if
     if (allocated(self%snow%thresh_temp_cache)) then
       self%exchange%thresh_temp%data => self%snow%thresh_temp_cache(:, land_cover_idx)
@@ -2396,7 +2408,7 @@ contains
     if (allocated(self%runoff%thresh_sealed_cache)) then
       self%exchange%thresh_sealed%data => self%runoff%thresh_sealed_cache
     end if
-    self%active_lai_idx = lai_idx
+    self%lai%active_idx = lai_idx
     self%land_cover%active_idx = land_cover_idx
     log_trace(*) "MPR: active cache slice lai=", n2s(lai_idx), ", land_cover=", n2s(land_cover_idx)
   end subroutine mpr_update_exchange_slices
@@ -2407,7 +2419,7 @@ contains
     integer(i4) :: id(1)
 
     id(1) = self%exchange%domain
-    if (self%n_lai_periods < 1_i4) then
+    if (self%lai%n_periods < 1_i4) then
       log_fatal(*) "MPR: n_lai_periods must be >= 1."
       error stop 1
     end if
@@ -2415,11 +2427,11 @@ contains
     lai_idx = 1_i4
     select case (self%config%lai_time_step(id(1)))
       case (0_i4, 1_i4)
-        if (self%n_lai_periods >= YEAR_MONTHS) lai_idx = self%exchange%time%month
+        if (self%lai%n_periods >= YEAR_MONTHS) lai_idx = self%exchange%time%month
       case default
         lai_idx = 1_i4
     end select
-    lai_idx = max(1_i4, min(lai_idx, self%n_lai_periods))
+    lai_idx = max(1_i4, min(lai_idx, self%lai%n_periods))
   end function mpr_lai_index_for_time
 
   !> \brief Resolve active land-cover period index from current exchange time.
@@ -2574,8 +2586,8 @@ contains
     if (allocated(self%land_cover%pervious_fraction_l1)) deallocate(self%land_cover%pervious_fraction_l1)
     if (allocated(self%land_cover%period_start)) deallocate(self%land_cover%period_start)
     if (allocated(self%land_cover%period_end)) deallocate(self%land_cover%period_end)
-    if (allocated(self%lai_l0_cache)) deallocate(self%lai_l0_cache)
-    if (allocated(self%max_interception_cache)) deallocate(self%max_interception_cache)
+    if (allocated(self%lai%l0_cache)) deallocate(self%lai%l0_cache)
+    if (allocated(self%canopy%max_interception_cache)) deallocate(self%canopy%max_interception_cache)
     if (allocated(self%snow%thresh_temp_cache)) deallocate(self%snow%thresh_temp_cache)
     if (allocated(self%snow%degday_dry_cache)) deallocate(self%snow%degday_dry_cache)
     if (allocated(self%snow%degday_inc_cache)) deallocate(self%snow%degday_inc_cache)
@@ -2610,8 +2622,8 @@ contains
     self%land_cover%temporal = .false.
     self%land_cover%n_periods = 1_i4
     self%land_cover%active_idx = 0_i4
-    self%n_lai_periods = 1_i4
-    self%active_lai_idx = 0_i4
+    self%lai%n_periods = 1_i4
+    self%lai%active_idx = 0_i4
     log_info(*) "Finalize MPR for domain ", n2s(self%exchange%domain)
   end subroutine mpr_finalize
 end module mo_mpr_container
