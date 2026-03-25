@@ -12,8 +12,8 @@
 module mo_mpr_container
   use, intrinsic :: ieee_arithmetic, only: ieee_is_finite
   use mo_logging
-  use mo_constants, only: YearMonths, nodata_dp
-  use mo_datetime, only: datetime
+  use mo_constants, only: nodata_dp
+  use mo_datetime, only: datetime, YEAR_MONTHS
   use mo_kind, only: i4, dp
   use mo_common_constants, only: soilHorizonsVarName, landCoverPeriodsVarName, LAIVarName
   use mo_exchange_type, only: exchange_t
@@ -94,7 +94,6 @@ module mo_mpr_container
     type(scaler_t) :: upscaler !< scaler from level0 morphology to level1 hydrology
     character(:), allocatable :: soil_lut_path !< resolved soil LUT path
     character(:), allocatable :: geo_lut_path !< resolved geology LUT path
-    type(mpr_land_cover_state_t) :: land_cover !< land-cover configuration and cached temporal state
     character(:), allocatable :: lai_path !< resolved gridded LAI path
     character(:), allocatable :: lai_lut_path !< resolved LAI LUT path
     logical :: read_restart = .false. !< whether to read MPR restart file
@@ -104,6 +103,7 @@ module mo_mpr_container
     real(dp), allocatable :: slope_emp(:) !< empirical slope distribution on level0
     real(dp), allocatable :: lai_l0_cache(:, :) !< cached LAI on level0 (nCells0, nLAI)
     real(dp), allocatable :: max_interception_cache(:, :, :) !< cached max interception (nCells1, nLAI, nLC)
+    type(mpr_land_cover_state_t) :: land_cover !< land-cover configuration and cached temporal state
     type(mpr_snow_state_t) :: snow !< cached snow parameter fields
     type(mpr_pet_state_t) :: pet !< cached PET parameter fields
     type(mpr_soil_state_t) :: soil !< cached soil moisture parameter fields
@@ -111,36 +111,36 @@ module mo_mpr_container
     integer(i4) :: n_lai_periods = 1_i4 !< number of cached LAI periods
     integer(i4) :: active_lai_idx = 0_i4 !< active cached LAI index
   contains
-    procedure :: configure => mpr_configure
-    procedure :: connect => mpr_connect
+    procedure :: configure  => mpr_configure
+    procedure :: connect    => mpr_connect
     procedure :: initialize => mpr_initialize
-    procedure :: update => mpr_update
-    procedure :: finalize => mpr_finalize
-    procedure, private :: create_restart => mpr_create_restart
-    procedure, private :: write_restart_data => mpr_write_restart_data
-    procedure, private :: read_restart_data => mpr_read_restart_data
-    procedure, private :: ensure_level1_grid => mpr_ensure_level1_grid
-    procedure, private :: init_upscaler => mpr_init_upscaler
-    procedure, private :: init_slope_emp => mpr_init_slope_emp
-    procedure, private :: init_temporal_cache => mpr_init_temporal_cache
-    procedure, private :: init_land_cover_cache => mpr_init_land_cover_cache
-    procedure, private :: init_land_cover_fraction_cache => mpr_init_land_cover_fraction_cache
-    procedure, private :: build_lai_l0_cache => mpr_build_lai_l0_cache
-    procedure, private :: init_max_interception_cache => mpr_init_max_interception_cache
-    procedure, private :: init_snow_cache => mpr_init_snow_cache
-    procedure, private :: init_pet_cache => mpr_init_pet_cache
-    procedure, private :: init_pet_aspect_cache => mpr_init_pet_aspect_cache
-    procedure, private :: init_pet_hargreaves_cache => mpr_init_pet_hargreaves_cache
-    procedure, private :: init_pet_lai_cache => mpr_init_pet_lai_cache
+    procedure :: update     => mpr_update
+    procedure :: finalize   => mpr_finalize
+    procedure, private :: create_restart                  => mpr_create_restart
+    procedure, private :: write_restart_data              => mpr_write_restart_data
+    procedure, private :: read_restart_data               => mpr_read_restart_data
+    procedure, private :: ensure_level1_grid              => mpr_ensure_level1_grid
+    procedure, private :: init_upscaler                   => mpr_init_upscaler
+    procedure, private :: init_slope_emp                  => mpr_init_slope_emp
+    procedure, private :: init_temporal_cache             => mpr_init_temporal_cache
+    procedure, private :: init_land_cover_cache           => mpr_init_land_cover_cache
+    procedure, private :: init_land_cover_fraction_cache  => mpr_init_land_cover_fraction_cache
+    procedure, private :: build_lai_l0_cache              => mpr_build_lai_l0_cache
+    procedure, private :: init_max_interception_cache     => mpr_init_max_interception_cache
+    procedure, private :: init_snow_cache                 => mpr_init_snow_cache
+    procedure, private :: init_pet_cache                  => mpr_init_pet_cache
+    procedure, private :: init_pet_aspect_cache           => mpr_init_pet_aspect_cache
+    procedure, private :: init_pet_hargreaves_cache       => mpr_init_pet_hargreaves_cache
+    procedure, private :: init_pet_lai_cache              => mpr_init_pet_lai_cache
     procedure, private :: init_pet_priestley_taylor_cache => mpr_init_pet_priestley_taylor_cache
-    procedure, private :: init_pet_penman_cache => mpr_init_pet_penman_cache
-    procedure, private :: init_soil_cache => mpr_init_soil_cache
-    procedure, private :: init_runoff_cache => mpr_init_runoff_cache
-    procedure, private :: update_exchange_slices => mpr_update_exchange_slices
-    procedure, private :: lai_index_for_time => mpr_lai_index_for_time
-    procedure, private :: land_cover_index_for_time => mpr_land_cover_index_for_time
-    procedure, private :: check_geo_units_against_lut => mpr_check_geo_units_against_lut
-    procedure, private :: check_geoparameter_consistency => mpr_check_geoparameter_consistency
+    procedure, private :: init_pet_penman_cache           => mpr_init_pet_penman_cache
+    procedure, private :: init_soil_cache                 => mpr_init_soil_cache
+    procedure, private :: init_runoff_cache               => mpr_init_runoff_cache
+    procedure, private :: update_exchange_slices          => mpr_update_exchange_slices
+    procedure, private :: lai_index_for_time              => mpr_lai_index_for_time
+    procedure, private :: land_cover_index_for_time       => mpr_land_cover_index_for_time
+    procedure, private :: check_geo_units_against_lut     => mpr_check_geo_units_against_lut
+    procedure, private :: check_geoparameter_consistency  => mpr_check_geoparameter_consistency
   end type mpr_t
 
 contains
@@ -344,7 +344,7 @@ contains
     select case (self%config%soil_db_mode(id(1)))
       case (0_i4)
         if (soil_layers /= 1_i4) then
-          log_fatal(*) "MPR: soil_db_mode=0 expects a single soil class layer, but got ", n2s(soil_layers), "."
+          log_fatal(*) "MPR: soil_db_mode=0 expects a single soil class layer, but got ", soil_layers, "."
           error stop 1
         end if
       case (1_i4)
@@ -353,18 +353,19 @@ contains
           error stop 1
         end if
         if (soil_layers < self%config%n_horizons(id(1))) then
-          log_fatal(*) "MPR: soil horizon input provides ", n2s(soil_layers), " layers, but n_horizons=", &
-            n2s(self%config%n_horizons(id(1))), "."
+          log_fatal(*) "MPR: soil horizon input provides ", soil_layers, " layers, but n_horizons=", &
+            self%config%n_horizons(id(1)), "."
           error stop 1
         end if
       case default
-        log_fatal(*) "MPR: unsupported soil_db_mode=", n2s(self%config%soil_db_mode(id(1))), "."
+        log_fatal(*) "MPR: unsupported soil_db_mode=", self%config%soil_db_mode(id(1)), "."
+
         error stop 1
     end select
 
     if (require_gridded_lai) then
       if (.not.self%exchange%gridded_lai%provided) then
-        log_fatal(*) "MPR: gridded_lai not provided, but required for lai_time_step=", n2s(self%config%lai_time_step(id(1))), "."
+        log_fatal(*) "MPR: gridded_lai not provided, but required for lai_time_step=", self%config%lai_time_step(id(1)), "."
         error stop 1
       end if
       if (.not.associated(self%exchange%gridded_lai%data)) then
@@ -399,8 +400,8 @@ contains
     end if
     call self%ensure_level1_grid()
     if (size(self%exchange%slope%data) /= self%exchange%level0%nCells) then
-      log_fatal(*) "MPR: slope size (", n2s(size(self%exchange%slope%data)), &
-        ") does not match level0 nCells (", n2s(int(self%exchange%level0%nCells, i4)), ")."
+      log_fatal(*) "MPR: slope size (", size(self%exchange%slope%data), &
+        ") does not match level0 nCells (", int(self%exchange%level0%nCells, i4), ")."
       error stop 1
     end if
     call self%init_slope_emp()
@@ -944,12 +945,12 @@ contains
           error stop 1
         end if
         call read_lai_lut(filename=trim(self%lai_lut_path), nLAI=n_lai_classes, LAIIDlist=lai_id_list, LAI=lai_lut)
-        if (size(lai_lut, 2) < int(YearMonths, i4)) then
-          log_fatal(*) "MPR: LAI LUT provides ", n2s(size(lai_lut, 2)), " periods, expected at least ", n2s(int(YearMonths, i4)), "."
+        if (size(lai_lut, 2) < YEAR_MONTHS) then
+          log_fatal(*) "MPR: LAI LUT provides ", n2s(size(lai_lut, 2)), " periods, expected at least ", n2s(YEAR_MONTHS), "."
           error stop 1
         end if
 
-        self%n_lai_periods = int(YearMonths, i4)
+        self%n_lai_periods = YEAR_MONTHS
         allocate(self%lai_l0_cache(size(self%exchange%gridded_lai%data), self%n_lai_periods))
         do i_cell = 1_i4, size(self%exchange%gridded_lai%data)
           class_value = self%exchange%gridded_lai%data(i_cell)
@@ -1503,7 +1504,7 @@ contains
     lai_idx = 1_i4
     select case (self%config%lai_time_step(id(1)))
       case (0_i4, 1_i4)
-        if (self%n_lai_periods >= int(YearMonths, i4)) lai_idx = self%exchange%time%month
+        if (self%n_lai_periods >= YEAR_MONTHS) lai_idx = self%exchange%time%month
       case default
         lai_idx = 1_i4
     end select
