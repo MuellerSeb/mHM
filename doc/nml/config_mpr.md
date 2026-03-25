@@ -19,6 +19,7 @@ Configuration for the multiscale parameter regionalization in mHM.
 | [land_cover_var](#land_cover_var) | string array | no | Land cover variable |
 | [lai_time_step](#lai_time_step) | integer array | no | LAI time step |
 | [lai_path](#lai_path) | string array | no | LAI path |
+| [lai_var](#lai_var) | string array | no | LAI variable |
 | [soil_lut_path](#soil_lut_path) | string array | no | Soil LUT path |
 | [geo_lut_path](#geo_lut_path) | string array | no | Geology LUT path |
 | [lai_lut_path](#lai_lut_path) | string array | no | LAI LUT path |
@@ -136,12 +137,23 @@ Summary:
 
 LAI path `lai_path`
 
-LAI data path (if `lai_time_step` < 0 or = 1).
+Gridded LAI dataset path (if `lai_time_step` < 0 or = 1).
 
 Summary:
 - Type: `character(len=buf), dimension(max_domains)`
 - Flexible tail dims: 1
 - Required: no
+
+### lai_var
+
+LAI variable `lai_var`
+
+LAI variable name in the gridded NetCDF dataset.
+
+Summary:
+- Type: `character(len=buf), dimension(max_domains)`
+- Required: no
+- Default: `"lai"`
 
 ### soil_lut_path
 
@@ -227,6 +239,7 @@ Summary:
   land_cover_var(:) = "land_cover"
   lai_time_step(:) = -3
   lai_path(:) = ""
+  lai_var(:) = "lai"
   soil_lut_path(:) = ""
   geo_lut_path(:) = ""
   lai_lut_path(:) = ""

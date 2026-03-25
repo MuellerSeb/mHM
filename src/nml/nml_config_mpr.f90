@@ -43,6 +43,7 @@ module nml_config_mpr
   ! default values
   integer(i4), parameter, public :: soil_db_mode_default = 0_i4
   character(len=buf), parameter, public :: land_cover_var_default = "land_cover"
+  character(len=buf), parameter, public :: lai_var_default = "lai"
   logical, parameter, public :: read_restart_default = .false.
   logical, parameter, public :: write_restart_default = .false.
 
@@ -64,6 +65,7 @@ module nml_config_mpr
     character(len=buf), dimension(max_domains) :: land_cover_var !< Land cover variable
     integer(i4), dimension(max_domains) :: lai_time_step !< LAI time step
     character(len=buf), dimension(max_domains) :: lai_path !< LAI path
+    character(len=buf), dimension(max_domains) :: lai_var !< LAI variable
     character(len=buf), dimension(max_domains) :: soil_lut_path !< Soil LUT path
     character(len=buf), dimension(max_domains) :: geo_lut_path !< Geology LUT path
     character(len=buf), dimension(max_domains) :: lai_lut_path !< LAI LUT path
@@ -139,6 +141,7 @@ contains
     ! default values
     this%soil_db_mode = soil_db_mode_default
     this%land_cover_var = land_cover_var_default
+    this%lai_var = lai_var_default
     this%read_restart = read_restart_default
     this%write_restart = write_restart_default
   end function nml_config_mpr_init
@@ -158,6 +161,7 @@ contains
     character(len=buf), dimension(max_domains) :: land_cover_var
     integer(i4), dimension(max_domains) :: lai_time_step
     character(len=buf), dimension(max_domains) :: lai_path
+    character(len=buf), dimension(max_domains) :: lai_var
     character(len=buf), dimension(max_domains) :: soil_lut_path
     character(len=buf), dimension(max_domains) :: geo_lut_path
     character(len=buf), dimension(max_domains) :: lai_lut_path
@@ -181,6 +185,7 @@ contains
       land_cover_var, &
       lai_time_step, &
       lai_path, &
+      lai_var, &
       soil_lut_path, &
       geo_lut_path, &
       lai_lut_path, &
@@ -200,6 +205,7 @@ contains
     land_cover_var = this%land_cover_var
     lai_time_step = this%lai_time_step
     lai_path = this%lai_path
+    lai_var = this%lai_var
     soil_lut_path = this%soil_lut_path
     geo_lut_path = this%geo_lut_path
     lai_lut_path = this%lai_lut_path
@@ -241,6 +247,7 @@ contains
     this%land_cover_var = land_cover_var
     this%lai_time_step = lai_time_step
     this%lai_path = lai_path
+    this%lai_var = lai_var
     this%soil_lut_path = soil_lut_path
     this%geo_lut_path = geo_lut_path
     this%lai_lut_path = lai_lut_path
@@ -265,6 +272,7 @@ contains
     land_cover_var, &
     lai_time_step, &
     lai_path, &
+    lai_var, &
     soil_lut_path, &
     geo_lut_path, &
     lai_lut_path, &
@@ -285,6 +293,7 @@ contains
     character(len=*), dimension(:), intent(in), optional :: land_cover_var
     integer(i4), dimension(:), intent(in), optional :: lai_time_step
     character(len=*), dimension(:), intent(in), optional :: lai_path
+    character(len=*), dimension(:), intent(in), optional :: lai_var
     character(len=*), dimension(:), intent(in), optional :: soil_lut_path
     character(len=*), dimension(:), intent(in), optional :: geo_lut_path
     character(len=*), dimension(:), intent(in), optional :: lai_lut_path
@@ -399,6 +408,16 @@ contains
       lb_1 = lbound(this%lai_path, 1)
       ub_1 = lb_1 + size(lai_path, 1) - 1
       this%lai_path(lb_1:ub_1) = lai_path
+    end if
+    if (present(lai_var)) then
+      if (size(lai_var, 1) > size(this%lai_var, 1)) then
+        status = NML_ERR_INVALID_INDEX
+        if (present(errmsg)) errmsg = "dimension 1 exceeds bounds for 'lai_var'"
+        return
+      end if
+      lb_1 = lbound(this%lai_var, 1)
+      ub_1 = lb_1 + size(lai_var, 1) - 1
+      this%lai_var(lb_1:ub_1) = lai_var
     end if
     if (present(soil_lut_path)) then
       if (size(soil_lut_path, 1) > size(this%soil_lut_path, 1)) then
@@ -562,6 +581,13 @@ contains
         if (this%lai_path(idx(1)) == repeat(achar(0), len(this%lai_path))) status = NML_ERR_NOT_SET
       else
         if (all(this%lai_path == repeat(achar(0), len(this%lai_path)))) status = NML_ERR_NOT_SET
+      end if
+    case ("lai_var")
+      if (present(idx)) then
+        status = idx_check(idx, lbound(this%lai_var), ubound(this%lai_var), &
+          "lai_var", errmsg)
+        if (status /= NML_OK) return
+      else
       end if
     case ("soil_lut_path")
       if (present(idx)) then

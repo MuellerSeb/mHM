@@ -396,6 +396,8 @@
   lai_time_step(:) = -3
   ! LAI path
   lai_path(:) = ""
+  ! LAI variable
+  lai_var(:) = "lai"
   ! Soil LUT path
   soil_lut_path(:) = ""
   ! Geology LUT path

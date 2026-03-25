@@ -128,7 +128,7 @@ module mo_input_container
     type(input_var_i4) :: geo_class !< input variable for geology class
     type(input_var_i4) :: soil_class !< input variable for soil class
     type(input_var2d_i4) :: soil_horizon_class !< input variable for soil horizon class
-    type(input_var_dp) :: lai_class !< input variable for LAI class
+    type(input_var_i4) :: lai_class !< input variable for LAI class
     ! level 1 inputs
     type(input_var_i4) :: hydro_mask !< input variable for hydro mask
     type(input_var_dp) :: runoff !< input variable for runoff
@@ -687,7 +687,7 @@ contains
       call self%lai_class%init( &
         path=self%config%input%lai_class_path(id(1)), name=self%config%input%lai_class_var(id(1)), &
         static=.true., morph_latlon=self%morph_latlon)
-      self%exchange%gridded_lai%provided = .true. ! mark as provided in exchange
+      self%exchange%lai_class%provided = .true. ! mark as provided in exchange
     end if
 
     ! hydro mask (hydro_mask_var by default "mask")
@@ -838,9 +838,9 @@ contains
       stop 1
     else if (self%lai_class%provided) then
       init_grid = need_grid(self%tgt_level0, self%exchange%level0) ! associate grid if not yet done
-      call self%lai_class%open_dataset(kind="dp", timestamp=ts, grid=self%exchange%level0, init_grid=init_grid)
+      call self%lai_class%open_dataset(kind="i4", timestamp=ts, grid=self%exchange%level0, init_grid=init_grid)
       call self%lai_class%read_static()
-      self%exchange%gridded_lai%data => self%lai_class%cache(:, 1) ! associate exchange variable to input cache
+      self%exchange%lai_class%data => self%lai_class%cache(:, 1) ! associate exchange variable to input cache
     end if
 
     ! hydro mask
@@ -893,7 +893,7 @@ contains
     if ((self%soil_class%provided .or. self%soil_horizon_class%provided) .and. .not.self%exchange%soil_id%required) then
       log_warn(*) "Input: soil class provided but not required. Check your configuration."
     end if
-    if (self%lai_class%provided .and. .not.self%exchange%gridded_lai%required) then
+    if (self%lai_class%provided .and. .not.self%exchange%lai_class%required) then
       log_warn(*) "Input: LAI class provided but not required. Check your configuration."
     end if
     if (self%runoff%provided .and. .not.self%exchange%runoff_total%required) then

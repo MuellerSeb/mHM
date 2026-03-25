@@ -149,7 +149,7 @@ module mo_exchange_type
     type(var_i4) :: facc                !< flow accumulation [1] on level l0 (static)
     type(var2d_i4) :: soil_id           !< soil class ID on level l0 (static)
     type(var_i4) :: geo_unit            !< geological unit ID on level l0 (static)
-    type(var_dp) :: gridded_lai         !< gridded LAI on level l0 (static)
+    type(var_i4) :: lai_class           !< LAI class ID on level l0 (static)
     type(var_dp) :: slope_emp           !< empirical slope distribution on level l0 (static)
     type(geology_classdefinition_t), pointer :: geo_class_def => null() !< geology class lookup
 
@@ -379,7 +379,7 @@ contains
     self%facc   = var_i4(static=.true., grid=l0, name="facc",   units="1",      long_name="flow accumulation")
     self%soil_id = var2d_i4(static=.true., grid=l0, name="soil_id", units="1", long_name="soil class ID")
     self%geo_unit = var_i4(static=.true., grid=l0, name="geo_unit", units="1", long_name="geological unit ID")
-    self%gridded_lai = var_dp(static=.true., grid=l0, name="gridded_lai", units="1", long_name="gridded LAI")
+    self%lai_class = var_i4(static=.true., grid=l0, name="lai_class", units="1", long_name="LAI class ID")
     self%slope_emp = var_dp(static=.true., grid=l0, name="slope_emp", units="1", long_name="empirical slope distribution")
 
     ! hydrology (level1)
@@ -559,8 +559,8 @@ contains
         var_pnt => self%soil_id
       case("geo_unit")
         var_pnt => self%geo_unit
-      case("gridded_lai")
-        var_pnt => self%gridded_lai
+      case("lai_class")
+        var_pnt => self%lai_class
       case("slope_emp")
         var_pnt => self%slope_emp
       ! hydrology (level1)

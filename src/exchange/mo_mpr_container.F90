@@ -56,7 +56,7 @@ module mo_mpr_container
   use mo_common_constants, only: soilHorizonsVarName, landCoverPeriodsVarName, LAIVarName
   use mo_exchange_type, only: exchange_t
   use mo_grid, only: grid_t, cartesian, spherical
-  use mo_grid_io, only: input_dataset, start_timestamp, var
+  use mo_grid_io, only: input_dataset, start_timestamp, daily, monthly, yearly, var
   use mo_grid_scaler, only: scaler_t, up_a_mean
   use mo_mpr_legacy_bridge, only: mpr_bridge_land_cover_fraction, mpr_bridge_snow_param, mpr_bridge_pet_lai, &
     mpr_bridge_pet_aspect, mpr_bridge_pet_hargreaves, mpr_bridge_pet_priestley_taylor, &
@@ -92,9 +92,13 @@ module mo_mpr_container
   !> \class   mpr_lai_state_t
   !> \brief   Grouped LAI input paths, cached L0 slices, and active LAI timing state for MPR.
   type :: mpr_lai_state_t
-    character(:), allocatable :: path !< resolved gridded LAI path
+    character(:), allocatable :: path !< resolved gridded LAI dataset path
     character(:), allocatable :: lut_path !< resolved LAI LUT path
+    character(:), allocatable :: var_name !< configured gridded LAI variable name
     real(dp), allocatable :: l0_cache(:, :) !< cached LAI on level0 (nCells0, nLAI)
+    type(datetime), allocatable :: period_start(:) !< cached start times for dated LAI periods
+    type(datetime), allocatable :: period_end(:) !< cached end times for dated LAI periods
+    logical :: dated = .false. !< whether LAI periods are dated instead of cyclic monthly
     integer(i4) :: n_periods = 1_i4 !< number of cached LAI periods
     integer(i4) :: active_idx = 0_i4 !< active cached LAI index
   end type mpr_lai_state_t
@@ -192,7 +196,9 @@ module mo_mpr_container
     procedure :: finalize   => mpr_finalize
     procedure, private :: create_restart                  => mpr_create_restart
     procedure, private :: write_restart_data              => mpr_write_restart_data
+    procedure, private :: write_restart_lai_timing        => mpr_write_restart_lai_timing
     procedure, private :: write_restart_land_cover_timing => mpr_write_restart_land_cover_timing
+    procedure, private :: read_restart_lai_timing         => mpr_read_restart_lai_timing
     procedure, private :: read_restart_land_cover_timing  => mpr_read_restart_land_cover_timing
     procedure, private :: read_restart_field_2d           => mpr_read_restart_field_2d
     procedure, private :: read_restart_field_3d           => mpr_read_restart_field_3d
@@ -209,6 +215,8 @@ module mo_mpr_container
     procedure, private :: init_land_cover_cache           => mpr_init_land_cover_cache
     procedure, private :: init_land_cover_fraction_cache  => mpr_init_land_cover_fraction_cache
     procedure, private :: build_lai_l0_cache              => mpr_build_lai_l0_cache
+    procedure, private :: read_monthly_lai_l0_cache       => mpr_read_monthly_lai_l0_cache
+    procedure, private :: read_dated_lai_l0_cache         => mpr_read_dated_lai_l0_cache
     procedure, private :: load_process_params             => mpr_load_process_params
     procedure, private :: init_max_interception_cache     => mpr_init_max_interception_cache
     procedure, private :: init_snow_cache                 => mpr_init_snow_cache
@@ -326,21 +334,28 @@ contains
 
     if (self%config%lai_time_step(id(1)) == 0_i4) then
       status = self%config%is_set("lai_lut_path", idx=id, errmsg=errmsg)
-      if (status /= NML_OK) then
+      if (status /= NML_OK .and. .not.self%config%read_restart(id(1))) then
         log_fatal(*) "MPR: lai_lut_path not set for domain ", n2s(id(1)), &
           " while lai_time_step=0. Error: ", trim(errmsg)
         error stop 1
       end if
-      self%lai%lut_path = self%exchange%get_path(self%config%lai_lut_path(id(1)))
+      if (status == NML_OK) self%lai%lut_path = self%exchange%get_path(self%config%lai_lut_path(id(1)))
       if (allocated(self%lai%path)) deallocate(self%lai%path)
+      if (allocated(self%lai%var_name)) deallocate(self%lai%var_name)
     else
       status = self%config%is_set("lai_path", idx=id, errmsg=errmsg)
-      if (status /= NML_OK) then
+      if (status /= NML_OK .and. .not.self%config%read_restart(id(1))) then
         log_fatal(*) "MPR: lai_path not set for domain ", n2s(id(1)), &
           " while lai_time_step=", n2s(self%config%lai_time_step(id(1))), ". Error: ", trim(errmsg)
         error stop 1
       end if
-      self%lai%path = self%exchange%get_path(self%config%lai_path(id(1)))
+      if (status == NML_OK) then
+        self%lai%path = self%exchange%get_path(self%config%lai_path(id(1)))
+        self%lai%var_name = trim(self%config%lai_var(id(1)))
+      else
+        if (allocated(self%lai%path)) deallocate(self%lai%path)
+        if (allocated(self%lai%var_name)) deallocate(self%lai%var_name)
+      end if
       if (allocated(self%lai%lut_path)) deallocate(self%lai%lut_path)
     end if
   end subroutine mpr_configure
@@ -350,7 +365,8 @@ contains
     class(mpr_t), intent(inout), target :: self
     integer(i4) :: id(1)
     integer(i4) :: soil_layers
-    logical :: require_gridded_lai
+    logical :: require_lai_class
+    logical :: need_lai_cache
     integer(i4) :: pet_process
     integer :: status
     character(1024) :: errmsg
@@ -384,10 +400,10 @@ contains
     self%exchange%soil_id%required = .not.self%read_restart
     self%exchange%geo_unit%required = .not.self%read_restart
     pet_process = self%exchange%parameters%process_matrix(5, 1)
-    require_gridded_lai = self%config%lai_time_step(id(1)) /= 0_i4 .or. &
-      self%exchange%parameters%process_matrix(1, 1) /= 0_i4 .or. &
+    need_lai_cache = self%exchange%parameters%process_matrix(1, 1) /= 0_i4 .or. &
       pet_process == -1_i4 .or. pet_process == 2_i4 .or. pet_process == 3_i4
-    self%exchange%gridded_lai%required = require_gridded_lai .and. .not.self%read_restart
+    require_lai_class = self%config%lai_time_step(id(1)) == 0_i4 .and. need_lai_cache
+    self%exchange%lai_class%required = require_lai_class .and. .not.self%read_restart
 
     if (self%read_restart) then
       call self%read_restart_data()
@@ -454,13 +470,13 @@ contains
         error stop 1
     end select
 
-    if (require_gridded_lai) then
-      if (.not.self%exchange%gridded_lai%provided) then
-        log_fatal(*) "MPR: gridded_lai not provided, but required for lai_time_step=", self%config%lai_time_step(id(1)), "."
+    if (require_lai_class) then
+      if (.not.self%exchange%lai_class%provided) then
+        log_fatal(*) "MPR: lai_class not provided, but required for lai_time_step=0."
         error stop 1
       end if
-      if (.not.associated(self%exchange%gridded_lai%data)) then
-        log_fatal(*) "MPR: gridded_lai marked as provided but data is not connected."
+      if (.not.associated(self%exchange%lai_class%data)) then
+        log_fatal(*) "MPR: lai_class marked as provided but data is not connected."
         error stop 1
       end if
     end if
@@ -473,6 +489,10 @@ contains
     else
       if (.not.allocated(self%lai%path)) then
         log_fatal(*) "MPR: internal error, lai_path not resolved in configure."
+        error stop 1
+      end if
+      if (.not.allocated(self%lai%var_name)) then
+        log_fatal(*) "MPR: internal error, lai_var not resolved in configure."
         error stop 1
       end if
     end if
@@ -539,6 +559,7 @@ contains
     nc_var = nc%setVariable("mpr_meta", "i32", dims0(:0))
     call nc_var%setAttribute("time_stamp", self%exchange%time%str())
     call nc_var%setAttribute("domain", self%exchange%domain)
+    call nc_var%setAttribute("lai_time_step", self%config%lai_time_step(self%exchange%domain))
     call nc_var%setAttribute("n_lai_periods", self%lai%n_periods)
     call nc_var%setAttribute("n_land_cover_periods", self%land_cover%n_periods)
     call nc%close()
@@ -569,6 +590,7 @@ contains
       dims_xy(2) = nc%getDimension("lat")
     end if
     lai_dim = nc%setDimension(trim(LAIVarName), self%lai%n_periods)
+    call self%write_restart_lai_timing(nc, lai_dim)
     land_cover_dim = nc%setDimension(trim(landCoverPeriodsVarName), self%land_cover%n_periods)
     call self%write_restart_land_cover_timing(nc, land_cover_dim)
     if (allocated(self%soil%horizon_bounds)) then
@@ -772,6 +794,243 @@ contains
 
     dt = datetime(trim(units), value)
   end function mpr_datetime_from_restart_time
+
+  !> \brief Write LAI timing metadata as cyclic monthly bounds or dated CF time bounds, depending on lai_time_step.
+  subroutine mpr_write_restart_lai_timing(self, nc, lai_dim)
+    class(mpr_t), intent(inout), target :: self
+    type(NcDataset), intent(inout) :: nc
+    type(NcDimension), intent(in) :: lai_dim
+    type(NcDimension) :: bounds_dim
+    type(NcVariable) :: coord_var
+    type(NcVariable) :: bounds_var
+    character(:), allocatable :: units
+    integer(i4), allocatable :: coord_data(:)
+    integer(i4), allocatable :: bounds_data(:, :)
+    integer(i4) :: lai_mode
+    integer(i4) :: i
+
+    lai_mode = self%config%lai_time_step(self%exchange%domain)
+    if (.not.allocated(self%canopy%max_interception_cache) .and. .not.allocated(self%pet%pet_fac_lai_cache) .and. &
+      .not.allocated(self%pet%pet_coeff_pt_cache) .and. .not.allocated(self%pet%resist_aero_cache) .and. &
+      .not.allocated(self%pet%resist_surf_cache)) return
+
+    if (nc%hasDimension("bnds")) then
+      bounds_dim = nc%getDimension("bnds")
+    else
+      bounds_dim = nc%setDimension("bnds", 2_i4)
+    end if
+    allocate(coord_data(self%lai%n_periods))
+    allocate(bounds_data(2, self%lai%n_periods))
+
+    select case (lai_mode)
+      case (0_i4, 1_i4)
+        if (self%lai%n_periods /= YEAR_MONTHS) then
+          log_fatal(*) "MPR: cyclic monthly LAI restart expects 12 cached periods, but nLAI=", n2s(self%lai%n_periods), "."
+          error stop 1
+        end if
+        do i = 1_i4, self%lai%n_periods
+          coord_data(i) = i
+          bounds_data(1, i) = i
+          bounds_data(2, i) = i + 1_i4
+        end do
+        coord_var = nc%setVariable(trim(LAIVarName), "i32", [lai_dim])
+        call coord_var%setAttribute("long_name", "cyclic monthly LAI periods")
+        call coord_var%setAttribute("bounds", trim(LAIVarName) // "_bnds")
+        call coord_var%setData(coord_data)
+      case (-3_i4:-1_i4)
+        if (.not.self%lai%dated) then
+          log_fatal(*) "MPR: dated LAI restart requires cached dated LAI bounds."
+          error stop 1
+        end if
+        if (.not.allocated(self%lai%period_start) .or. .not.allocated(self%lai%period_end)) then
+          log_fatal(*) "MPR: dated LAI restart requires cached LAI period bounds."
+          error stop 1
+        end if
+        units = "hours since " // self%lai%period_start(1)%str()
+        do i = 1_i4, self%lai%n_periods
+          coord_data(i) = mpr_restart_hour_stamp(self%lai%period_start(1), self%lai%period_start(i))
+          bounds_data(1, i) = coord_data(i)
+          bounds_data(2, i) = mpr_restart_hour_stamp(self%lai%period_start(1), self%lai%period_end(i))
+        end do
+        coord_var = nc%setVariable(trim(LAIVarName), "i32", [lai_dim])
+        call coord_var%setAttribute("standard_name", "time")
+        call coord_var%setAttribute("axis", "T")
+        call coord_var%setAttribute("units", trim(units))
+        call coord_var%setAttribute("calendar", lc_restart_calendar)
+        call coord_var%setAttribute("bounds", trim(LAIVarName) // "_bnds")
+        call coord_var%setData(coord_data)
+      case default
+        log_fatal(*) "MPR: unsupported lai_time_step=", n2s(lai_mode), " while writing restart metadata."
+        error stop 1
+    end select
+
+    bounds_var = nc%setVariable(trim(LAIVarName) // "_bnds", "i32", [bounds_dim, lai_dim])
+    call bounds_var%setData(bounds_data)
+    deallocate(coord_data)
+    deallocate(bounds_data)
+  end subroutine mpr_write_restart_lai_timing
+
+  !> \brief Read LAI timing metadata from restart and restore cyclic or dated LAI switching state.
+  subroutine mpr_read_restart_lai_timing(self, nc)
+    class(mpr_t), intent(inout), target :: self
+    type(NcDataset), intent(inout) :: nc
+    type(NcDimension) :: nc_dim
+    type(NcVariable) :: nc_var
+    integer(i4), allocatable :: var_shape(:)
+    integer(i4), allocatable :: coord_values(:)
+    integer(i4), allocatable :: bounds_in(:, :)
+    integer(i4), allocatable :: bounds_2d(:, :)
+    character(256) :: bounds_name
+    character(256) :: units
+    character(256) :: calendar
+    integer(i4) :: lai_mode
+    integer(i4) :: restart_lai_mode
+    integer(i4) :: n_lai_restart
+    integer(i4) :: i
+
+    lai_mode = self%config%lai_time_step(self%exchange%domain)
+    if (.not.nc%hasVariable("mpr_meta")) then
+      log_fatal(*) "MPR restart: missing mpr_meta needed to validate LAI timing metadata."
+      error stop 1
+    end if
+    nc_var = nc%getVariable("mpr_meta")
+    if (.not.nc_var%hasAttribute("lai_time_step")) then
+      log_fatal(*) "MPR restart: missing lai_time_step metadata."
+      error stop 1
+    end if
+    call nc_var%getAttribute("lai_time_step", restart_lai_mode)
+    if (restart_lai_mode /= lai_mode) then
+      log_fatal(*) "MPR restart: restart lai_time_step=", n2s(restart_lai_mode), &
+        " does not match current config ", n2s(lai_mode), "."
+      error stop 1
+    end if
+
+    if (.not.nc%hasDimension(trim(LAIVarName))) then
+      log_fatal(*) "MPR restart: required LAI dimension missing: ", trim(LAIVarName)
+      error stop 1
+    end if
+    nc_dim = nc%getDimension(trim(LAIVarName))
+    n_lai_restart = nc_dim%getLength()
+    if (n_lai_restart < 1_i4) then
+      log_fatal(*) "MPR restart: LAI dimension length must be >= 1."
+      error stop 1
+    end if
+
+    if (allocated(self%lai%period_start)) deallocate(self%lai%period_start)
+    if (allocated(self%lai%period_end)) deallocate(self%lai%period_end)
+    self%lai%dated = .false.
+    self%lai%n_periods = n_lai_restart
+
+    if (.not.nc%hasVariable(trim(LAIVarName))) then
+      log_fatal(*) "MPR restart: required LAI timing variable missing: ", trim(LAIVarName)
+      error stop 1
+    end if
+    nc_var = nc%getVariable(trim(LAIVarName))
+    if (trim(nc_var%getDtype()) /= "i32") then
+      log_fatal(*) "MPR restart: LAI timing variable must use i32 metadata."
+      error stop 1
+    end if
+    if (.not.nc_var%hasAttribute("bounds")) then
+      log_fatal(*) "MPR restart: LAI timing variable is missing bounds metadata."
+      error stop 1
+    end if
+    call nc_var%getAttribute("bounds", bounds_name)
+    bounds_name = trim(bounds_name)
+    if (len_trim(bounds_name) < 1 .or. .not.nc%hasVariable(bounds_name)) then
+      log_fatal(*) "MPR restart: required LAI bounds variable missing: ", trim(bounds_name)
+      error stop 1
+    end if
+    call nc_var%getData(coord_values)
+    if (size(coord_values) /= n_lai_restart) then
+      log_fatal(*) "MPR restart: LAI timing coordinate length does not match its dimension."
+      error stop 1
+    end if
+    nc_var = nc%getVariable(bounds_name)
+    var_shape = nc_var%getShape()
+    if (size(var_shape) /= 2_i4) then
+      log_fatal(*) "MPR restart: LAI bounds variable has rank ", n2s(size(var_shape)), ", expected 2."
+      error stop 1
+    end if
+    call nc_var%getData(bounds_in)
+    if (size(bounds_in, 1) == 2_i4 .and. size(bounds_in, 2) == n_lai_restart) then
+      allocate(bounds_2d(2, n_lai_restart))
+      bounds_2d = bounds_in
+    else if (size(bounds_in, 2) == 2_i4 .and. size(bounds_in, 1) == n_lai_restart) then
+      allocate(bounds_2d(2, n_lai_restart))
+      bounds_2d = transpose(bounds_in)
+    else
+      log_fatal(*) "MPR restart: LAI bounds variable has incompatible shape."
+      error stop 1
+    end if
+    deallocate(bounds_in)
+
+    select case (restart_lai_mode)
+      case (0_i4, 1_i4)
+        if (n_lai_restart /= YEAR_MONTHS) then
+          log_fatal(*) "MPR restart: cyclic monthly LAI metadata must contain 12 periods, but got ", n2s(n_lai_restart), "."
+          error stop 1
+        end if
+        do i = 1_i4, n_lai_restart
+          if (coord_values(i) /= i .or. bounds_2d(1, i) /= i .or. bounds_2d(2, i) /= i + 1_i4) then
+            log_fatal(*) "MPR restart: malformed cyclic monthly LAI metadata."
+            error stop 1
+          end if
+        end do
+      case (-3_i4:-1_i4)
+        nc_var = nc%getVariable(trim(LAIVarName))
+        if (.not.nc_var%hasAttribute("units")) then
+          log_fatal(*) "MPR restart: dated LAI metadata is missing CF units."
+          error stop 1
+        end if
+        call nc_var%getAttribute("units", units)
+        if (index(trim(units), "hours since ") /= 1) then
+          log_fatal(*) "MPR restart: unsupported LAI time units '", trim(units), "'."
+          error stop 1
+        end if
+        if (.not.nc_var%hasAttribute("calendar")) then
+          log_fatal(*) "MPR restart: dated LAI metadata is missing the calendar attribute."
+          error stop 1
+        end if
+        call nc_var%getAttribute("calendar", calendar)
+        if (trim(calendar) /= lc_restart_calendar) then
+          log_fatal(*) "MPR restart: unsupported LAI calendar '", trim(calendar), "'."
+          error stop 1
+        end if
+        allocate(self%lai%period_start(n_lai_restart))
+        allocate(self%lai%period_end(n_lai_restart))
+        do i = 1_i4, n_lai_restart
+          if (coord_values(i) /= bounds_2d(1, i) .or. bounds_2d(2, i) <= bounds_2d(1, i)) then
+            log_fatal(*) "MPR restart: malformed dated LAI bounds for period ", n2s(i), "."
+            error stop 1
+          end if
+          self%lai%period_start(i) = mpr_datetime_from_restart_time(trim(units), bounds_2d(1, i))
+          self%lai%period_end(i) = mpr_datetime_from_restart_time(trim(units), bounds_2d(2, i))
+          if (i > 1_i4) then
+            if (self%lai%period_start(i) /= self%lai%period_end(i - 1_i4)) then
+              log_fatal(*) "MPR restart: dated LAI periods are not contiguous."
+              error stop 1
+            end if
+          end if
+        end do
+        if (self%exchange%start_time < self%lai%period_start(1)) then
+          log_fatal(*) "MPR restart: LAI timing starts at ", self%lai%period_start(1)%str(), &
+            ", but simulation starts at ", self%exchange%start_time%str(), "."
+          error stop 1
+        end if
+        if (self%exchange%end_time > self%lai%period_end(n_lai_restart)) then
+          log_fatal(*) "MPR restart: LAI timing ends at ", self%lai%period_end(n_lai_restart)%str(), &
+            ", but simulation ends at ", self%exchange%end_time%str(), "."
+          error stop 1
+        end if
+        self%lai%dated = .true.
+      case default
+        log_fatal(*) "MPR restart: unsupported lai_time_step=", n2s(restart_lai_mode), "."
+        error stop 1
+    end select
+
+    deallocate(coord_values)
+    deallocate(bounds_2d)
+  end subroutine mpr_read_restart_lai_timing
 
   !> \brief Write temporal land-cover restart timing metadata as an integer CF time axis with bounds.
   subroutine mpr_write_restart_land_cover_timing(self, nc, land_cover_dim)
@@ -1157,10 +1416,10 @@ contains
     integer(i4) :: pet_process
     integer(i4) :: soil_process
     integer(i4) :: neutron_process
-    integer(i4) :: n_lai_restart
     integer(i4) :: n_land_cover_restart
     integer(i4) :: n_soil_restart
     integer(i4) :: land_cover_idx
+    logical :: need_lai_restart
     real(dp), allocatable :: field_3d(:, :)
     real(dp), allocatable :: bounds_2d(:, :)
 
@@ -1190,20 +1449,14 @@ contains
     pet_process = self%exchange%parameters%process_matrix(5, 1)
     soil_process = self%exchange%parameters%process_matrix(3, 1)
     neutron_process = self%exchange%parameters%process_matrix(10, 1)
-    if (self%exchange%parameters%process_matrix(1, 1) /= 0_i4 .or. any(pet_process == [-1_i4, 2_i4, 3_i4])) then
-      if (.not.nc%hasDimension(trim(LAIVarName))) then
-        log_fatal(*) "MPR restart: required LAI dimension missing: ", trim(LAIVarName)
-        error stop 1
-      end if
-      nc_dim = nc%getDimension(trim(LAIVarName))
-      n_lai_restart = nc_dim%getLength()
-      if (n_lai_restart < 1_i4) then
-        log_fatal(*) "MPR restart: LAI dimension length must be >= 1."
-        error stop 1
-      end if
-      self%lai%n_periods = n_lai_restart
+    need_lai_restart = self%exchange%parameters%process_matrix(1, 1) /= 0_i4 .or. any(pet_process == [-1_i4, 2_i4, 3_i4])
+    if (need_lai_restart) then
+      call self%read_restart_lai_timing(nc)
     else
+      if (allocated(self%lai%period_start)) deallocate(self%lai%period_start)
+      if (allocated(self%lai%period_end)) deallocate(self%lai%period_end)
       self%lai%n_periods = 1_i4
+      self%lai%dated = .false.
     end if
 
     if (soil_process /= 0_i4 .or. neutron_process > 0_i4) then
@@ -1579,6 +1832,9 @@ contains
     self%land_cover%n_periods = 1_i4
     self%lai%active_idx = 0_i4
     self%land_cover%active_idx = 0_i4
+    self%lai%dated = .false.
+    if (allocated(self%lai%period_start)) deallocate(self%lai%period_start)
+    if (allocated(self%lai%period_end)) deallocate(self%lai%period_end)
 
     ! Land-cover timing drives every land-cover-dependent cache, so initialize it first.
     call self%init_land_cover_cache()
@@ -1588,10 +1844,6 @@ contains
     need_lai_cache = self%exchange%parameters%process_matrix(1, 1) /= 0_i4 .or. &
       any(pet_process == [-1_i4, 2_i4, 3_i4])
     if (need_lai_cache) then
-      if (.not.associated(self%exchange%gridded_lai%data)) then
-        log_fatal(*) "MPR: gridded_lai data must be connected before temporal cache initialization."
-        error stop 1
-      end if
       call self%build_lai_l0_cache()
     end if
 
@@ -1760,21 +2012,26 @@ contains
     integer(i4) :: i_cell
     integer(i4) :: i_class
     integer(i4) :: lai_idx
-    integer(i4) :: class_id
     integer(i4) :: class_pos
     integer(i4) :: n_lai_classes
-    real(dp) :: class_value
     integer(i4), allocatable :: lai_id_list(:)
     real(dp), allocatable :: lai_lut(:, :)
 
     id(1) = self%exchange%domain
 
     if (allocated(self%lai%l0_cache)) deallocate(self%lai%l0_cache)
+    if (allocated(self%lai%period_start)) deallocate(self%lai%period_start)
+    if (allocated(self%lai%period_end)) deallocate(self%lai%period_end)
+    self%lai%dated = .false.
 
     select case (self%config%lai_time_step(id(1)))
       case (0_i4)
         if (.not.allocated(self%lai%lut_path)) then
           log_fatal(*) "MPR: internal error, lai_lut_path not resolved in configure."
+          error stop 1
+        end if
+        if (.not.associated(self%exchange%lai_class%data)) then
+          log_fatal(*) "MPR: lai_class data must be connected before LUT-based LAI cache initialization."
           error stop 1
         end if
         call read_lai_lut(filename=trim(self%lai%lut_path), nLAI=n_lai_classes, LAIIDlist=lai_id_list, LAI=lai_lut)
@@ -1784,24 +2041,18 @@ contains
         end if
 
         self%lai%n_periods = YEAR_MONTHS
-        allocate(self%lai%l0_cache(size(self%exchange%gridded_lai%data), self%lai%n_periods))
-        do i_cell = 1_i4, size(self%exchange%gridded_lai%data)
-          class_value = self%exchange%gridded_lai%data(i_cell)
-          class_id = nint(class_value)
-          if (.not.is_close(class_value, real(class_id, dp))) then
-            log_fatal(*) "MPR: LAI class map contains non-integer ID at cell ", n2s(i_cell), ": ", n2s(class_value), "."
-            error stop 1
-          end if
-
+        allocate(self%lai%l0_cache(size(self%exchange%lai_class%data), self%lai%n_periods))
+        do i_cell = 1_i4, size(self%exchange%lai_class%data)
           class_pos = 0_i4
           do i_class = 1_i4, n_lai_classes
-            if (lai_id_list(i_class) == class_id) then
+            if (lai_id_list(i_class) == self%exchange%lai_class%data(i_cell)) then
               class_pos = i_class
               exit
             end if
           end do
           if (class_pos < 1_i4) then
-            log_fatal(*) "MPR: LAI class ID ", n2s(class_id), " missing in LAI LUT: ", self%lai%lut_path
+            log_fatal(*) "MPR: LAI class ID ", n2s(self%exchange%lai_class%data(i_cell)), &
+              " missing in LAI LUT: ", self%lai%lut_path
             error stop 1
           end if
 
@@ -1810,13 +2061,168 @@ contains
           end do
         end do
 
+      case (1_i4)
+        call self%read_monthly_lai_l0_cache()
+      case (-3_i4:-1_i4)
+        call self%read_dated_lai_l0_cache()
       case default
-        ! Current exchange contract carries one active gridded_lai slice.
-        self%lai%n_periods = 1_i4
-        allocate(self%lai%l0_cache(size(self%exchange%gridded_lai%data), 1))
-        self%lai%l0_cache(:, 1) = min(30.0_dp, max(1.0e-10_dp, self%exchange%gridded_lai%data))
+        log_fatal(*) "MPR: unsupported lai_time_step=", n2s(self%config%lai_time_step(id(1))), "."
+        error stop 1
     end select
   end subroutine mpr_build_lai_l0_cache
+
+  !> \brief Read a 12-slice cyclic monthly gridded LAI dataset into the MPR-owned level0 cache.
+  subroutine mpr_read_monthly_lai_l0_cache(self)
+    class(mpr_t), intent(inout), target :: self
+    type(NcDataset) :: nc
+    type(NcVariable) :: lai_var
+    integer(i4), allocatable :: var_shape(:)
+    real(dp), allocatable :: lai_3d(:, :, :)
+    logical, pointer :: mask(:, :)
+    real(dp) :: nodata_value
+    integer(i4) :: lai_idx
+
+    if (.not.allocated(self%lai%path)) then
+      log_fatal(*) "MPR: internal error, gridded LAI path not resolved in configure."
+      error stop 1
+    end if
+    if (.not.allocated(self%lai%var_name)) then
+      log_fatal(*) "MPR: internal error, gridded LAI variable name not resolved in configure."
+      error stop 1
+    end if
+    if (.not.associated(self%exchange%level0)) then
+      log_fatal(*) "MPR: level0 grid not connected before gridded LAI cache initialization."
+      error stop 1
+    end if
+
+    mask => self%exchange%level0%mask
+    nc = NcDataset(self%lai%path, "r")
+    lai_var = nc%getVariable(trim(self%lai%var_name))
+    var_shape = lai_var%getShape()
+    if (size(var_shape) /= 3_i4) then
+      log_fatal(*) "MPR: gridded LAI variable ", trim(self%lai%var_name), " has rank ", n2s(size(var_shape)), ", expected 3."
+      error stop 1
+    end if
+    if (any(var_shape(1:2) /= shape(mask))) then
+      log_fatal(*) "MPR: gridded LAI variable ", trim(self%lai%var_name), &
+        " does not match the level0 mask shape."
+      error stop 1
+    end if
+    if (var_shape(3) /= YEAR_MONTHS) then
+      log_fatal(*) "MPR: lai_time_step=1 requires exactly 12 LAI slices, but ", trim(self%lai%var_name), &
+        " provides ", n2s(var_shape(3)), "."
+      error stop 1
+    end if
+    if (lai_var%hasAttribute("_FillValue")) then
+      call lai_var%getAttribute("_FillValue", nodata_value)
+    else if (lai_var%hasAttribute("missing_value")) then
+      call lai_var%getAttribute("missing_value", nodata_value)
+    else
+      log_fatal(*) "MPR: gridded LAI variable ", trim(self%lai%var_name), &
+        " needs either _FillValue or missing_value."
+      error stop 1
+    end if
+    call lai_var%getData(lai_3d)
+    call nc%close()
+
+    self%lai%n_periods = YEAR_MONTHS
+    allocate(self%lai%l0_cache(self%exchange%level0%nCells, self%lai%n_periods))
+    do lai_idx = 1_i4, self%lai%n_periods
+      if (any(is_close(lai_3d(:, :, lai_idx), nodata_value) .and. mask)) then
+        log_fatal(*) "MPR: gridded LAI climatology contains missing values inside the level0 domain at slice ", &
+          n2s(lai_idx), "."
+        error stop 1
+      end if
+      self%lai%l0_cache(:, lai_idx) = pack(min(30.0_dp, max(1.0e-10_dp, lai_3d(:, :, lai_idx))), mask)
+    end do
+  end subroutine mpr_read_monthly_lai_l0_cache
+
+  !> \brief Read a dated gridded LAI time series into the MPR-owned level0 cache and cache full period bounds.
+  subroutine mpr_read_dated_lai_l0_cache(self)
+    class(mpr_t), intent(inout), target :: self
+    type(input_dataset) :: lai_ds
+    real(dp), allocatable :: lai_3d(:, :, :)
+    logical, pointer :: mask(:, :)
+    real(dp) :: nodata_value
+    integer(i4) :: expected_timestep
+    integer(i4) :: lai_idx
+
+    if (.not.allocated(self%lai%path)) then
+      log_fatal(*) "MPR: internal error, gridded LAI path not resolved in configure."
+      error stop 1
+    end if
+    if (.not.allocated(self%lai%var_name)) then
+      log_fatal(*) "MPR: internal error, gridded LAI variable name not resolved in configure."
+      error stop 1
+    end if
+    if (.not.associated(self%exchange%level0)) then
+      log_fatal(*) "MPR: level0 grid not connected before dated LAI cache initialization."
+      error stop 1
+    end if
+
+    mask => self%exchange%level0%mask
+    call lai_ds%init( &
+      path=self%lai%path, &
+      vars=[var(name=trim(self%lai%var_name), kind="dp", static=.false.)], &
+      grid=self%exchange%level0, &
+      timestamp=start_timestamp)
+    if (lai_ds%static) then
+      log_fatal(*) "MPR: gridded LAI dataset is static, but a dated LAI mode was configured."
+      error stop 1
+    end if
+    expected_timestep = self%config%lai_time_step(self%exchange%domain)
+    if (lai_ds%timestep /= expected_timestep) then
+      log_fatal(*) "MPR: gridded LAI timestep ", n2s(lai_ds%timestep), " does not match configured lai_time_step=", &
+        n2s(expected_timestep), "."
+      error stop 1
+    end if
+    if (size(lai_ds%times) < 1_i4) then
+      log_fatal(*) "MPR: dated gridded LAI dataset does not expose any time periods."
+      error stop 1
+    end if
+    if (lai_ds%vars(1)%nc%hasAttribute("_FillValue")) then
+      call lai_ds%vars(1)%nc%getAttribute("_FillValue", nodata_value)
+    else if (lai_ds%vars(1)%nc%hasAttribute("missing_value")) then
+      call lai_ds%vars(1)%nc%getAttribute("missing_value", nodata_value)
+    else
+      log_fatal(*) "MPR: gridded LAI variable ", trim(self%lai%var_name), &
+        " needs either _FillValue or missing_value."
+      error stop 1
+    end if
+
+    self%lai%n_periods = size(lai_ds%times)
+    self%lai%dated = .true.
+    allocate(self%lai%period_start(self%lai%n_periods))
+    allocate(self%lai%period_end(self%lai%n_periods))
+    self%lai%period_start(1) = lai_ds%start_time
+    self%lai%period_end = lai_ds%times
+    do lai_idx = 2_i4, self%lai%n_periods
+      self%lai%period_start(lai_idx) = lai_ds%times(lai_idx - 1_i4)
+    end do
+    if (self%exchange%start_time < self%lai%period_start(1)) then
+      log_fatal(*) "MPR: gridded LAI coverage starts at ", self%lai%period_start(1)%str(), &
+        ", but simulation starts at ", self%exchange%start_time%str(), "."
+      error stop 1
+    end if
+    if (self%exchange%end_time > self%lai%period_end(self%lai%n_periods)) then
+      log_fatal(*) "MPR: gridded LAI coverage ends at ", self%lai%period_end(self%lai%n_periods)%str(), &
+        ", but simulation ends at ", self%exchange%end_time%str(), "."
+      error stop 1
+    end if
+    ! Read the complete dated LAI stack once so later updates only switch cached slices.
+    call lai_ds%read_chunk(trim(self%lai%var_name), lai_3d, self%lai%period_start(1), self%lai%period_end(self%lai%n_periods))
+    call lai_ds%close()
+
+    allocate(self%lai%l0_cache(self%exchange%level0%nCells, self%lai%n_periods))
+    do lai_idx = 1_i4, self%lai%n_periods
+      if (any(is_close(lai_3d(:, :, lai_idx), nodata_value) .and. mask)) then
+        log_fatal(*) "MPR: dated gridded LAI contains missing values inside the level0 domain at slice ", &
+          n2s(lai_idx), "."
+        error stop 1
+      end if
+      self%lai%l0_cache(:, lai_idx) = pack(min(30.0_dp, max(1.0e-10_dp, lai_3d(:, :, lai_idx))), mask)
+    end do
+  end subroutine mpr_read_dated_lai_l0_cache
 
   !> \brief Load one configured process parameter block into an allocated local array.
   subroutine mpr_load_process_params(self, process_id, params)
@@ -2301,6 +2707,7 @@ contains
     class(mpr_t), intent(inout), target :: self
     logical, optional, intent(in) :: force
     logical :: force_
+    logical :: need_lai_slice
     integer(i4) :: lai_idx
     integer(i4) :: land_cover_idx
 
@@ -2325,7 +2732,15 @@ contains
       .not.allocated(self%runoff%f_karst_loss_cache) .and. &
       .not.allocated(self%runoff%thresh_sealed_cache)) return
 
-    lai_idx = self%lai_index_for_time()
+    ! Only resolve a timed LAI slice when one of the published MPR caches actually depends on LAI.
+    need_lai_slice = allocated(self%canopy%max_interception_cache) .or. &
+      allocated(self%pet%pet_coeff_pt_cache) .or. allocated(self%pet%pet_fac_lai_cache) .or. &
+      allocated(self%pet%resist_aero_cache) .or. allocated(self%pet%resist_surf_cache)
+    if (need_lai_slice) then
+      lai_idx = self%lai_index_for_time()
+    else
+      lai_idx = 1_i4
+    end if
     land_cover_idx = self%land_cover_index_for_time()
     if (lai_idx < 1_i4 .or. lai_idx > self%lai%n_periods) then
       log_fatal(*) "MPR: LAI index out of bounds: ", n2s(lai_idx), " not in [1,", n2s(self%lai%n_periods), "]."
@@ -2419,6 +2834,14 @@ contains
     integer(i4) :: id(1)
 
     id(1) = self%exchange%domain
+    if (.not.allocated(self%canopy%max_interception_cache) .and. &
+      .not.allocated(self%pet%pet_coeff_pt_cache) .and. &
+      .not.allocated(self%pet%pet_fac_lai_cache) .and. &
+      .not.allocated(self%pet%resist_aero_cache) .and. &
+      .not.allocated(self%pet%resist_surf_cache)) then
+      lai_idx = 1_i4
+      return
+    end if
     if (self%lai%n_periods < 1_i4) then
       log_fatal(*) "MPR: n_lai_periods must be >= 1."
       error stop 1
@@ -2427,9 +2850,30 @@ contains
     lai_idx = 1_i4
     select case (self%config%lai_time_step(id(1)))
       case (0_i4, 1_i4)
-        if (self%lai%n_periods >= YEAR_MONTHS) lai_idx = self%exchange%time%month
-      case default
-        lai_idx = 1_i4
+        if (self%lai%n_periods /= YEAR_MONTHS) then
+          log_fatal(*) "MPR: cyclic monthly LAI expects 12 cached periods, but nLAI=", n2s(self%lai%n_periods), "."
+          error stop 1
+        end if
+        lai_idx = self%exchange%time%month
+      case (-3_i4:-1_i4)
+        if (.not.self%lai%dated) then
+          log_fatal(*) "MPR: dated LAI mode requires cached LAI period bounds."
+          error stop 1
+        end if
+        if (.not.allocated(self%lai%period_start) .or. .not.allocated(self%lai%period_end)) then
+          log_fatal(*) "MPR: dated LAI period bounds are not cached."
+          error stop 1
+        end if
+        if (self%exchange%time < self%lai%period_start(1)) then
+          log_fatal(*) "MPR: current time ", self%exchange%time%str(), &
+            " is before the first cached LAI period start ", self%lai%period_start(1)%str(), "."
+          error stop 1
+        end if
+        lai_idx = max(1_i4, self%lai%active_idx)
+        do while (lai_idx < self%lai%n_periods)
+          if (self%exchange%time < self%lai%period_end(lai_idx)) exit
+          lai_idx = lai_idx + 1_i4
+        end do
     end select
     lai_idx = max(1_i4, min(lai_idx, self%lai%n_periods))
   end function mpr_lai_index_for_time
@@ -2587,6 +3031,8 @@ contains
     if (allocated(self%land_cover%period_start)) deallocate(self%land_cover%period_start)
     if (allocated(self%land_cover%period_end)) deallocate(self%land_cover%period_end)
     if (allocated(self%lai%l0_cache)) deallocate(self%lai%l0_cache)
+    if (allocated(self%lai%period_start)) deallocate(self%lai%period_start)
+    if (allocated(self%lai%period_end)) deallocate(self%lai%period_end)
     if (allocated(self%canopy%max_interception_cache)) deallocate(self%canopy%max_interception_cache)
     if (allocated(self%snow%thresh_temp_cache)) deallocate(self%snow%thresh_temp_cache)
     if (allocated(self%snow%degday_dry_cache)) deallocate(self%snow%degday_dry_cache)
@@ -2622,6 +3068,7 @@ contains
     self%land_cover%temporal = .false.
     self%land_cover%n_periods = 1_i4
     self%land_cover%active_idx = 0_i4
+    self%lai%dated = .false.
     self%lai%n_periods = 1_i4
     self%lai%active_idx = 0_i4
     log_info(*) "Finalize MPR for domain ", n2s(self%exchange%domain)
