@@ -74,6 +74,13 @@ module mo_mpr_container
     real(dp), allocatable :: ks_var_v_l0(:, :) !< cached vertical Ks variability on L0 (nCells0, nLC)
   end type mpr_soil_state_t
 
+  type :: mpr_neutron_state_t
+    real(dp), allocatable :: desilets_n0_cache(:) !< cached dry neutron count (nCells1)
+    real(dp), allocatable :: bulk_density_cache(:, :, :) !< cached bulk density (nCells1, nHorizons, nLC)
+    real(dp), allocatable :: lattice_water_cache(:, :, :) !< cached lattice water (nCells1, nHorizons, nLC)
+    real(dp), allocatable :: cosmic_l3_cache(:, :, :) !< cached COSMIC L3 parameter (nCells1, nHorizons, nLC)
+  end type mpr_neutron_state_t
+
   type :: mpr_runoff_state_t
     real(dp), allocatable :: alpha_cache(:, :) !< cached alpha field (nCells1, nLC)
     real(dp), allocatable :: k_fastflow_cache(:, :) !< cached fast interflow recession (nCells1, nLC)
@@ -107,6 +114,7 @@ module mo_mpr_container
     type(mpr_snow_state_t) :: snow !< cached snow parameter fields
     type(mpr_pet_state_t) :: pet !< cached PET parameter fields
     type(mpr_soil_state_t) :: soil !< cached soil moisture parameter fields
+    type(mpr_neutron_state_t) :: neutron !< cached neutron parameter fields
     type(mpr_runoff_state_t) :: runoff !< cached runoff/baseflow parameter fields
     integer(i4) :: n_lai_periods = 1_i4 !< number of cached LAI periods
     integer(i4) :: active_lai_idx = 0_i4 !< active cached LAI index
@@ -579,6 +587,25 @@ contains
         self, nc, dims_xy, "L1_sealedThresh", &
         "Threshold water depth for runoff on sealed surfaces at level 1", self%runoff%thresh_sealed_cache)
     end if
+    if (allocated(self%neutron%desilets_n0_cache)) then
+      call mpr_write_restart_field_2d( &
+        self, nc, dims_xy, "L1_No_Count", "N0 count at level 1", self%neutron%desilets_n0_cache)
+    end if
+    if (allocated(self%neutron%bulk_density_cache)) then
+      call mpr_write_restart_field_4d( &
+        self, nc, dims_xy, soil_dim, land_cover_dim, "L1_bulkDens", &
+        "Bulk density at level 1 for processCase(10)", self%neutron%bulk_density_cache)
+    end if
+    if (allocated(self%neutron%lattice_water_cache)) then
+      call mpr_write_restart_field_4d( &
+        self, nc, dims_xy, soil_dim, land_cover_dim, "L1_latticeWater", &
+        "Lattice water content at level 1 for processCase(10)", self%neutron%lattice_water_cache)
+    end if
+    if (allocated(self%neutron%cosmic_l3_cache)) then
+      call mpr_write_restart_field_4d( &
+        self, nc, dims_xy, soil_dim, land_cover_dim, "L1_COSMICL3", &
+        "COSMIC L3 parameter at level 1 for processCase(10)", self%neutron%cosmic_l3_cache)
+    end if
 
     process_case = self%exchange%parameters%process_matrix(3, 1)
     if (allocated(self%soil%thresh_jarvis_cache) .and. any(process_case == [2_i4, 3_i4])) then
@@ -793,6 +820,11 @@ contains
         error stop 1
       end if
       call self%build_lai_l0_cache()
+    end if
+
+    if (self%exchange%parameters%process_matrix(10, 1) > 0_i4 .and. self%exchange%parameters%process_matrix(3, 1) == 0_i4) then
+      log_fatal(*) "MPR: neutron regionalization requires an active soil-moisture process."
+      error stop 1
     end if
 
     if (self%exchange%parameters%process_matrix(1, 1) /= 0_i4) call self%init_max_interception_cache()
@@ -1241,12 +1273,15 @@ contains
     class(mpr_t), intent(inout), target :: self
     integer(i4) :: domain_id
     integer(i4) :: n_horizons
+    integer(i4) :: neutron_process
     integer(i4) :: n_soil_layers
     integer(i4) :: land_cover_idx
+    real(dp), allocatable :: neutron_param(:)
     real(dp), allocatable :: soil_param(:)
 
     domain_id = self%exchange%domain
     n_horizons = self%config%n_horizons(domain_id)
+    neutron_process = self%exchange%parameters%process_matrix(10, 1)
     if (n_horizons < 1_i4) then
       log_fatal(*) "MPR: n_horizons must be >= 1 before soil cache initialization."
       error stop 1
@@ -1279,6 +1314,10 @@ contains
     if (allocated(self%soil%sm_deficit_fc_l0)) deallocate(self%soil%sm_deficit_fc_l0)
     if (allocated(self%soil%ks_var_h_l0)) deallocate(self%soil%ks_var_h_l0)
     if (allocated(self%soil%ks_var_v_l0)) deallocate(self%soil%ks_var_v_l0)
+    if (allocated(self%neutron%desilets_n0_cache)) deallocate(self%neutron%desilets_n0_cache)
+    if (allocated(self%neutron%bulk_density_cache)) deallocate(self%neutron%bulk_density_cache)
+    if (allocated(self%neutron%lattice_water_cache)) deallocate(self%neutron%lattice_water_cache)
+    if (allocated(self%neutron%cosmic_l3_cache)) deallocate(self%neutron%cosmic_l3_cache)
     allocate(self%soil%sm_exponent_cache(self%exchange%level1%ncells, n_horizons, self%land_cover%n_periods))
     allocate(self%soil%sm_saturation_cache(self%exchange%level1%ncells, n_horizons, self%land_cover%n_periods))
     allocate(self%soil%sm_field_capacity_cache(self%exchange%level1%ncells, n_horizons, self%land_cover%n_periods))
@@ -1288,16 +1327,53 @@ contains
     allocate(self%soil%sm_deficit_fc_l0(self%exchange%level0%ncells, self%land_cover%n_periods))
     allocate(self%soil%ks_var_h_l0(self%exchange%level0%ncells, self%land_cover%n_periods))
     allocate(self%soil%ks_var_v_l0(self%exchange%level0%ncells, self%land_cover%n_periods))
+    if (neutron_process > 0_i4) then
+      neutron_param = self%exchange%parameters%get_process(10_i4)
+      if (size(neutron_param) < 1_i4) then
+        log_fatal(*) "MPR: neutron process definition is empty."
+        error stop 1
+      end if
+      allocate(self%neutron%desilets_n0_cache(self%exchange%level1%ncells))
+      allocate(self%neutron%bulk_density_cache(self%exchange%level1%ncells, n_horizons, self%land_cover%n_periods))
+      allocate(self%neutron%lattice_water_cache(self%exchange%level1%ncells, n_horizons, self%land_cover%n_periods))
+      self%neutron%desilets_n0_cache = neutron_param(1)
+      if (neutron_process == 2_i4) then
+        allocate(self%neutron%cosmic_l3_cache(self%exchange%level1%ncells, n_horizons, self%land_cover%n_periods))
+      end if
+    end if
 
     do land_cover_idx = 1_i4, self%land_cover%n_periods
-      call mpr_bridge_soil_moisture( &
-        self%exchange%parameters%process_matrix, soil_param, self%land_cover%l0_cache(:, land_cover_idx), &
-        self%exchange%soil_id%data(:, :n_soil_layers), self%exchange%level0, self%upscaler, &
-        self%soil%thresh_jarvis_cache, self%soil%sm_exponent_cache(:, :, land_cover_idx), &
-        self%soil%sm_saturation_cache(:, :, land_cover_idx), self%soil%sm_field_capacity_cache(:, :, land_cover_idx), &
-        self%soil%wilting_point_cache(:, :, land_cover_idx), self%soil%f_roots_cache(:, :, land_cover_idx), &
-        self%soil%sm_deficit_fc_l0(:, land_cover_idx), self%soil%ks_var_h_l0(:, land_cover_idx), &
-        self%soil%ks_var_v_l0(:, land_cover_idx))
+      if (neutron_process == 2_i4) then
+        call mpr_bridge_soil_moisture( &
+          self%exchange%parameters%process_matrix, soil_param, self%land_cover%l0_cache(:, land_cover_idx), &
+          self%exchange%soil_id%data(:, :n_soil_layers), self%exchange%level0, self%upscaler, &
+          self%soil%thresh_jarvis_cache, self%soil%sm_exponent_cache(:, :, land_cover_idx), &
+          self%soil%sm_saturation_cache(:, :, land_cover_idx), self%soil%sm_field_capacity_cache(:, :, land_cover_idx), &
+          self%soil%wilting_point_cache(:, :, land_cover_idx), self%soil%f_roots_cache(:, :, land_cover_idx), &
+          self%soil%sm_deficit_fc_l0(:, land_cover_idx), self%soil%ks_var_h_l0(:, land_cover_idx), &
+          self%soil%ks_var_v_l0(:, land_cover_idx), self%neutron%bulk_density_cache(:, :, land_cover_idx), &
+          self%neutron%lattice_water_cache(:, :, land_cover_idx), self%neutron%cosmic_l3_cache(:, :, land_cover_idx), &
+          neutron_param)
+      else if (neutron_process == 1_i4) then
+        call mpr_bridge_soil_moisture( &
+          self%exchange%parameters%process_matrix, soil_param, self%land_cover%l0_cache(:, land_cover_idx), &
+          self%exchange%soil_id%data(:, :n_soil_layers), self%exchange%level0, self%upscaler, &
+          self%soil%thresh_jarvis_cache, self%soil%sm_exponent_cache(:, :, land_cover_idx), &
+          self%soil%sm_saturation_cache(:, :, land_cover_idx), self%soil%sm_field_capacity_cache(:, :, land_cover_idx), &
+          self%soil%wilting_point_cache(:, :, land_cover_idx), self%soil%f_roots_cache(:, :, land_cover_idx), &
+          self%soil%sm_deficit_fc_l0(:, land_cover_idx), self%soil%ks_var_h_l0(:, land_cover_idx), &
+          self%soil%ks_var_v_l0(:, land_cover_idx), self%neutron%bulk_density_cache(:, :, land_cover_idx), &
+          self%neutron%lattice_water_cache(:, :, land_cover_idx), neutron_param=neutron_param)
+      else
+        call mpr_bridge_soil_moisture( &
+          self%exchange%parameters%process_matrix, soil_param, self%land_cover%l0_cache(:, land_cover_idx), &
+          self%exchange%soil_id%data(:, :n_soil_layers), self%exchange%level0, self%upscaler, &
+          self%soil%thresh_jarvis_cache, self%soil%sm_exponent_cache(:, :, land_cover_idx), &
+          self%soil%sm_saturation_cache(:, :, land_cover_idx), self%soil%sm_field_capacity_cache(:, :, land_cover_idx), &
+          self%soil%wilting_point_cache(:, :, land_cover_idx), self%soil%f_roots_cache(:, :, land_cover_idx), &
+          self%soil%sm_deficit_fc_l0(:, land_cover_idx), self%soil%ks_var_h_l0(:, land_cover_idx), &
+          self%soil%ks_var_v_l0(:, land_cover_idx))
+      end if
     end do
 
     self%exchange%f_roots%provided = .true.
@@ -1306,6 +1382,10 @@ contains
     self%exchange%sm_field_capacity%provided = .true.
     self%exchange%wilting_point%provided = .true.
     self%exchange%thresh_jarvis%provided = .true.
+    if (allocated(self%neutron%desilets_n0_cache)) self%exchange%desilets_n0%provided = .true.
+    if (allocated(self%neutron%bulk_density_cache)) self%exchange%bulk_density%provided = .true.
+    if (allocated(self%neutron%lattice_water_cache)) self%exchange%lattice_water%provided = .true.
+    if (allocated(self%neutron%cosmic_l3_cache)) self%exchange%cosmic_l3%provided = .true.
   end subroutine mpr_init_soil_cache
 
   !> \brief Cache runoff and baseflow parameter fields on level1.
@@ -1411,6 +1491,10 @@ contains
       .not.allocated(self%pet%resist_surf_cache) .and. &
       .not.allocated(self%soil%sm_exponent_cache) .and. &
       .not.allocated(self%soil%thresh_jarvis_cache) .and. &
+      .not.allocated(self%neutron%desilets_n0_cache) .and. &
+      .not.allocated(self%neutron%bulk_density_cache) .and. &
+      .not.allocated(self%neutron%lattice_water_cache) .and. &
+      .not.allocated(self%neutron%cosmic_l3_cache) .and. &
       .not.allocated(self%runoff%alpha_cache) .and. &
       .not.allocated(self%runoff%f_karst_loss_cache) .and. &
       .not.allocated(self%runoff%thresh_sealed_cache)) return
@@ -1466,6 +1550,18 @@ contains
     end if
     if (allocated(self%soil%thresh_jarvis_cache)) then
       self%exchange%thresh_jarvis%data => self%soil%thresh_jarvis_cache
+    end if
+    if (allocated(self%neutron%desilets_n0_cache)) then
+      self%exchange%desilets_n0%data => self%neutron%desilets_n0_cache
+    end if
+    if (allocated(self%neutron%bulk_density_cache)) then
+      self%exchange%bulk_density%data => self%neutron%bulk_density_cache(:, :, land_cover_idx)
+    end if
+    if (allocated(self%neutron%lattice_water_cache)) then
+      self%exchange%lattice_water%data => self%neutron%lattice_water_cache(:, :, land_cover_idx)
+    end if
+    if (allocated(self%neutron%cosmic_l3_cache)) then
+      self%exchange%cosmic_l3%data => self%neutron%cosmic_l3_cache(:, :, land_cover_idx)
     end if
     if (allocated(self%runoff%alpha_cache)) then
       self%exchange%alpha%data => self%runoff%alpha_cache(:, land_cover_idx)
@@ -1621,6 +1717,14 @@ contains
     self%exchange%wilting_point%provided = .false.
     nullify(self%exchange%thresh_jarvis%data)
     self%exchange%thresh_jarvis%provided = .false.
+    nullify(self%exchange%desilets_n0%data)
+    self%exchange%desilets_n0%provided = .false.
+    nullify(self%exchange%bulk_density%data)
+    self%exchange%bulk_density%provided = .false.
+    nullify(self%exchange%lattice_water%data)
+    self%exchange%lattice_water%provided = .false.
+    nullify(self%exchange%cosmic_l3%data)
+    self%exchange%cosmic_l3%provided = .false.
     nullify(self%exchange%alpha%data)
     self%exchange%alpha%provided = .false.
     nullify(self%exchange%k_fastflow%data)
@@ -1666,6 +1770,10 @@ contains
     if (allocated(self%soil%sm_deficit_fc_l0)) deallocate(self%soil%sm_deficit_fc_l0)
     if (allocated(self%soil%ks_var_h_l0)) deallocate(self%soil%ks_var_h_l0)
     if (allocated(self%soil%ks_var_v_l0)) deallocate(self%soil%ks_var_v_l0)
+    if (allocated(self%neutron%desilets_n0_cache)) deallocate(self%neutron%desilets_n0_cache)
+    if (allocated(self%neutron%bulk_density_cache)) deallocate(self%neutron%bulk_density_cache)
+    if (allocated(self%neutron%lattice_water_cache)) deallocate(self%neutron%lattice_water_cache)
+    if (allocated(self%neutron%cosmic_l3_cache)) deallocate(self%neutron%cosmic_l3_cache)
     if (allocated(self%runoff%alpha_cache)) deallocate(self%runoff%alpha_cache)
     if (allocated(self%runoff%k_fastflow_cache)) deallocate(self%runoff%k_fastflow_cache)
     if (allocated(self%runoff%k_slowflow_cache)) deallocate(self%runoff%k_slowflow_cache)

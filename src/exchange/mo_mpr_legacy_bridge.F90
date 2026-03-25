@@ -16,6 +16,7 @@ module mo_mpr_legacy_bridge
   use mo_kind, only: i4, i8, dp
   use mo_grid_scaler, only: scaler_t, up_fraction, up_h_mean, up_a_mean
   use mo_mpr_global_variables, only: soilDB, HorizonDepth_mHM, iFlag_soilDB, nSoilHorizons_mHM, nSoilTypes, tillageDepth
+  use mo_mpr_neutrons, only: mpr_neutrons
   use mo_mpr_pet, only: pet_correctbyASP, priestley_taylor_alpha, bulksurface_resistance
   use mo_mpr_runoff, only: mpr_runoff
   use mo_mpr_smhorizons, only: mpr_SMhorizons
@@ -443,7 +444,7 @@ contains
   !> \brief Bridge soil-moisture parameter generation through the legacy soil routines.
   subroutine mpr_bridge_soil_moisture(process_matrix, param, land_cover_l0, soil_id_l0, level0, upscaler, &
       thresh_jarvis_l1, sm_exponent_l1, sm_saturation_l1, sm_field_capacity_l1, wilting_point_l1, f_roots_l1, &
-      sm_deficit_fc_l0, ks_var_h_l0, ks_var_v_l0)
+      sm_deficit_fc_l0, ks_var_h_l0, ks_var_v_l0, bulk_density_l1, lattice_water_l1, cosmic_l3_l1, neutron_param)
     integer(i4), dimension(:, :), intent(in) :: process_matrix
     real(dp), dimension(:), intent(in) :: param
     integer(i4), dimension(:), intent(in) :: land_cover_l0
@@ -459,6 +460,10 @@ contains
     real(dp), dimension(:), intent(out), optional :: sm_deficit_fc_l0
     real(dp), dimension(:), intent(out), optional :: ks_var_h_l0
     real(dp), dimension(:), intent(out), optional :: ks_var_v_l0
+    real(dp), dimension(:, :), intent(out), optional :: bulk_density_l1
+    real(dp), dimension(:, :), intent(out), optional :: lattice_water_l1
+    real(dp), dimension(:, :), intent(out), optional :: cosmic_l3_l1
+    real(dp), dimension(:), intent(in), optional :: neutron_param
     integer(i4), allocatable :: id0(:)
     integer(i4) :: i
     integer(i4) :: process_case
@@ -490,9 +495,9 @@ contains
     real(dp), allocatable :: COSMIC_L3_till(:, :, :)
     real(dp), allocatable :: latWat(:, :)
     real(dp), allocatable :: COSMIC_L3(:, :)
-    real(dp), allocatable :: bulk_dens_l1(:, :)
-    real(dp), allocatable :: lattice_water_l1(:, :)
-    real(dp), allocatable :: cosmic_l3_l1(:, :)
+    real(dp), allocatable :: bulk_density_tmp(:, :)
+    real(dp), allocatable :: lattice_water_tmp(:, :)
+    real(dp), allocatable :: cosmic_l3_tmp(:, :)
     integer(i4), allocatable :: upper_bound1(:)
     integer(i4), allocatable :: lower_bound1(:)
     integer(i4), allocatable :: left_bound1(:)
@@ -595,9 +600,9 @@ contains
     allocate(COSMIC_L3_till(msoil, mtill, m_lc))
     allocate(latWat(msoil, m_hor))
     allocate(COSMIC_L3(msoil, m_hor))
-    allocate(bulk_dens_l1(n_cells1, size(sm_exponent_l1, 2)))
-    allocate(lattice_water_l1(n_cells1, size(sm_exponent_l1, 2)))
-    allocate(cosmic_l3_l1(n_cells1, size(sm_exponent_l1, 2)))
+    allocate(bulk_density_tmp(n_cells1, size(sm_exponent_l1, 2)))
+    allocate(lattice_water_tmp(n_cells1, size(sm_exponent_l1, 2)))
+    allocate(cosmic_l3_tmp(n_cells1, size(sm_exponent_l1, 2)))
     allocate(upper_bound1(n_cells1))
     allocate(lower_bound1(n_cells1))
     allocate(left_bound1(n_cells1))
@@ -607,9 +612,9 @@ contains
     COSMIC_L3_till = 1.0e-6_dp
     latWat = 1.0e-6_dp
     COSMIC_L3 = 1.0e-6_dp
-    bulk_dens_l1 = nodata_dp
-    lattice_water_l1 = nodata_dp
-    cosmic_l3_l1 = nodata_dp
+    bulk_density_tmp = nodata_dp
+    lattice_water_tmp = nodata_dp
+    cosmic_l3_tmp = nodata_dp
     do i = 1_i4, n_cells1
       call upscaler%coarse_bounds(int(i, i8), x_lb, x_ub, y_lb, y_ub)
       ! Legacy MPR upscaling routines slice arrays as (dim1, dim2). The new forces grid stores data as (x, y),
@@ -647,13 +652,47 @@ contains
       ks_var_v_l0 = KsVar_V0
     end if
 
+    if (process_matrix(10, 1) > 0_i4) then
+      if (.not.present(neutron_param)) then
+        log_fatal(*) "MPR bridge: neutron parameters must be provided when the neutrons process is active."
+        error stop 1
+      end if
+      call mpr_neutrons( &
+        process_matrix(10, 1), &
+        neutron_param, &
+        soilDB%is_present, soilDB%nHorizons, soilDB%nTillHorizons, land_cover_l0, &
+        soilDB%clay, soilDB%DbM, Db, COSMIC_L3_till, latWat_till, COSMIC_L3, latWat)
+    end if
+
     call mpr_SMhorizons(param(horizon_param_start:horizon_param_end), process_matrix, &
       iFlag_soilDB, nSoilHorizons_mHM, HorizonDepth_mHM, land_cover_l0, soil_id_l0, &
       soilDB%nHorizons, soilDB%nTillHorizons, thetaS_till, thetaFC_till, thetaPW_till, thetaS, thetaFC, thetaPW, &
       soilDB%Wd, Db, soilDB%DbM, soilDB%RZdepth, level0%mask, id0, &
       upper_bound1, lower_bound1, left_bound1, right_bound1, upscaler%n_subcells, &
       sm_exponent_l1, sm_saturation_l1, sm_field_capacity_l1, wilting_point_l1, f_roots_l1, &
-      latWat_till, COSMIC_L3_till, latWat, COSMIC_L3, bulk_dens_l1, lattice_water_l1, cosmic_l3_l1)
+      latWat_till, COSMIC_L3_till, latWat, COSMIC_L3, bulk_density_tmp, lattice_water_tmp, cosmic_l3_tmp)
+
+    if (present(bulk_density_l1)) then
+      if (any(shape(bulk_density_l1) /= shape(bulk_density_tmp))) then
+        log_fatal(*) "MPR bridge: bulk_density_l1 output has wrong shape."
+        error stop 1
+      end if
+      bulk_density_l1 = bulk_density_tmp
+    end if
+    if (present(lattice_water_l1)) then
+      if (any(shape(lattice_water_l1) /= shape(lattice_water_tmp))) then
+        log_fatal(*) "MPR bridge: lattice_water_l1 output has wrong shape."
+        error stop 1
+      end if
+      lattice_water_l1 = lattice_water_tmp
+    end if
+    if (present(cosmic_l3_l1)) then
+      if (any(shape(cosmic_l3_l1) /= shape(cosmic_l3_tmp))) then
+        log_fatal(*) "MPR bridge: cosmic_l3_l1 output has wrong shape."
+        error stop 1
+      end if
+      cosmic_l3_l1 = cosmic_l3_tmp
+    end if
 
     deallocate(id0)
     deallocate(thetaS_till)
@@ -671,9 +710,9 @@ contains
     deallocate(COSMIC_L3_till)
     deallocate(latWat)
     deallocate(COSMIC_L3)
-    deallocate(bulk_dens_l1)
-    deallocate(lattice_water_l1)
-    deallocate(cosmic_l3_l1)
+    deallocate(bulk_density_tmp)
+    deallocate(lattice_water_tmp)
+    deallocate(cosmic_l3_tmp)
     deallocate(upper_bound1)
     deallocate(lower_bound1)
     deallocate(left_bound1)
