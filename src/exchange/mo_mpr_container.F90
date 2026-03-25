@@ -130,8 +130,9 @@ module mo_mpr_container
   end type mpr_pet_state_t
 
   !> \class   mpr_soil_state_t
-  !> \brief   Grouped cached soil-moisture fields and soil-horizon intermediates for MPR.
+  !> \brief   Grouped soil LUT configuration plus cached soil-moisture fields and soil-horizon intermediates for MPR.
   type :: mpr_soil_state_t
+    character(:), allocatable :: lut_path !< resolved soil LUT path
     real(dp), allocatable :: sm_exponent_cache(:, :, :) !< cached soil moisture exponent (nCells1, nHorizons, nLC)
     real(dp), allocatable :: sm_saturation_cache(:, :, :) !< cached saturated soil moisture (nCells1, nHorizons, nLC)
     real(dp), allocatable :: sm_field_capacity_cache(:, :, :) !< cached soil moisture field capacity (nCells1, nHorizons, nLC)
@@ -166,6 +167,13 @@ module mo_mpr_container
     real(dp), allocatable :: thresh_sealed_cache(:) !< cached sealed runoff threshold (nCells1)
   end type mpr_runoff_state_t
 
+  !> \class   mpr_preproc_state_t
+  !> \brief   Grouped preprocessing support state for resolved morphology LUT input and derived slope metrics.
+  type :: mpr_preproc_state_t
+    character(:), allocatable :: geo_lut_path !< resolved geology LUT path
+    real(dp), allocatable :: slope_emp(:) !< empirical slope distribution on level0
+  end type mpr_preproc_state_t
+
   !> \class   mpr_t
   !> \brief   Class for a single MPR process container.
   type, public :: mpr_t
@@ -173,13 +181,10 @@ module mo_mpr_container
     type(exchange_t), pointer :: exchange => null() !< exchange container of the domain
     type(grid_t) :: tgt_level1 !< internal level1 grid derived from level0 when needed
     type(scaler_t) :: upscaler !< scaler from level0 morphology to level1 hydrology
-    character(:), allocatable :: soil_lut_path !< resolved soil LUT path
-    character(:), allocatable :: geo_lut_path !< resolved geology LUT path
     logical :: read_restart = .false. !< whether to read MPR restart file
     logical :: write_restart = .false. !< whether to write MPR restart file
     character(:), allocatable :: restart_input_path !< path to restart file to read
     character(:), allocatable :: restart_output_path !< path to restart file to write
-    real(dp), allocatable :: slope_emp(:) !< empirical slope distribution on level0
     type(mpr_land_cover_state_t) :: land_cover !< land-cover configuration and cached temporal state
     type(mpr_lai_state_t) :: lai !< LAI configuration, cached L0 fields, and active timing state
     type(mpr_canopy_state_t) :: canopy !< canopy interception cache state
@@ -188,6 +193,7 @@ module mo_mpr_container
     type(mpr_soil_state_t) :: soil !< cached soil moisture parameter fields
     type(mpr_neutron_state_t) :: neutron !< cached neutron parameter fields
     type(mpr_runoff_state_t) :: runoff !< cached runoff/baseflow parameter fields
+    type(mpr_preproc_state_t) :: preproc !< resolved preprocessing inputs and derived support fields
   contains
     procedure :: configure  => mpr_configure
     procedure :: connect    => mpr_connect
@@ -310,14 +316,14 @@ contains
       log_fatal(*) "MPR: soil_lut_path not set for domain ", n2s(id(1)), ". Error: ", trim(errmsg)
       error stop 1
     end if
-    self%soil_lut_path = self%exchange%get_path(self%config%soil_lut_path(id(1)))
+    self%soil%lut_path = self%exchange%get_path(self%config%soil_lut_path(id(1)))
 
     status = self%config%is_set("geo_lut_path", idx=id, errmsg=errmsg)
     if (status /= NML_OK) then
       log_fatal(*) "MPR: geo_lut_path not set for domain ", n2s(id(1)), ". Error: ", trim(errmsg)
       error stop 1
     end if
-    self%geo_lut_path = self%exchange%get_path(self%config%geo_lut_path(id(1)))
+    self%preproc%geo_lut_path = self%exchange%get_path(self%config%geo_lut_path(id(1)))
 
     self%land_cover%var_name = trim(self%config%land_cover_var(id(1)))
     if (len_trim(self%land_cover%var_name) < 1) then
@@ -497,12 +503,12 @@ contains
       end if
     end if
 
-    if (.not.allocated(self%soil_lut_path)) then
-      log_fatal(*) "MPR: internal error, soil_lut_path not resolved in configure."
+    if (.not.allocated(self%soil%lut_path)) then
+      log_fatal(*) "MPR: internal error, soil LUT path not resolved in configure."
       error stop 1
     end if
-    if (.not.allocated(self%geo_lut_path)) then
-      log_fatal(*) "MPR: internal error, geo_lut_path not resolved in configure."
+    if (.not.allocated(self%preproc%geo_lut_path)) then
+      log_fatal(*) "MPR: internal error, geology LUT path not resolved in configure."
       error stop 1
     end if
     if (.not.associated(self%exchange%level0)) then
@@ -519,12 +525,12 @@ contains
 
     if (.not.associated(self%exchange%geo_class_def)) allocate(self%exchange%geo_class_def)
     call self%exchange%geo_class_def%reset()
-    log_info(*) "MPR: read geology LUT: ", self%geo_lut_path
+    log_info(*) "MPR: read geology LUT: ", self%preproc%geo_lut_path
     call read_geoformation_lut( &
-      filename=trim(self%geo_lut_path), nGeo=self%exchange%geo_class_def%nGeo, &
+      filename=trim(self%preproc%geo_lut_path), nGeo=self%exchange%geo_class_def%nGeo, &
       geo_unit=self%exchange%geo_class_def%geo_unit, geo_karstic=self%exchange%geo_class_def%geo_karstic)
     if (self%exchange%geo_class_def%nGeo < 1_i4) then
-      log_fatal(*) "MPR: geology LUT contains no classes: ", self%geo_lut_path
+      log_fatal(*) "MPR: geology LUT contains no classes: ", self%preproc%geo_lut_path
       error stop 1
     end if
     call self%init_upscaler()
@@ -1800,24 +1806,24 @@ contains
       log_fatal(*) "MPR: cannot build slope_emp from empty slope input."
       error stop 1
     end if
-    if (allocated(self%slope_emp)) deallocate(self%slope_emp)
-    allocate(self%slope_emp(n_cells), slope_sorted_index(n_cells))
+    if (allocated(self%preproc%slope_emp)) deallocate(self%preproc%slope_emp)
+    allocate(self%preproc%slope_emp(n_cells), slope_sorted_index(n_cells))
 
     slope_sorted_index = sort_index(self%exchange%slope%data)
-    self%slope_emp(slope_sorted_index(n_cells)) = real(n_cells, dp) / real(n_cells + 1_i4, dp)
+    self%preproc%slope_emp(slope_sorted_index(n_cells)) = real(n_cells, dp) / real(n_cells + 1_i4, dp)
 
     do i = n_cells - 1_i4, 1_i4, -1_i4
       i_sort = slope_sorted_index(i)
       i_sortpost = slope_sorted_index(i + 1_i4)
       if (eq(self%exchange%slope%data(i_sort), self%exchange%slope%data(i_sortpost))) then
-        self%slope_emp(i_sort) = self%slope_emp(i_sortpost)
+        self%preproc%slope_emp(i_sort) = self%preproc%slope_emp(i_sortpost)
       else
-        self%slope_emp(i_sort) = real(i, dp) / real(n_cells + 1_i4, dp)
+        self%preproc%slope_emp(i_sort) = real(i, dp) / real(n_cells + 1_i4, dp)
       end if
     end do
 
     self%exchange%slope_emp%provided = .true.
-    self%exchange%slope_emp%data => self%slope_emp
+    self%exchange%slope_emp%data => self%preproc%slope_emp
     deallocate(slope_sorted_index)
   end subroutine mpr_init_slope_emp
 
@@ -2514,8 +2520,8 @@ contains
       log_fatal(*) "MPR: n_horizons must be >= 1 before soil cache initialization."
       error stop 1
     end if
-    if (.not.allocated(self%soil_lut_path)) then
-      log_fatal(*) "MPR: internal error, soil_lut_path not resolved in configure."
+    if (.not.allocated(self%soil%lut_path)) then
+      log_fatal(*) "MPR: internal error, soil LUT path not resolved in configure."
       error stop 1
     end if
     if (.not.allocated(self%land_cover%l0_cache)) then
@@ -2532,7 +2538,7 @@ contains
     if (self%config%soil_db_mode(domain_id) == 1_i4) n_soil_layers = n_horizons
     if (allocated(self%soil%horizon_bounds)) deallocate(self%soil%horizon_bounds)
     call mpr_bridge_setup_soil_database( &
-      self%config, domain_id, self%soil_lut_path, self%exchange%soil_id%data(:, :n_soil_layers), &
+      self%config, domain_id, self%soil%lut_path, self%exchange%soil_id%data(:, :n_soil_layers), &
       self%soil%horizon_bounds)
 
     call self%load_process_params(3_i4, soil_param)
@@ -2652,7 +2658,7 @@ contains
       call self%load_process_params(6_i4, interflow_param)
       do land_cover_idx = 1_i4, self%land_cover%n_periods
         call mpr_bridge_runoff_param( &
-          self%land_cover%l0_cache(:, land_cover_idx), self%slope_emp, self%soil%sm_deficit_fc_l0(:, land_cover_idx), &
+          self%land_cover%l0_cache(:, land_cover_idx), self%preproc%slope_emp, self%soil%sm_deficit_fc_l0(:, land_cover_idx), &
           self%soil%ks_var_h_l0(:, land_cover_idx), self%exchange%level0, self%upscaler, interflow_param, &
           self%runoff%thresh_unsat_cache, self%runoff%k_fastflow_cache(:, land_cover_idx), &
           self%runoff%k_slowflow_cache(:, land_cover_idx), self%runoff%alpha_cache(:, land_cover_idx))
@@ -3023,7 +3029,8 @@ contains
     self%exchange%thresh_sealed%provided = .false.
     if (self%write_restart) call self%create_restart()
     if (allocated(self%land_cover%ds%vars)) call self%land_cover%ds%close()
-    if (allocated(self%slope_emp)) deallocate(self%slope_emp)
+    if (allocated(self%preproc%slope_emp)) deallocate(self%preproc%slope_emp)
+    if (allocated(self%preproc%geo_lut_path)) deallocate(self%preproc%geo_lut_path)
     if (allocated(self%land_cover%l0_cache)) deallocate(self%land_cover%l0_cache)
     if (allocated(self%land_cover%forest_fraction_l1)) deallocate(self%land_cover%forest_fraction_l1)
     if (allocated(self%land_cover%sealed_fraction_l1)) deallocate(self%land_cover%sealed_fraction_l1)
@@ -3053,6 +3060,7 @@ contains
     if (allocated(self%soil%sm_deficit_fc_l0)) deallocate(self%soil%sm_deficit_fc_l0)
     if (allocated(self%soil%ks_var_h_l0)) deallocate(self%soil%ks_var_h_l0)
     if (allocated(self%soil%ks_var_v_l0)) deallocate(self%soil%ks_var_v_l0)
+    if (allocated(self%soil%lut_path)) deallocate(self%soil%lut_path)
     if (allocated(self%neutron%desilets_n0_cache)) deallocate(self%neutron%desilets_n0_cache)
     if (allocated(self%neutron%bulk_density_cache)) deallocate(self%neutron%bulk_density_cache)
     if (allocated(self%neutron%lattice_water_cache)) deallocate(self%neutron%lattice_water_cache)
