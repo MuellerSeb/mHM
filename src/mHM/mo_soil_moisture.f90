@@ -25,6 +25,8 @@ MODULE mo_soil_moisture
   PUBLIC :: feddes_et_reduction
   PUBLIC :: jarvis_et_reduction
 
+  PUBLIC :: soil_moisture_direct_runoff
+  PUBLIC :: soil_moisture_pervious
   PUBLIC :: soil_moisture  ! Soil moisture in different soil horizons
 
   ! ------------------------------------------------------------------
@@ -95,8 +97,6 @@ CONTAINS
                           soil_moist_FC, wilting_point, soil_moist_exponen, jarvis_thresh_c1, aet_canopy, prec_effec, &
                           runoff_sealed, storage_sealed, infiltration, soil_moist, aet, aet_sealed)
 
-    use mo_constants, only : eps_dp
-
     implicit none
 
     ! 1 - Feddes equation for PET reduction2 - Jarvis equation for PET reduction3 - Jarvis equation for PET reduction
@@ -157,25 +157,32 @@ CONTAINS
     ! actual ET from free-water surfaces,i.e impervious cover [mm TS-1]
     real(dp), intent(out) :: aet_sealed
 
-    ! counter
-    integer(i4) :: hh
+    call soil_moisture_direct_runoff(frac_sealed, water_thresh_sealed, pet, evap_coeff, aet_canopy, prec_effec, &
+      runoff_sealed, storage_sealed, aet_sealed)
+    call soil_moisture_pervious(processCase, pet, soil_moist_sat, frac_roots, soil_moist_FC, wilting_point, &
+      soil_moist_exponen, jarvis_thresh_c1, aet_canopy, prec_effec, infiltration, soil_moist, aet)
+  end subroutine soil_moisture
 
-    ! Effective Prec or infiltration from above
-    real(dp) :: prec_effec_soil
+  !> \brief Update sealed-area storage, runoff, and evaporation.
+  subroutine soil_moisture_direct_runoff(frac_sealed, water_thresh_sealed, pet, evap_coeff, aet_canopy, prec_effec, &
+                                        runoff_sealed, storage_sealed, aet_sealed)
 
-    ! Runoof fraction
-    real(dp) :: frac_runoff
+    use mo_constants, only : eps_dp
 
-    ! PET reduction factor according to actual soil moisture
-    real(dp) :: soil_stress_factor
+    implicit none
 
-    ! temporary variable for misc use
+    real(dp), intent(in) :: frac_sealed
+    real(dp), intent(in) :: water_thresh_sealed
+    real(dp), intent(in) :: pet
+    real(dp), intent(in) :: evap_coeff
+    real(dp), intent(in) :: aet_canopy
+    real(dp), intent(in) :: prec_effec
+    real(dp), intent(inout) :: runoff_sealed
+    real(dp), intent(inout) :: storage_sealed
+    real(dp), intent(out) :: aet_sealed
+
     real(dp) :: tmp
 
-
-    ! ----------------------------------------------------------------
-    ! IMPERVIOUS COVER PROCESS
-    ! ----------------------------------------------------------------
     runoff_sealed = 0.0_dp
     aet_sealed = 0.0_dp
 
@@ -190,46 +197,64 @@ CONTAINS
         storage_sealed = tmp
       end if
 
-      ! aET from sealed area is propotional to the available water content
-      if(water_thresh_sealed .gt. eps_dp) then
+      if (water_thresh_sealed > eps_dp) then
         aet_sealed = (pet / evap_coeff - aet_canopy) * (storage_sealed / water_thresh_sealed)
-        ! numerical problem
-        if (aet_sealed .lt. 0.0_dp) aet_sealed = 0.0_dp
+        if (aet_sealed < 0.0_dp) aet_sealed = 0.0_dp
       else
         aet_sealed = huge(1.0_dp)
       end if
 
-      ! sealed storage updata
-      if (storage_sealed .gt. aet_sealed) then
+      if (storage_sealed > aet_sealed) then
         storage_sealed = storage_sealed - aet_sealed
       else
         aet_sealed = storage_sealed
         storage_sealed = 0.0_dp
       end if
-
     end if
-    ! ----------------------------------------------------------------
-    ! N-LAYER SOIL MODULE
-    ! ----------------------------------------------------------------
+  end subroutine soil_moisture_direct_runoff
+
+  !> \brief Update pervious-soil infiltration, soil moisture, and soil evapotranspiration.
+  subroutine soil_moisture_pervious(processCase, pet, soil_moist_sat, frac_roots, soil_moist_FC, wilting_point, &
+                                   soil_moist_exponen, jarvis_thresh_c1, aet_canopy, prec_effec, infiltration, &
+                                   soil_moist, aet)
+
+    use mo_constants, only : eps_dp
+
+    implicit none
+
+    integer(i4), intent(in) :: processCase
+    real(dp), intent(in) :: pet
+    real(dp), dimension(:), intent(in) :: soil_moist_sat
+    real(dp), dimension(:), intent(in) :: frac_roots
+    real(dp), dimension(:), intent(in) :: soil_moist_FC
+    real(dp), dimension(:), intent(in) :: wilting_point
+    real(dp), dimension(:), intent(in) :: soil_moist_exponen
+    real(dp), intent(in) :: jarvis_thresh_c1
+    real(dp), intent(in) :: aet_canopy
+    real(dp), intent(in) :: prec_effec
+    real(dp), dimension(size(soil_moist_sat, 1)), intent(inout) :: infiltration
+    real(dp), dimension(size(soil_moist_sat, 1)), intent(inout) :: soil_moist
+    real(dp), dimension(size(soil_moist_sat, 1)), intent(out) :: aet
+
+    integer(i4) :: hh
+    integer(i4) :: prev_hh
+    real(dp) :: prec_effec_soil
+    real(dp) :: frac_runoff
+    real(dp) :: soil_stress_factor
+    real(dp) :: tmp
+
     aet(:) = 0.0_dp
     infiltration(:) = 0.0_dp
 
-    ! for 1st layer input is prec_effec
-    prec_effec_soil = prec_effec
-
-    do hh = 1, size(soil_moist_sat, 1) ! nHorizons
-      ! input for other layers is the infiltration from its immediate upper layer will be input
-      if (hh .NE. 1) prec_effec_soil = infiltration(hh - 1)
-
-      !  start processing for soil moisture process
-      !  BASED ON SMs as its upper LIMIT
+    do hh = 1, size(soil_moist_sat, 1)
+      prev_hh = max(1_i4, hh - 1_i4)
+      prec_effec_soil = prec_effec
+      if (hh > 1) prec_effec_soil = infiltration(prev_hh)
 
       if (soil_moist(hh) > soil_moist_sat(hh)) then
         infiltration(hh) = prec_effec_soil
       else
-        ! to avoid underflow -- or numerical errors
-        if(soil_moist(hh) > eps_dp) then
-          !frac_runoff = (soil_moist(hh) / soil_moist_sat(hh))**soil_moist_exponen(hh)
+        if (soil_moist(hh) > eps_dp) then
           frac_runoff = exp(soil_moist_exponen(hh) * log(soil_moist(hh) / soil_moist_sat(hh)))
         else
           frac_runoff = 0.0_dp
@@ -245,49 +270,30 @@ CONTAINS
         end if
       end if
 
-      !             aET calculations
+      aet(hh) = pet - aet_canopy
+      if (hh /= 1) aet(hh) = aet(hh) - sum(aet(1 : hh - 1), mask = (aet(1 : hh - 1) > 0.0_dp))
 
-      !  Satisfying ET demand sequentially from top to the bottom layer
-      !  Note that the potential ET for the first soil layer is reduced after
-      !  satisfying ET demands of the canopy surface
-
-      aet(hh) = pet - aet_canopy                                                     ! First layer
-      if (hh /= 1) aet(hh) = aet(hh) - sum(aet(1 : hh - 1), mask = (aet(1 : hh - 1) > 0.0_dp)) ! remaining layers
-
-      ! estimate fraction of ET demand based on root fraction and SM status
       select case(processCase)
-        ! FEDDES EQUATION: https://doi.org/10.1016/0022-1694(76)90017-2
-      case(1 , 4)
-        soil_stress_factor = feddes_et_reduction(soil_moist(hh), soil_moist_FC(hh), wilting_point(hh), &
-                             frac_roots(hh))
-        ! JARVIS EQUATION: https://doi.org/10.1016/0022-1694(89)90050-4
-      case(2 , 3)
-        !!!!!!!!! INTRODUCING STRESS FACTOR FOR SOIL MOISTURE ET REDUCTION !!!!!!!!!!!!!!!!!
+      case(1, 4)
+        soil_stress_factor = feddes_et_reduction(soil_moist(hh), soil_moist_FC(hh), wilting_point(hh), frac_roots(hh))
+      case(2, 3)
         soil_stress_factor = jarvis_et_reduction(soil_moist(hh), soil_moist_sat(hh), wilting_point(hh), &
-                             frac_roots(hh), jarvis_thresh_c1)
+          frac_roots(hh), jarvis_thresh_c1)
       end select
 
       aet(hh) = aet(hh) * soil_stress_factor
+      if (aet(hh) < 0.0_dp) aet(hh) = 0.0_dp
 
-      ! avoid numerical error
-      if(aet(hh) < 0.0_dp) aet(hh) = 0.0_dp
-
-      ! reduce SM state
-      if(soil_moist(hh) > aet(hh)) then
+      if (soil_moist(hh) > aet(hh)) then
         soil_moist(hh) = soil_moist(hh) - aet(hh)
       else
         aet(hh) = soil_moist(hh) - eps_dp
         soil_moist(hh) = eps_dp
       end if
 
-      ! avoid numerical error of underflow
-      if(soil_moist(hh) < eps_dp) soil_moist(hh) = eps_dp
-
-    end do ! hh
-
-
-
-  end subroutine soil_moisture
+      if (soil_moist(hh) < eps_dp) soil_moist(hh) = eps_dp
+    end do
+  end subroutine soil_moisture_pervious
 
 
   ! ------------------------------------------------------------------

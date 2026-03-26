@@ -13,6 +13,9 @@
 module mo_mhm_container
   use, intrinsic :: ieee_arithmetic, only: ieee_is_finite
   use mo_logging
+  use mo_canopy_interc, only: canopy_interc
+  use mo_snow_accum_melt, only: snow_accum_melt
+  use mo_soil_moisture, only: soil_moisture_direct_runoff, soil_moisture_pervious
   use mo_kind, only: i4, dp
   use mo_constants, only: YearMonths
   use mo_common_constants, only: P1_InitStateFluxes
@@ -139,6 +142,10 @@ module mo_mhm_container
     procedure :: initialize => mhm_initialize
     procedure :: update => mhm_update
     procedure :: finalize => mhm_finalize
+    procedure :: update_interception => mhm_update_interception
+    procedure :: update_snow => mhm_update_snow
+    procedure :: update_direct_runoff => mhm_update_direct_runoff
+    procedure :: update_soil_moisture => mhm_update_soil_moisture
   end type mhm_t
 
 contains
@@ -286,8 +293,7 @@ contains
     call mhm_mark_required_2d(self, self%exchange%sm_field_capacity, soil_case /= 0_i4, "sm_field_capacity", n_horizons)
     call mhm_mark_required_2d(self, self%exchange%wilting_point, soil_case /= 0_i4, "wilting_point", n_horizons)
     call mhm_mark_required_dp(self, self%exchange%thresh_jarvis, (soil_case == 2_i4) .or. (soil_case == 3_i4), "thresh_jarvis")
-    call mhm_mark_required_dp(self, self%exchange%thresh_sealed, &
-      (soil_case /= 0_i4) .or. (direct_runoff_case /= 0_i4), "thresh_sealed")
+    call mhm_mark_required_dp(self, self%exchange%thresh_sealed, direct_runoff_case /= 0_i4, "thresh_sealed")
 
     call mhm_mark_required_dp(self, self%exchange%alpha, interflow_case /= 0_i4, "alpha")
     call mhm_mark_required_dp(self, self%exchange%k_fastflow, interflow_case /= 0_i4, "k_fastflow")
@@ -339,7 +345,6 @@ contains
   subroutine mhm_initialize(self)
     class(mhm_t), intent(inout), target :: self
     integer(i4) :: coeff_domain
-    integer(i4) :: soil_case
     integer(i4) :: direct_runoff_case
     integer(i4) :: neutron_case
 
@@ -356,9 +361,8 @@ contains
 
     coeff_domain = self%exchange%domain
     if (self%config%share_evap_coeff) coeff_domain = 1_i4
-    soil_case = self%exchange%parameters%process_matrix(3, 1)
     direct_runoff_case = self%exchange%parameters%process_matrix(4, 1)
-    if (soil_case /= 0_i4 .or. direct_runoff_case /= 0_i4) then
+    if (direct_runoff_case /= 0_i4) then
       self%forcing%evap_coeff = self%config%evap_coeff(:, coeff_domain)
       if (any(.not.ieee_is_finite(self%forcing%evap_coeff))) then
         log_fatal(*) "mHM: evap_coeff contains invalid values for domain ", n2s(coeff_domain), "."
@@ -391,7 +395,138 @@ contains
   subroutine mhm_update(self)
     class(mhm_t), intent(inout), target :: self
     log_trace(*) "Update mhm at step ", n2s(self%exchange%step_count)
+    call self%update_interception()
+    call self%update_snow()
+    call self%update_direct_runoff()
+    call self%update_soil_moisture()
   end subroutine mhm_update
+
+  !> \brief Update canopy interception and throughfall for the current step.
+  subroutine mhm_update_interception(self)
+    class(mhm_t), intent(inout), target :: self
+    integer(i4) :: interception_case
+    integer(i4) :: k
+
+    interception_case = self%exchange%parameters%process_matrix(1, 1)
+    select case (interception_case)
+    case (0_i4)
+      self%canopy%interception = P1_InitStateFluxes
+      if (associated(self%exchange%pre%data)) then
+        self%canopy%throughfall = self%exchange%pre%data
+      else
+        self%canopy%throughfall = P1_InitStateFluxes
+      end if
+      self%canopy%aet = P1_InitStateFluxes
+    case (1_i4)
+      do k = 1_i4, size(self%canopy%interception)
+        call canopy_interc(self%exchange%pet%data(k), self%exchange%max_interception%data(k), self%exchange%pre%data(k), &
+          self%canopy%interception(k), self%canopy%throughfall(k), self%canopy%aet(k))
+      end do
+    case default
+      log_fatal(*) "mHM: unsupported interception case ", n2s(interception_case), "."
+      error stop 1
+    end select
+  end subroutine mhm_update_interception
+
+  !> \brief Update snow accumulation, melt, and effective precipitation.
+  subroutine mhm_update_snow(self)
+    class(mhm_t), intent(inout), target :: self
+    integer(i4) :: snow_case
+    integer(i4) :: k
+
+    snow_case = self%exchange%parameters%process_matrix(2, 1)
+    select case (snow_case)
+    case (0_i4)
+      self%snow%snowpack = P2_InitStateFluxes
+      self%snow%melt = P1_InitStateFluxes
+      self%snow%snow = P1_InitStateFluxes
+      self%snow%degday = P1_InitStateFluxes
+      self%snow%rain = self%canopy%throughfall
+      self%snow%pre_effect = self%canopy%throughfall
+    case (1_i4)
+      do k = 1_i4, size(self%snow%snowpack)
+        call snow_accum_melt(self%exchange%degday_inc%data(k), self%exchange%degday_max%data(k) * self%runtime%c2TSTu, &
+          self%exchange%degday_dry%data(k) * self%runtime%c2TSTu, self%exchange%pre%data(k), self%exchange%temp%data(k), &
+          self%exchange%thresh_temp%data(k), self%canopy%throughfall(k), self%snow%snowpack(k), self%snow%degday(k), &
+          self%snow%melt(k), self%snow%pre_effect(k), self%snow%rain(k), self%snow%snow(k))
+      end do
+    case default
+      log_fatal(*) "mHM: unsupported snow case ", n2s(snow_case), "."
+      error stop 1
+    end select
+  end subroutine mhm_update_snow
+
+  !> \brief Update direct runoff and sealed-area storage independently from pervious soil water.
+  subroutine mhm_update_direct_runoff(self)
+    class(mhm_t), intent(inout), target :: self
+    integer(i4) :: direct_runoff_case
+    integer(i4) :: month
+    integer(i4) :: k
+
+    direct_runoff_case = self%exchange%parameters%process_matrix(4, 1)
+    select case (direct_runoff_case)
+    case (0_i4)
+      self%direct_runoff%storage = P1_InitStateFluxes
+      self%direct_runoff%aet = P1_InitStateFluxes
+      self%direct_runoff%runoff = P1_InitStateFluxes
+    case (1_i4)
+      month = self%exchange%time%month
+      if (month < 1_i4 .or. month > int(YearMonths, i4)) then
+        log_fatal(*) "mHM: invalid month for evaporation coefficients: ", n2s(month), "."
+        error stop 1
+      end if
+      do k = 1_i4, size(self%direct_runoff%storage)
+        call soil_moisture_direct_runoff(self%exchange%f_sealed%data(k), self%exchange%thresh_sealed%data(k), &
+          self%exchange%pet%data(k), self%forcing%evap_coeff(month), self%canopy%aet(k), self%snow%pre_effect(k), &
+          self%direct_runoff%runoff(k), self%direct_runoff%storage(k), self%direct_runoff%aet(k))
+      end do
+    case default
+      log_fatal(*) "mHM: unsupported direct runoff case ", n2s(direct_runoff_case), "."
+      error stop 1
+    end select
+  end subroutine mhm_update_direct_runoff
+
+  !> \brief Update pervious-soil infiltration, evapotranspiration, and soil moisture.
+  subroutine mhm_update_soil_moisture(self)
+    class(mhm_t), intent(inout), target :: self
+    integer(i4) :: soil_case
+    integer(i4) :: k
+    real(dp) :: jarvis_thresh
+    real(dp) :: tmp_infiltration(size(self%soil%infiltration, 2))
+    real(dp) :: tmp_soil_moisture(size(self%soil%moisture, 2))
+    real(dp) :: tmp_aet(size(self%soil%aet, 2))
+
+    soil_case = self%exchange%parameters%process_matrix(3, 1)
+    if (soil_case == 0_i4) then
+      self%soil%infiltration = P1_InitStateFluxes
+      self%soil%aet = P1_InitStateFluxes
+      return
+    end if
+    if (soil_case < 0_i4 .or. soil_case > 4_i4) then
+      log_fatal(*) "mHM: unsupported soil moisture case ", n2s(soil_case), "."
+      error stop 1
+    end if
+
+    if (self%exchange%step_count == 1_i4 .and. .not.self%io%read_restart) then
+      self%soil%moisture = 0.5_dp * self%exchange%sm_field_capacity%data
+    end if
+
+    do k = 1_i4, size(self%soil%moisture, 1)
+      tmp_infiltration = self%soil%infiltration(k, :)
+      tmp_soil_moisture = self%soil%moisture(k, :)
+      jarvis_thresh = 0.0_dp
+      if (soil_case == 2_i4 .or. soil_case == 3_i4) jarvis_thresh = self%exchange%thresh_jarvis%data(k)
+
+      call soil_moisture_pervious(soil_case, self%exchange%pet%data(k), self%exchange%sm_saturation%data(k, :), &
+        self%exchange%f_roots%data(k, :), self%exchange%sm_field_capacity%data(k, :), self%exchange%wilting_point%data(k, :), &
+        self%exchange%sm_exponent%data(k, :), jarvis_thresh, self%canopy%aet(k), self%snow%pre_effect(k), &
+        tmp_infiltration, tmp_soil_moisture, tmp_aet)
+
+      self%soil%infiltration(k, :) = tmp_infiltration
+      self%soil%moisture(k, :) = tmp_soil_moisture
+      self%soil%aet(k, :) = tmp_aet
+    end do
+  end subroutine mhm_update_soil_moisture
 
   !> \brief Finalize the mHM process container after the simulation.
   subroutine mhm_finalize(self)

@@ -142,6 +142,7 @@ contains
     class(meteo_t), intent(inout), target :: self
     integer(i4) :: domain_id
     integer(i4) :: pet_process
+    integer(i4) :: snow_process
     integer(i4) :: riv_temp_process
     integer(i4) :: steps_day
     integer(i4) :: id(1)
@@ -163,11 +164,12 @@ contains
     domain_id = self%exchange%domain
     id(1) = domain_id
     pet_process = self%exchange%parameters%process_matrix(5, 1)
+    snow_process = self%exchange%parameters%process_matrix(2, 1)
     riv_temp_process = self%exchange%parameters%process_matrix(11, 1)
     steps_day = self%steps_per_day()
 
     need_pre = self%exchange%parameters%meteo_active()
-    need_temp = self%exchange%parameters%mhm_active()
+    need_temp = (snow_process /= 0_i4) .or. any(pet_process == [1_i4, 2_i4, 3_i4])
 
     self%exchange%raw_pre%required = need_pre
     self%exchange%raw_temp%required = need_temp
