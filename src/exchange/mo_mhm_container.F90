@@ -14,6 +14,7 @@ module mo_mhm_container
   use, intrinsic :: ieee_arithmetic, only: ieee_is_finite
   use mo_logging
   use mo_canopy_interc, only: canopy_interc
+  use mo_runoff, only: L1_total_runoff, runoff_sat_zone, runoff_unsat_zone
   use mo_snow_accum_melt, only: snow_accum_melt
   use mo_soil_moisture, only: soil_moisture_direct_runoff, soil_moisture_pervious
   use mo_kind, only: i4, dp
@@ -22,7 +23,7 @@ module mo_mhm_container
   use mo_exchange_type, only: exchange_t, var_dp, var2d_dp
   use mo_datetime, only: one_hour
   use mo_mhm_constants, only: P2_InitStateFluxes, P3_InitStateFluxes, P4_InitStateFluxes, C1_InitStateSM
-  use mo_neutrons, only: TabularIntegralAFast
+  use mo_neutrons, only: COSMIC, DesiletsN0, TabularIntegralAFast
   use mo_string_utils, only: n2s => num2str
   use nml_config_mhm, only: nml_config_mhm_t, NML_OK
   use nml_output_mhm, only: nml_output_mhm_t
@@ -146,6 +147,10 @@ module mo_mhm_container
     procedure :: update_snow => mhm_update_snow
     procedure :: update_direct_runoff => mhm_update_direct_runoff
     procedure :: update_soil_moisture => mhm_update_soil_moisture
+    procedure :: update_interflow => mhm_update_interflow
+    procedure :: update_baseflow => mhm_update_baseflow
+    procedure :: update_total_runoff => mhm_update_total_runoff
+    procedure :: update_neutrons => mhm_update_neutrons
   end type mhm_t
 
 contains
@@ -240,6 +245,7 @@ contains
     integer(i4) :: soil_case
     integer(i4) :: direct_runoff_case
     integer(i4) :: interflow_case
+    integer(i4) :: percolation_case
     integer(i4) :: baseflow_case
     integer(i4) :: neutron_case
 
@@ -268,8 +274,14 @@ contains
     soil_case = self%exchange%parameters%process_matrix(3, 1)
     direct_runoff_case = self%exchange%parameters%process_matrix(4, 1)
     interflow_case = self%exchange%parameters%process_matrix(6, 1)
+    percolation_case = self%exchange%parameters%process_matrix(7, 1)
     baseflow_case = self%exchange%parameters%process_matrix(9, 1)
     neutron_case = self%exchange%parameters%process_matrix(10, 1)
+
+    if ((interflow_case == 0_i4) .neqv. (percolation_case == 0_i4)) then
+      log_fatal(*) "mHM: interflow and percolation must currently be activated together on the exchange path."
+      error stop 1
+    end if
 
     call mhm_mark_required_dp(self, self%exchange%pre, &
       (interception_case /= 0_i4) .or. (snow_case /= 0_i4) .or. (soil_case /= 0_i4) .or. (direct_runoff_case /= 0_i4), &
@@ -298,8 +310,8 @@ contains
     call mhm_mark_required_dp(self, self%exchange%alpha, interflow_case /= 0_i4, "alpha")
     call mhm_mark_required_dp(self, self%exchange%k_fastflow, interflow_case /= 0_i4, "k_fastflow")
     call mhm_mark_required_dp(self, self%exchange%k_slowflow, interflow_case /= 0_i4, "k_slowflow")
-    call mhm_mark_required_dp(self, self%exchange%k_percolation, interflow_case /= 0_i4, "k_percolation")
-    call mhm_mark_required_dp(self, self%exchange%f_karst_loss, interflow_case /= 0_i4, "f_karst_loss")
+    call mhm_mark_required_dp(self, self%exchange%k_percolation, percolation_case /= 0_i4, "k_percolation")
+    call mhm_mark_required_dp(self, self%exchange%f_karst_loss, percolation_case /= 0_i4, "f_karst_loss")
     call mhm_mark_required_dp(self, self%exchange%thresh_unsat, interflow_case /= 0_i4, "thresh_unsat")
     call mhm_mark_required_dp(self, self%exchange%k_baseflow, baseflow_case /= 0_i4, "k_baseflow")
 
@@ -399,6 +411,10 @@ contains
     call self%update_snow()
     call self%update_direct_runoff()
     call self%update_soil_moisture()
+    call self%update_interflow()
+    call self%update_baseflow()
+    call self%update_total_runoff()
+    call self%update_neutrons()
   end subroutine mhm_update
 
   !> \brief Update canopy interception and throughfall for the current step.
@@ -527,6 +543,119 @@ contains
       self%soil%aet(k, :) = tmp_aet
     end do
   end subroutine mhm_update_soil_moisture
+
+  !> \brief Update the unsaturated-zone runoff, interflow, and percolation state.
+  subroutine mhm_update_interflow(self)
+    class(mhm_t), intent(inout), target :: self
+    integer(i4) :: interflow_case
+    integer(i4) :: percolation_case
+    integer(i4) :: n_horizons
+    integer(i4) :: k
+
+    interflow_case = self%exchange%parameters%process_matrix(6, 1)
+    percolation_case = self%exchange%parameters%process_matrix(7, 1)
+    if (interflow_case == 0_i4 .and. percolation_case == 0_i4) then
+      self%runoff%percolation = P1_InitStateFluxes
+      self%runoff%fast_interflow = P1_InitStateFluxes
+      self%runoff%slow_interflow = P1_InitStateFluxes
+      return
+    end if
+    if (interflow_case /= 1_i4 .or. percolation_case /= 1_i4) then
+      log_fatal(*) "mHM: unsupported interflow/percolation cases ", n2s(interflow_case), "/", n2s(percolation_case), "."
+      error stop 1
+    end if
+
+    n_horizons = size(self%soil%infiltration, 2)
+    do k = 1_i4, size(self%runoff%unsat_storage)
+      call runoff_unsat_zone(self%runtime%c2TSTu / self%exchange%k_slowflow%data(k), &
+        self%runtime%c2TSTu / self%exchange%k_percolation%data(k), self%runtime%c2TSTu / self%exchange%k_fastflow%data(k), &
+        self%exchange%alpha%data(k), self%exchange%f_karst_loss%data(k), self%soil%infiltration(k, n_horizons), &
+        self%exchange%thresh_unsat%data(k), self%runoff%sat_storage(k), self%runoff%unsat_storage(k), &
+        self%runoff%slow_interflow(k), self%runoff%fast_interflow(k), self%runoff%percolation(k))
+      end do
+  end subroutine mhm_update_interflow
+
+  !> \brief Update the saturated-zone storage and baseflow.
+  subroutine mhm_update_baseflow(self)
+    class(mhm_t), intent(inout), target :: self
+    integer(i4) :: baseflow_case
+    integer(i4) :: k
+
+    baseflow_case = self%exchange%parameters%process_matrix(9, 1)
+    select case (baseflow_case)
+    case (0_i4)
+      self%runoff%baseflow = P1_InitStateFluxes
+    case (1_i4)
+      do k = 1_i4, size(self%runoff%sat_storage)
+        call runoff_sat_zone(self%runtime%c2TSTu / self%exchange%k_baseflow%data(k), self%runoff%sat_storage(k), &
+          self%runoff%baseflow(k))
+      end do
+    case default
+      log_fatal(*) "mHM: unsupported baseflow case ", n2s(baseflow_case), "."
+      error stop 1
+    end select
+  end subroutine mhm_update_baseflow
+
+  !> \brief Accumulate total runoff from the generated runoff components.
+  subroutine mhm_update_total_runoff(self)
+    class(mhm_t), intent(inout), target :: self
+    integer(i4) :: direct_runoff_case
+    integer(i4) :: interflow_case
+    integer(i4) :: baseflow_case
+    integer(i4) :: k
+
+    direct_runoff_case = self%exchange%parameters%process_matrix(4, 1)
+    interflow_case = self%exchange%parameters%process_matrix(6, 1)
+    baseflow_case = self%exchange%parameters%process_matrix(9, 1)
+    if (direct_runoff_case == 0_i4 .and. interflow_case == 0_i4 .and. baseflow_case == 0_i4) then
+      self%runoff%total_runoff = P1_InitStateFluxes
+      return
+    end if
+
+    do k = 1_i4, size(self%runoff%total_runoff)
+      call L1_total_runoff(self%exchange%f_sealed%data(k), self%runoff%fast_interflow(k), self%runoff%slow_interflow(k), &
+        self%runoff%baseflow(k), self%direct_runoff%runoff(k), self%runoff%total_runoff(k))
+    end do
+  end subroutine mhm_update_total_runoff
+
+  !> \brief Update neutron counts from the current soil-water and surface states.
+  subroutine mhm_update_neutrons(self)
+    class(mhm_t), intent(inout), target :: self
+    integer(i4) :: neutron_case
+    integer(i4) :: n_layers
+    integer(i4) :: k
+
+    neutron_case = self%exchange%parameters%process_matrix(10, 1)
+    if (neutron_case == 0_i4) then
+      self%neutrons%counts = P1_InitStateFluxes
+      return
+    end if
+
+    n_layers = size(self%soil%moisture, 2) - 1_i4
+    if (n_layers < 1_i4) then
+      log_fatal(*) "mHM: neutron calculations require at least two soil horizons."
+      error stop 1
+    end if
+
+    select case (neutron_case)
+    case (1_i4)
+      do k = 1_i4, size(self%neutrons%counts)
+        call DesiletsN0(self%soil%moisture(k, 1:n_layers), self%soil%horizon_bounds(2:n_layers + 1_i4), &
+          self%exchange%bulk_density%data(k, 1:n_layers), self%exchange%lattice_water%data(k, 1:n_layers), &
+          self%exchange%desilets_n0%data(k), self%neutrons%counts(k))
+      end do
+    case (2_i4)
+      do k = 1_i4, size(self%neutrons%counts)
+        call COSMIC(self%soil%moisture(k, 1:n_layers), self%soil%horizon_bounds(2:n_layers + 1_i4), &
+          self%neutrons%integral_afast, self%canopy%interception(k), self%snow%snowpack(k), self%exchange%desilets_n0%data(k), &
+          self%exchange%bulk_density%data(k, 1:n_layers), self%exchange%lattice_water%data(k, 1:n_layers), &
+          self%exchange%cosmic_l3%data(k, 1:n_layers), self%neutrons%counts(k))
+      end do
+    case default
+      log_fatal(*) "mHM: unsupported neutrons case ", n2s(neutron_case), "."
+      error stop 1
+    end select
+  end subroutine mhm_update_neutrons
 
   !> \brief Finalize the mHM process container after the simulation.
   subroutine mhm_finalize(self)
