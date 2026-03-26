@@ -112,6 +112,7 @@ module mo_exchange_type
     type(grid_t), pointer :: level1 => null() !< level1 grid of the hydrology
     type(grid_t), pointer :: level2 => null() !< level2 grid of the meteorology
     type(grid_t), pointer :: level3 => null() !< level3 grid of the river network
+    real(dp), dimension(:), pointer :: soil_horizon_bounds => null() !< soil-horizon boundary depths [mm] for mHM metadata
 
     ! grid resolutions (for deriving grids after configuration)
     real(dp) :: level0_resolution = -1.0_dp !< level0 resolution of the morphology

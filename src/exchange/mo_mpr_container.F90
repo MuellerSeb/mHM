@@ -232,6 +232,7 @@ module mo_mpr_container
     procedure, private :: init_pet_lai_cache              => mpr_init_pet_lai_cache
     procedure, private :: init_pet_priestley_taylor_cache => mpr_init_pet_priestley_taylor_cache
     procedure, private :: init_pet_penman_cache           => mpr_init_pet_penman_cache
+    procedure, private :: init_soil_horizon_bounds        => mpr_init_soil_horizon_bounds
     procedure, private :: init_soil_cache                 => mpr_init_soil_cache
     procedure, private :: init_runoff_cache               => mpr_init_runoff_cache
     procedure, private :: update_exchange_slices          => mpr_update_exchange_slices
@@ -536,6 +537,7 @@ contains
     call self%init_upscaler()
     call self%check_geo_units_against_lut()
     call self%check_geoparameter_consistency()
+    call self%init_soil_horizon_bounds()
     ! Build all MPR caches before the first timestep so update only switches pointers.
     call self%init_temporal_cache()
     call self%update_exchange_slices(force=.true.)
@@ -2502,6 +2504,36 @@ contains
     self%exchange%resist_surf%provided = .true.
   end subroutine mpr_init_pet_penman_cache
 
+  !> \brief Initialize the soil-horizon boundary metadata needed by downstream mHM consumers.
+  subroutine mpr_init_soil_horizon_bounds(self)
+    class(mpr_t), intent(inout), target :: self
+    integer(i4) :: domain_id
+    integer(i4) :: n_horizons
+    integer(i4) :: n_soil_layers
+
+    domain_id = self%exchange%domain
+    n_horizons = self%config%n_horizons(domain_id)
+    if (n_horizons < 1_i4) then
+      log_fatal(*) "MPR: n_horizons must be >= 1 before soil horizon initialization."
+      error stop 1
+    end if
+    if (.not.allocated(self%soil%lut_path)) then
+      log_fatal(*) "MPR: internal error, soil LUT path not resolved in configure."
+      error stop 1
+    end if
+    if (.not.associated(self%exchange%soil_id%data)) then
+      log_fatal(*) "MPR: soil_id data not connected before soil horizon initialization."
+      error stop 1
+    end if
+
+    n_soil_layers = 1_i4
+    if (self%config%soil_db_mode(domain_id) == 1_i4) n_soil_layers = n_horizons
+    if (allocated(self%soil%horizon_bounds)) deallocate(self%soil%horizon_bounds)
+    call mpr_bridge_setup_soil_database( &
+      self%config, domain_id, self%soil%lut_path, self%exchange%soil_id%data(:, :n_soil_layers), &
+      self%soil%horizon_bounds)
+  end subroutine mpr_init_soil_horizon_bounds
+
   !> \brief Cache soil-moisture parameter fields on level1 for all land-cover slices.
   subroutine mpr_init_soil_cache(self)
     class(mpr_t), intent(inout), target :: self
@@ -2533,13 +2565,10 @@ contains
       error stop 1
     end if
 
-    ! Mirror the legacy soil-database setup once before caching per-land-cover soil outputs.
+    ! The soil horizon metadata is shared with downstream mHM state allocation.
+    call self%init_soil_horizon_bounds()
     n_soil_layers = 1_i4
     if (self%config%soil_db_mode(domain_id) == 1_i4) n_soil_layers = n_horizons
-    if (allocated(self%soil%horizon_bounds)) deallocate(self%soil%horizon_bounds)
-    call mpr_bridge_setup_soil_database( &
-      self%config, domain_id, self%soil%lut_path, self%exchange%soil_id%data(:, :n_soil_layers), &
-      self%soil%horizon_bounds)
 
     call self%load_process_params(3_i4, soil_param)
     if (allocated(self%soil%sm_exponent_cache)) deallocate(self%soil%sm_exponent_cache)
@@ -2718,6 +2747,12 @@ contains
     integer(i4) :: land_cover_idx
 
     force_ = optval(force, .false.)
+
+    if (allocated(self%soil%horizon_bounds)) then
+      self%exchange%soil_horizon_bounds => self%soil%horizon_bounds
+    else
+      nullify(self%exchange%soil_horizon_bounds)
+    end if
 
     if (.not.allocated(self%land_cover%sealed_fraction_l1) .and. &
       .not.allocated(self%canopy%max_interception_cache) .and. &
@@ -2965,6 +3000,7 @@ contains
   !> \brief Finalize the MPR process container after the simulation.
   subroutine mpr_finalize(self)
     class(mpr_t), intent(inout), target :: self
+    nullify(self%exchange%soil_horizon_bounds)
     nullify(self%exchange%slope_emp%data)
     self%exchange%slope_emp%provided = .false.
     nullify(self%exchange%f_sealed%data)
@@ -3057,6 +3093,7 @@ contains
     if (allocated(self%soil%wilting_point_cache)) deallocate(self%soil%wilting_point_cache)
     if (allocated(self%soil%f_roots_cache)) deallocate(self%soil%f_roots_cache)
     if (allocated(self%soil%thresh_jarvis_cache)) deallocate(self%soil%thresh_jarvis_cache)
+    if (allocated(self%soil%horizon_bounds)) deallocate(self%soil%horizon_bounds)
     if (allocated(self%soil%sm_deficit_fc_l0)) deallocate(self%soil%sm_deficit_fc_l0)
     if (allocated(self%soil%ks_var_h_l0)) deallocate(self%soil%ks_var_h_l0)
     if (allocated(self%soil%ks_var_v_l0)) deallocate(self%soil%ks_var_v_l0)
