@@ -115,6 +115,7 @@ contains
       (self%process_matrix(1, 1) /= 0_i4) .or. &
       (self%process_matrix(2, 1) /= 0_i4) .or. &
       (self%process_matrix(3, 1) /= 0_i4) .or. &
+      (self%process_matrix(4, 1) /= 0_i4) .or. &
       (self%process_matrix(5, 1) /= 0_i4) .or. &
       (self%process_matrix(6, 1) /= 0_i4) .or. &
       (self%process_matrix(7, 1) /= 0_i4) .or. &

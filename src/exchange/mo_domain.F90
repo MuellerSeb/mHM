@@ -122,7 +122,7 @@ contains
     character(*), intent(in), optional :: out_file !< file containing the output namelists
     log_info(*) "CONFIGURE COMPONENTS"
     call self%input%configure(file)
-    if (self%exchange%parameters%meteo_active()) call self%mhm%configure(file)
+    if (self%exchange%parameters%meteo_active()) call self%mhm%configure(file, out_file)
     if (self%exchange%parameters%mhm_active()) call self%mpr%configure(file)
     if (self%exchange%parameters%meteo_active()) call self%meteo%configure(file)
     if (self%exchange%parameters%mrm_active()) call self%mrm%configure(file, out_file)
