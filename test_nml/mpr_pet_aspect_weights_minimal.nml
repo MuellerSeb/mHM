@@ -3,7 +3,7 @@
 /
 
 &config_processes
-  pet = 3
+  pet = -2
 /
 
 &config_time
@@ -13,20 +13,22 @@
 /
 
 &config_input
+  time_stamp_location(1) = 2
   slope_path(1)     = "src/tests/files/input.nc"
   aspect_path(1)    = "test_domain/input/morph/aspect.asc"
   geo_class_path(1) = "test_domain/input/morph/geology_class.asc"
   soil_class_path(1)= "test_domain/input/morph/soil_class.asc"
   lai_class_path(1) = "test_domain/input/morph/LAI_class.asc"
-  meteo_mask_path(1)= "test_domain/input/meteo/mask.nc"
-  pre_path(1)       = "test_domain/input/meteo/pre/pre.nc"
-  temp_path(1)      = "test_domain/input/meteo/tavg/tavg.nc"
-  netrad_path(1)    = "test_domain/input/meteo/net_rad.nc"
-  eabs_path(1)      = "test_domain/input/meteo/eabs.nc"
-  wind_path(1)      = "test_domain/input/meteo/windspeed.nc"
+  pre_path(1)       = "src/tests/files/pre_daily_aligned.nc"
+  temp_path(1)      = "src/tests/files/tavg_daily_aligned.nc"
+  pet_path(1)       = "src/tests/files/pet_daily_aligned.nc"
 /
 
 &config_meteo
+  read_meteo_weights(1) = .true.
+  pre_weights_path(1)   = "src/tests/files/pre_weights.nc"
+  pet_weights_path(1)   = "src/tests/files/pet_weights.nc"
+  temp_weights_path(1)  = "src/tests/files/tavg_weights.nc"
 /
 
 &config_mpr
@@ -41,8 +43,6 @@
   soil_lut_path(1)         = "test_domain/input/morph/soil_classdefinition.txt"
   geo_lut_path(1)          = "test_domain/input/morph/geology_classdefinition.txt"
   lai_lut_path(1)          = "test_domain/input/morph/LAI_classdefinition.txt"
-  write_restart(1)         = .true.
-  restart_output_path(1)   = "mpr_pet_penman_restart.nc"
 /
 
 &config_mhm
