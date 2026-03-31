@@ -204,6 +204,16 @@ cmake-gfortran122MPI:
     COMPILER: gfortran122MPI
   <<: *cmake_mpi_template
 
+cmake-gfortran133:
+  variables:
+    COMPILER: gfortran133
+  <<: *cmake_template
+
+cmake-gfortran133MPI:
+  variables:
+    COMPILER: gfortran133MPI
+  <<: *cmake_mpi_template
+
 cmake-intel2020b:
   variables:
     COMPILER: intel2020b
@@ -223,6 +233,11 @@ cmake-intel2023bMPI-classic:
   variables:
     COMPILER: intel2023bMPI-classic
   <<: *cmake_mpi_template
+
+cmake-nagfor72:
+  variables:
+    COMPILER: nagfor72
+  <<: *cmake_template
 
 #################
 ### TEST JOBS ###
@@ -259,6 +274,22 @@ check-gfortran122MPI:
       artifacts: true
   <<: *check_mpi_template
 
+check-gfortran133:
+  variables:
+    COMPILER: gfortran133
+  needs:
+    - job: cmake-gfortran133
+      artifacts: true
+  <<: *check_template
+
+check-gfortran133MPI:
+  variables:
+    COMPILER: gfortran133MPI
+  needs:
+    - job: cmake-gfortran133MPI
+      artifacts: true
+  <<: *check_mpi_template
+
 check-intel2020b:
   variables:
     COMPILER: intel2020b
@@ -291,15 +322,23 @@ check-intel2023bMPI-classic:
       artifacts: true
   <<: *check_mpi_template
 
+check-nagfor72:
+  variables:
+    COMPILER: nagfor72
+  needs:
+    - job: cmake-nagfor72
+      artifacts: true
+  <<: *check_template
+
 ######################
 ### UNIT TEST JOBS ###
 ######################
 
-unittest-gfortran122:
+unittest-gfortran133:
   variables:
-    COMPILER: gfortran122
+    COMPILER: gfortran133
   needs:
-    - job: cmake-gfortran122
+    - job: cmake-gfortran133
   <<: *unittest_template
 
 unittest-intel2023b-classic:
@@ -307,6 +346,13 @@ unittest-intel2023b-classic:
     COMPILER: intel2023b-classic
   needs:
     - job: cmake-intel2023b-classic
+  <<: *unittest_template
+
+unittest-nagfor72:
+  variables:
+    COMPILER: nagfor72
+  needs:
+    - job: cmake-nagfor72
   <<: *unittest_template
 
 valgrind-gfortran122:
