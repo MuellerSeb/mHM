@@ -407,7 +407,7 @@ contains
     self%exchange%soil_id%required = .not.self%read_restart
     self%exchange%geo_unit%required = .not.self%read_restart
     pet_process = self%exchange%parameters%process_matrix(5, 1)
-    need_lai_cache = self%exchange%parameters%process_matrix(1, 1) /= 0_i4 .or. &
+    need_lai_cache = self%exchange%parameters%process_matrix(1, 1) > 0_i4 .or. &
       pet_process == -1_i4 .or. pet_process == 2_i4 .or. pet_process == 3_i4
     require_lai_class = self%config%lai_time_step(id(1)) == 0_i4 .and. need_lai_cache
     self%exchange%lai_class%required = require_lai_class .and. .not.self%read_restart
@@ -1457,7 +1457,7 @@ contains
     pet_process = self%exchange%parameters%process_matrix(5, 1)
     soil_process = self%exchange%parameters%process_matrix(3, 1)
     neutron_process = self%exchange%parameters%process_matrix(10, 1)
-    need_lai_restart = self%exchange%parameters%process_matrix(1, 1) /= 0_i4 .or. any(pet_process == [-1_i4, 2_i4, 3_i4])
+    need_lai_restart = self%exchange%parameters%process_matrix(1, 1) > 0_i4 .or. any(pet_process == [-1_i4, 2_i4, 3_i4])
     if (need_lai_restart) then
       call self%read_restart_lai_timing(nc)
     else
@@ -1503,7 +1503,7 @@ contains
     deallocate(field_3d)
     self%exchange%f_sealed%provided = .true.
 
-    if (self%exchange%parameters%process_matrix(1, 1) /= 0_i4) then
+    if (self%exchange%parameters%process_matrix(1, 1) > 0_i4) then
       if (allocated(self%canopy%max_interception_cache)) deallocate(self%canopy%max_interception_cache)
       call self%read_restart_field_3d(nc, "L1_maxInter", field_3d)
       if (size(field_3d, 2) /= self%lai%n_periods) then
@@ -1518,7 +1518,7 @@ contains
       self%exchange%max_interception%provided = .true.
     end if
 
-    if (self%exchange%parameters%process_matrix(2, 1) /= 0_i4) then
+    if (self%exchange%parameters%process_matrix(2, 1) > 0_i4) then
       if (allocated(self%snow%thresh_temp_cache)) deallocate(self%snow%thresh_temp_cache)
       if (allocated(self%snow%degday_dry_cache)) deallocate(self%snow%degday_dry_cache)
       if (allocated(self%snow%degday_inc_cache)) deallocate(self%snow%degday_inc_cache)
@@ -1849,7 +1849,7 @@ contains
     call self%init_land_cover_fraction_cache()
 
     pet_process = self%exchange%parameters%process_matrix(5, 1)
-    need_lai_cache = self%exchange%parameters%process_matrix(1, 1) /= 0_i4 .or. &
+    need_lai_cache = self%exchange%parameters%process_matrix(1, 1) > 0_i4 .or. &
       any(pet_process == [-1_i4, 2_i4, 3_i4])
     if (need_lai_cache) then
       call self%build_lai_l0_cache()
@@ -1861,8 +1861,8 @@ contains
     end if
 
     ! Generate grouped cache families once during connect and expose only active slices afterwards.
-    if (self%exchange%parameters%process_matrix(1, 1) /= 0_i4) call self%init_max_interception_cache()
-    if (self%exchange%parameters%process_matrix(2, 1) /= 0_i4) call self%init_snow_cache()
+    if (self%exchange%parameters%process_matrix(1, 1) > 0_i4) call self%init_max_interception_cache()
+    if (self%exchange%parameters%process_matrix(2, 1) > 0_i4) call self%init_snow_cache()
     if (pet_process /= 0_i4) call self%init_pet_cache()
     if (self%exchange%parameters%process_matrix(3, 1) /= 0_i4) call self%init_soil_cache()
     need_runoff_cache = self%exchange%parameters%process_matrix(4, 1) /= 0_i4 .or. &

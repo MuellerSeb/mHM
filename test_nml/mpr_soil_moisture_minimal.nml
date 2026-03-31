@@ -3,6 +3,8 @@
 /
 
 &config_processes
+  interception = -1
+  snow = -1
   soil_moisture = 3
   pet = -2
 /

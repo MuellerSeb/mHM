@@ -4,10 +4,13 @@
 
 &config_processes
   interception = -1
-  snow = -1
+  snow = 0
   soil_moisture = 3
+  direct_runoff = 1
   pet = -2
-  neutrons = 2
+  interflow = 1
+  percolation = 1
+  baseflow = 1
 /
 
 &config_time
@@ -42,8 +45,6 @@
   soil_lut_path(1)         = "test_domain/input/morph/soil_classdefinition.txt"
   geo_lut_path(1)          = "test_domain/input/morph/geology_classdefinition.txt"
   lai_lut_path(1)          = "test_domain/input/morph/LAI_classdefinition.txt"
-  write_restart(1)         = .true.
-  restart_output_path(1)   = "mpr_neutrons_cosmic_restart.nc"
 /
 
 &config_mhm

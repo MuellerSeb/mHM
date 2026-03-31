@@ -8,10 +8,11 @@ properties:
     x-fortran-kind: i4
     default: 0
     examples: [1]
-    enum: [0, 1]
+    enum: [-1, 0, 1]
     title: Interception process case
     description: |-
       Process case for interception.
+      - -1: pass through precipitation as throughfall
       - 0: deactivated
       - 1: maximum Interception
   snow:
@@ -19,10 +20,11 @@ properties:
     x-fortran-kind: i4
     default: 0
     examples: [1]
-    enum: [0, 1]
+    enum: [-1, 0, 1]
     title: Snow process case
     description: |-
       Process case for snow.
+      - -1: pass through throughfall as effective precipitation
       - 0: deactivated
       - 1: degree-day approach
   soil_moisture:

@@ -29,6 +29,7 @@ Configuration for process case selection in mHM.
 Interception process case `interception`
 
 Process case for interception.
+- -1: pass through precipitation as throughfall
 - 0: deactivated
 - 1: maximum Interception
 
@@ -36,7 +37,7 @@ Summary:
 - Type: `integer(i4)`
 - Required: no
 - Default: `0`
-- Allowed values: `0`, `1`
+- Allowed values: `-1`, `0`, `1`
 - Examples: `1`
 
 ### snow
@@ -44,6 +45,7 @@ Summary:
 Snow process case `snow`
 
 Process case for snow.
+- -1: pass through throughfall as effective precipitation
 - 0: deactivated
 - 1: degree-day approach
 
@@ -51,7 +53,7 @@ Summary:
 - Type: `integer(i4)`
 - Required: no
 - Default: `0`
-- Allowed values: `0`, `1`
+- Allowed values: `-1`, `0`, `1`
 - Examples: `1`
 
 ### soil_moisture

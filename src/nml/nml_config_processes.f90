@@ -48,8 +48,8 @@ module nml_config_processes
   integer(i4), parameter, public :: temperature_routing_default = 0_i4
 
   ! enum values
-  integer(i4), parameter, public :: interception_enum_values(2) = [0_i4, 1_i4]
-  integer(i4), parameter, public :: snow_enum_values(2) = [0_i4, 1_i4]
+  integer(i4), parameter, public :: interception_enum_values(3) = [-1_i4, 0_i4, 1_i4]
+  integer(i4), parameter, public :: snow_enum_values(3) = [-1_i4, 0_i4, 1_i4]
   integer(i4), parameter, public :: soil_moisture_enum_values(5) = [0_i4, 1_i4, 2_i4, 3_i4, 4_i4]
   integer(i4), parameter, public :: direct_runoff_enum_values(2) = [0_i4, 1_i4]
   integer(i4), parameter, public :: pet_enum_values(6) = [-2_i4, -1_i4, 0_i4, 1_i4, 2_i4, 3_i4]
