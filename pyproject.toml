@@ -77,7 +77,7 @@ build-type = "Release"
 args = ["-GNinja"]
 
 [tool.scikit-build.cmake.define]
-BUILD_MHM_PYBIND = "ON"
+MHM_BUILD_PYBIND = "ON"
 
 [tool.scikit-build.sdist]
 include = [

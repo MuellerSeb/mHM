@@ -176,6 +176,13 @@ You can execute it with:
 ./mhm
 ```
 
+The project-specific CMake options are namespaced with `MHM_`. Common examples are:
+
+- `-DMHM_WITH_OpenMP=ON`
+- `-DMHM_WITH_MPI=ON`
+- `-DMHM_BUILD_TESTING=ON`
+- `-DMHM_ENABLE_NATIVE=ON`
+
 
 ## Installation
 
@@ -230,6 +237,13 @@ You can control all `cmake` options by passing them as directives staring with `
 For example for debug configuration, you can do the following:
 ```bash
 cmake -B build -DCMAKE_BUILD_TYPE=Debug
+```
+
+To enable OpenMP, MPI, or pfUnit testing explicitly, use:
+```bash
+cmake -B build -DCMAKE_BUILD_TYPE=Release -DMHM_WITH_OpenMP=ON
+cmake -B build -DCMAKE_BUILD_TYPE=Release -DMHM_WITH_MPI=ON
+cmake -B build -DCMAKE_BUILD_TYPE=Debug -DMHM_BUILD_TESTING=ON
 ```
 
 To configure the build interactively, you can also use [ccmake](https://cmake.org/cmake/help/latest/manual/ccmake.1.html) (command line tool) or the [CMake GUI](https://cmake.org/cmake/help/latest/manual/cmake-gui.1.html) (graphical user interface).
