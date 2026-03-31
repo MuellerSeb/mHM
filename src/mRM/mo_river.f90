@@ -499,23 +499,32 @@ contains
   subroutine river_upstream_area(this)
     use mo_message, only: error_message
     class(river_t), intent(inout), target :: this
-    integer(i8) :: i, j, n, m
-    integer(i8), pointer, contiguous :: sources(:)
+    integer(i8) :: i, j, n, m, k
+    logical :: reverse_order
     if (allocated(this%upstream_area)) deallocate(this%upstream_area)
-    allocate(this%upstream_area(this%n_nodes))
     if (.not.allocated(this%order%id)) call error_message("river%calc_upstream_area: order not initialized")
+    reverse_order = .not.this%order%to_root
+    if (reverse_order) call this%order%reverse()
+    allocate(this%upstream_area(this%n_nodes))
     do i = 1_i8, size(this%order%level_start, kind=i8)
-      !$omp parallel do default(shared) private(n, m) schedule(static)
+      !$omp parallel do default(shared) private(n,m,k) schedule(static)
       do j = this%order%level_start(i), this%order%level_end(i)
         n = this%order%id(j)
-        this%upstream_area(n) = this%grid%cell_area(this%node_cell(n)) * this%area_fraction(n)
-        call this%src_view(n, sources)
-        do m = 1_i8, size(sources, kind=i8)
-          this%upstream_area(n) = this%upstream_area(n) + this%upstream_area(sources(m))
+        ! area fraction not allocated for d8 river
+        if (this%scc) then
+          this%upstream_area(n) = this%grid%cell_area(this%node_cell(n)) * this%area_fraction(n)
+        else
+          this%upstream_area(n) = this%grid%cell_area(n)
+        end if
+        k = this%off_up(n)
+        do m = k, k + this%n_up(n) - 1_i8
+          this%upstream_area(n) = this%upstream_area(n) + this%upstream_area(this%up(m))
         end do
       end do
       !$omp end parallel do
     end do
+    ! restore original order if it was reversed
+    if (reverse_order) call this%order%reverse()
   end subroutine river_upstream_area
 
   !> \brief Calculate D8 flow direction from network
