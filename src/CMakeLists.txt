@@ -41,6 +41,16 @@ endif()
 file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/../version_forces.txt" ver_forces LIMIT_COUNT 1)
 # cmake directive to specify forces version: CPM_forces_VERSION
 set(CPM_forces_VERSION "${ver_forces}" CACHE STRING "FORCES version to download with CPM.")
+if(NOT DEFINED FORCES_WITH_MPI)
+  set(FORCES_WITH_MPI ${MHM_WITH_MPI} CACHE BOOL
+    "Build FORCES with MPI support (defaults to MHM_WITH_MPI)."
+  )
+endif()
+if(NOT DEFINED FORCES_WITH_OpenMP)
+  set(FORCES_WITH_OpenMP ${MHM_WITH_OpenMP} CACHE BOOL
+    "Build FORCES with OpenMP support (defaults to MHM_WITH_OpenMP)."
+  )
+endif()
 CPMAddPackage("https://git.ufz.de/chs/forces.git#${CPM_forces_VERSION}")
 if(MHM_BUILD_LIB_SHARED OR MHM_BUILD_LIB_PIC)
   set_property(TARGET forces PROPERTY POSITION_INDEPENDENT_CODE ON)
