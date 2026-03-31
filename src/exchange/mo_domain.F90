@@ -122,9 +122,9 @@ contains
     character(*), intent(in), optional :: out_file !< file containing the output namelists
     log_info(*) "CONFIGURE COMPONENTS"
     call self%input%configure(file)
-    if (self%exchange%parameters%meteo_active()) call self%meteo%configure(file)
+    if (self%exchange%parameters%meteo_active()) call self%mhm%configure(file)
     if (self%exchange%parameters%mhm_active()) call self%mpr%configure(file)
-    if (self%exchange%parameters%mhm_active()) call self%mhm%configure(file)
+    if (self%exchange%parameters%meteo_active()) call self%meteo%configure(file)
     if (self%exchange%parameters%mrm_active()) call self%mrm%configure(file, out_file)
   end subroutine domain_configure
 
@@ -135,8 +135,8 @@ contains
     class(domain_t), intent(inout), target :: self ! needs "target" so components can safely point to "exchange"
     log_info(*) "CONNECT COMPONENTS"
     call self%input%connect()
-    if (self%exchange%parameters%meteo_active()) call self%meteo%connect()
     if (self%exchange%parameters%mhm_active()) call self%mpr%connect()
+    if (self%exchange%parameters%meteo_active()) call self%meteo%connect()
     if (self%exchange%parameters%mhm_active()) call self%mhm%connect()
     if (self%exchange%parameters%mrm_active()) call self%mrm%connect()
   end subroutine domain_connect
@@ -152,8 +152,8 @@ contains
     self%exchange%time = self%exchange%start_time
     call self%exchange%parameters%set(parameters)
     call self%input%initialize()
-    if (self%exchange%parameters%meteo_active()) call self%meteo%initialize()
     if (self%exchange%parameters%mhm_active()) call self%mpr%initialize()
+    if (self%exchange%parameters%meteo_active()) call self%meteo%initialize()
     if (self%exchange%parameters%mhm_active()) call self%mhm%initialize()
     if (self%exchange%parameters%mrm_active()) call self%mrm%initialize()
   end subroutine domain_initialize
@@ -165,8 +165,8 @@ contains
     call self%exchange%time%add(self%exchange%step)
     self%exchange%step_count = self%exchange%step_count + 1_i4
     call self%input%update()
-    if (self%exchange%parameters%meteo_active()) call self%meteo%update()
     if (self%exchange%parameters%mhm_active()) call self%mpr%update()
+    if (self%exchange%parameters%meteo_active()) call self%meteo%update()
     if (self%exchange%parameters%mhm_active()) call self%mhm%update()
     if (self%exchange%parameters%mrm_active()) call self%mrm%update()
     log_trace(*) "Time step: ", self%exchange%time%str()
@@ -181,8 +181,8 @@ contains
     class(domain_t), intent(inout), target :: self
     log_info(*) "FINALIZE COMPONENTS"
     call self%input%finalize()
-    if (self%exchange%parameters%meteo_active()) call self%meteo%finalize()
     if (self%exchange%parameters%mhm_active()) call self%mpr%finalize()
+    if (self%exchange%parameters%meteo_active()) call self%meteo%finalize()
     if (self%exchange%parameters%mhm_active()) call self%mhm%finalize()
     if (self%exchange%parameters%mrm_active()) call self%mrm%finalize()
   end subroutine domain_finalize

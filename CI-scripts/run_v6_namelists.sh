@@ -4,7 +4,7 @@ set -euo pipefail
 
 usage() {
   cat <<'EOF'
-Run all v6 smoke namelists with one or more mHM v6 driver executables.
+Run curated v6 smoke namelists with one or more mHM v6 driver executables.
 
 Usage:
   run_v6_namelists.sh [--log-dir DIR] [--threads N] [--mpi N] EXE [EXE ...]
@@ -77,21 +77,34 @@ cleanup_generated_outputs() {
   rm -f ./mpr*.nc ./mrm*.nc
 }
 
+parameter_file_for_namelist() {
+  local nml_name="$1"
+
+  case "${nml_name}" in
+    mpr_pet_aspect_*|mpr_temporal_lc_pet_lai_*|mpr_pet_hargreaves_*|mpr_pet_priestley_taylor_*|mpr_pet_penman_*|mrm_rivertemp_*)
+      printf '%s\n' "test_nml/mhm_parameter_v6_meteo.nml"
+      ;;
+    mpr_*)
+      printf '%s\n' "mhm-para-template.nml"
+      ;;
+    *)
+      printf '%s\n' "mhm_parameter.nml"
+      ;;
+  esac
+}
+
 run_namelist() {
   local exe="$1"
   local nml="$2"
-  local exe_name nml_name log_path
+  local exe_name nml_name log_path param_file
   local -a cmd=()
 
   exe_name=$(basename "${exe}")
   nml_name=$(basename "${nml}" .nml)
   log_path="${log_dir}/${exe_name}__${nml_name}.log"
+  param_file=$(parameter_file_for_namelist "${nml_name}")
 
-  if [[ "${nml_name}" == mpr_* ]]; then
-    cmd+=("${exe}" -n "${nml}" -p mhm-para-template.nml -o mhm-output-template.nml)
-  else
-    cmd+=("${exe}" -n "${nml}" -o mhm-output-template.nml)
-  fi
+  cmd+=("${exe}" -n "${nml}" -p "${param_file}" -o mhm-output-template.nml)
 
   if ((mpi_ranks > 0)); then
     cmd=(mpirun -n "${mpi_ranks}" "${cmd[@]}")
@@ -115,7 +128,19 @@ run_namelist() {
   echo "Completed ${exe_name} with ${nml}"
 }
 
-mapfile -t namelists < <(find test_nml -maxdepth 1 -type f -name '*.nml' | sort)
+namelists=(
+  test_nml/mpr_pet_aspect_minimal.nml
+  test_nml/mpr_temporal_lc_pet_lai_minimal.nml
+  test_nml/mpr_pet_hargreaves_minimal.nml
+  test_nml/mpr_pet_priestley_taylor_minimal.nml
+  test_nml/mpr_pet_penman_minimal.nml
+  test_nml/mpr_pet_aspect_hourly6h_minimal.nml
+  test_nml/mpr_pet_aspect_weights_minimal.nml
+  test_nml/mrm_rivertemp_meteo_minimal.nml
+  test_nml/mrm_minimal.nml
+  test_nml/mrm_minimal1.nml
+  test_nml/mrm_minimal2.nml
+)
 
 for exe in "${executables[@]}"; do
   if [[ ! -x "${exe}" ]]; then
@@ -125,6 +150,10 @@ for exe in "${executables[@]}"; do
 
   cleanup_generated_outputs
   for nml in "${namelists[@]}"; do
+    if [[ ! -f "${nml}" ]]; then
+      echo "Smoke namelist not found: ${nml}" >&2
+      exit 1
+    fi
     run_namelist "${exe}" "${nml}"
   done
 done

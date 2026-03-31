@@ -125,7 +125,7 @@ contains
   !> \brief Check if meteo processes are active.
   logical function parameters_meteo_active(self)
     class(parameters_t), intent(in) :: self
-    parameters_meteo_active = self%mhm_active() .or. (self%process_matrix(4, 1) /= 0_i4)
+    parameters_meteo_active = self%mhm_active() .or. (self%process_matrix(4, 1) /= 0_i4) .or. (self%process_matrix(11, 1) /= 0_i4)
   end function parameters_meteo_active
 
   !> \brief Check if mRM processes are active.

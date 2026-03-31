@@ -18,6 +18,11 @@
   geo_class_path(1) = "test_domain/input/morph/geology_class.asc"
   soil_class_path(1)= "test_domain/input/morph/soil_class.asc"
   lai_class_path(1) = "test_domain/input/morph/LAI_class.asc"
+  meteo_mask_path(1)= "test_domain/input/meteo/mask.nc"
+  pre_path(1)       = "test_domain/input/meteo/pre/pre.nc"
+  temp_path(1)      = "test_domain/input/meteo/tavg/tavg.nc"
+  tmin_path(1)      = "test_domain/input/meteo/tmin.nc"
+  tmax_path(1)      = "test_domain/input/meteo/tmax.nc"
 /
 
 &config_meteo

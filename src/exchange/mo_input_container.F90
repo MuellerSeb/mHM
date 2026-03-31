@@ -15,7 +15,7 @@ module mo_input_container
   use mo_kind, only: i4, dp
   use mo_list, only: list
   use mo_os, only: path_ext
-  use mo_exchange_type, only: exchange_t
+  use mo_exchange_type, only: exchange_t, var_dp
   use mo_datetime, only: datetime, timedelta, HOUR_SECONDS, DAY_HOURS, one_hour, one_day
   use mo_grid, only: grid_t, cartesian, spherical
   use mo_grid_io, only: var, input_dataset, end_timestamp, start_timestamp, no_time, daily, monthly, yearly, varying
@@ -32,6 +32,7 @@ module mo_input_container
     logical :: provided = .false. !< whether this input variable is provided
     logical :: coupled = .false. !< whether this variable is from a coupler
     logical :: static = .false. !< whether this variable is static in time
+    logical :: allow_static = .false. !< whether a static file is accepted for a temporal variable
     logical :: morph_latlon = .false. !< whether morphology grid should be initialized as spherical coordinates
     character(len=:), allocatable :: path !< path to the input dataset
     character(len=:), allocatable :: name !< variable name in the dataset
@@ -129,6 +130,18 @@ module mo_input_container
     type(input_var_i4) :: soil_class !< input variable for soil class
     type(input_var2d_i4) :: soil_horizon_class !< input variable for soil horizon class
     type(input_var_i4) :: lai_class !< input variable for LAI class
+    type(input_var_i4) :: meteo_mask !< input variable for the meteorological mask
+    type(input_var_dp) :: pre !< raw precipitation input variable on level2
+    type(input_var_dp) :: pet !< raw PET input variable on level2
+    type(input_var_dp) :: temp !< raw temperature input variable on level2
+    type(input_var_dp) :: tann !< raw annual mean temperature input variable on level2
+    type(input_var_dp) :: tmin !< raw minimum temperature input variable on level2
+    type(input_var_dp) :: tmax !< raw maximum temperature input variable on level2
+    type(input_var_dp) :: ssrd !< raw short-wave radiation input variable on level2
+    type(input_var_dp) :: strd !< raw long-wave radiation input variable on level2
+    type(input_var_dp) :: netrad !< raw net radiation input variable on level2
+    type(input_var_dp) :: eabs !< raw vapor pressure input variable on level2
+    type(input_var_dp) :: wind !< raw wind input variable on level2
     ! level 1 inputs
     type(input_var_i4) :: hydro_mask !< input variable for hydro mask
     type(input_var_dp) :: runoff !< input variable for runoff
@@ -150,6 +163,15 @@ contains
     need_grid = .not.associated(exchange_grid)
     if (need_grid) exchange_grid => tgt_grid
   end function need_grid
+
+  !> \brief Copy stepping/static/provided metadata from an input variable to the exchange variable.
+  subroutine sync_input_var_meta(input_var, exchange_var)
+    class(input_var_abc), intent(in) :: input_var
+    type(var_dp), intent(inout) :: exchange_var
+    exchange_var%provided = input_var%provided
+    exchange_var%static = input_var%static
+    exchange_var%stepping = input_var%stepping
+  end subroutine sync_input_var_meta
 
   !> \brief Update the time frame for chunked reading.
   subroutine update_time_frame(chunk_time_start, chunk_time_end, chunking, end_time)
@@ -178,19 +200,21 @@ contains
   end subroutine update_time_frame
 
   !> \brief Initialize the input variable.
-  subroutine input_var_init(self, path, name, static, coupled, morph_latlon)
+  subroutine input_var_init(self, path, name, static, coupled, morph_latlon, allow_static)
     class(input_var_abc), intent(inout), target :: self
     character(*), intent(in), optional :: path !< path to the input dataset
     character(*), intent(in), optional :: name !< variable name in the dataset
     logical, intent(in), optional :: static !< whether this variable is static in time
     logical, intent(in), optional :: coupled !< whether this variable is from a coupler
     logical, intent(in), optional :: morph_latlon !< whether to initialize ASCII grid as spherical coordinates
+    logical, intent(in), optional :: allow_static !< whether to allow a static input dataset for a temporal variable
     self%provided = .true. ! mark as provided when initialized
     if (present(path)) self%path = trim(path)
     if (present(name)) self%name = trim(name)
     if (present(static)) self%static = static
     if (present(coupled)) self%coupled = coupled
     if (present(morph_latlon)) self%morph_latlon = morph_latlon
+    if (present(allow_static)) self%allow_static = allow_static
   end subroutine input_var_init
 
   logical function input_var_is_ascii(self)
@@ -236,15 +260,18 @@ contains
 
     if (init_grid) then
       grid_init_var = self%name ! allocate variable name for grid initialization
-      call self%ds%init(path=self%path, vars=[var(name=trim(self%name), kind=kind, static=self%static, layered=layered_)], &
+      call self%ds%init(path=self%path, vars=[var(name=trim(self%name), kind=kind, static=self%static, layered=layered_, &
+        allow_static=self%allow_static)], &
         timestamp=timestamp, grid=grid, grid_init_var=grid_init_var, tol=1.0e-5_dp)
     else
-      call self%ds%init(path=self%path, vars=[var(name=trim(self%name), kind=kind, static=self%static, layered=layered_)], &
+      call self%ds%init(path=self%path, vars=[var(name=trim(self%name), kind=kind, static=self%static, layered=layered_, &
+        allow_static=self%allow_static)], &
         timestamp=timestamp, grid=grid, tol=1.0e-5_dp)
     end if
     ! TODO: make tol configurable in case of single precision variables with small values
+    self%static = self%ds%static
+    self%stepping = merge(no_time, self%ds%timestep, self%static)
     self%var_id = self%ds%var_index(self%name)
-    if (.not.self%static) self%stepping = self%ds%timestep
   end subroutine input_var_open_dataset
 
   !> \brief Check whether a coupled variable is properly initialized and within time bounds.
@@ -296,16 +323,27 @@ contains
       exchange_var => self%cache(:, self%ds%time_index(time) - self%offset)
     else
       if (.not.allocated(self%cache)) allocate(self%cache(self%ds%grid%ncells, 1))
-      if (self%stepping == 1_i4) then
-        call self%ds%read(self%var_id, self%cache(:, 1), time)
-      else
-        ! if this variable stepping is not hourly, read only when time exceeds current time frame
-        if (time > self%chunk_time_end) then
-          self%chunk_time_start = self%chunk_time_end
-          self%chunk_time_end = self%ds%times(self%ds%time_index(time))
+      select case (self%stepping)
+        case (1_i4)
           call self%ds%read(self%var_id, self%cache(:, 1), time)
-        end if
-      end if
+        case (daily, monthly, yearly)
+          if (time > self%chunk_time_end) then
+            self%chunk_time_start = self%chunk_time_end
+            self%chunk_time_end = self%ds%times(self%ds%time_index(time))
+            call self%ds%read(self%var_id, self%cache(:, 1), time)
+          end if
+        case default
+          if (self%stepping > 1_i4) then
+            if (time > self%chunk_time_end) then
+              self%chunk_time_start = self%chunk_time_end
+              self%chunk_time_end = self%ds%times(self%ds%time_index(time))
+              call self%ds%read(self%var_id, self%cache(:, 1), time)
+            end if
+          else
+            log_fatal(*) "Input: unsupported temporal stepping for variable '", trim(self%name), "': ", n2s(self%stepping)
+            error stop 1
+          end if
+      end select
       exchange_var => self%cache(:, 1)
     end if
   end subroutine input_var_dp_update
@@ -334,16 +372,27 @@ contains
       exchange_var => self%cache(:, self%ds%time_index(time) - self%offset)
     else
       if (.not.allocated(self%cache)) allocate(self%cache(self%ds%grid%ncells, 1))
-      if (self%stepping == 1_i4) then
-        call self%ds%read(self%var_id, self%cache(:, 1), time)
-      else
-        ! if this variable stepping is not hourly, read only when time exceeds current time frame
-        if (time > self%chunk_time_end) then
-          self%chunk_time_start = self%chunk_time_end
-          self%chunk_time_end = self%ds%times(self%ds%time_index(time))
+      select case (self%stepping)
+        case (1_i4)
           call self%ds%read(self%var_id, self%cache(:, 1), time)
-        end if
-      end if
+        case (daily, monthly, yearly)
+          if (time > self%chunk_time_end) then
+            self%chunk_time_start = self%chunk_time_end
+            self%chunk_time_end = self%ds%times(self%ds%time_index(time))
+            call self%ds%read(self%var_id, self%cache(:, 1), time)
+          end if
+        case default
+          if (self%stepping > 1_i4) then
+            if (time > self%chunk_time_end) then
+              self%chunk_time_start = self%chunk_time_end
+              self%chunk_time_end = self%ds%times(self%ds%time_index(time))
+              call self%ds%read(self%var_id, self%cache(:, 1), time)
+            end if
+          else
+            log_fatal(*) "Input: unsupported temporal stepping for variable '", trim(self%name), "': ", n2s(self%stepping)
+            error stop 1
+          end if
+      end select
       exchange_var => self%cache(:, 1)
     end if
   end subroutine input_var_i4_update
@@ -372,16 +421,27 @@ contains
       exchange_var => self%cache(:, :, self%ds%time_index(time) - self%offset)
     else
       if (.not.allocated(self%cache)) allocate(self%cache(self%ds%grid%ncells, self%ds%nlayers, 1))
-      if (self%stepping == 1_i4) then
-        call self%ds%read_layered(self%var_id, self%cache(:, :, 1), time)
-      else
-        ! if this variable stepping is not hourly, read only when time exceeds current time frame
-        if (time > self%chunk_time_end) then
-          self%chunk_time_start = self%chunk_time_end
-          self%chunk_time_end = self%ds%times(self%ds%time_index(time))
+      select case (self%stepping)
+        case (1_i4)
           call self%ds%read_layered(self%var_id, self%cache(:, :, 1), time)
-        end if
-      end if
+        case (daily, monthly, yearly)
+          if (time > self%chunk_time_end) then
+            self%chunk_time_start = self%chunk_time_end
+            self%chunk_time_end = self%ds%times(self%ds%time_index(time))
+            call self%ds%read_layered(self%var_id, self%cache(:, :, 1), time)
+          end if
+        case default
+          if (self%stepping > 1_i4) then
+            if (time > self%chunk_time_end) then
+              self%chunk_time_start = self%chunk_time_end
+              self%chunk_time_end = self%ds%times(self%ds%time_index(time))
+              call self%ds%read_layered(self%var_id, self%cache(:, :, 1), time)
+            end if
+          else
+            log_fatal(*) "Input: unsupported temporal stepping for variable '", trim(self%name), "': ", n2s(self%stepping)
+            error stop 1
+          end if
+      end select
       exchange_var => self%cache(:, :, 1)  ! maybe not needed to re-associate every time
     end if
   end subroutine input_var2d_dp_update
@@ -410,16 +470,27 @@ contains
       exchange_var => self%cache(:, :, self%ds%time_index(time) - self%offset)
     else
       if (.not.allocated(self%cache)) allocate(self%cache(self%ds%grid%ncells, self%ds%nlayers, 1))
-      if (self%stepping == 1_i4) then
-        call self%ds%read_layered(self%var_id, self%cache(:, :, 1), time)
-      else
-        ! if this variable stepping is not hourly, read only when time exceeds current time frame
-        if (time > self%chunk_time_end) then
-          self%chunk_time_start = self%chunk_time_end
-          self%chunk_time_end = self%ds%times(self%ds%time_index(time))
+      select case (self%stepping)
+        case (1_i4)
           call self%ds%read_layered(self%var_id, self%cache(:, :, 1), time)
-        end if
-      end if
+        case (daily, monthly, yearly)
+          if (time > self%chunk_time_end) then
+            self%chunk_time_start = self%chunk_time_end
+            self%chunk_time_end = self%ds%times(self%ds%time_index(time))
+            call self%ds%read_layered(self%var_id, self%cache(:, :, 1), time)
+          end if
+        case default
+          if (self%stepping > 1_i4) then
+            if (time > self%chunk_time_end) then
+              self%chunk_time_start = self%chunk_time_end
+              self%chunk_time_end = self%ds%times(self%ds%time_index(time))
+              call self%ds%read_layered(self%var_id, self%cache(:, :, 1), time)
+            end if
+          else
+            log_fatal(*) "Input: unsupported temporal stepping for variable '", trim(self%name), "': ", n2s(self%stepping)
+            error stop 1
+          end if
+      end select
       exchange_var => self%cache(:, :, 1)  ! maybe not needed to re-associate every time
     end if
   end subroutine input_var2d_i4_update
@@ -690,6 +761,90 @@ contains
       self%exchange%lai_class%provided = .true. ! mark as provided in exchange
     end if
 
+    ! meteorological mask (meteo_mask_var by default "mask")
+    status = self%config%input%is_set("meteo_mask_path", idx=id, errmsg=errmsg)
+    if (status == NML_OK) then
+      call self%meteo_mask%init( &
+        path=self%config%input%meteo_mask_path(id(1)), name=self%config%input%meteo_mask_var(id(1)), allow_static=.true.)
+    end if
+
+    ! raw precipitation on level2
+    status = self%config%input%is_set("pre_path", idx=id, errmsg=errmsg)
+    if (status == NML_OK) then
+      call self%pre%init(path=self%config%input%pre_path(id(1)), name=self%config%input%pre_var(id(1)))
+      self%exchange%raw_pre%provided = .true.
+    end if
+
+    ! raw PET on level2
+    status = self%config%input%is_set("pet_path", idx=id, errmsg=errmsg)
+    if (status == NML_OK) then
+      call self%pet%init(path=self%config%input%pet_path(id(1)), name=self%config%input%pet_var(id(1)))
+      self%exchange%raw_pet%provided = .true.
+    end if
+
+    ! raw temperature on level2
+    status = self%config%input%is_set("temp_path", idx=id, errmsg=errmsg)
+    if (status == NML_OK) then
+      call self%temp%init(path=self%config%input%temp_path(id(1)), name=self%config%input%temp_var(id(1)))
+      self%exchange%raw_temp%provided = .true.
+    end if
+
+    ! raw annual mean temperature on level2
+    status = self%config%input%is_set("tann_path", idx=id, errmsg=errmsg)
+    if (status == NML_OK) then
+      call self%tann%init(path=self%config%input%tann_path(id(1)), name=self%config%input%tann_var(id(1)), allow_static=.true.)
+      self%exchange%raw_tann%provided = .true.
+    end if
+
+    ! raw minimum temperature on level2
+    status = self%config%input%is_set("tmin_path", idx=id, errmsg=errmsg)
+    if (status == NML_OK) then
+      call self%tmin%init(path=self%config%input%tmin_path(id(1)), name=self%config%input%tmin_var(id(1)))
+      self%exchange%raw_tmin%provided = .true.
+    end if
+
+    ! raw maximum temperature on level2
+    status = self%config%input%is_set("tmax_path", idx=id, errmsg=errmsg)
+    if (status == NML_OK) then
+      call self%tmax%init(path=self%config%input%tmax_path(id(1)), name=self%config%input%tmax_var(id(1)))
+      self%exchange%raw_tmax%provided = .true.
+    end if
+
+    ! raw short-wave radiation on level2
+    status = self%config%input%is_set("ssrd_path", idx=id, errmsg=errmsg)
+    if (status == NML_OK) then
+      call self%ssrd%init(path=self%config%input%ssrd_path(id(1)), name=self%config%input%ssrd_var(id(1)))
+      self%exchange%raw_ssrd%provided = .true.
+    end if
+
+    ! raw long-wave radiation on level2
+    status = self%config%input%is_set("strd_path", idx=id, errmsg=errmsg)
+    if (status == NML_OK) then
+      call self%strd%init(path=self%config%input%strd_path(id(1)), name=self%config%input%strd_var(id(1)))
+      self%exchange%raw_strd%provided = .true.
+    end if
+
+    ! raw net radiation on level2
+    status = self%config%input%is_set("netrad_path", idx=id, errmsg=errmsg)
+    if (status == NML_OK) then
+      call self%netrad%init(path=self%config%input%netrad_path(id(1)), name=self%config%input%netrad_var(id(1)))
+      self%exchange%raw_netrad%provided = .true.
+    end if
+
+    ! raw vapor pressure on level2
+    status = self%config%input%is_set("eabs_path", idx=id, errmsg=errmsg)
+    if (status == NML_OK) then
+      call self%eabs%init(path=self%config%input%eabs_path(id(1)), name=self%config%input%eabs_var(id(1)))
+      self%exchange%raw_eabs%provided = .true.
+    end if
+
+    ! raw wind speed on level2
+    status = self%config%input%is_set("wind_path", idx=id, errmsg=errmsg)
+    if (status == NML_OK) then
+      call self%wind%init(path=self%config%input%wind_path(id(1)), name=self%config%input%wind_var(id(1)))
+      self%exchange%raw_wind%provided = .true.
+    end if
+
     ! hydro mask (hydro_mask_var by default "mask")
     status = self%config%input%is_set("hydro_mask_path", idx=id, errmsg=errmsg)
     if (status == NML_OK) then
@@ -843,6 +998,171 @@ contains
       self%exchange%lai_class%data => self%lai_class%cache(:, 1) ! associate exchange variable to input cache
     end if
 
+    ! meteorological mask
+    if (self%meteo_mask%coupled) then
+      log_error(*) "Input: meteorological mask is coupled... not yet implemented"
+      stop 1
+    else if (self%meteo_mask%provided) then
+      init_grid = need_grid(self%tgt_level2, self%exchange%level2)
+      call self%meteo_mask%open_dataset(kind="i4", timestamp=ts, grid=self%exchange%level2, init_grid=init_grid)
+      if (.not.self%meteo_mask%is_ascii()) call self%meteo_mask%ds%close()
+      call self%meteo_mask%set_mask(self%exchange%level2%mask)
+    end if
+
+    ! raw precipitation
+    if (self%pre%coupled) then
+      log_error(*) "Input: precipitation is coupled... not yet implemented"
+      stop 1
+    else if (self%pre%provided) then
+      init_grid = need_grid(self%tgt_level2, self%exchange%level2)
+      call self%pre%open_dataset(kind="dp", timestamp=ts, grid=self%exchange%level2, init_grid=init_grid)
+      call sync_input_var_meta(self%pre, self%exchange%raw_pre)
+      if (self%pre%static) then
+        call self%pre%read_static()
+        self%exchange%raw_pre%data => self%pre%cache(:, 1)
+      end if
+    end if
+
+    ! raw PET
+    if (self%pet%coupled) then
+      log_error(*) "Input: PET is coupled... not yet implemented"
+      stop 1
+    else if (self%pet%provided) then
+      init_grid = need_grid(self%tgt_level2, self%exchange%level2)
+      call self%pet%open_dataset(kind="dp", timestamp=ts, grid=self%exchange%level2, init_grid=init_grid)
+      call sync_input_var_meta(self%pet, self%exchange%raw_pet)
+      if (self%pet%static) then
+        call self%pet%read_static()
+        self%exchange%raw_pet%data => self%pet%cache(:, 1)
+      end if
+    end if
+
+    ! raw temperature
+    if (self%temp%coupled) then
+      log_error(*) "Input: temperature is coupled... not yet implemented"
+      stop 1
+    else if (self%temp%provided) then
+      init_grid = need_grid(self%tgt_level2, self%exchange%level2)
+      call self%temp%open_dataset(kind="dp", timestamp=ts, grid=self%exchange%level2, init_grid=init_grid)
+      call sync_input_var_meta(self%temp, self%exchange%raw_temp)
+      if (self%temp%static) then
+        call self%temp%read_static()
+        self%exchange%raw_temp%data => self%temp%cache(:, 1)
+      end if
+    end if
+
+    ! raw annual mean temperature
+    if (self%tann%coupled) then
+      log_error(*) "Input: annual mean temperature is coupled... not yet implemented"
+      stop 1
+    else if (self%tann%provided) then
+      init_grid = need_grid(self%tgt_level2, self%exchange%level2)
+      call self%tann%open_dataset(kind="dp", timestamp=ts, grid=self%exchange%level2, init_grid=init_grid)
+      call sync_input_var_meta(self%tann, self%exchange%raw_tann)
+      if (self%tann%static) then
+        call self%tann%read_static()
+        self%exchange%raw_tann%data => self%tann%cache(:, 1)
+      end if
+    end if
+
+    ! raw minimum temperature
+    if (self%tmin%coupled) then
+      log_error(*) "Input: minimum temperature is coupled... not yet implemented"
+      stop 1
+    else if (self%tmin%provided) then
+      init_grid = need_grid(self%tgt_level2, self%exchange%level2)
+      call self%tmin%open_dataset(kind="dp", timestamp=ts, grid=self%exchange%level2, init_grid=init_grid)
+      call sync_input_var_meta(self%tmin, self%exchange%raw_tmin)
+      if (self%tmin%static) then
+        call self%tmin%read_static()
+        self%exchange%raw_tmin%data => self%tmin%cache(:, 1)
+      end if
+    end if
+
+    ! raw maximum temperature
+    if (self%tmax%coupled) then
+      log_error(*) "Input: maximum temperature is coupled... not yet implemented"
+      stop 1
+    else if (self%tmax%provided) then
+      init_grid = need_grid(self%tgt_level2, self%exchange%level2)
+      call self%tmax%open_dataset(kind="dp", timestamp=ts, grid=self%exchange%level2, init_grid=init_grid)
+      call sync_input_var_meta(self%tmax, self%exchange%raw_tmax)
+      if (self%tmax%static) then
+        call self%tmax%read_static()
+        self%exchange%raw_tmax%data => self%tmax%cache(:, 1)
+      end if
+    end if
+
+    ! raw short-wave radiation
+    if (self%ssrd%coupled) then
+      log_error(*) "Input: short-wave radiation is coupled... not yet implemented"
+      stop 1
+    else if (self%ssrd%provided) then
+      init_grid = need_grid(self%tgt_level2, self%exchange%level2)
+      call self%ssrd%open_dataset(kind="dp", timestamp=ts, grid=self%exchange%level2, init_grid=init_grid)
+      call sync_input_var_meta(self%ssrd, self%exchange%raw_ssrd)
+      if (self%ssrd%static) then
+        call self%ssrd%read_static()
+        self%exchange%raw_ssrd%data => self%ssrd%cache(:, 1)
+      end if
+    end if
+
+    ! raw long-wave radiation
+    if (self%strd%coupled) then
+      log_error(*) "Input: long-wave radiation is coupled... not yet implemented"
+      stop 1
+    else if (self%strd%provided) then
+      init_grid = need_grid(self%tgt_level2, self%exchange%level2)
+      call self%strd%open_dataset(kind="dp", timestamp=ts, grid=self%exchange%level2, init_grid=init_grid)
+      call sync_input_var_meta(self%strd, self%exchange%raw_strd)
+      if (self%strd%static) then
+        call self%strd%read_static()
+        self%exchange%raw_strd%data => self%strd%cache(:, 1)
+      end if
+    end if
+
+    ! raw net radiation
+    if (self%netrad%coupled) then
+      log_error(*) "Input: net radiation is coupled... not yet implemented"
+      stop 1
+    else if (self%netrad%provided) then
+      init_grid = need_grid(self%tgt_level2, self%exchange%level2)
+      call self%netrad%open_dataset(kind="dp", timestamp=ts, grid=self%exchange%level2, init_grid=init_grid)
+      call sync_input_var_meta(self%netrad, self%exchange%raw_netrad)
+      if (self%netrad%static) then
+        call self%netrad%read_static()
+        self%exchange%raw_netrad%data => self%netrad%cache(:, 1)
+      end if
+    end if
+
+    ! raw vapor pressure
+    if (self%eabs%coupled) then
+      log_error(*) "Input: vapor pressure is coupled... not yet implemented"
+      stop 1
+    else if (self%eabs%provided) then
+      init_grid = need_grid(self%tgt_level2, self%exchange%level2)
+      call self%eabs%open_dataset(kind="dp", timestamp=ts, grid=self%exchange%level2, init_grid=init_grid)
+      call sync_input_var_meta(self%eabs, self%exchange%raw_eabs)
+      if (self%eabs%static) then
+        call self%eabs%read_static()
+        self%exchange%raw_eabs%data => self%eabs%cache(:, 1)
+      end if
+    end if
+
+    ! raw wind speed
+    if (self%wind%coupled) then
+      log_error(*) "Input: wind speed is coupled... not yet implemented"
+      stop 1
+    else if (self%wind%provided) then
+      init_grid = need_grid(self%tgt_level2, self%exchange%level2)
+      call self%wind%open_dataset(kind="dp", timestamp=ts, grid=self%exchange%level2, init_grid=init_grid)
+      call sync_input_var_meta(self%wind, self%exchange%raw_wind)
+      if (self%wind%static) then
+        call self%wind%read_static()
+        self%exchange%raw_wind%data => self%wind%cache(:, 1)
+      end if
+    end if
+
     ! hydro mask
     if (self%hydro_mask%coupled) then
       ! TODO: init grid from coupling namelist if needed
@@ -864,6 +1184,8 @@ contains
       init_grid = need_grid(self%tgt_level1, self%exchange%level1) ! associate grid if not yet done
       call self%runoff%open_dataset(kind="dp", timestamp=ts, grid=self%exchange%level1, init_grid=init_grid)
     end if
+
+    if (associated(self%exchange%level2)) self%exchange%level2_resolution = self%exchange%level2%cellsize
   end subroutine input_connect
 
   !> \brief Initialize the Input container for the model run.
@@ -900,12 +1222,34 @@ contains
       log_warn(*) "Input: runoff provided but not required. Check your configuration."
     end if
     self%runoff%provided = self%exchange%runoff_total%required ! only provide if required
+    call self%pre%reset_time(self%chunking, self%exchange%start_time)
+    call self%pet%reset_time(self%chunking, self%exchange%start_time)
+    call self%temp%reset_time(self%chunking, self%exchange%start_time)
+    call self%tann%reset_time(self%chunking, self%exchange%start_time)
+    call self%tmin%reset_time(self%chunking, self%exchange%start_time)
+    call self%tmax%reset_time(self%chunking, self%exchange%start_time)
+    call self%ssrd%reset_time(self%chunking, self%exchange%start_time)
+    call self%strd%reset_time(self%chunking, self%exchange%start_time)
+    call self%netrad%reset_time(self%chunking, self%exchange%start_time)
+    call self%eabs%reset_time(self%chunking, self%exchange%start_time)
+    call self%wind%reset_time(self%chunking, self%exchange%start_time)
     call self%runoff%reset_time(self%chunking, self%exchange%start_time)
   end subroutine input_initialize
 
   subroutine input_update(self)
     class(input_t), target, intent(inout) :: self
     log_trace(*) "Update Input"
+    call self%pre%update(self%exchange%raw_pre%data, self%exchange%time, self%chunking, self%exchange%end_time)
+    call self%pet%update(self%exchange%raw_pet%data, self%exchange%time, self%chunking, self%exchange%end_time)
+    call self%temp%update(self%exchange%raw_temp%data, self%exchange%time, self%chunking, self%exchange%end_time)
+    call self%tann%update(self%exchange%raw_tann%data, self%exchange%time, self%chunking, self%exchange%end_time)
+    call self%tmin%update(self%exchange%raw_tmin%data, self%exchange%time, self%chunking, self%exchange%end_time)
+    call self%tmax%update(self%exchange%raw_tmax%data, self%exchange%time, self%chunking, self%exchange%end_time)
+    call self%ssrd%update(self%exchange%raw_ssrd%data, self%exchange%time, self%chunking, self%exchange%end_time)
+    call self%strd%update(self%exchange%raw_strd%data, self%exchange%time, self%chunking, self%exchange%end_time)
+    call self%netrad%update(self%exchange%raw_netrad%data, self%exchange%time, self%chunking, self%exchange%end_time)
+    call self%eabs%update(self%exchange%raw_eabs%data, self%exchange%time, self%chunking, self%exchange%end_time)
+    call self%wind%update(self%exchange%raw_wind%data, self%exchange%time, self%chunking, self%exchange%end_time)
     call self%runoff%update(self%exchange%runoff_total%data, self%exchange%time, self%chunking, self%exchange%end_time)
   end subroutine input_update
 
@@ -913,6 +1257,17 @@ contains
     class(input_t), target, intent(inout) :: self
     log_info(*) "Finalize Input"
     ! close datasets
+    if (self%pre%provided .and. .not.self%pre%static) call self%pre%ds%close()
+    if (self%pet%provided .and. .not.self%pet%static) call self%pet%ds%close()
+    if (self%temp%provided .and. .not.self%temp%static) call self%temp%ds%close()
+    if (self%tann%provided .and. .not.self%tann%static) call self%tann%ds%close()
+    if (self%tmin%provided .and. .not.self%tmin%static) call self%tmin%ds%close()
+    if (self%tmax%provided .and. .not.self%tmax%static) call self%tmax%ds%close()
+    if (self%ssrd%provided .and. .not.self%ssrd%static) call self%ssrd%ds%close()
+    if (self%strd%provided .and. .not.self%strd%static) call self%strd%ds%close()
+    if (self%netrad%provided .and. .not.self%netrad%static) call self%netrad%ds%close()
+    if (self%eabs%provided .and. .not.self%eabs%static) call self%eabs%ds%close()
+    if (self%wind%provided .and. .not.self%wind%static) call self%wind%ds%close()
     if (self%runoff%provided) call self%runoff%ds%close()
     if (allocated(self%soil_class_one_layer)) deallocate(self%soil_class_one_layer)
   end subroutine input_finalize
