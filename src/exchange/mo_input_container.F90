@@ -1221,7 +1221,7 @@ contains
     if (self%runoff%provided .and. .not.self%exchange%runoff_total%required) then
       log_warn(*) "Input: runoff provided but not required. Check your configuration."
     end if
-    self%runoff%provided = self%exchange%runoff_total%required ! only provide if required
+    if (.not. self%exchange%runoff_total%required) self%runoff%provided = .false.
     call self%pre%reset_time(self%chunking, self%exchange%start_time)
     call self%pet%reset_time(self%chunking, self%exchange%start_time)
     call self%temp%reset_time(self%chunking, self%exchange%start_time)
