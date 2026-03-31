@@ -42,6 +42,10 @@ module nml_config_mpr
 
   ! default values
   integer(i4), parameter, public :: soil_db_mode_default = 0_i4
+  character(len=buf), parameter, public :: land_cover_var_default = "land_cover"
+  character(len=buf), parameter, public :: lai_var_default = "lai"
+  logical, parameter, public :: read_restart_default = .false.
+  logical, parameter, public :: write_restart_default = .false.
 
   ! enum values
   integer(i4), parameter, public :: soil_db_mode_enum_values(2) = [0_i4, 1_i4]
@@ -58,11 +62,17 @@ module nml_config_mpr
     integer(i4), dimension(max_layers, max_domains) :: soil_depth !< Soil horizon depth
     real(dp), dimension(max_domains) :: fracsealed_cityarea !< Sealed fraction of city area
     character(len=buf), dimension(max_domains) :: land_cover_path !< Land cover path
+    character(len=buf), dimension(max_domains) :: land_cover_var !< Land cover variable
     integer(i4), dimension(max_domains) :: lai_time_step !< LAI time step
     character(len=buf), dimension(max_domains) :: lai_path !< LAI path
+    character(len=buf), dimension(max_domains) :: lai_var !< LAI variable
     character(len=buf), dimension(max_domains) :: soil_lut_path !< Soil LUT path
     character(len=buf), dimension(max_domains) :: geo_lut_path !< Geology LUT path
     character(len=buf), dimension(max_domains) :: lai_lut_path !< LAI LUT path
+    logical, dimension(max_domains) :: read_restart !< Read restart
+    character(len=buf), dimension(max_domains) :: restart_input_path !< Restart input path
+    logical, dimension(max_domains) :: write_restart !< Write restart
+    character(len=buf), dimension(max_domains) :: restart_output_path !< Restart output path
   contains
     procedure :: init => nml_config_mpr_init
     procedure :: from_file => nml_config_mpr_from_file
@@ -126,8 +136,14 @@ contains
     this%soil_lut_path = repeat(achar(0), len(this%soil_lut_path)) ! sentinel for optional string array
     this%geo_lut_path = repeat(achar(0), len(this%geo_lut_path)) ! sentinel for optional string array
     this%lai_lut_path = repeat(achar(0), len(this%lai_lut_path)) ! sentinel for optional string array
+    this%restart_input_path = repeat(achar(0), len(this%restart_input_path)) ! sentinel for optional string array
+    this%restart_output_path = repeat(achar(0), len(this%restart_output_path)) ! sentinel for optional string array
     ! default values
     this%soil_db_mode = soil_db_mode_default
+    this%land_cover_var = land_cover_var_default
+    this%lai_var = lai_var_default
+    this%read_restart = read_restart_default
+    this%write_restart = write_restart_default
   end function nml_config_mpr_init
 
   !> \brief Read config_mpr namelist from file
@@ -142,11 +158,17 @@ contains
     integer(i4), dimension(max_layers, max_domains) :: soil_depth
     real(dp), dimension(max_domains) :: fracsealed_cityarea
     character(len=buf), dimension(max_domains) :: land_cover_path
+    character(len=buf), dimension(max_domains) :: land_cover_var
     integer(i4), dimension(max_domains) :: lai_time_step
     character(len=buf), dimension(max_domains) :: lai_path
+    character(len=buf), dimension(max_domains) :: lai_var
     character(len=buf), dimension(max_domains) :: soil_lut_path
     character(len=buf), dimension(max_domains) :: geo_lut_path
     character(len=buf), dimension(max_domains) :: lai_lut_path
+    logical, dimension(max_domains) :: read_restart
+    character(len=buf), dimension(max_domains) :: restart_input_path
+    logical, dimension(max_domains) :: write_restart
+    character(len=buf), dimension(max_domains) :: restart_output_path
     ! locals
     type(nml_file_t) :: nml
     integer :: iostat
@@ -160,11 +182,17 @@ contains
       soil_depth, &
       fracsealed_cityarea, &
       land_cover_path, &
+      land_cover_var, &
       lai_time_step, &
       lai_path, &
+      lai_var, &
       soil_lut_path, &
       geo_lut_path, &
-      lai_lut_path
+      lai_lut_path, &
+      read_restart, &
+      restart_input_path, &
+      write_restart, &
+      restart_output_path
 
     status = this%init(errmsg=errmsg)
     if (status /= NML_OK) return
@@ -174,11 +202,17 @@ contains
     soil_depth = this%soil_depth
     fracsealed_cityarea = this%fracsealed_cityarea
     land_cover_path = this%land_cover_path
+    land_cover_var = this%land_cover_var
     lai_time_step = this%lai_time_step
     lai_path = this%lai_path
+    lai_var = this%lai_var
     soil_lut_path = this%soil_lut_path
     geo_lut_path = this%geo_lut_path
     lai_lut_path = this%lai_lut_path
+    read_restart = this%read_restart
+    restart_input_path = this%restart_input_path
+    write_restart = this%write_restart
+    restart_output_path = this%restart_output_path
 
     status = nml%open(file, errmsg=errmsg)
     if (status /= NML_OK) return
@@ -210,11 +244,17 @@ contains
     this%soil_depth = soil_depth
     this%fracsealed_cityarea = fracsealed_cityarea
     this%land_cover_path = land_cover_path
+    this%land_cover_var = land_cover_var
     this%lai_time_step = lai_time_step
     this%lai_path = lai_path
+    this%lai_var = lai_var
     this%soil_lut_path = soil_lut_path
     this%geo_lut_path = geo_lut_path
     this%lai_lut_path = lai_lut_path
+    this%read_restart = read_restart
+    this%restart_input_path = restart_input_path
+    this%write_restart = write_restart
+    this%restart_output_path = restart_output_path
 
     ! mark as configured
     this%is_configured = .true.
@@ -229,11 +269,17 @@ contains
     soil_depth, &
     fracsealed_cityarea, &
     land_cover_path, &
+    land_cover_var, &
     lai_time_step, &
     lai_path, &
+    lai_var, &
     soil_lut_path, &
     geo_lut_path, &
     lai_lut_path, &
+    read_restart, &
+    restart_input_path, &
+    write_restart, &
+    restart_output_path, &
     errmsg) result(status)
 
     class(nml_config_mpr_t), intent(inout) :: this
@@ -244,11 +290,17 @@ contains
     integer(i4), dimension(:, :), intent(in), optional :: soil_depth
     real(dp), dimension(:), intent(in), optional :: fracsealed_cityarea
     character(len=*), dimension(:), intent(in), optional :: land_cover_path
+    character(len=*), dimension(:), intent(in), optional :: land_cover_var
     integer(i4), dimension(:), intent(in), optional :: lai_time_step
     character(len=*), dimension(:), intent(in), optional :: lai_path
+    character(len=*), dimension(:), intent(in), optional :: lai_var
     character(len=*), dimension(:), intent(in), optional :: soil_lut_path
     character(len=*), dimension(:), intent(in), optional :: geo_lut_path
     character(len=*), dimension(:), intent(in), optional :: lai_lut_path
+    logical, dimension(:), intent(in), optional :: read_restart
+    character(len=*), dimension(:), intent(in), optional :: restart_input_path
+    logical, dimension(:), intent(in), optional :: write_restart
+    character(len=*), dimension(:), intent(in), optional :: restart_output_path
     integer :: &
       lb_1, &
       lb_2, &
@@ -327,6 +379,16 @@ contains
       ub_1 = lb_1 + size(land_cover_path, 1) - 1
       this%land_cover_path(lb_1:ub_1) = land_cover_path
     end if
+    if (present(land_cover_var)) then
+      if (size(land_cover_var, 1) > size(this%land_cover_var, 1)) then
+        status = NML_ERR_INVALID_INDEX
+        if (present(errmsg)) errmsg = "dimension 1 exceeds bounds for 'land_cover_var'"
+        return
+      end if
+      lb_1 = lbound(this%land_cover_var, 1)
+      ub_1 = lb_1 + size(land_cover_var, 1) - 1
+      this%land_cover_var(lb_1:ub_1) = land_cover_var
+    end if
     if (present(lai_time_step)) then
       if (size(lai_time_step, 1) > size(this%lai_time_step, 1)) then
         status = NML_ERR_INVALID_INDEX
@@ -346,6 +408,16 @@ contains
       lb_1 = lbound(this%lai_path, 1)
       ub_1 = lb_1 + size(lai_path, 1) - 1
       this%lai_path(lb_1:ub_1) = lai_path
+    end if
+    if (present(lai_var)) then
+      if (size(lai_var, 1) > size(this%lai_var, 1)) then
+        status = NML_ERR_INVALID_INDEX
+        if (present(errmsg)) errmsg = "dimension 1 exceeds bounds for 'lai_var'"
+        return
+      end if
+      lb_1 = lbound(this%lai_var, 1)
+      ub_1 = lb_1 + size(lai_var, 1) - 1
+      this%lai_var(lb_1:ub_1) = lai_var
     end if
     if (present(soil_lut_path)) then
       if (size(soil_lut_path, 1) > size(this%soil_lut_path, 1)) then
@@ -376,6 +448,46 @@ contains
       lb_1 = lbound(this%lai_lut_path, 1)
       ub_1 = lb_1 + size(lai_lut_path, 1) - 1
       this%lai_lut_path(lb_1:ub_1) = lai_lut_path
+    end if
+    if (present(read_restart)) then
+      if (size(read_restart, 1) > size(this%read_restart, 1)) then
+        status = NML_ERR_INVALID_INDEX
+        if (present(errmsg)) errmsg = "dimension 1 exceeds bounds for 'read_restart'"
+        return
+      end if
+      lb_1 = lbound(this%read_restart, 1)
+      ub_1 = lb_1 + size(read_restart, 1) - 1
+      this%read_restart(lb_1:ub_1) = read_restart
+    end if
+    if (present(restart_input_path)) then
+      if (size(restart_input_path, 1) > size(this%restart_input_path, 1)) then
+        status = NML_ERR_INVALID_INDEX
+        if (present(errmsg)) errmsg = "dimension 1 exceeds bounds for 'restart_input_path'"
+        return
+      end if
+      lb_1 = lbound(this%restart_input_path, 1)
+      ub_1 = lb_1 + size(restart_input_path, 1) - 1
+      this%restart_input_path(lb_1:ub_1) = restart_input_path
+    end if
+    if (present(write_restart)) then
+      if (size(write_restart, 1) > size(this%write_restart, 1)) then
+        status = NML_ERR_INVALID_INDEX
+        if (present(errmsg)) errmsg = "dimension 1 exceeds bounds for 'write_restart'"
+        return
+      end if
+      lb_1 = lbound(this%write_restart, 1)
+      ub_1 = lb_1 + size(write_restart, 1) - 1
+      this%write_restart(lb_1:ub_1) = write_restart
+    end if
+    if (present(restart_output_path)) then
+      if (size(restart_output_path, 1) > size(this%restart_output_path, 1)) then
+        status = NML_ERR_INVALID_INDEX
+        if (present(errmsg)) errmsg = "dimension 1 exceeds bounds for 'restart_output_path'"
+        return
+      end if
+      lb_1 = lbound(this%restart_output_path, 1)
+      ub_1 = lb_1 + size(restart_output_path, 1) - 1
+      this%restart_output_path(lb_1:ub_1) = restart_output_path
     end if
 
     ! mark as configured
@@ -445,6 +557,13 @@ contains
       else
         if (all(this%land_cover_path == repeat(achar(0), len(this%land_cover_path)))) status = NML_ERR_NOT_SET
       end if
+    case ("land_cover_var")
+      if (present(idx)) then
+        status = idx_check(idx, lbound(this%land_cover_var), ubound(this%land_cover_var), &
+          "land_cover_var", errmsg)
+        if (status /= NML_OK) return
+      else
+      end if
     case ("lai_time_step")
       if (present(idx)) then
         status = idx_check(idx, lbound(this%lai_time_step), ubound(this%lai_time_step), &
@@ -462,6 +581,13 @@ contains
         if (this%lai_path(idx(1)) == repeat(achar(0), len(this%lai_path))) status = NML_ERR_NOT_SET
       else
         if (all(this%lai_path == repeat(achar(0), len(this%lai_path)))) status = NML_ERR_NOT_SET
+      end if
+    case ("lai_var")
+      if (present(idx)) then
+        status = idx_check(idx, lbound(this%lai_var), ubound(this%lai_var), &
+          "lai_var", errmsg)
+        if (status /= NML_OK) return
+      else
       end if
     case ("soil_lut_path")
       if (present(idx)) then
@@ -489,6 +615,38 @@ contains
         if (this%lai_lut_path(idx(1)) == repeat(achar(0), len(this%lai_lut_path))) status = NML_ERR_NOT_SET
       else
         if (all(this%lai_lut_path == repeat(achar(0), len(this%lai_lut_path)))) status = NML_ERR_NOT_SET
+      end if
+    case ("read_restart")
+      if (present(idx)) then
+        status = idx_check(idx, lbound(this%read_restart), ubound(this%read_restart), &
+          "read_restart", errmsg)
+        if (status /= NML_OK) return
+      else
+      end if
+    case ("restart_input_path")
+      if (present(idx)) then
+        status = idx_check(idx, lbound(this%restart_input_path), ubound(this%restart_input_path), &
+          "restart_input_path", errmsg)
+        if (status /= NML_OK) return
+        if (this%restart_input_path(idx(1)) == repeat(achar(0), len(this%restart_input_path))) status = NML_ERR_NOT_SET
+      else
+        if (all(this%restart_input_path == repeat(achar(0), len(this%restart_input_path)))) status = NML_ERR_NOT_SET
+      end if
+    case ("write_restart")
+      if (present(idx)) then
+        status = idx_check(idx, lbound(this%write_restart), ubound(this%write_restart), &
+          "write_restart", errmsg)
+        if (status /= NML_OK) return
+      else
+      end if
+    case ("restart_output_path")
+      if (present(idx)) then
+        status = idx_check(idx, lbound(this%restart_output_path), ubound(this%restart_output_path), &
+          "restart_output_path", errmsg)
+        if (status /= NML_OK) return
+        if (this%restart_output_path(idx(1)) == repeat(achar(0), len(this%restart_output_path))) status = NML_ERR_NOT_SET
+      else
+        if (all(this%restart_output_path == repeat(achar(0), len(this%restart_output_path)))) status = NML_ERR_NOT_SET
       end if
     case default
       status = NML_ERR_INVALID_NAME
@@ -786,6 +944,58 @@ contains
           return
         end if
       end if
+    case ("restart_input_path")
+      if (size(filled) /= 1) then
+        status = NML_ERR_INVALID_INDEX
+        if (present(errmsg)) errmsg = "shape rank mismatch for 'restart_input_path'"
+        return
+      end if
+      do dim = 1, 1
+        filled(dim) = size(this%restart_input_path, dim)
+      end do
+      filled(1) = 0
+      do idx = ubound(this%restart_input_path, 1), &
+        lbound(this%restart_input_path, 1), -1
+        if (.not. (this%restart_input_path(idx) == repeat(achar(0), len(this%restart_input_path)))) then
+          filled(1) = idx - lbound(this%restart_input_path, 1) + 1
+          exit
+        end if
+      end do
+      if (minval(filled) > 0) then
+        lb_1 = lbound(this%restart_input_path, 1)
+        ub_1 = lb_1 + filled(1) - 1
+        if (any(this%restart_input_path(lb_1:ub_1) == repeat(achar(0), len(this%restart_input_path)))) then
+          status = NML_ERR_PARTLY_SET
+          if (present(errmsg)) errmsg = "array partly set: restart_input_path"
+          return
+        end if
+      end if
+    case ("restart_output_path")
+      if (size(filled) /= 1) then
+        status = NML_ERR_INVALID_INDEX
+        if (present(errmsg)) errmsg = "shape rank mismatch for 'restart_output_path'"
+        return
+      end if
+      do dim = 1, 1
+        filled(dim) = size(this%restart_output_path, dim)
+      end do
+      filled(1) = 0
+      do idx = ubound(this%restart_output_path, 1), &
+        lbound(this%restart_output_path, 1), -1
+        if (.not. (this%restart_output_path(idx) == repeat(achar(0), len(this%restart_output_path)))) then
+          filled(1) = idx - lbound(this%restart_output_path, 1) + 1
+          exit
+        end if
+      end do
+      if (minval(filled) > 0) then
+        lb_1 = lbound(this%restart_output_path, 1)
+        ub_1 = lb_1 + filled(1) - 1
+        if (any(this%restart_output_path(lb_1:ub_1) == repeat(achar(0), len(this%restart_output_path)))) then
+          status = NML_ERR_PARTLY_SET
+          if (present(errmsg)) errmsg = "array partly set: restart_output_path"
+          return
+        end if
+      end if
     case default
       status = NML_ERR_INVALID_NAME
       if (present(errmsg)) errmsg = "field is not a flexible array: " // trim(name)
@@ -936,6 +1146,34 @@ contains
       status = istat
       if (present(errmsg)) then
         if (len_trim(errmsg) == 0) errmsg = "array partly set: lai_lut_path"
+      end if
+      return
+    end if
+    if (istat /= NML_OK) then
+      status = istat
+      return
+    end if
+    if (allocated(filled)) deallocate(filled)
+    allocate(filled(1))
+    istat = this%filled_shape("restart_input_path", filled, errmsg=errmsg)
+    if (istat == NML_ERR_PARTLY_SET) then
+      status = istat
+      if (present(errmsg)) then
+        if (len_trim(errmsg) == 0) errmsg = "array partly set: restart_input_path"
+      end if
+      return
+    end if
+    if (istat /= NML_OK) then
+      status = istat
+      return
+    end if
+    if (allocated(filled)) deallocate(filled)
+    allocate(filled(1))
+    istat = this%filled_shape("restart_output_path", filled, errmsg=errmsg)
+    if (istat == NML_ERR_PARTLY_SET) then
+      status = istat
+      if (present(errmsg)) then
+        if (len_trim(errmsg) == 0) errmsg = "array partly set: restart_output_path"
       end if
       return
     end if

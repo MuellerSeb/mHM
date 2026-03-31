@@ -21,6 +21,7 @@ MODULE mo_multi_param_reg
 
   PUBLIC :: mpr                     ! calculates effective regionalised parameters
   PUBLIC :: canopy_intercept_param  ! estimate effective max. canopy interception
+  PUBLIC :: aerodynamical_resistance ! legacy PET Penman-Monteith helper used by the exchange bridge
 
 contains
 

@@ -37,6 +37,8 @@ test_domain*/output*/*.out
 test_domain*/restart/*.nc
 *prog_for_check
 *terminal
+mrm_*.nc
+mpr_*.nc
 
 ### Python template
 # Byte-compiled / optimized / DLL files

@@ -390,16 +390,28 @@
   fracSealed_cityArea(:) = 0.0
   ! Land cover path
   land_cover_path(:) = ""
+  ! Land cover variable
+  land_cover_var(:) = "land_cover"
   ! LAI time step
   lai_time_step(:) = -3
   ! LAI path
   lai_path(:) = ""
+  ! LAI variable
+  lai_var(:) = "lai"
   ! Soil LUT path
   soil_lut_path(:) = ""
   ! Geology LUT path
   geo_lut_path(:) = ""
   ! LAI LUT path
   lai_lut_path(:) = ""
+  ! Read restart
+  read_restart(:) = .false.
+  ! Restart input path
+  restart_input_path(:) = "mpr_restart_in.nc"
+  ! Write restart
+  write_restart(:) = .false.
+  ! Restart output path
+  restart_output_path(:) = "mpr_restart_out.nc"
 /
 
 ! mHM model configuration

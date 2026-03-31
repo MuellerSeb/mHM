@@ -14,9 +14,10 @@ module mo_input_container
   use mo_logging
   use mo_kind, only: i4, dp
   use mo_list, only: list
+  use mo_os, only: path_ext
   use mo_exchange_type, only: exchange_t
   use mo_datetime, only: datetime, timedelta, HOUR_SECONDS, DAY_HOURS, one_hour, one_day
-  use mo_grid, only: grid_t
+  use mo_grid, only: grid_t, cartesian, spherical
   use mo_grid_io, only: var, input_dataset, end_timestamp, start_timestamp, no_time, daily, monthly, yearly, varying
   use mo_string_utils, only: n2s => num2str
   use nml_config_input, only: nml_config_input_t
@@ -31,9 +32,11 @@ module mo_input_container
     logical :: provided = .false. !< whether this input variable is provided
     logical :: coupled = .false. !< whether this variable is from a coupler
     logical :: static = .false. !< whether this variable is static in time
+    logical :: morph_latlon = .false. !< whether morphology grid should be initialized as spherical coordinates
     character(len=:), allocatable :: path !< path to the input dataset
     character(len=:), allocatable :: name !< variable name in the dataset
     type(input_dataset) :: ds !< input netcdf dataset
+    type(grid_t), pointer :: grid => null() !< grid reference used for data reads
     integer(i4) :: var_id !< variable ID in the dataset
     integer(i4) :: stepping = 0_i4 !< time-stepping in hours (0 - static, -1 - daily, -2 -monthly, -3 - yearly, >0 - hourly)
     integer(i4) :: offset !< offset for reading in chunked mode
@@ -42,6 +45,7 @@ module mo_input_container
     logical, allocatable :: mask(:,:) !< optional mask for this variable size(nx, ny) (used for coupling)
   contains
     procedure :: init => input_var_init
+    procedure :: is_ascii => input_var_is_ascii
     procedure :: open_dataset => input_var_open_dataset
     procedure :: check_couple_status => input_var_check_couple_status
     procedure :: set_mask => input_var_set_mask
@@ -113,6 +117,7 @@ module mo_input_container
     type(grid_t) :: tgt_level3 !< grid level 3 of the domain if given from input
     integer(i4) :: chunking !< chunking configuration (0 single read, -1 daily, -2 monthly, -3 yearly, >0 every n hours)
     integer(i4) :: time_stamp_location !< location of time-stamp variable in input datasets (0 start, 1 center, 2 end)
+    logical :: morph_latlon = .false. !< whether morphology inputs are defined in spherical (lat/lon) coordinates
     ! level 0 inputs
     type(input_var_i4) :: morph_mask !< input variable for morph mask
     type(input_var_dp) :: dem !< input variable for digital elevation model
@@ -120,9 +125,14 @@ module mo_input_container
     type(input_var_dp) :: aspect !< input variable for aspect
     type(input_var_i4) :: fdir !< input variable for flow direction
     type(input_var_i4) :: facc !< input variable for flow accumulation
+    type(input_var_i4) :: geo_class !< input variable for geology class
+    type(input_var_i4) :: soil_class !< input variable for soil class
+    type(input_var2d_i4) :: soil_horizon_class !< input variable for soil horizon class
+    type(input_var_i4) :: lai_class !< input variable for LAI class
     ! level 1 inputs
     type(input_var_i4) :: hydro_mask !< input variable for hydro mask
     type(input_var_dp) :: runoff !< input variable for runoff
+    integer(i4), allocatable :: soil_class_one_layer(:,:) !< adapter for single-layer soil class input
   contains
     procedure :: configure => input_configure
     procedure :: connect => input_connect
@@ -168,30 +178,70 @@ contains
   end subroutine update_time_frame
 
   !> \brief Initialize the input variable.
-  subroutine input_var_init(self, path, name, static, coupled)
-    class(input_var_abc), intent(inout) :: self
+  subroutine input_var_init(self, path, name, static, coupled, morph_latlon)
+    class(input_var_abc), intent(inout), target :: self
     character(*), intent(in), optional :: path !< path to the input dataset
     character(*), intent(in), optional :: name !< variable name in the dataset
     logical, intent(in), optional :: static !< whether this variable is static in time
     logical, intent(in), optional :: coupled !< whether this variable is from a coupler
+    logical, intent(in), optional :: morph_latlon !< whether to initialize ASCII grid as spherical coordinates
     self%provided = .true. ! mark as provided when initialized
     if (present(path)) self%path = trim(path)
     if (present(name)) self%name = trim(name)
     if (present(static)) self%static = static
     if (present(coupled)) self%coupled = coupled
+    if (present(morph_latlon)) self%morph_latlon = morph_latlon
   end subroutine input_var_init
 
-  subroutine input_var_open_dataset(self, kind, timestamp, grid, init_grid)
-    class(input_var_abc), intent(inout) :: self
+  logical function input_var_is_ascii(self)
+    class(input_var_abc), intent(in), target :: self
+    character(:), allocatable :: ext
+    input_var_is_ascii = .false.
+    if (.not.allocated(self%path)) return
+    ext = path_ext(self%path)
+    input_var_is_ascii = (ext == ".asc") .or. (ext == ".ASC")
+  end function input_var_is_ascii
+
+  subroutine input_var_open_dataset(self, kind, timestamp, grid, init_grid, layered)
+    class(input_var_abc), intent(inout), target :: self
     character(*), intent(in) :: kind !< kind of variable to create dataset for
     integer(i4), intent(in) :: timestamp !< time stamp for the dataset
-    type(grid_t), intent(in), pointer :: grid !< grid for the variable
+    type(grid_t), intent(inout), pointer :: grid !< grid for the variable
     logical, intent(in) :: init_grid !< whether to initialize the grid
+    logical, intent(in), optional :: layered !< whether the variable has a layer dimension
     character(:), allocatable :: grid_init_var
+    logical :: layered_
     if (.not.self%provided) return
-    if (init_grid) grid_init_var = self%name ! allocate variable name for grid initialization
-    call self%ds%init(path=self%path, vars=[var(name=trim(self%name), kind=kind, static=self%static)], &
-      timestamp=timestamp, grid=grid, grid_init_var=grid_init_var, tol=1.0e-5_dp) ! if grid_init_var is un-allocated, it is "not present"
+    layered_ = .false.
+    if (present(layered)) layered_ = layered
+    self%grid => grid
+
+    if (self%is_ascii()) then
+      if (.not.self%static) then
+        log_fatal(*) "Input: ASCII input is only supported for static variables. Variable: ", trim(self%name)
+        error stop 1
+      end if
+      if (layered_) then
+        log_fatal(*) "Input: layered ASCII input is not supported. Variable: ", trim(self%name)
+        error stop 1
+      end if
+      if (init_grid) then
+        call self%grid%from_ascii_file(self%path, coordsys=merge(spherical, cartesian, self%morph_latlon))
+      else if (.not.associated(self%grid)) then
+        log_fatal(*) "Input: grid is not connected for ASCII variable: ", trim(self%name)
+        error stop 1
+      end if
+      return
+    end if
+
+    if (init_grid) then
+      grid_init_var = self%name ! allocate variable name for grid initialization
+      call self%ds%init(path=self%path, vars=[var(name=trim(self%name), kind=kind, static=self%static, layered=layered_)], &
+        timestamp=timestamp, grid=grid, grid_init_var=grid_init_var, tol=1.0e-5_dp)
+    else
+      call self%ds%init(path=self%path, vars=[var(name=trim(self%name), kind=kind, static=self%static, layered=layered_)], &
+        timestamp=timestamp, grid=grid, tol=1.0e-5_dp)
+    end if
     ! TODO: make tol configurable in case of single precision variables with small values
     self%var_id = self%ds%var_index(self%name)
     if (.not.self%static) self%stepping = self%ds%timestep
@@ -376,10 +426,22 @@ contains
 
   !> \brief Read a single static double precision input variable and close the dataset.
   subroutine input_var_dp_read_static(self)
-    class(input_var_dp), intent(inout) :: self
+    class(input_var_dp), intent(inout), target :: self
+    real(dp), allocatable :: data2d(:, :)
     if (.not.self%provided) return
     if (self%coupled) return
     if (.not.self%static) return
+    if (self%is_ascii()) then
+      if (.not.associated(self%grid)) then
+        log_fatal(*) "Input: grid not connected for static ASCII variable: ", trim(self%name)
+        error stop 1
+      end if
+      if (.not.allocated(self%cache)) allocate(self%cache(self%grid%ncells, 1))
+      call self%grid%read_data(self%path, data2d)
+      call self%grid%pack_into(data2d, self%cache(:, 1))
+      if (allocated(data2d)) deallocate(data2d)
+      return
+    end if
     if (.not.allocated(self%cache)) allocate(self%cache(self%ds%grid%ncells, 1))
     call self%ds%read(self%var_id, self%cache(:, 1))
     call self%ds%close()
@@ -387,10 +449,22 @@ contains
 
   !> \brief Read a single static integer input variable and close the dataset.
   subroutine input_var_i4_read_static(self)
-    class(input_var_i4), intent(inout) :: self
+    class(input_var_i4), intent(inout), target :: self
+    integer(i4), allocatable :: data2d(:, :)
     if (.not.self%provided) return
     if (self%coupled) return
     if (.not.self%static) return
+    if (self%is_ascii()) then
+      if (.not.associated(self%grid)) then
+        log_fatal(*) "Input: grid not connected for static ASCII variable: ", trim(self%name)
+        error stop 1
+      end if
+      if (.not.allocated(self%cache)) allocate(self%cache(self%grid%ncells, 1))
+      call self%grid%read_data(self%path, data2d)
+      call self%grid%pack_into(data2d, self%cache(:, 1))
+      if (allocated(data2d)) deallocate(data2d)
+      return
+    end if
     if (.not.allocated(self%cache)) allocate(self%cache(self%ds%grid%ncells, 1))
     call self%ds%read(self%var_id, self%cache(:, 1))
     call self%ds%close()
@@ -398,10 +472,14 @@ contains
 
   !> \brief Read a single static 2D double precision input variable and close the dataset.
   subroutine input_var2d_dp_read_static(self)
-    class(input_var2d_dp), intent(inout) :: self
+    class(input_var2d_dp), intent(inout), target :: self
     if (.not.self%provided) return
     if (self%coupled) return
     if (.not.self%static) return
+    if (self%is_ascii()) then
+      log_fatal(*) "Input: layered ASCII input is not supported for variable: ", trim(self%name)
+      error stop 1
+    end if
     if (.not.allocated(self%cache)) allocate(self%cache(self%ds%grid%ncells, self%ds%nlayers, 1))
     call self%ds%read_layered(self%var_id, self%cache(:, :, 1))
     call self%ds%close()
@@ -409,10 +487,14 @@ contains
 
   !> \brief Read a single static 2D integer input variable and close the dataset.
   subroutine input_var2d_i4_read_static(self)
-    class(input_var2d_i4), intent(inout) :: self
+    class(input_var2d_i4), intent(inout), target :: self
     if (.not.self%provided) return
     if (self%coupled) return
     if (.not.self%static) return
+    if (self%is_ascii()) then
+      log_fatal(*) "Input: layered ASCII input is not supported for variable: ", trim(self%name)
+      error stop 1
+    end if
     if (.not.allocated(self%cache)) allocate(self%cache(self%ds%grid%ncells, self%ds%nlayers, 1))
     call self%ds%read_layered(self%var_id, self%cache(:, :, 1))
     call self%ds%close()
@@ -513,19 +595,22 @@ contains
     id(1) = self%exchange%domain ! domain ID to read correct namelist entries
     self%chunking = self%config%input%chunking(id(1))
     self%time_stamp_location = self%config%input%time_stamp_location(id(1))
+    self%morph_latlon = self%config%input%morph_latlon(id(1))
 
     ! morph mask (morph_mask_var by default "mask")
     status = self%config%input%is_set("morph_mask_path", idx=id, errmsg=errmsg)
     if (status == NML_OK) then
       call self%morph_mask%init( &
-        path=self%config%input%morph_mask_path(id(1)), name=self%config%input%morph_mask_var(id(1)), static=.true.)
+        path=self%config%input%morph_mask_path(id(1)), name=self%config%input%morph_mask_var(id(1)), &
+        static=.true., morph_latlon=self%morph_latlon)
     end if
 
     ! DEM (dem_var by default "dem")
     status = self%config%input%is_set("dem_path", idx=id, errmsg=errmsg)
     if (status == NML_OK) then
       call self%dem%init( &
-        path=self%config%input%dem_path(id(1)), name=self%config%input%dem_var(id(1)), static=.true.)
+        path=self%config%input%dem_path(id(1)), name=self%config%input%dem_var(id(1)), &
+        static=.true., morph_latlon=self%morph_latlon)
       self%exchange%dem%provided = .true. ! mark as provided in exchange
     end if
 
@@ -533,7 +618,8 @@ contains
     status = self%config%input%is_set("slope_path", idx=id, errmsg=errmsg)
     if (status == NML_OK) then
       call self%slope%init( &
-        path=self%config%input%slope_path(id(1)), name=self%config%input%slope_var(id(1)), static=.true.)
+        path=self%config%input%slope_path(id(1)), name=self%config%input%slope_var(id(1)), &
+        static=.true., morph_latlon=self%morph_latlon)
       self%exchange%slope%provided = .true. ! mark as provided in exchange
     end if
 
@@ -541,7 +627,8 @@ contains
     status = self%config%input%is_set("aspect_path", idx=id, errmsg=errmsg)
     if (status == NML_OK) then
       call self%aspect%init( &
-        path=self%config%input%aspect_path(id(1)), name=self%config%input%aspect_var(id(1)), static=.true.)
+        path=self%config%input%aspect_path(id(1)), name=self%config%input%aspect_var(id(1)), &
+        static=.true., morph_latlon=self%morph_latlon)
       self%exchange%aspect%provided = .true. ! mark as provided in exchange
     end if
 
@@ -549,7 +636,8 @@ contains
     status = self%config%input%is_set("fdir_path", idx=id, errmsg=errmsg)
     if (status == NML_OK) then
       call self%fdir%init( &
-        path=self%config%input%fdir_path(id(1)), name=self%config%input%fdir_var(id(1)), static=.true.)
+        path=self%config%input%fdir_path(id(1)), name=self%config%input%fdir_var(id(1)), &
+        static=.true., morph_latlon=self%morph_latlon)
       self%exchange%fdir%provided = .true. ! mark as provided in exchange
     end if
 
@@ -557,8 +645,49 @@ contains
     status = self%config%input%is_set("facc_path", idx=id, errmsg=errmsg)
     if (status == NML_OK) then
       call self%facc%init( &
-        path=self%config%input%facc_path(id(1)), name=self%config%input%facc_var(id(1)), static=.true.)
+        path=self%config%input%facc_path(id(1)), name=self%config%input%facc_var(id(1)), &
+        static=.true., morph_latlon=self%morph_latlon)
       self%exchange%facc%provided = .true. ! mark as provided in exchange
+    end if
+
+    ! geology class (geo_class_var by default "geology_class")
+    status = self%config%input%is_set("geo_class_path", idx=id, errmsg=errmsg)
+    if (status == NML_OK) then
+      call self%geo_class%init( &
+        path=self%config%input%geo_class_path(id(1)), name=self%config%input%geo_class_var(id(1)), &
+        static=.true., morph_latlon=self%morph_latlon)
+      self%exchange%geo_unit%provided = .true. ! mark as provided in exchange
+    end if
+
+    ! soil class (soil_class_var by default "soil_class")
+    status = self%config%input%is_set("soil_class_path", idx=id, errmsg=errmsg)
+    if (status == NML_OK) then
+      call self%soil_class%init( &
+        path=self%config%input%soil_class_path(id(1)), name=self%config%input%soil_class_var(id(1)), &
+        static=.true., morph_latlon=self%morph_latlon)
+      self%exchange%soil_id%provided = .true. ! mark as provided in exchange
+    end if
+
+    ! soil horizon class (uses soil_class_var by default)
+    status = self%config%input%is_set("soil_horizon_class_path", idx=id, errmsg=errmsg)
+    if (status == NML_OK) then
+      call self%soil_horizon_class%init( &
+        path=self%config%input%soil_horizon_class_path(id(1)), name=self%config%input%soil_class_var(id(1)), &
+        static=.true., morph_latlon=self%morph_latlon)
+      self%exchange%soil_id%provided = .true. ! mark as provided in exchange
+    end if
+
+    if (self%soil_class%provided .and. self%soil_horizon_class%provided) then
+      log_warn(*) "Input: both soil_class_path and soil_horizon_class_path are configured. Prefer layered soil horizon class."
+    end if
+
+    ! LAI class (lai_class_var by default "LAI_class")
+    status = self%config%input%is_set("lai_class_path", idx=id, errmsg=errmsg)
+    if (status == NML_OK) then
+      call self%lai_class%init( &
+        path=self%config%input%lai_class_path(id(1)), name=self%config%input%lai_class_var(id(1)), &
+        static=.true., morph_latlon=self%morph_latlon)
+      self%exchange%lai_class%provided = .true. ! mark as provided in exchange
     end if
 
     ! hydro mask (hydro_mask_var by default "mask")
@@ -596,7 +725,7 @@ contains
     else if (self%morph_mask%provided) then
       init_grid = need_grid(self%tgt_level0, self%exchange%level0) ! associate grid if not yet done
       call self%morph_mask%open_dataset(kind="i4", timestamp=ts, grid=self%exchange%level0, init_grid=init_grid)
-      call self%morph_mask%ds%close() ! morph mask not read, since we only need the grid information
+      if (.not.self%morph_mask%is_ascii()) call self%morph_mask%ds%close() ! morph mask not read, since we only need the grid information
       call self%morph_mask%set_mask(self%exchange%level0%mask) ! only done for masks
     end if
 
@@ -660,6 +789,60 @@ contains
       self%exchange%facc%data => self%facc%cache(:, 1) ! associate exchange variable to input cache
     end if
 
+    ! geology class
+    if (self%geo_class%coupled) then
+      ! TODO: init grid from coupling namelist if needed
+      log_error(*) "Input: geology class is coupled... not yet implemented"
+      stop 1
+    else if (self%geo_class%provided) then
+      init_grid = need_grid(self%tgt_level0, self%exchange%level0) ! associate grid if not yet done
+      call self%geo_class%open_dataset(kind="i4", timestamp=ts, grid=self%exchange%level0, init_grid=init_grid)
+      call self%geo_class%read_static()
+      self%exchange%geo_unit%data => self%geo_class%cache(:, 1) ! associate exchange variable to input cache
+    end if
+
+    ! soil class
+    if (self%soil_class%coupled) then
+      ! TODO: init grid from coupling namelist if needed
+      log_error(*) "Input: soil class is coupled... not yet implemented"
+      stop 1
+    else if (self%soil_class%provided) then
+      init_grid = need_grid(self%tgt_level0, self%exchange%level0) ! associate grid if not yet done
+      call self%soil_class%open_dataset(kind="i4", timestamp=ts, grid=self%exchange%level0, init_grid=init_grid)
+      call self%soil_class%read_static()
+      if (.not.self%soil_horizon_class%provided) then
+        if (allocated(self%soil_class_one_layer)) deallocate(self%soil_class_one_layer)
+        allocate(self%soil_class_one_layer(size(self%soil_class%cache, 1), 1))
+        self%soil_class_one_layer(:, 1) = self%soil_class%cache(:, 1)
+        self%exchange%soil_id%data => self%soil_class_one_layer ! map single-layer soil class to 2D exchange shape
+      end if
+    end if
+
+    ! soil horizon class
+    if (self%soil_horizon_class%coupled) then
+      ! TODO: init grid from coupling namelist if needed
+      log_error(*) "Input: soil horizon class is coupled... not yet implemented"
+      stop 1
+    else if (self%soil_horizon_class%provided) then
+      init_grid = need_grid(self%tgt_level0, self%exchange%level0) ! associate grid if not yet done
+      call self%soil_horizon_class%open_dataset( &
+        kind="i4", timestamp=ts, grid=self%exchange%level0, init_grid=init_grid, layered=.true.)
+      call self%soil_horizon_class%read_static()
+      self%exchange%soil_id%data => self%soil_horizon_class%cache(:, :, 1) ! associate exchange variable to input cache
+    end if
+
+    ! LAI class
+    if (self%lai_class%coupled) then
+      ! TODO: init grid from coupling namelist if needed
+      log_error(*) "Input: LAI class is coupled... not yet implemented"
+      stop 1
+    else if (self%lai_class%provided) then
+      init_grid = need_grid(self%tgt_level0, self%exchange%level0) ! associate grid if not yet done
+      call self%lai_class%open_dataset(kind="i4", timestamp=ts, grid=self%exchange%level0, init_grid=init_grid)
+      call self%lai_class%read_static()
+      self%exchange%lai_class%data => self%lai_class%cache(:, 1) ! associate exchange variable to input cache
+    end if
+
     ! hydro mask
     if (self%hydro_mask%coupled) then
       ! TODO: init grid from coupling namelist if needed
@@ -668,7 +851,7 @@ contains
     else if (self%hydro_mask%provided) then
       init_grid = need_grid(self%tgt_level1, self%exchange%level1) ! associate grid if not yet done
       call self%hydro_mask%open_dataset(kind="i4", timestamp=ts, grid=self%exchange%level1, init_grid=init_grid)
-      call self%hydro_mask%ds%close() ! hydro mask not read, since we only need the grid information
+      if (.not.self%hydro_mask%is_ascii()) call self%hydro_mask%ds%close() ! hydro mask not read, since we only need the grid information
       call self%hydro_mask%set_mask(self%exchange%level1%mask) ! only done for masks
     end if
 
@@ -704,6 +887,15 @@ contains
     if (self%aspect%provided .and. .not.self%exchange%aspect%required) then
       log_warn(*) "Input: aspect provided but not required. Check your configuration."
     end if
+    if (self%geo_class%provided .and. .not.self%exchange%geo_unit%required) then
+      log_warn(*) "Input: geology class provided but not required. Check your configuration."
+    end if
+    if ((self%soil_class%provided .or. self%soil_horizon_class%provided) .and. .not.self%exchange%soil_id%required) then
+      log_warn(*) "Input: soil class provided but not required. Check your configuration."
+    end if
+    if (self%lai_class%provided .and. .not.self%exchange%lai_class%required) then
+      log_warn(*) "Input: LAI class provided but not required. Check your configuration."
+    end if
     if (self%runoff%provided .and. .not.self%exchange%runoff_total%required) then
       log_warn(*) "Input: runoff provided but not required. Check your configuration."
     end if
@@ -722,6 +914,7 @@ contains
     log_info(*) "Finalize Input"
     ! close datasets
     if (self%runoff%provided) call self%runoff%ds%close()
+    if (allocated(self%soil_class_one_layer)) deallocate(self%soil_class_one_layer)
   end subroutine input_finalize
 
 end module mo_input_container

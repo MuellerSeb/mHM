@@ -16,11 +16,17 @@ Configuration for the multiscale parameter regionalization in mHM.
 | [soil_depth](#soil_depth) | integer array | no | Soil horizon depth |
 | [fracSealed_cityArea](#fracsealed_cityarea) | real array | no | Sealed fraction of city area |
 | [land_cover_path](#land_cover_path) | string array | no | Land cover path |
+| [land_cover_var](#land_cover_var) | string array | no | Land cover variable |
 | [lai_time_step](#lai_time_step) | integer array | no | LAI time step |
 | [lai_path](#lai_path) | string array | no | LAI path |
+| [lai_var](#lai_var) | string array | no | LAI variable |
 | [soil_lut_path](#soil_lut_path) | string array | no | Soil LUT path |
 | [geo_lut_path](#geo_lut_path) | string array | no | Geology LUT path |
 | [lai_lut_path](#lai_lut_path) | string array | no | LAI LUT path |
+| [read_restart](#read_restart) | logical array | no | Read restart |
+| [restart_input_path](#restart_input_path) | string array | no | Restart input path |
+| [write_restart](#write_restart) | logical array | no | Write restart |
+| [restart_output_path](#restart_output_path) | string array | no | Restart output path |
 
 ## Field details
 
@@ -92,12 +98,23 @@ Summary:
 
 Land cover path `land_cover_path`
 
-Land cover data path (periods derived from time bounds or start time stamp assumed).
+NetCDF land-cover dataset path.
 
 Summary:
 - Type: `character(len=buf), dimension(max_domains)`
 - Flexible tail dims: 1
 - Required: no
+
+### land_cover_var
+
+Land cover variable `land_cover_var`
+
+Land-cover variable name in the NetCDF dataset.
+
+Summary:
+- Type: `character(len=buf), dimension(max_domains)`
+- Required: no
+- Default: `"land_cover"`
 
 ### lai_time_step
 
@@ -120,12 +137,23 @@ Summary:
 
 LAI path `lai_path`
 
-LAI data path (if `lai_time_step` < 0 or = 1).
+Gridded LAI dataset path (if `lai_time_step` < 0 or = 1).
 
 Summary:
 - Type: `character(len=buf), dimension(max_domains)`
 - Flexible tail dims: 1
 - Required: no
+
+### lai_var
+
+LAI variable `lai_var`
+
+LAI variable name in the gridded NetCDF dataset.
+
+Summary:
+- Type: `character(len=buf), dimension(max_domains)`
+- Required: no
+- Default: `"lai"`
 
 ### soil_lut_path
 
@@ -160,6 +188,44 @@ Summary:
 - Flexible tail dims: 1
 - Required: no
 
+### read_restart
+
+Read restart `read_restart`
+
+Summary:
+- Type: `logical, dimension(max_domains)`
+- Required: no
+- Default: `.false.`
+
+### restart_input_path
+
+Restart input path `restart_input_path`
+
+Summary:
+- Type: `character(len=buf), dimension(max_domains)`
+- Flexible tail dims: 1
+- Required: no
+- Examples: `["mpr_restart_in.nc"]`
+
+### write_restart
+
+Write restart `write_restart`
+
+Summary:
+- Type: `logical, dimension(max_domains)`
+- Required: no
+- Default: `.false.`
+
+### restart_output_path
+
+Restart output path `restart_output_path`
+
+Summary:
+- Type: `character(len=buf), dimension(max_domains)`
+- Flexible tail dims: 1
+- Required: no
+- Examples: `["mpr_restart_out.nc"]`
+
 ## Example
 
 ```fortran
@@ -170,11 +236,17 @@ Summary:
   soil_depth(:, :) = 0
   fracSealed_cityArea(:) = 0.0
   land_cover_path(:) = ""
+  land_cover_var(:) = "land_cover"
   lai_time_step(:) = -3
   lai_path(:) = ""
+  lai_var(:) = "lai"
   soil_lut_path(:) = ""
   geo_lut_path(:) = ""
   lai_lut_path(:) = ""
+  read_restart(:) = .false.
+  restart_input_path(:) = "mpr_restart_in.nc"
+  write_restart(:) = .false.
+  restart_output_path(:) = "mpr_restart_out.nc"
 /
 ```
 

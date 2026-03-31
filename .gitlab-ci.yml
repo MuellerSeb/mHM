@@ -11,6 +11,7 @@ variables:
 stages:
   - info
   - build
+  - check-v6-nmls
   - check-cases
   - code-analysis
   - doc
@@ -73,6 +74,10 @@ show-env-vars:
     - mhm_debug
     - mhm_openmp
     - mhm_openmp_debug
+    - mhm_driver
+    - mhm_driver_debug
+    - mhm_driver_openmp
+    - mhm_driver_openmp_debug
 
 .cmake_mpi_template: &cmake_mpi_template
   when: always
@@ -85,6 +90,30 @@ show-env-vars:
     paths:
     - mhm_mpi
     - mhm_mpi_debug
+    - mhm_driver_mpi
+    - mhm_driver_mpi_debug
+
+.check_v6_template: &check_v6_template
+  when: always
+  stage: check-v6-nmls
+  script:
+    - source hpc-module-loads/eve.$COMPILER
+    - bash CI-scripts/run_v6_namelists.sh --log-dir logs_v6 --threads 4 ./mhm_driver_debug ./mhm_driver ./mhm_driver_openmp_debug ./mhm_driver_openmp
+  artifacts:
+    when: always
+    paths:
+    - logs_v6/
+
+.check_v6_mpi_template: &check_v6_mpi_template
+  when: always
+  stage: check-v6-nmls
+  script:
+    - source hpc-module-loads/eve.$COMPILER
+    - bash CI-scripts/run_v6_namelists.sh --log-dir logs_v6 --mpi 4 ./mhm_driver_mpi_debug ./mhm_driver_mpi
+  artifacts:
+    when: always
+    paths:
+    - logs_v6/
 
 .check_template: &check_template
   when: always
@@ -227,6 +256,70 @@ cmake-intel2023bMPI-classic:
 #################
 ### TEST JOBS ###
 #################
+
+check-v6-gfortran102:
+  variables:
+    COMPILER: gfortran102
+  needs:
+    - job: cmake-gfortran102
+      artifacts: true
+  <<: *check_v6_template
+
+# check-v6-gfortran102MPI:
+#   variables:
+#     COMPILER: gfortran102MPI
+#   needs:
+#     - job: cmake-gfortran102MPI
+#       artifacts: true
+#   <<: *check_v6_mpi_template
+
+check-v6-gfortran122:
+  variables:
+    COMPILER: gfortran122
+  needs:
+    - job: cmake-gfortran122
+      artifacts: true
+  <<: *check_v6_template
+
+# check-v6-gfortran122MPI:
+#   variables:
+#     COMPILER: gfortran122MPI
+#   needs:
+#     - job: cmake-gfortran122MPI
+#       artifacts: true
+#   <<: *check_v6_mpi_template
+
+check-v6-intel2020b:
+  variables:
+    COMPILER: intel2020b
+  needs:
+    - job: cmake-intel2020b
+      artifacts: true
+  <<: *check_v6_template
+
+# check-v6-intel2020bMPI:
+#   variables:
+#     COMPILER: intel2020bMPI
+#   needs:
+#     - job: cmake-intel2020bMPI
+#       artifacts: true
+#   <<: *check_v6_mpi_template
+
+check-v6-intel2023b-classic:
+  variables:
+    COMPILER: intel2023b-classic
+  needs:
+    - job: cmake-intel2023b-classic
+      artifacts: true
+  <<: *check_v6_template
+
+# check-v6-intel2023bMPI-classic:
+#   variables:
+#     COMPILER: intel2023bMPI-classic
+#   needs:
+#     - job: cmake-intel2023bMPI-classic
+#       artifacts: true
+#   <<: *check_v6_mpi_template
 
 check-gfortran102:
   variables:

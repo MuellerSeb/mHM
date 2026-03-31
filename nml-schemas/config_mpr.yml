@@ -67,7 +67,16 @@ properties:
     x-fortran-shape: max_domains
     x-fortran-flex-tail-dims: 1
     title: Land cover path
-    description: Land cover data path (periods derived from time bounds or start time stamp assumed).
+    description: NetCDF land-cover dataset path.
+  land_cover_var:
+    type: array
+    items:
+      type: string
+      x-fortran-len: buf
+      default: land_cover
+    x-fortran-shape: max_domains
+    title: Land cover variable
+    description: Land-cover variable name in the NetCDF dataset.
   lai_time_step:
     type: array
     items:
@@ -92,7 +101,16 @@ properties:
     x-fortran-shape: max_domains
     x-fortran-flex-tail-dims: 1
     title: LAI path
-    description: LAI data path (if `lai_time_step` < 0 or = 1).
+    description: Gridded LAI dataset path (if `lai_time_step` < 0 or = 1).
+  lai_var:
+    type: array
+    items:
+      type: string
+      x-fortran-len: buf
+      default: lai
+    x-fortran-shape: max_domains
+    title: LAI variable
+    description: LAI variable name in the gridded NetCDF dataset.
   soil_lut_path:
     type: array
     items:
@@ -120,3 +138,35 @@ properties:
     x-fortran-flex-tail-dims: 1
     title: LAI LUT path
     description: LAI look-up table path.
+  read_restart:
+    type: array
+    items:
+      type: boolean
+      default: false
+    x-fortran-shape: max_domains
+    title: Read restart
+  restart_input_path:
+    type: array
+    items:
+      type: string
+      x-fortran-len: buf
+    x-fortran-shape: max_domains
+    x-fortran-flex-tail-dims: 1
+    title: Restart input path
+    examples: [["mpr_restart_in.nc"]]
+  write_restart:
+    type: array
+    items:
+      type: boolean
+      default: false
+    x-fortran-shape: max_domains
+    title: Write restart
+  restart_output_path:
+    type: array
+    items:
+      type: string
+      x-fortran-len: buf
+    x-fortran-shape: max_domains
+    x-fortran-flex-tail-dims: 1
+    title: Restart output path
+    examples: [["mpr_restart_out.nc"]]

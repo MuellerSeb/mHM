@@ -11,12 +11,14 @@
 !> \ingroup f_exchange
 #include "logging.h"
 module mo_mhm_container
+  use, intrinsic :: ieee_arithmetic, only: ieee_is_finite
   use mo_logging
   use mo_kind, only: i4, dp
   use mo_constants, only : yearmonths
   use mo_mhm_constants, only : noutflxstate
   use mo_optimization_types, only : optidata
   use mo_exchange_type, only: exchange_t
+  use mo_string_utils, only: n2s => num2str
   use mo_message, only: message, error_message
   use nml_config_mhm, only: nml_config_mhm_t, NML_OK
 
@@ -86,6 +88,8 @@ contains
   subroutine mhm_configure(self, file)
     class(mhm_t), intent(inout), target :: self
     character(*), intent(in), optional :: file !< file containing the namelists
+    integer(i4) :: id(1)
+    real(dp) :: l1_res
     character(1024) :: errmsg
     character(:), allocatable :: path
     integer :: status
@@ -105,6 +109,21 @@ contains
       log_fatal(*) "mHM config not valid: ", trim(errmsg)
       error stop 1
     end if
+
+    id(1) = self%exchange%domain
+    status = self%config%is_set("resolution", idx=id, errmsg=errmsg)
+    if (status /= NML_OK) then
+      log_fatal(*) "mHM: resolution not set for domain ", n2s(id(1)), ". Error: ", trim(errmsg)
+      error stop 1
+    end if
+
+    l1_res = self%config%resolution(id(1))
+    if (.not.ieee_is_finite(l1_res) .or. l1_res <= 0.0_dp) then
+      log_fatal(*) "mHM: resolution must be finite and > 0 for domain ", n2s(id(1)), "."
+      error stop 1
+    end if
+    self%exchange%level1_resolution = l1_res
+    log_info(*) "mHM: set level1 resolution for domain ", n2s(id(1)), ": ", n2s(l1_res)
   end subroutine mhm_configure
 
   !> \brief Connect the mHM process container with other components.
