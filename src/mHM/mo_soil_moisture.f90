@@ -18,7 +18,10 @@
 !> \ingroup f_mhm
 MODULE mo_soil_moisture
 
+  USE, INTRINSIC :: ieee_arithmetic, ONLY : ieee_is_finite
   USE mo_kind, ONLY : i4, dp
+  USE mo_message, ONLY : error_message
+  USE mo_string_utils, ONLY : num2str
 
   IMPLICIT NONE
 
@@ -277,6 +280,8 @@ CONTAINS
       case(1, 4)
         soil_stress_factor = feddes_et_reduction(soil_moist(hh), soil_moist_FC(hh), wilting_point(hh), frac_roots(hh))
       case(2, 3)
+        call validate_jarvis_inputs(hh, soil_moist(hh), soil_moist_sat(hh), wilting_point(hh), frac_roots(hh), &
+                                    jarvis_thresh_c1)
         soil_stress_factor = jarvis_et_reduction(soil_moist(hh), soil_moist_sat(hh), wilting_point(hh), &
           frac_roots(hh), jarvis_thresh_c1)
       end select
@@ -294,6 +299,44 @@ CONTAINS
       if (soil_moist(hh) < eps_dp) soil_moist(hh) = eps_dp
     end do
   end subroutine soil_moisture_pervious
+
+  !> \brief Validate Jarvis ET reduction inputs before calling the pure helper.
+  subroutine validate_jarvis_inputs(horizon, soil_moist, soil_moist_sat, wilting_point, frac_roots, jarvis_thresh_c1)
+    implicit none
+
+    integer(i4), intent(in) :: horizon
+    real(dp), intent(in) :: soil_moist
+    real(dp), intent(in) :: soil_moist_sat
+    real(dp), intent(in) :: wilting_point
+    real(dp), intent(in) :: frac_roots
+    real(dp), intent(in) :: jarvis_thresh_c1
+
+    if (.not.ieee_is_finite(jarvis_thresh_c1) .or. jarvis_thresh_c1 <= 0.0_dp) then
+      call error_message("soil_moisture_pervious: invalid Jarvis threshold for horizon ", trim(num2str(horizon)), &
+                         ": ", trim(num2str(jarvis_thresh_c1)), raise=.true.)
+    end if
+    if (.not.ieee_is_finite(soil_moist_sat)) then
+      call error_message("soil_moisture_pervious: non-finite saturated soil moisture for horizon ", trim(num2str(horizon)), &
+                         ": ", trim(num2str(soil_moist_sat)), raise=.true.)
+    end if
+    if (.not.ieee_is_finite(wilting_point)) then
+      call error_message("soil_moisture_pervious: non-finite wilting point for horizon ", trim(num2str(horizon)), &
+                         ": ", trim(num2str(wilting_point)), raise=.true.)
+    end if
+    if (soil_moist_sat <= wilting_point) then
+      call error_message("soil_moisture_pervious: saturated soil moisture must exceed wilting point for horizon ", &
+                         trim(num2str(horizon)), ". sat=", trim(num2str(soil_moist_sat)), ", wp=", &
+                         trim(num2str(wilting_point)), raise=.true.)
+    end if
+    if (.not.ieee_is_finite(frac_roots)) then
+      call error_message("soil_moisture_pervious: non-finite root fraction for horizon ", trim(num2str(horizon)), &
+                         ": ", trim(num2str(frac_roots)), raise=.true.)
+    end if
+    if (.not.ieee_is_finite(soil_moist)) then
+      call error_message("soil_moisture_pervious: non-finite soil moisture for horizon ", trim(num2str(horizon)), &
+                         ": ", trim(num2str(soil_moist)), raise=.true.)
+    end if
+  end subroutine validate_jarvis_inputs
 
 
   ! ------------------------------------------------------------------
@@ -432,20 +475,28 @@ CONTAINS
     ! normalized soil water content
     real(dp) :: theta_inorm
 
+    jarvis_et_reduction = 0.0_dp
+    if (.not.ieee_is_finite(soil_moist)) return
+    if (.not.ieee_is_finite(soil_moist_sat)) return
+    if (.not.ieee_is_finite(wilting_point)) return
+    if (.not.ieee_is_finite(frac_roots)) return
+    if (.not.ieee_is_finite(jarvis_thresh_c1)) return
+    if (soil_moist_sat <= wilting_point) return
+    if (jarvis_thresh_c1 <= 0.0_dp) return
 
     ! Calculating normalized Soil Water Content
     theta_inorm = (soil_moist - wilting_point) / (soil_moist_sat - wilting_point)
+    if (.not.ieee_is_finite(theta_inorm)) return
 
     ! correct for numerical unaccuracies
-    if (theta_inorm .LT. 0.0_dp)    theta_inorm = 0.0_dp
-    if (theta_inorm .GT. 1.0_dp)    theta_inorm = 1.0_dp
+    if (theta_inorm .LT. 0.0_dp) theta_inorm = 0.0_dp
+    if (theta_inorm .GT. 1.0_dp) theta_inorm = 1.0_dp
 
     ! estimate fraction of ET demand based on root fraction and SM status using theta_inorm
     ! theta_inorm >= jarvis_thresh_c1
     if (theta_inorm .GE. jarvis_thresh_c1) then
       jarvis_et_reduction = frac_roots
-      ! 0 < theta_inorm < jarvis_thresh_c1
-    else if (theta_inorm .LT. jarvis_thresh_c1) then
+    else
       jarvis_et_reduction = frac_roots * (theta_inorm / jarvis_thresh_c1)
     end if
 
