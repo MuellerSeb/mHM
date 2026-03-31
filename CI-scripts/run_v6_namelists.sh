@@ -74,7 +74,7 @@ cd "${repo_root}"
 mkdir -p "${log_dir}"
 
 cleanup_generated_outputs() {
-  rm -f ./mpr*.nc ./mrm*.nc
+  rm -f ./mpr*.nc ./mrm*.nc ./mhm*.nc
 }
 
 parameter_file_for_namelist() {
@@ -83,6 +83,9 @@ parameter_file_for_namelist() {
   case "${nml_name}" in
     mpr_pet_aspect_*|mpr_temporal_lc_pet_lai_*|mpr_pet_hargreaves_*|mpr_pet_priestley_taylor_*|mpr_pet_penman_*|mrm_rivertemp_*)
       printf '%s\n' "test_nml/mhm_parameter_v6_meteo.nml"
+      ;;
+    mpr_snow_pet_lai_*|mpr_runoff_baseflow_*|mpr_soil_moisture_*|mpr_neutrons_desilets_*|mpr_neutrons_cosmic_*|mhm_runoff_baseflow_restart_*|mhm_output_*)
+      printf '%s\n' "test_nml/mhm_parameter_v6_hydrology.nml"
       ;;
     mpr_*)
       printf '%s\n' "mhm-para-template.nml"
@@ -93,18 +96,32 @@ parameter_file_for_namelist() {
   esac
 }
 
+output_file_for_namelist() {
+  local nml_name="$1"
+
+  case "${nml_name}" in
+    mhm_output_*)
+      printf '%s\n' "test_nml/mhm_output_v6_smoke.nml"
+      ;;
+    *)
+      printf '%s\n' "mhm-output-template.nml"
+      ;;
+  esac
+}
+
 run_namelist() {
   local exe="$1"
   local nml="$2"
-  local exe_name nml_name log_path param_file
+  local exe_name nml_name log_path param_file out_file
   local -a cmd=()
 
   exe_name=$(basename "${exe}")
   nml_name=$(basename "${nml}" .nml)
   log_path="${log_dir}/${exe_name}__${nml_name}.log"
   param_file=$(parameter_file_for_namelist "${nml_name}")
+  out_file=$(output_file_for_namelist "${nml_name}")
 
-  cmd+=("${exe}" -n "${nml}" -p "${param_file}" -o mhm-output-template.nml)
+  cmd+=("${exe}" -n "${nml}" -p "${param_file}" -o "${out_file}")
 
   if ((mpi_ranks > 0)); then
     cmd=(mpirun -n "${mpi_ranks}" "${cmd[@]}")
@@ -136,6 +153,12 @@ namelists=(
   test_nml/mpr_pet_penman_minimal.nml
   test_nml/mpr_pet_aspect_hourly6h_minimal.nml
   test_nml/mpr_pet_aspect_weights_minimal.nml
+  test_nml/mpr_snow_pet_lai_minimal.nml
+  test_nml/mpr_runoff_baseflow_minimal.nml
+  test_nml/mpr_neutrons_desilets_minimal.nml
+  test_nml/mhm_runoff_baseflow_restart_write.nml
+  test_nml/mhm_runoff_baseflow_restart_read.nml
+  test_nml/mhm_output_minimal.nml
   test_nml/mrm_rivertemp_meteo_minimal.nml
   test_nml/mrm_minimal.nml
   test_nml/mrm_minimal1.nml

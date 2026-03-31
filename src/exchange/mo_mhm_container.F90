@@ -15,6 +15,7 @@ module mo_mhm_container
   use mo_logging
   use mo_canopy_interc, only: canopy_interc
   use mo_constants, only: nodata_dp
+  use mo_grid_io, only: output_dataset, var, daily, monthly, yearly, no_time, time_units_delta
   use mo_runoff, only: L1_total_runoff, runoff_sat_zone, runoff_unsat_zone
   use mo_snow_accum_melt, only: snow_accum_melt
   use mo_soil_moisture, only: soil_moisture_direct_runoff, soil_moisture_pervious
@@ -132,6 +133,7 @@ module mo_mhm_container
     type(nml_config_mhm_t) :: config !< configuration of the mHM process container
     type(nml_output_mhm_t) :: output_config !< output configuration of the mHM process container
     type(exchange_t), pointer :: exchange => null() !< exchange container of the domain
+    type(output_dataset) :: ds_out !< output dataset for gridded mHM output
     type(mhm_observation_state_t) :: observation !< optimization observation support state
     type(mhm_canopy_state_t) :: canopy !< canopy process state and fluxes
     type(mhm_snow_state_t) :: snow !< snow process state and fluxes
@@ -156,6 +158,8 @@ module mo_mhm_container
     procedure :: update_baseflow => mhm_update_baseflow
     procedure :: update_total_runoff => mhm_update_total_runoff
     procedure :: update_neutrons => mhm_update_neutrons
+    procedure, private :: create_output => mhm_create_output
+    procedure, private :: update_output => mhm_update_output
     procedure, private :: create_restart => mhm_create_restart
     procedure, private :: write_restart_data => mhm_write_restart_data
     procedure, private :: read_restart_data => mhm_read_restart_data
@@ -327,7 +331,7 @@ contains
       "pre")
     call mhm_mark_required_dp(self, self%exchange%temp, snow_case /= 0_i4, "temp")
     call mhm_mark_required_dp(self, self%exchange%pet, &
-      (interception_case /= 0_i4) .or. (soil_case /= 0_i4) .or. (direct_runoff_case /= 0_i4), "pet")
+      (interception_case /= 0_i4) .or. (soil_case /= 0_i4) .or. (direct_runoff_case /= 0_i4) .or. self%output_config%out_pet, "pet")
 
     call mhm_mark_required_dp(self, self%exchange%max_interception, interception_case /= 0_i4, "max_interception")
     call mhm_mark_required_dp(self, self%exchange%thresh_temp, snow_case /= 0_i4, "thresh_temp")
@@ -336,10 +340,14 @@ contains
     call mhm_mark_required_dp(self, self%exchange%degday_max, snow_case /= 0_i4, "degday_max")
 
     call mhm_mark_required_dp(self, self%exchange%f_sealed, &
-      (soil_case /= 0_i4) .or. (direct_runoff_case /= 0_i4) .or. (interflow_case /= 0_i4) .or. (baseflow_case /= 0_i4), &
+      (soil_case /= 0_i4) .or. (direct_runoff_case /= 0_i4) .or. (interflow_case /= 0_i4) .or. (baseflow_case /= 0_i4) .or. &
+      self%output_config%out_aet_all .or. self%output_config%out_qd .or. self%output_config%out_qif .or. &
+      self%output_config%out_qis .or. self%output_config%out_qb .or. self%output_config%out_recharge .or. &
+      self%output_config%out_soil_infil .or. self%output_config%out_aet_layer, &
       "f_sealed")
     call mhm_mark_required_2d(self, self%exchange%f_roots, soil_case /= 0_i4, "f_roots", n_horizons)
-    call mhm_mark_required_2d(self, self%exchange%sm_saturation, soil_case /= 0_i4, "sm_saturation", n_horizons)
+    call mhm_mark_required_2d(self, self%exchange%sm_saturation, &
+      (soil_case /= 0_i4) .or. self%output_config%out_sm .or. self%output_config%out_sm_all, "sm_saturation", n_horizons)
     call mhm_mark_required_2d(self, self%exchange%sm_exponent, soil_case /= 0_i4, "sm_exponent", n_horizons)
     call mhm_mark_required_2d(self, self%exchange%sm_field_capacity, soil_case /= 0_i4, "sm_field_capacity", n_horizons)
     call mhm_mark_required_2d(self, self%exchange%wilting_point, soil_case /= 0_i4, "wilting_point", n_horizons)
@@ -442,6 +450,8 @@ contains
     else
       call mhm_reset_state_fluxes(self)
     end if
+
+    call self%create_output()
   end subroutine mhm_initialize
 
   !> \brief Update the mHM process container for the current time step.
@@ -456,7 +466,204 @@ contains
     call self%update_baseflow()
     call self%update_total_runoff()
     call self%update_neutrons()
+    call self%update_output()
   end subroutine mhm_update
+
+  !> \brief Create the gridded mHM output dataset from the configured output flags.
+  subroutine mhm_create_output(self)
+    class(mhm_t), intent(inout), target :: self
+    type(var), allocatable :: vars(:)
+    character(:), allocatable :: dtype
+    character(:), allocatable :: flux_unit
+    character(:), allocatable :: delta
+    integer(i4) :: timestamp
+    integer(i4) :: horizon
+
+    if (.not.self%io%output_active) return
+
+    timestamp = self%output_config%output_time_reference
+    delta = time_units_delta(self%output_config%output_frequency, timestamp)
+    dtype = "f64"
+    if (.not.self%output_config%output_double_precision) dtype = "f32"
+    flux_unit = mhm_flux_units(self)
+    allocate(vars(0))
+
+    if (self%output_config%out_interception) then
+      vars = [vars, var(name="interception", long_name="canopy interception storage", units="mm", dtype=dtype, avg=.true.)]
+    end if
+    if (self%output_config%out_snowpack) then
+      vars = [vars, var(name="snowpack", long_name="depth of snowpack", units="mm", dtype=dtype, avg=.true.)]
+    end if
+    if (self%output_config%out_swc) then
+      do horizon = 1_i4, size(self%soil%moisture, 2)
+        vars = [vars, var(name="SWC_L" // trim(n2s(horizon, '(i2.2)')), &
+          long_name="soil water content of soil layer" // trim(n2s(horizon)), units="mm", dtype=dtype, avg=.true.)]
+      end do
+    end if
+    if (self%output_config%out_sm) then
+      do horizon = 1_i4, size(self%soil%moisture, 2)
+        vars = [vars, var(name="SM_L" // trim(n2s(horizon, '(i2.2)')), &
+          long_name="volumetric soil moisture of soil layer" // trim(n2s(horizon)), units="mm mm-1", dtype=dtype, avg=.true.)]
+      end do
+    end if
+    if (self%output_config%out_sm_all) then
+      vars = [vars, var(name="SM_Lall", long_name="average soil moisture over all layers", units="mm mm-1", &
+        dtype=dtype, avg=.true.)]
+    end if
+    if (self%output_config%out_sealedstw) then
+      vars = [vars, var(name="sealedSTW", long_name="reservoir of sealed areas (sealedSTW)", units="mm", dtype=dtype, &
+        avg=.true.)]
+    end if
+    if (self%output_config%out_unsatstw) then
+      vars = [vars, var(name="unsatSTW", long_name="reservoir of unsaturated zone", units="mm", dtype=dtype, avg=.true.)]
+    end if
+    if (self%output_config%out_satstw) then
+      vars = [vars, var(name="satSTW", long_name="water level in groundwater reservoir", units="mm", dtype=dtype, avg=.true.)]
+    end if
+    if (self%output_config%out_neutrons) then
+      vars = [vars, var(name="neutrons", long_name="ground albedo neutrons", units="cph", dtype=dtype, avg=.true.)]
+    end if
+    if (self%output_config%out_pet) then
+      vars = [vars, var(name="PET", long_name="potential Evapotranspiration", units=flux_unit, dtype=dtype)]
+    end if
+    if (self%output_config%out_aet_all) then
+      vars = [vars, var(name="aET", long_name="actual Evapotranspiration", units=flux_unit, dtype=dtype)]
+    end if
+    if (self%output_config%out_q) then
+      vars = [vars, var(name="Q", long_name="total runoff generated by every cell", units=flux_unit, dtype=dtype)]
+    end if
+    if (self%output_config%out_qd) then
+      vars = [vars, var(name="QD", long_name="direct runoff generated by every cell (runoffSeal)", units=flux_unit, dtype=dtype)]
+    end if
+    if (self%output_config%out_qif) then
+      vars = [vars, var(name="QIf", long_name="fast interflow generated by every cell (fastRunoff)", units=flux_unit, dtype=dtype)]
+    end if
+    if (self%output_config%out_qis) then
+      vars = [vars, var(name="QIs", long_name="slow interflow generated by every cell (slowRunoff)", units=flux_unit, dtype=dtype)]
+    end if
+    if (self%output_config%out_qb) then
+      vars = [vars, var(name="QB", long_name="baseflow generated by every cell", units=flux_unit, dtype=dtype)]
+    end if
+    if (self%output_config%out_recharge) then
+      vars = [vars, var(name="recharge", long_name="groundwater recharge", units=flux_unit, dtype=dtype)]
+    end if
+    if (self%output_config%out_soil_infil) then
+      do horizon = 1_i4, size(self%soil%infiltration, 2)
+        vars = [vars, var(name="soil_infil_L" // trim(n2s(horizon, '(i2.2)')), &
+          long_name="infiltration flux from soil layer" // trim(n2s(horizon)), units=flux_unit, dtype=dtype)]
+      end do
+    end if
+    if (self%output_config%out_aet_layer) then
+      do horizon = 1_i4, size(self%soil%aet, 2)
+        vars = [vars, var(name="aET_L" // trim(n2s(horizon, '(i2.2)')), &
+          long_name="actual Evapotranspiration from soil layer" // trim(n2s(horizon)), units="mm " // trim(flux_unit), &
+          dtype=dtype)]
+      end do
+    end if
+    if (self%output_config%out_preeffect) then
+      vars = [vars, var(name="preEffect", long_name="effective precipitation", units=flux_unit, dtype=dtype)]
+    end if
+    if (self%output_config%out_qsm) then
+      vars = [vars, var(name="Qsm", &
+        long_name="Average liquid water generated from solid to liquid phase change in the snow", units=flux_unit, dtype=dtype)]
+    end if
+
+    log_info(*) "Create mHM output file: ", self%io%output_path
+    call self%ds_out%init( &
+      path          = self%io%output_path, &
+      grid          = self%exchange%level1, &
+      vars          = vars, &
+      start_time    = self%exchange%start_time, &
+      delta         = delta, &
+      timestamp     = timestamp, &
+      deflate_level = self%output_config%output_deflate_level)
+  end subroutine mhm_create_output
+
+  !> \brief Update buffered mHM outputs and write them when the configured stamp is reached.
+  subroutine mhm_update_output(self)
+    class(mhm_t), intent(inout), target :: self
+    real(dp), allocatable :: f_not_sealed(:)
+    real(dp), allocatable :: tmp(:)
+    logical :: needs_f_sealed
+    logical :: write_stamp
+    integer(i4) :: horizon
+
+    if (.not.self%io%output_active) return
+
+    needs_f_sealed = self%output_config%out_aet_all .or. self%output_config%out_qd .or. self%output_config%out_qif .or. &
+      self%output_config%out_qis .or. self%output_config%out_qb .or. self%output_config%out_recharge .or. &
+      self%output_config%out_soil_infil .or. self%output_config%out_aet_layer
+    if (needs_f_sealed) then
+      allocate(f_not_sealed(size(self%exchange%f_sealed%data)))
+      f_not_sealed = 1.0_dp - self%exchange%f_sealed%data
+    end if
+
+    if (self%output_config%out_interception) call self%ds_out%update("interception", self%canopy%interception)
+    if (self%output_config%out_snowpack) call self%ds_out%update("snowpack", self%snow%snowpack)
+    if (self%output_config%out_swc) then
+      do horizon = 1_i4, size(self%soil%moisture, 2)
+        call self%ds_out%update("SWC_L" // trim(n2s(horizon, '(i2.2)')), self%soil%moisture(:, horizon))
+      end do
+    end if
+    if (self%output_config%out_sm) then
+      do horizon = 1_i4, size(self%soil%moisture, 2)
+        call self%ds_out%update("SM_L" // trim(n2s(horizon, '(i2.2)')), &
+          self%soil%moisture(:, horizon) / self%exchange%sm_saturation%data(:, horizon))
+      end do
+    end if
+    if (self%output_config%out_sm_all) then
+      allocate(tmp(size(self%soil%moisture, 1)))
+      tmp = sum(self%soil%moisture, dim=2) / sum(self%exchange%sm_saturation%data, dim=2)
+      call self%ds_out%update("SM_Lall", tmp)
+      deallocate(tmp)
+    end if
+    if (self%output_config%out_sealedstw) call self%ds_out%update("sealedSTW", self%direct_runoff%storage)
+    if (self%output_config%out_unsatstw) call self%ds_out%update("unsatSTW", self%runoff%unsat_storage)
+    if (self%output_config%out_satstw) call self%ds_out%update("satSTW", self%runoff%sat_storage)
+    if (self%output_config%out_neutrons) call self%ds_out%update("neutrons", self%neutrons%counts)
+    if (self%output_config%out_pet) call self%ds_out%update("PET", self%exchange%pet%data)
+    if (self%output_config%out_aet_all) then
+      allocate(tmp(size(self%soil%aet, 1)))
+      tmp = sum(self%soil%aet, dim=2) * f_not_sealed + self%canopy%aet + self%direct_runoff%aet * self%exchange%f_sealed%data
+      call self%ds_out%update("aET", tmp)
+      deallocate(tmp)
+    end if
+    if (self%output_config%out_q) call self%ds_out%update("Q", self%runoff%total_runoff)
+    if (self%output_config%out_qd) call self%ds_out%update("QD", self%direct_runoff%runoff * self%exchange%f_sealed%data)
+    if (self%output_config%out_qif) call self%ds_out%update("QIf", self%runoff%fast_interflow * f_not_sealed)
+    if (self%output_config%out_qis) call self%ds_out%update("QIs", self%runoff%slow_interflow * f_not_sealed)
+    if (self%output_config%out_qb) call self%ds_out%update("QB", self%runoff%baseflow * f_not_sealed)
+    if (self%output_config%out_recharge) call self%ds_out%update("recharge", self%runoff%percolation * f_not_sealed)
+    if (self%output_config%out_soil_infil) then
+      do horizon = 1_i4, size(self%soil%infiltration, 2)
+        call self%ds_out%update("soil_infil_L" // trim(n2s(horizon, '(i2.2)')), self%soil%infiltration(:, horizon) * f_not_sealed)
+      end do
+    end if
+    if (self%output_config%out_aet_layer) then
+      do horizon = 1_i4, size(self%soil%aet, 2)
+        call self%ds_out%update("aET_L" // trim(n2s(horizon, '(i2.2)')), self%soil%aet(:, horizon) * f_not_sealed)
+      end do
+    end if
+    if (self%output_config%out_preeffect) call self%ds_out%update("preEffect", self%snow%pre_effect)
+    if (self%output_config%out_qsm) call self%ds_out%update("Qsm", self%snow%melt)
+
+    write_stamp = .false.
+    select case (self%output_config%output_frequency)
+    case (daily)
+      if (self%exchange%time%is_new_day()) write_stamp = .true.
+    case (monthly)
+      if (self%exchange%time%is_new_month()) write_stamp = .true.
+    case (yearly)
+      if (self%exchange%time%is_new_year()) write_stamp = .true.
+    case (no_time)
+      if (self%exchange%time == self%exchange%end_time) write_stamp = .true.
+    case default
+      if (mod(self%exchange%step_count, self%output_config%output_frequency) == 0_i4) write_stamp = .true.
+    end select
+    if (write_stamp) call self%ds_out%write(self%exchange%time)
+
+    if (allocated(f_not_sealed)) deallocate(f_not_sealed)
+  end subroutine mhm_update_output
 
   !> \brief Update canopy interception and throughfall for the current step.
   subroutine mhm_update_interception(self)
@@ -1076,6 +1283,12 @@ contains
   subroutine mhm_finalize(self)
     class(mhm_t), intent(inout), target :: self
     if (self%io%write_restart) call self%create_restart()
+    if (self%io%output_active) then
+      call self%ds_out%close()
+      log_info(*) "Close mHM output file: ", self%io%output_path
+    else
+      log_info(*) "No mHM output file will be written"
+    end if
     call mhm_clear_exchange(self)
     if (allocated(self%canopy%interception)) deallocate(self%canopy%interception)
     if (allocated(self%canopy%throughfall)) deallocate(self%canopy%throughfall)
@@ -1106,6 +1319,33 @@ contains
     self%runtime%c2TSTu = 0.0_dp
     log_info(*) "Finalize mhm"
   end subroutine mhm_finalize
+
+  !> \brief Build the legacy flux-unit string for mHM gridded output metadata.
+  function mhm_flux_units(self) result(units)
+    class(mhm_t), intent(in), target :: self
+    character(:), allocatable :: units
+    integer(i4) :: step_hours
+    integer(i4) :: total_steps
+
+    step_hours = max(1_i4, int(self%exchange%step / one_hour(), i4))
+    select case (self%output_config%output_frequency)
+    case (daily)
+      units = "mm d-1"
+    case (monthly)
+      units = "mm month-1"
+    case (yearly)
+      units = "mm a-1"
+    case (no_time)
+      total_steps = max(1_i4, nint((self%exchange%end_time - self%exchange%start_time) / self%exchange%step))
+      units = "mm " // trim(n2s(total_steps)) // "h-1"
+    case default
+      if (step_hours * self%output_config%output_frequency == 1_i4) then
+        units = "mm h-1"
+      else
+        units = "mm " // trim(n2s(step_hours * self%output_config%output_frequency)) // "h-1"
+      end if
+    end select
+  end function mhm_flux_units
 
   !> \brief Mark a 1D exchange field as required and validate it.
   subroutine mhm_mark_required_dp(self, var, required, name)

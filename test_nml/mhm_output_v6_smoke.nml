@@ -1,0 +1,36 @@
+&output_mhm
+  output_deflate_level    = 6
+  output_double_precision = .false.
+  output_time_reference   = 2
+  output_frequency        = -1
+  out_interception        = .true.
+  out_snowpack            = .true.
+  out_swc                 = .true.
+  out_sm                  = .true.
+  out_sm_all              = .true.
+  out_sealedstw           = .true.
+  out_unsatstw            = .true.
+  out_satstw              = .true.
+  out_pet                 = .true.
+  out_aet_all             = .true.
+  out_q                   = .true.
+  out_qd                  = .true.
+  out_qif                 = .true.
+  out_qis                 = .true.
+  out_qb                  = .true.
+  out_recharge            = .true.
+  out_soil_infil          = .true.
+  out_neutrons            = .true.
+  out_aet_layer           = .true.
+  out_preeffect           = .true.
+  out_qsm                 = .true.
+/
+
+&output_mrm
+  output_deflate_level    = 6
+  output_double_precision = .false.
+  output_time_reference   = 2
+  output_frequency        = -1
+  out_Qrouted             = .false.
+  out_RivTemp             = .false.
+/
