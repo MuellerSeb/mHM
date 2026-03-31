@@ -531,7 +531,7 @@ contains
     if (this%river%scc) then
       this%scaled_runoff = this%scale_runoff(this%acc_runoff)
       ! Keep SIMD but avoid the combined OpenMP 4.x form that NAG rejects here.
-      !$omp parallel default(none) shared(this) private(c)
+      !$omp parallel default(none) shared(this) private(c, n)
       !$omp do simd schedule(static)
       do n = 1_i8, this%river%n_nodes
         c = this%river%node_cell(n)
