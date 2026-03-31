@@ -63,6 +63,15 @@ Then use cmake option below. Note that memory dump is a common issue for cygwin 
 
     cmake -DCMAKE_Fortran_FLAGS="${CMAKE_Fortran_FLAGS} -Wl,--stack,12485760" -DCMAKE_WITH_OpenMP=ON -DCMAKE_BUILD_TYPE=Release ..
 
+To keep optimization while also retaining debug symbols, `RelWithDebInfo` is
+supported as well:
+
+    cmake -DCMAKE_Fortran_FLAGS="${CMAKE_Fortran_FLAGS} -Wl,--stack,12485760" -DCMAKE_WITH_OpenMP=ON -DCMAKE_BUILD_TYPE=RelWithDebInfo ..
+
+For local host-tuned release builds, you can additionally enable:
+
+    cmake -DCMAKE_BUILD_TYPE=Release -DMHM_ENABLE_NATIVE=ON ..
+
 4) Execute `make`
         make
 

@@ -176,6 +176,9 @@ You can execute it with:
 ./mhm
 ```
 
+For direct CMake builds, the environment variable `MHM_BUILD_PARALLEL=[0|1]`
+provides the default value for `CMAKE_WITH_OpenMP`.
+
 
 ## Installation
 
@@ -230,6 +233,27 @@ You can control all `cmake` options by passing them as directives staring with `
 For example for debug configuration, you can do the following:
 ```bash
 cmake -B build -DCMAKE_BUILD_TYPE=Debug
+```
+
+Common legacy mHMv5 CMake options are:
+
+- `-DCMAKE_BUILD_TYPE=RelWithDebInfo`
+- `-DCMAKE_WITH_OpenMP=ON`
+- `-DCMAKE_WITH_MPI=ON`
+- `-DMHM_ENABLE_NATIVE=ON`
+- `-DCMAKE_WITH_COVERAGE=ON`
+- `-DCMAKE_WITH_GPROF=ON`
+
+The legacy parallel options also configure the embedded FORCES dependency:
+`CMAKE_WITH_OpenMP` enables `FORCES_WITH_OpenMP`, and `CMAKE_WITH_MPI`
+enables `FORCES_WITH_MPI`.
+
+For example:
+
+```bash
+cmake -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo
+cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_WITH_OpenMP=ON
+cmake -B build -DCMAKE_BUILD_TYPE=Release -DMHM_ENABLE_NATIVE=ON
 ```
 
 To configure the build interactively, you can also use [ccmake](https://cmake.org/cmake/help/latest/manual/ccmake.1.html) (command line tool) or the [CMake GUI](https://cmake.org/cmake/help/latest/manual/cmake-gui.1.html) (graphical user interface).
