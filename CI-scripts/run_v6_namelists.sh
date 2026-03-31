@@ -154,7 +154,13 @@ namelists=(
   test_nml/mpr_pet_aspect_hourly6h_minimal.nml
   test_nml/mpr_pet_aspect_weights_minimal.nml
   test_nml/mpr_snow_pet_lai_minimal.nml
+  test_nml/mpr_runoff_baseflow_minimal.nml
+  test_nml/mpr_neutrons_desilets_minimal.nml
+  test_nml/mpr_neutrons_cosmic_minimal.nml
   test_nml/mhm_interception_snow_passthrough_minimal.nml
+  test_nml/mhm_runoff_baseflow_restart_write.nml
+  test_nml/mhm_runoff_baseflow_restart_read.nml
+  test_nml/mhm_output_minimal.nml
   test_nml/mrm_rivertemp_meteo_minimal.nml
   test_nml/mrm_minimal.nml
   test_nml/mrm_minimal1.nml
