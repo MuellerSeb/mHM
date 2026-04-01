@@ -67,12 +67,12 @@ ${SUCMD}make install
 cd ..
 
 ## NetCDF-Fortran
-git clone --depth 1 --branch ${VNC_F} https://github.com/Unidata/netcdf-fortran.git
-cd netcdf-fortran
-LD_LIBRARY_PATH=${INSTDIR}/lib:${LD_LIBRARY_PATH} CPPFLAGS=-I${INSTDIR}/include LDFLAGS=-L${INSTDIR}/lib ./configure --prefix=${INSTDIR}
-make -j
-${SUCMD}make install
-cd ..
+# git clone --depth 1 --branch ${VNC_F} https://github.com/Unidata/netcdf-fortran.git
+# cd netcdf-fortran
+# LD_LIBRARY_PATH=${INSTDIR}/lib:${LD_LIBRARY_PATH} CPPFLAGS=-I${INSTDIR}/include LDFLAGS=-L${INSTDIR}/lib ./configure --prefix=${INSTDIR}
+# make -j
+# ${SUCMD}make install
+# cd ..
 
 # remove temporary directory
 cd .. && ${SUCMD}rm -rf _tmp_mhm_deps

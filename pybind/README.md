@@ -56,7 +56,8 @@ The following environment variables can be used to control the compilation and i
 
 - `SKBUILD_CMAKE_BUILD_TYPE=[Release|Debug]`: build type for the mhm library (default: `Release`)
 - `MHM_BUILD_FORCES_PATH=<path>`: custom path to forces source dir (default: None)
-- `MHM_BUILD_PARALLEL=[0|1]`: whether to use OpenMP with mHM (default: `0`)
+- `MHM_BUILD_PARALLEL=[0|1]`: default value for `CMAKE_WITH_OpenMP` when building mHM (default: `0`)
+- `CMAKE_ARGS="<args>"`: additional CMake defines, for example `-DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_WITH_OpenMP=ON -DMHM_ENABLE_NATIVE=ON`
 
 
 ## Test domain download tool
