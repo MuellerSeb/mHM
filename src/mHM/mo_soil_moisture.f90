@@ -183,6 +183,9 @@ CONTAINS
 
     real(dp) :: tmp
 
+    ! ----------------------------------------------------------------
+    ! IMPERVIOUS COVER PROCESS
+    ! ----------------------------------------------------------------
     runoff_sealed = 0.0_dp
     aet_sealed = 0.0_dp
 
@@ -197,13 +200,16 @@ CONTAINS
         storage_sealed = tmp
       end if
 
+      ! aET from sealed area is propotional to the available water content
       if (water_thresh_sealed > eps_dp) then
         aet_sealed = (pet / evap_coeff - aet_canopy) * (storage_sealed / water_thresh_sealed)
+        ! numerical problem
         if (aet_sealed < 0.0_dp) aet_sealed = 0.0_dp
       else
         aet_sealed = huge(1.0_dp)
       end if
 
+      ! sealed storage updata
       if (storage_sealed > aet_sealed) then
         storage_sealed = storage_sealed - aet_sealed
       else
@@ -243,18 +249,29 @@ CONTAINS
     real(dp) :: soil_stress_factor
     real(dp) :: tmp
 
+    ! ----------------------------------------------------------------
+    ! N-LAYER SOIL MODULE
+    ! ----------------------------------------------------------------
     aet(:) = 0.0_dp
     infiltration(:) = 0.0_dp
 
     do hh = 1, size(soil_moist_sat, 1)
       prev_hh = max(1_i4, hh - 1_i4)
+
+      ! for 1st layer input is prec_effec
       prec_effec_soil = prec_effec
+
+      ! input for other layers is the infiltration from its immediate upper layer will be input
       if (hh > 1) prec_effec_soil = infiltration(prev_hh)
 
+      ! start processing for soil moisture process
+      ! BASED ON SMs as its upper LIMIT
       if (soil_moist(hh) > soil_moist_sat(hh)) then
         infiltration(hh) = prec_effec_soil
       else
+        ! to avoid underflow -- or numerical errors
         if (soil_moist(hh) > eps_dp) then
+          !frac_runoff = (soil_moist(hh) / soil_moist_sat(hh))**soil_moist_exponen(hh)
           frac_runoff = exp(soil_moist_exponen(hh) * log(soil_moist(hh) / soil_moist_sat(hh)))
         else
           frac_runoff = 0.0_dp
@@ -270,20 +287,30 @@ CONTAINS
         end if
       end if
 
+      ! aET calculations
+      ! Satisfying ET demand sequentially from top to the bottom layer.
+      ! Note that the potential ET for the first soil layer is reduced after
+      ! satisfying ET demands of the canopy surface.
       aet(hh) = pet - aet_canopy
       if (hh /= 1) aet(hh) = aet(hh) - sum(aet(1 : hh - 1), mask = (aet(1 : hh - 1) > 0.0_dp))
 
+      ! estimate fraction of ET demand based on root fraction and SM status
       select case(processCase)
+      ! FEDDES EQUATION: https://doi.org/10.1016/0022-1694(76)90017-2
       case(1, 4)
         soil_stress_factor = feddes_et_reduction(soil_moist(hh), soil_moist_FC(hh), wilting_point(hh), frac_roots(hh))
+      ! JARVIS EQUATION: https://doi.org/10.1016/0022-1694(89)90050-4
       case(2, 3)
+        !!!!!!!!! INTRODUCING STRESS FACTOR FOR SOIL MOISTURE ET REDUCTION !!!!!!!!!!!!!!!!!
         soil_stress_factor = jarvis_et_reduction(soil_moist(hh), soil_moist_sat(hh), wilting_point(hh), &
           frac_roots(hh), jarvis_thresh_c1)
       end select
 
       aet(hh) = aet(hh) * soil_stress_factor
+      ! avoid numerical error
       if (aet(hh) < 0.0_dp) aet(hh) = 0.0_dp
 
+      ! reduce SM state
       if (soil_moist(hh) > aet(hh)) then
         soil_moist(hh) = soil_moist(hh) - aet(hh)
       else
@@ -291,6 +318,7 @@ CONTAINS
         soil_moist(hh) = eps_dp
       end if
 
+      ! avoid numerical error of underflow
       if (soil_moist(hh) < eps_dp) soil_moist(hh) = eps_dp
     end do
   end subroutine soil_moisture_pervious
