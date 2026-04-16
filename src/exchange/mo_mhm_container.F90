@@ -35,16 +35,6 @@ module mo_mhm_container
 
   implicit none
 
-  !> \class   mhm_observation_state_t
-  !> \brief   Optional optimization-observation arrays owned by the mHM container.
-  type :: mhm_observation_state_t
-    real(dp), allocatable :: soil_moisture(:, :) !< soil moisture input for optimization
-    logical, allocatable :: soil_moisture_mask(:, :) !< valid-data mask for soil moisture optimization input
-    real(dp), allocatable :: neutrons(:, :) !< ground albedo neutrons input
-    logical, allocatable :: neutrons_mask(:, :) !< valid-data mask for neutron optimization input
-    integer(i4) :: n_soil_horizons = 0_i4 !< number of mHM soil horizons represented in optimization input
-  end type mhm_observation_state_t
-
   !> \class   mhm_canopy_state_t
   !> \brief   Grouped canopy process state and fluxes.
   type :: mhm_canopy_state_t
@@ -161,7 +151,6 @@ module mo_mhm_container
     type(nml_output_mhm_t) :: output_config !< output configuration of the mHM process container
     type(exchange_t), pointer :: exchange => null() !< exchange container of the domain
     type(output_dataset) :: ds_out !< output dataset for gridded mHM output
-    type(mhm_observation_state_t) :: observation !< optimization observation support state
     type(mhm_canopy_state_t) :: canopy !< canopy process state and fluxes
     type(mhm_snow_state_t) :: snow !< snow process state and fluxes
     type(mhm_direct_runoff_state_t) :: direct_runoff !< direct-runoff/sealed-area state and fluxes
@@ -343,7 +332,6 @@ contains
       log_fatal(*) "mHM: soil_horizon_bounds must contain at least two entries."
       error stop 1
     end if
-    self%observation%n_soil_horizons = n_horizons
 
     interception_case = self%exchange%parameters%process_matrix(1, 1)
     snow_case = self%exchange%parameters%process_matrix(2, 1)
@@ -1491,7 +1479,6 @@ contains
     if (allocated(self%runoff%total_runoff)) deallocate(self%runoff%total_runoff)
     if (allocated(self%neutrons%counts)) deallocate(self%neutrons%counts)
     if (allocated(self%neutrons%integral_afast)) deallocate(self%neutrons%integral_afast)
-    self%observation%n_soil_horizons = 0_i4
     self%runtime%c2TSTu = 0.0_dp
     log_info(*) "Finalize mhm"
   end subroutine mhm_finalize
