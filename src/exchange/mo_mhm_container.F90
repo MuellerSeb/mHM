@@ -25,7 +25,7 @@ module mo_mhm_container
   use mo_exchange_type, only: exchange_t
   use mo_datetime, only: one_hour
   use mo_grid, only: grid_t, cartesian
-  use mo_mhm_constants, only: P2_InitStateFluxes, P3_InitStateFluxes, P4_InitStateFluxes, C1_InitStateSM
+  use mo_mhm_constants, only: P2_InitStateFluxes, P3_InitStateFluxes, P4_InitStateFluxes
   use mo_neutrons, only: COSMIC, DesiletsN0, TabularIntegralAFast
   use mo_netcdf, only: NcDataset, NcDimension, NcVariable
   use mo_string_utils, only: n2s => num2str
@@ -36,7 +36,7 @@ module mo_mhm_container
   implicit none
 
   !> \class   mhm_canopy_state_t
-  !> \brief   Grouped canopy process state and fluxes.
+  !> \brief   Grouped canopy process fields.
   type :: mhm_canopy_state_t
     real(dp), allocatable :: interception(:) !< canopy interception storage
     real(dp), allocatable :: throughfall(:) !< throughfall flux
@@ -44,7 +44,7 @@ module mo_mhm_container
   end type mhm_canopy_state_t
 
   !> \class   mhm_snow_state_t
-  !> \brief   Grouped snow process state and fluxes.
+  !> \brief   Grouped snow process fields.
   type :: mhm_snow_state_t
     real(dp), allocatable :: snowpack(:) !< snowpack storage
     real(dp), allocatable :: melt(:) !< melting snow depth
@@ -55,7 +55,7 @@ module mo_mhm_container
   end type mhm_snow_state_t
 
   !> \class   mhm_direct_runoff_state_t
-  !> \brief   Grouped sealed-area/direct-runoff state and fluxes.
+  !> \brief   Grouped sealed-area/direct-runoff process fields.
   type :: mhm_direct_runoff_state_t
     real(dp), allocatable :: storage(:) !< retention storage of impervious areas
     real(dp), allocatable :: aet(:) !< actual evapotranspiration from free-water surfaces
@@ -63,7 +63,7 @@ module mo_mhm_container
   end type mhm_direct_runoff_state_t
 
   !> \class   mhm_soil_state_t
-  !> \brief   Grouped soil-moisture state and vertical fluxes.
+  !> \brief   Grouped soil-moisture process fields.
   type :: mhm_soil_state_t
     real(dp), allocatable :: horizon_bounds(:) !< soil-horizon boundary depths copied from MPR metadata
     real(dp), allocatable :: moisture(:, :) !< soil moisture by horizon
@@ -72,7 +72,7 @@ module mo_mhm_container
   end type mhm_soil_state_t
 
   !> \class   mhm_runoff_state_t
-  !> \brief   Grouped storages and runoff/baseflow fluxes.
+  !> \brief   Grouped runoff/baseflow process fields.
   type :: mhm_runoff_state_t
     real(dp), allocatable :: unsat_storage(:) !< upper soil storage
     real(dp), allocatable :: sat_storage(:) !< groundwater storage
@@ -84,7 +84,7 @@ module mo_mhm_container
   end type mhm_runoff_state_t
 
   !> \class   mhm_neutron_state_t
-  !> \brief   Grouped neutron state and static support data.
+  !> \brief   Grouped neutron process fields and static support data.
   type :: mhm_neutron_state_t
     real(dp), allocatable :: counts(:) !< simulated ground albedo neutrons
     real(dp), allocatable :: integral_afast(:) !< pre-calculated integrand for neutron flux approximation
@@ -151,12 +151,12 @@ module mo_mhm_container
     type(nml_output_mhm_t) :: output_config !< output configuration of the mHM process container
     type(exchange_t), pointer :: exchange => null() !< exchange container of the domain
     type(output_dataset) :: ds_out !< output dataset for gridded mHM output
-    type(mhm_canopy_state_t) :: canopy !< canopy process state and fluxes
-    type(mhm_snow_state_t) :: snow !< snow process state and fluxes
-    type(mhm_direct_runoff_state_t) :: direct_runoff !< direct-runoff/sealed-area state and fluxes
-    type(mhm_soil_state_t) :: soil !< soil-moisture state and vertical fluxes
-    type(mhm_runoff_state_t) :: runoff !< runoff/baseflow storages and fluxes
-    type(mhm_neutron_state_t) :: neutrons !< neutron state and static support data
+    type(mhm_canopy_state_t) :: canopy !< canopy process fields
+    type(mhm_snow_state_t) :: snow !< snow process fields
+    type(mhm_direct_runoff_state_t) :: direct_runoff !< direct-runoff/sealed-area process fields
+    type(mhm_soil_state_t) :: soil !< soil-moisture process fields
+    type(mhm_runoff_state_t) :: runoff !< runoff/baseflow process fields
+    type(mhm_neutron_state_t) :: neutrons !< neutron process fields and static support data
     type(mhm_forcing_state_t) :: forcing !< forcing caches and monthly evap coefficients
     type(mhm_contract_state_t) :: contract !< internal ownership of couplable subprocess outputs
     type(mhm_io_state_t) :: io !< restart/output bookkeeping
@@ -175,6 +175,7 @@ module mo_mhm_container
     procedure :: update_baseflow => mhm_update_baseflow
     procedure :: update_total_runoff => mhm_update_total_runoff
     procedure :: update_neutrons => mhm_update_neutrons
+    procedure, private :: reset_fields => mhm_reset_fields
     procedure, private :: create_output => mhm_create_output
     procedure, private :: update_output => mhm_update_output
     procedure, private :: create_restart => mhm_create_restart
@@ -288,6 +289,9 @@ contains
     integer(i4) :: routing_case
     integer(i4) :: baseflow_case
     integer(i4) :: neutron_case
+    logical :: allocate_throughfall
+    logical :: allocate_pre_effect
+    logical :: allocate_rain
     logical :: aet_all_needs_f_sealed
     integer :: status
     character(1024) :: errmsg
@@ -371,6 +375,9 @@ contains
     self%contract%own_baseflow = baseflow_case /= 0_i4
     self%contract%own_total_runoff = direct_runoff_case /= 0_i4 .or. interflow_case /= 0_i4 .or. baseflow_case /= 0_i4
     self%contract%own_neutrons = neutron_case /= 0_i4
+    allocate_throughfall = interception_case == 1_i4
+    allocate_pre_effect = snow_case == 1_i4
+    allocate_rain = snow_case == 1_i4
 
     call mhm_filter_output(self)
     aet_all_needs_f_sealed = self%output_config%out_aet_all .and. &
@@ -417,34 +424,34 @@ contains
     call self%exchange%lattice_water%require("mHM", neutron_case /= 0_i4, expected_shape_2d)
     call self%exchange%cosmic_l3%require("mHM", neutron_case == 2_i4, expected_shape_2d)
 
-    call mhm_allocate_1d(self%canopy%interception, n_cells)
-    call mhm_allocate_1d(self%canopy%throughfall, n_cells)
-    call mhm_allocate_1d(self%canopy%aet, n_cells)
+    call mhm_allocate_1d(self%canopy%interception, n_cells, self%contract%own_interception)
+    call mhm_allocate_1d(self%canopy%throughfall, n_cells, allocate_throughfall)
+    call mhm_allocate_1d(self%canopy%aet, n_cells, self%contract%own_aet_canopy)
 
-    call mhm_allocate_1d(self%snow%snowpack, n_cells)
-    call mhm_allocate_1d(self%snow%melt, n_cells)
-    call mhm_allocate_1d(self%snow%pre_effect, n_cells)
-    call mhm_allocate_1d(self%snow%rain, n_cells)
-    call mhm_allocate_1d(self%snow%snow, n_cells)
-    call mhm_allocate_1d(self%snow%degday, n_cells)
+    call mhm_allocate_1d(self%snow%snowpack, n_cells, self%contract%own_snowpack)
+    call mhm_allocate_1d(self%snow%melt, n_cells, self%contract%own_melt)
+    call mhm_allocate_1d(self%snow%pre_effect, n_cells, allocate_pre_effect)
+    call mhm_allocate_1d(self%snow%rain, n_cells, allocate_rain)
+    call mhm_allocate_1d(self%snow%snow, n_cells, self%contract%own_snow)
+    call mhm_allocate_1d(self%snow%degday, n_cells, self%contract%own_degday)
 
-    call mhm_allocate_1d(self%direct_runoff%storage, n_cells)
-    call mhm_allocate_1d(self%direct_runoff%aet, n_cells)
-    call mhm_allocate_1d(self%direct_runoff%runoff, n_cells)
+    call mhm_allocate_1d(self%direct_runoff%storage, n_cells, self%contract%own_sealed_storage)
+    call mhm_allocate_1d(self%direct_runoff%aet, n_cells, self%contract%own_aet_sealed)
+    call mhm_allocate_1d(self%direct_runoff%runoff, n_cells, self%contract%own_runoff_sealed)
 
-    call mhm_allocate_2d(self%soil%moisture, n_cells, n_horizons)
-    call mhm_allocate_2d(self%soil%infiltration, n_cells, n_horizons)
-    call mhm_allocate_2d(self%soil%aet, n_cells, n_horizons)
+    call mhm_allocate_2d(self%soil%moisture, n_cells, n_horizons, self%contract%own_soil_moisture)
+    call mhm_allocate_2d(self%soil%infiltration, n_cells, n_horizons, self%contract%own_infiltration)
+    call mhm_allocate_2d(self%soil%aet, n_cells, n_horizons, self%contract%own_aet_soil)
 
-    call mhm_allocate_1d(self%runoff%unsat_storage, n_cells)
-    call mhm_allocate_1d(self%runoff%sat_storage, n_cells)
-    call mhm_allocate_1d(self%runoff%percolation, n_cells)
-    call mhm_allocate_1d(self%runoff%fast_interflow, n_cells)
-    call mhm_allocate_1d(self%runoff%slow_interflow, n_cells)
-    call mhm_allocate_1d(self%runoff%baseflow, n_cells)
-    call mhm_allocate_1d(self%runoff%total_runoff, n_cells)
+    call mhm_allocate_1d(self%runoff%unsat_storage, n_cells, self%contract%own_unsat_storage)
+    call mhm_allocate_1d(self%runoff%sat_storage, n_cells, self%contract%own_sat_storage)
+    call mhm_allocate_1d(self%runoff%percolation, n_cells, self%contract%own_percolation)
+    call mhm_allocate_1d(self%runoff%fast_interflow, n_cells, self%contract%own_interflow_fast)
+    call mhm_allocate_1d(self%runoff%slow_interflow, n_cells, self%contract%own_interflow_slow)
+    call mhm_allocate_1d(self%runoff%baseflow, n_cells, self%contract%own_baseflow)
+    call mhm_allocate_1d(self%runoff%total_runoff, n_cells, self%contract%own_total_runoff)
 
-    call mhm_allocate_1d(self%neutrons%counts, n_cells)
+    call mhm_allocate_1d(self%neutrons%counts, n_cells, self%contract%own_neutrons)
 
     call mhm_publish_exchange(self)
     call self%exchange%interception%expect_handoff("mHM", &
@@ -473,7 +480,6 @@ contains
     call self%exchange%baseflow%expect_handoff("mHM", self%output_config%out_qb, expected_shape_1d)
     call self%exchange%runoff_total%expect_handoff("mHM", (routing_case /= 0_i4) .or. self%output_config%out_q, expected_shape_1d)
     call self%exchange%neutrons%expect_handoff("mHM", self%output_config%out_neutrons, expected_shape_1d)
-    call mhm_reset_state_fluxes(self)
   end subroutine mhm_connect
 
   !> \brief Initialize the mHM process container for the simulation.
@@ -483,7 +489,6 @@ contains
     integer(i4) :: coeff_domain
     integer(i4) :: direct_runoff_case
     integer(i4) :: neutron_case
-    integer(i4) :: soil_case
 
     log_info(*) "Initialize mhm"
 
@@ -522,15 +527,8 @@ contains
       self%neutrons%integral_afast = 0.0_dp
     end if
 
-    if (self%io%read_restart) then
-      call self%read_restart_data()
-    else
-      call mhm_reset_state_fluxes(self)
-    end if
-    soil_case = self%exchange%parameters%process_matrix(3, 1)
-    if ((soil_case /= 0_i4) .and. (.not.self%io%read_restart)) then
-      self%soil%moisture = 0.5_dp * self%exchange%sm_field_capacity%data
-    end if
+    call self%reset_fields()
+    if (self%io%read_restart) call self%read_restart_data()
 
     call self%create_output()
   end subroutine mhm_initialize
@@ -578,13 +576,13 @@ contains
       vars = [vars, var(name="snowpack", long_name="depth of snowpack", units="mm", dtype=dtype, avg=.true.)]
     end if
     if (self%output_config%out_swc) then
-      do horizon = 1_i4, size(self%soil%moisture, 2)
+      do horizon = 1_i4, size(self%exchange%soil_moisture%data, 2)
         vars = [vars, var(name="SWC_L" // trim(n2s(horizon, '(i2.2)')), &
           long_name="soil water content of soil layer" // trim(n2s(horizon)), units="mm", dtype=dtype, avg=.true.)]
       end do
     end if
     if (self%output_config%out_sm) then
-      do horizon = 1_i4, size(self%soil%moisture, 2)
+      do horizon = 1_i4, size(self%exchange%soil_moisture%data, 2)
         vars = [vars, var(name="SM_L" // trim(n2s(horizon, '(i2.2)')), &
           long_name="volumetric soil moisture of soil layer" // trim(n2s(horizon)), units="mm mm-1", dtype=dtype, avg=.true.)]
       end do
@@ -631,13 +629,13 @@ contains
       vars = [vars, var(name="recharge", long_name="groundwater recharge", units=flux_unit, dtype=dtype)]
     end if
     if (self%output_config%out_soil_infil) then
-      do horizon = 1_i4, size(self%soil%infiltration, 2)
+      do horizon = 1_i4, size(self%exchange%infiltration%data, 2)
         vars = [vars, var(name="soil_infil_L" // trim(n2s(horizon, '(i2.2)')), &
           long_name="infiltration flux from soil layer" // trim(n2s(horizon)), units=flux_unit, dtype=dtype)]
       end do
     end if
     if (self%output_config%out_aet_layer) then
-      do horizon = 1_i4, size(self%soil%aet, 2)
+      do horizon = 1_i4, size(self%exchange%aet_soil%data, 2)
         vars = [vars, var(name="aET_L" // trim(n2s(horizon, '(i2.2)')), &
           long_name="actual Evapotranspiration from soil layer" // trim(n2s(horizon)), units="mm " // trim(flux_unit), &
           dtype=dtype)]
@@ -856,9 +854,9 @@ contains
     integer(i4) :: soil_case
     integer(i4) :: k
     real(dp) :: jarvis_thresh
-    real(dp) :: tmp_infiltration(size(self%soil%infiltration, 2))
-    real(dp) :: tmp_soil_moisture(size(self%soil%moisture, 2))
-    real(dp) :: tmp_aet(size(self%soil%aet, 2))
+    real(dp), allocatable :: tmp_infiltration(:)
+    real(dp), allocatable :: tmp_soil_moisture(:)
+    real(dp), allocatable :: tmp_aet(:)
 
     soil_case = self%exchange%parameters%process_matrix(3, 1)
     if (soil_case == 0_i4) then
@@ -869,6 +867,9 @@ contains
       error stop 1
     end if
 
+    allocate(tmp_infiltration(size(self%exchange%infiltration%data, 2)))
+    allocate(tmp_soil_moisture(size(self%exchange%soil_moisture%data, 2)))
+    allocate(tmp_aet(size(self%exchange%aet_soil%data, 2)))
     !$omp do schedule(static)
     do k = 1_i4, size(self%exchange%soil_moisture%data, 1)
       tmp_infiltration = self%exchange%infiltration%data(k, :)
@@ -886,6 +887,7 @@ contains
       self%exchange%aet_soil%data(k, :) = tmp_aet
     end do
     !$omp end do
+    deallocate(tmp_infiltration, tmp_soil_moisture, tmp_aet)
   end subroutine mhm_update_soil_moisture
 
   !> \brief Update the unsaturated-zone runoff, interflow, and percolation state.
@@ -906,7 +908,7 @@ contains
       error stop 1
     end if
 
-    n_horizons = size(self%soil%infiltration, 2)
+    n_horizons = size(self%exchange%infiltration%data, 2)
     !$omp do schedule(static)
     do k = 1_i4, size(self%exchange%unsat_storage%data)
       call runoff_unsat_zone(self%runtime%c2TSTu / self%exchange%k_slowflow%data(k), &
@@ -1011,7 +1013,7 @@ contains
     end select
   end subroutine mhm_update_neutrons
 
-  !> \brief Create an mHM restart file containing the current level1 states and fluxes.
+  !> \brief Create an mHM restart file containing active physical state fields.
   subroutine mhm_create_restart(self)
     class(mhm_t), intent(inout), target :: self
     type(NcDataset) :: nc
@@ -1045,7 +1047,7 @@ contains
     call nc%close()
   end subroutine mhm_create_restart
 
-  !> \brief Write all mHM restart state and flux fields in unpacked level1 form.
+  !> \brief Write all mHM restart physical state fields in unpacked level1 form.
   subroutine mhm_write_restart_data(self, nc)
     class(mhm_t), intent(inout), target :: self
     type(NcDataset), intent(inout) :: nc
@@ -1157,8 +1159,6 @@ contains
       call self%read_restart_field_2d(nc, "L1_satSTW", self%runoff%sat_storage)
     end if
 
-    call mhm_reset_fluxes(self)
-    self%neutrons%counts = P1_InitStateFluxes
     call nc%close()
   end subroutine mhm_read_restart_data
 
@@ -1577,23 +1577,33 @@ contains
       self%exchange%melt%available(owned=self%contract%own_melt))
   end subroutine mhm_filter_output
 
-  !> \brief Allocate or resize a 1D state array.
-  subroutine mhm_allocate_1d(data, n_cells)
+  !> \brief Allocate, resize, or release a 1D field array.
+  subroutine mhm_allocate_1d(data, n_cells, required)
     real(dp), allocatable, intent(inout) :: data(:)
     integer(i4), intent(in) :: n_cells
+    logical, intent(in) :: required
 
+    if (.not.required) then
+      if (allocated(data)) deallocate(data)
+      return
+    end if
     if (allocated(data)) then
       if (size(data) /= n_cells) deallocate(data)
     end if
     if (.not.allocated(data)) allocate(data(n_cells))
   end subroutine mhm_allocate_1d
 
-  !> \brief Allocate or resize a 2D state array.
-  subroutine mhm_allocate_2d(data, n_cells, n_horizons)
+  !> \brief Allocate, resize, or release a 2D field array.
+  subroutine mhm_allocate_2d(data, n_cells, n_horizons, required)
     real(dp), allocatable, intent(inout) :: data(:, :)
     integer(i4), intent(in) :: n_cells
     integer(i4), intent(in) :: n_horizons
+    logical, intent(in) :: required
 
+    if (.not.required) then
+      if (allocated(data)) deallocate(data)
+      return
+    end if
     if (allocated(data)) then
       if (size(data, 1) /= n_cells .or. size(data, 2) /= n_horizons) deallocate(data)
     end if
@@ -1624,7 +1634,7 @@ contains
     end do
   end subroutine mhm_copy_horizon_bounds
 
-  !> \brief Publish mHM-owned state and flux arrays through the exchange contract.
+  !> \brief Publish mHM-owned fields through the exchange contract.
   subroutine mhm_publish_exchange(self)
     class(mhm_t), intent(inout), target :: self
     integer(i4) :: interception_case
@@ -1682,64 +1692,50 @@ contains
     if (self%contract%own_neutrons) call self%exchange%neutrons%publish_local("mHM", self%neutrons%counts)
   end subroutine mhm_publish_exchange
 
-  !> \brief Reset all mHM state and flux arrays to legacy default values.
-  subroutine mhm_reset_state_fluxes(self)
+  !> \brief Reset all mHM fields to default values.
+  subroutine mhm_reset_fields(self)
     class(mhm_t), intent(inout), target :: self
-    integer(i4) :: horizon
-    real(dp) :: layer_depth
 
-    if (.not.allocated(self%soil%horizon_bounds)) then
-      log_fatal(*) "mHM: soil horizon bounds not available for state initialization."
-      error stop 1
-    end if
+    if (allocated(self%canopy%interception)) self%canopy%interception = P1_InitStateFluxes
 
-    self%canopy%interception = P1_InitStateFluxes
+    if (allocated(self%snow%snowpack)) self%snow%snowpack = P2_InitStateFluxes
 
-    self%snow%snowpack = P2_InitStateFluxes
+    if (allocated(self%direct_runoff%storage)) self%direct_runoff%storage = P1_InitStateFluxes
 
-    self%direct_runoff%storage = P1_InitStateFluxes
-
-    do horizon = 1_i4, size(self%soil%moisture, 2)
-      layer_depth = self%soil%horizon_bounds(horizon + 1_i4) - self%soil%horizon_bounds(horizon)
-      if (.not.ieee_is_finite(layer_depth) .or. layer_depth <= 0.0_dp) then
-        log_fatal(*) "mHM: soil horizon depth must be finite and > 0."
+    if (allocated(self%soil%moisture)) then
+      if (.not.associated(self%exchange%sm_field_capacity%data)) then
+        log_fatal(*) "mHM: sm_field_capacity data not connected for soil-moisture field initialization."
         error stop 1
       end if
-      self%soil%moisture(:, horizon) = layer_depth * C1_InitStateSM
-    end do
+      self%soil%moisture = 0.5_dp * self%exchange%sm_field_capacity%data
+    end if
 
-    self%runoff%unsat_storage = P3_InitStateFluxes
-    self%runoff%sat_storage = P4_InitStateFluxes
-    call mhm_reset_fluxes(self)
-  end subroutine mhm_reset_state_fluxes
+    if (allocated(self%runoff%unsat_storage)) self%runoff%unsat_storage = P3_InitStateFluxes
+    if (allocated(self%runoff%sat_storage)) self%runoff%sat_storage = P4_InitStateFluxes
 
-  !> \brief Reset all mHM flux and diagnostic arrays to legacy default values without touching storages.
-  subroutine mhm_reset_fluxes(self)
-    class(mhm_t), intent(inout), target :: self
+    if (allocated(self%canopy%throughfall)) self%canopy%throughfall = P1_InitStateFluxes
+    if (allocated(self%canopy%aet)) self%canopy%aet = P1_InitStateFluxes
 
-    self%canopy%throughfall = P1_InitStateFluxes
-    self%canopy%aet = P1_InitStateFluxes
+    if (allocated(self%snow%melt)) self%snow%melt = P1_InitStateFluxes
+    if (allocated(self%snow%pre_effect)) self%snow%pre_effect = P1_InitStateFluxes
+    if (allocated(self%snow%rain)) self%snow%rain = P1_InitStateFluxes
+    if (allocated(self%snow%snow)) self%snow%snow = P1_InitStateFluxes
+    if (allocated(self%snow%degday)) self%snow%degday = P1_InitStateFluxes
 
-    self%snow%melt = P1_InitStateFluxes
-    self%snow%pre_effect = P1_InitStateFluxes
-    self%snow%rain = P1_InitStateFluxes
-    self%snow%snow = P1_InitStateFluxes
-    self%snow%degday = P1_InitStateFluxes
+    if (allocated(self%direct_runoff%aet)) self%direct_runoff%aet = P1_InitStateFluxes
+    if (allocated(self%direct_runoff%runoff)) self%direct_runoff%runoff = P1_InitStateFluxes
 
-    self%direct_runoff%aet = P1_InitStateFluxes
-    self%direct_runoff%runoff = P1_InitStateFluxes
+    if (allocated(self%soil%infiltration)) self%soil%infiltration = P1_InitStateFluxes
+    if (allocated(self%soil%aet)) self%soil%aet = P1_InitStateFluxes
 
-    self%soil%infiltration = P1_InitStateFluxes
-    self%soil%aet = P1_InitStateFluxes
+    if (allocated(self%runoff%percolation)) self%runoff%percolation = P1_InitStateFluxes
+    if (allocated(self%runoff%fast_interflow)) self%runoff%fast_interflow = P1_InitStateFluxes
+    if (allocated(self%runoff%slow_interflow)) self%runoff%slow_interflow = P1_InitStateFluxes
+    if (allocated(self%runoff%baseflow)) self%runoff%baseflow = P1_InitStateFluxes
+    if (allocated(self%runoff%total_runoff)) self%runoff%total_runoff = P1_InitStateFluxes
 
-    self%runoff%percolation = P1_InitStateFluxes
-    self%runoff%fast_interflow = P1_InitStateFluxes
-    self%runoff%slow_interflow = P1_InitStateFluxes
-    self%runoff%baseflow = P1_InitStateFluxes
-    self%runoff%total_runoff = P1_InitStateFluxes
-
-    self%neutrons%counts = P1_InitStateFluxes
-  end subroutine mhm_reset_fluxes
+    if (allocated(self%neutrons%counts)) self%neutrons%counts = P1_InitStateFluxes
+  end subroutine mhm_reset_fields
 
   !> \brief Clear mHM-owned exchange publications.
   subroutine mhm_clear_exchange(self)
