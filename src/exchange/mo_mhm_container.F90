@@ -504,6 +504,7 @@ contains
   subroutine mhm_update(self)
     class(mhm_t), intent(inout), target :: self
     log_trace(*) "Update mhm at step ", n2s(self%exchange%step_count)
+    !$omp parallel default(shared)
     call self%update_interception()
     call self%update_snow()
     call self%update_direct_runoff()
@@ -512,6 +513,7 @@ contains
     call self%update_baseflow()
     call self%update_total_runoff()
     call self%update_neutrons()
+    !$omp end parallel
     call self%update_output()
   end subroutine mhm_update
 
@@ -712,7 +714,7 @@ contains
   end subroutine mhm_update_output
 
   !> \brief Update canopy interception and throughfall for the current step.
-  subroutine mhm_update_interception(self)
+  recursive subroutine mhm_update_interception(self)
     class(mhm_t), intent(inout), target :: self
     integer(i4) :: interception_case
     integer(i4) :: k
@@ -720,14 +722,24 @@ contains
     interception_case = self%exchange%parameters%process_matrix(1, 1)
     select case (interception_case)
     case (-1_i4)
-      self%canopy%aet = 0.0_dp
+      !$omp do schedule(static)
+      do k = 1_i4, size(self%canopy%aet)
+        self%canopy%aet(k) = 0.0_dp
+      end do
+      !$omp end do
     case (0_i4)
-      self%canopy%aet = 0.0_dp
+      !$omp do schedule(static)
+      do k = 1_i4, size(self%canopy%aet)
+        self%canopy%aet(k) = 0.0_dp
+      end do
+      !$omp end do
     case (1_i4)
+      !$omp do schedule(static)
       do k = 1_i4, size(self%canopy%interception)
         call canopy_interc(self%exchange%pet%data(k), self%exchange%max_interception%data(k), self%exchange%pre%data(k), &
           self%canopy%interception(k), self%canopy%throughfall(k), self%canopy%aet(k))
       end do
+      !$omp end do
     case default
       log_fatal(*) "mHM: unsupported interception case ", n2s(interception_case), "."
       error stop 1
@@ -735,7 +747,7 @@ contains
   end subroutine mhm_update_interception
 
   !> \brief Update snow accumulation, melt, and effective precipitation.
-  subroutine mhm_update_snow(self)
+  recursive subroutine mhm_update_snow(self)
     class(mhm_t), intent(inout), target :: self
     integer(i4) :: snow_case
     integer(i4) :: k
@@ -743,22 +755,32 @@ contains
     snow_case = self%exchange%parameters%process_matrix(2, 1)
     select case (snow_case)
     case (-1_i4)
-      self%snow%melt = 0.0_dp
-      self%snow%snow = 0.0_dp
-      self%snow%degday = 0.0_dp
-      self%snow%rain = self%exchange%throughfall%data
+      !$omp do schedule(static)
+      do k = 1_i4, size(self%snow%melt)
+        self%snow%melt(k) = 0.0_dp
+        self%snow%snow(k) = 0.0_dp
+        self%snow%degday(k) = 0.0_dp
+        self%snow%rain(k) = self%exchange%throughfall%data(k)
+      end do
+      !$omp end do
     case (0_i4)
-      self%snow%melt = 0.0_dp
-      self%snow%snow = 0.0_dp
-      self%snow%degday = 0.0_dp
-      self%snow%rain = 0.0_dp
+      !$omp do schedule(static)
+      do k = 1_i4, size(self%snow%melt)
+        self%snow%melt(k) = 0.0_dp
+        self%snow%snow(k) = 0.0_dp
+        self%snow%degday(k) = 0.0_dp
+        self%snow%rain(k) = 0.0_dp
+      end do
+      !$omp end do
     case (1_i4)
+      !$omp do schedule(static)
       do k = 1_i4, size(self%snow%snowpack)
         call snow_accum_melt(self%exchange%degday_inc%data(k), self%exchange%degday_max%data(k) * self%runtime%c2TSTu, &
           self%exchange%degday_dry%data(k) * self%runtime%c2TSTu, self%exchange%pre%data(k), self%exchange%temp%data(k), &
           self%exchange%thresh_temp%data(k), self%exchange%throughfall%data(k), self%snow%snowpack(k), self%snow%degday(k), &
           self%snow%melt(k), self%snow%pre_effect(k), self%snow%rain(k), self%snow%snow(k))
       end do
+      !$omp end do
     case default
       log_fatal(*) "mHM: unsupported snow case ", n2s(snow_case), "."
       error stop 1
@@ -766,7 +788,7 @@ contains
   end subroutine mhm_update_snow
 
   !> \brief Update direct runoff and sealed-area storage independently from pervious soil water.
-  subroutine mhm_update_direct_runoff(self)
+  recursive subroutine mhm_update_direct_runoff(self)
     class(mhm_t), intent(inout), target :: self
     integer(i4) :: direct_runoff_case
     integer(i4) :: month
@@ -775,18 +797,24 @@ contains
     direct_runoff_case = self%exchange%parameters%process_matrix(4, 1)
     select case (direct_runoff_case)
     case (0_i4)
-      self%direct_runoff%aet = 0.0_dp
+      !$omp do schedule(static)
+      do k = 1_i4, size(self%direct_runoff%aet)
+        self%direct_runoff%aet(k) = 0.0_dp
+      end do
+      !$omp end do
     case (1_i4)
       month = self%exchange%time%month
       if (month < 1_i4 .or. month > int(YearMonths, i4)) then
         log_fatal(*) "mHM: invalid month for evaporation coefficients: ", n2s(month), "."
         error stop 1
       end if
+      !$omp do schedule(static)
       do k = 1_i4, size(self%direct_runoff%storage)
         call soil_moisture_direct_runoff(self%exchange%f_sealed%data(k), self%exchange%thresh_sealed%data(k), &
           self%exchange%pet%data(k), self%forcing%evap_coeff(month), self%canopy%aet(k), self%exchange%pre_eff%data(k), &
           self%direct_runoff%runoff(k), self%direct_runoff%storage(k), self%direct_runoff%aet(k))
       end do
+      !$omp end do
     case default
       log_fatal(*) "mHM: unsupported direct runoff case ", n2s(direct_runoff_case), "."
       error stop 1
@@ -794,7 +822,7 @@ contains
   end subroutine mhm_update_direct_runoff
 
   !> \brief Update pervious-soil infiltration, evapotranspiration, and soil moisture.
-  subroutine mhm_update_soil_moisture(self)
+  recursive subroutine mhm_update_soil_moisture(self)
     class(mhm_t), intent(inout), target :: self
     integer(i4) :: soil_case
     integer(i4) :: k
@@ -805,7 +833,11 @@ contains
 
     soil_case = self%exchange%parameters%process_matrix(3, 1)
     if (soil_case == 0_i4) then
-      self%soil%aet = 0.0_dp
+      !$omp do schedule(static)
+      do k = 1_i4, size(self%soil%aet, 1)
+        self%soil%aet(k, :) = 0.0_dp
+      end do
+      !$omp end do
       return
     end if
     if (soil_case < 0_i4 .or. soil_case > 4_i4) then
@@ -814,9 +846,14 @@ contains
     end if
 
     if (self%exchange%step_count == 1_i4 .and. .not.self%io%read_restart) then
-      self%soil%moisture = 0.5_dp * self%exchange%sm_field_capacity%data
+      !$omp do schedule(static)
+      do k = 1_i4, size(self%soil%moisture, 1)
+        self%soil%moisture(k, :) = 0.5_dp * self%exchange%sm_field_capacity%data(k, :)
+      end do
+      !$omp end do
     end if
 
+    !$omp do schedule(static)
     do k = 1_i4, size(self%soil%moisture, 1)
       tmp_infiltration = self%exchange%infiltration%data(k, :)
       tmp_soil_moisture = self%soil%moisture(k, :)
@@ -832,10 +869,11 @@ contains
       self%soil%moisture(k, :) = tmp_soil_moisture
       self%soil%aet(k, :) = tmp_aet
     end do
+    !$omp end do
   end subroutine mhm_update_soil_moisture
 
   !> \brief Update the unsaturated-zone runoff, interflow, and percolation state.
-  subroutine mhm_update_interflow(self)
+  recursive subroutine mhm_update_interflow(self)
     class(mhm_t), intent(inout), target :: self
     integer(i4) :: interflow_case
     integer(i4) :: percolation_case
@@ -853,6 +891,7 @@ contains
     end if
 
     n_horizons = size(self%soil%infiltration, 2)
+    !$omp do schedule(static)
     do k = 1_i4, size(self%runoff%unsat_storage)
       call runoff_unsat_zone(self%runtime%c2TSTu / self%exchange%k_slowflow%data(k), &
         self%runtime%c2TSTu / self%exchange%k_percolation%data(k), self%runtime%c2TSTu / self%exchange%k_fastflow%data(k), &
@@ -860,10 +899,11 @@ contains
         self%exchange%thresh_unsat%data(k), self%runoff%sat_storage(k), self%runoff%unsat_storage(k), &
         self%runoff%slow_interflow(k), self%runoff%fast_interflow(k), self%runoff%percolation(k))
       end do
+    !$omp end do
   end subroutine mhm_update_interflow
 
   !> \brief Update the saturated-zone storage and baseflow.
-  subroutine mhm_update_baseflow(self)
+  recursive subroutine mhm_update_baseflow(self)
     class(mhm_t), intent(inout), target :: self
     integer(i4) :: baseflow_case
     integer(i4) :: k
@@ -872,10 +912,12 @@ contains
     select case (baseflow_case)
     case (0_i4)
     case (1_i4)
+      !$omp do schedule(static)
       do k = 1_i4, size(self%runoff%sat_storage)
         call runoff_sat_zone(self%runtime%c2TSTu / self%exchange%k_baseflow%data(k), self%runoff%sat_storage(k), &
           self%runoff%baseflow(k))
       end do
+      !$omp end do
     case default
       log_fatal(*) "mHM: unsupported baseflow case ", n2s(baseflow_case), "."
       error stop 1
@@ -883,20 +925,22 @@ contains
   end subroutine mhm_update_baseflow
 
   !> \brief Accumulate total runoff from the generated runoff components.
-  subroutine mhm_update_total_runoff(self)
+  recursive subroutine mhm_update_total_runoff(self)
     class(mhm_t), intent(inout), target :: self
     integer(i4) :: k
 
     if (.not.self%contract%own_total_runoff) return
 
+    !$omp do schedule(static)
     do k = 1_i4, size(self%runoff%total_runoff)
       call L1_total_runoff(self%exchange%f_sealed%data(k), self%exchange%interflow_fast%data(k), self%exchange%interflow_slow%data(k), &
         self%exchange%baseflow%data(k), self%exchange%runoff_sealed%data(k), self%runoff%total_runoff(k))
     end do
+    !$omp end do
   end subroutine mhm_update_total_runoff
 
   !> \brief Update neutron counts from the current soil-water and surface states.
-  subroutine mhm_update_neutrons(self)
+  recursive subroutine mhm_update_neutrons(self)
     class(mhm_t), intent(inout), target :: self
     integer(i4) :: neutron_case
     integer(i4) :: n_layers
@@ -904,7 +948,11 @@ contains
 
     neutron_case = self%exchange%parameters%process_matrix(10, 1)
     if (neutron_case == 0_i4) then
-      self%neutrons%counts = 0.0_dp
+      !$omp do schedule(static)
+      do k = 1_i4, size(self%neutrons%counts)
+        self%neutrons%counts(k) = 0.0_dp
+      end do
+      !$omp end do
       return
     end if
 
@@ -916,18 +964,22 @@ contains
 
     select case (neutron_case)
     case (1_i4)
+      !$omp do schedule(static)
       do k = 1_i4, size(self%neutrons%counts)
         call DesiletsN0(self%soil%moisture(k, 1:n_layers), self%soil%horizon_bounds(2:n_layers + 1_i4), &
           self%exchange%bulk_density%data(k, 1:n_layers), self%exchange%lattice_water%data(k, 1:n_layers), &
           self%exchange%desilets_n0%data(k), self%neutrons%counts(k))
       end do
+      !$omp end do
     case (2_i4)
+      !$omp do schedule(static)
       do k = 1_i4, size(self%neutrons%counts)
         call COSMIC(self%soil%moisture(k, 1:n_layers), self%soil%horizon_bounds(2:n_layers + 1_i4), &
           self%neutrons%integral_afast, self%canopy%interception(k), self%snow%snowpack(k), self%exchange%desilets_n0%data(k), &
           self%exchange%bulk_density%data(k, 1:n_layers), self%exchange%lattice_water%data(k, 1:n_layers), &
           self%exchange%cosmic_l3%data(k, 1:n_layers), self%neutrons%counts(k))
       end do
+      !$omp end do
     case default
       log_fatal(*) "mHM: unsupported neutrons case ", n2s(neutron_case), "."
       error stop 1
