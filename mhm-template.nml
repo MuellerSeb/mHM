@@ -422,8 +422,6 @@
   output_path(:) = "mhm_output.nc"
   ! Read restart
   read_restart(:) = .false.
-  ! Read restart fluxes
-  read_restart_fluxes(:) = .true.
   ! Restart input path
   restart_input_path(:) = "mhm_restart_in.nc"
   ! Write restart

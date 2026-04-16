@@ -13,7 +13,6 @@ Configuration for the mHM model setup.
 | [resolution](#resolution) | real array | no | mHM model resolution (L1) |
 | [output_path](#output_path) | string array | no | Output path |
 | [read_restart](#read_restart) | logical array | no | Read restart |
-| [read_restart_fluxes](#read_restart_fluxes) | logical array | no | Read restart fluxes |
 | [restart_input_path](#restart_input_path) | string array | no | Restart input path |
 | [write_restart](#write_restart) | logical array | no | Write restart |
 | [restart_output_path](#restart_output_path) | string array | no | Restart output path |
@@ -51,15 +50,6 @@ Summary:
 - Type: `logical, dimension(max_domains)`
 - Required: no
 - Default: `.false.`
-
-### read_restart_fluxes
-
-Read restart fluxes `read_restart_fluxes`
-
-Summary:
-- Type: `logical, dimension(max_domains)`
-- Required: no
-- Default: `.true.`
 
 ### restart_input_path
 
@@ -122,7 +112,6 @@ Summary:
   resolution(:) = 0.0
   output_path(:) = "mhm_output.nc"
   read_restart(:) = .false.
-  read_restart_fluxes(:) = .true.
   restart_input_path(:) = "mhm_restart_in.nc"
   write_restart(:) = .false.
   restart_output_path(:) = "mhm_restart_out.nc"

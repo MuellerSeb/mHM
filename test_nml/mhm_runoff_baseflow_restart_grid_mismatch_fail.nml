@@ -55,7 +55,6 @@
 &config_mhm
   resolution(1)         = 8000.0
   read_restart(1)       = .true.
-  read_restart_fluxes(1)= .true.
   restart_input_path(1) = "mhm_runoff_baseflow_restart.nc"
   evap_coeff(:,1)       = 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0
 /

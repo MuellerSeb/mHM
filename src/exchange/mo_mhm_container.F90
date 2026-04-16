@@ -141,7 +141,6 @@ module mo_mhm_container
   !> \brief   Grouped restart/output bookkeeping owned by the mHM container.
   type :: mhm_io_state_t
     logical :: read_restart = .false. !< whether to read restart data
-    logical :: read_restart_fluxes = .true. !< whether restart reads should restore fluxes in addition to states
     logical :: write_restart = .false. !< whether to write restart data
     logical :: output_active = .false. !< whether gridded mHM output is enabled
     character(:), allocatable :: restart_input_path !< resolved restart input path
@@ -194,6 +193,7 @@ module mo_mhm_container
     procedure, private :: read_restart_data => mhm_read_restart_data
     procedure, private :: validate_restart_grid => mhm_validate_restart_grid
     procedure, private :: validate_restart_horizon_bounds => mhm_validate_restart_horizon_bounds
+    procedure, private :: validate_restart_process_cases => mhm_validate_restart_process_cases
     procedure, private :: write_restart_field_2d => mhm_write_restart_field_2d
     procedure, private :: write_restart_field_3d => mhm_write_restart_field_3d
     procedure, private :: read_restart_field_2d => mhm_read_restart_field_2d
@@ -249,7 +249,6 @@ contains
     log_info(*) "mHM: set level1 resolution for domain ", n2s(id(1)), ": ", n2s(l1_res)
 
     self%io%read_restart = self%config%read_restart(id(1))
-    self%io%read_restart_fluxes = self%config%read_restart_fluxes(id(1))
     self%io%write_restart = self%config%write_restart(id(1))
 
     self%io%output_active = .true.
@@ -298,6 +297,7 @@ contains
     integer(i4) :: routing_case
     integer(i4) :: baseflow_case
     integer(i4) :: neutron_case
+    logical :: aet_all_needs_f_sealed
     integer :: status
     character(1024) :: errmsg
 
@@ -305,7 +305,6 @@ contains
 
     id(1) = self%exchange%domain
     self%io%read_restart = self%config%read_restart(id(1))
-    self%io%read_restart_fluxes = self%config%read_restart_fluxes(id(1))
     self%io%write_restart = self%config%write_restart(id(1))
     if (self%io%read_restart) then
       status = self%config%is_set("restart_input_path", idx=id, errmsg=errmsg)
@@ -381,6 +380,11 @@ contains
     self%contract%own_total_runoff = direct_runoff_case /= 0_i4 .or. interflow_case /= 0_i4 .or. baseflow_case /= 0_i4
     self%contract%own_neutrons = neutron_case /= 0_i4
 
+    call mhm_filter_output(self)
+    aet_all_needs_f_sealed = self%output_config%out_aet_all .and. &
+      (mhm_available_2d(self%exchange%aet_soil, self%contract%own_aet_soil) .or. &
+      mhm_available_dp(self%exchange%aet_sealed, self%contract%own_aet_sealed))
+
     call mhm_mark_required_dp(self, self%exchange%pre, &
       (interception_case /= 0_i4) .or. (snow_case == 1_i4), &
       "pre")
@@ -396,7 +400,7 @@ contains
 
     call mhm_mark_required_dp(self, self%exchange%f_sealed, &
       (soil_case /= 0_i4) .or. (direct_runoff_case /= 0_i4) .or. (interflow_case /= 0_i4) .or. (baseflow_case /= 0_i4) .or. &
-      self%output_config%out_aet_all .or. self%output_config%out_qd .or. self%output_config%out_qif .or. &
+      aet_all_needs_f_sealed .or. self%output_config%out_qd .or. self%output_config%out_qif .or. &
       self%output_config%out_qis .or. self%output_config%out_qb .or. self%output_config%out_recharge .or. &
       self%output_config%out_soil_infil .or. self%output_config%out_aet_layer, &
       "f_sealed")
@@ -453,54 +457,45 @@ contains
 
     call mhm_publish_exchange(self)
     call mhm_expect_handoff_dp(self, self%exchange%interception, &
-      self%output_config%out_interception .or. (neutron_case /= 0_i4) .or. self%io%write_restart, "interception")
+      self%output_config%out_interception .or. (neutron_case /= 0_i4), "interception")
     call mhm_expect_handoff_dp(self, self%exchange%throughfall, &
-      (snow_case /= 0_i4) .or. self%io%write_restart, "throughfall")
+      snow_case /= 0_i4, "throughfall")
     call mhm_expect_handoff_dp(self, self%exchange%aet_canopy, &
-      (direct_runoff_case /= 0_i4) .or. (soil_case /= 0_i4) .or. self%io%write_restart, "aet_canopy")
+      (direct_runoff_case /= 0_i4) .or. (soil_case /= 0_i4), "aet_canopy")
     call mhm_expect_handoff_dp(self, self%exchange%snowpack, &
-      self%output_config%out_snowpack .or. (neutron_case /= 0_i4) .or. self%io%write_restart, "snowpack")
+      self%output_config%out_snowpack .or. (neutron_case /= 0_i4), "snowpack")
     call mhm_expect_handoff_dp(self, self%exchange%melt, &
-      self%output_config%out_qsm .or. self%io%write_restart, "melt")
+      self%output_config%out_qsm, "melt")
     call mhm_expect_handoff_dp(self, self%exchange%pre_eff, &
-      (direct_runoff_case /= 0_i4) .or. (soil_case /= 0_i4) .or. self%output_config%out_preeffect .or. self%io%write_restart, &
+      (direct_runoff_case /= 0_i4) .or. (soil_case /= 0_i4) .or. self%output_config%out_preeffect, &
       "pre_eff")
-    call mhm_expect_handoff_dp(self, self%exchange%rain, self%io%write_restart, "rain")
-    call mhm_expect_handoff_dp(self, self%exchange%snow, self%io%write_restart, "snow")
-    call mhm_expect_handoff_dp(self, self%exchange%degday, self%io%write_restart, "degday")
     call mhm_expect_handoff_dp(self, self%exchange%sealed_storage, &
-      self%output_config%out_sealedstw .or. self%io%write_restart, "sealed_storage")
-    call mhm_expect_handoff_dp(self, self%exchange%aet_sealed, self%io%write_restart, "aet_sealed")
+      self%output_config%out_sealedstw, "sealed_storage")
     call mhm_expect_handoff_2d(self, self%exchange%infiltration, &
-      (interflow_case /= 0_i4) .or. self%output_config%out_soil_infil .or. self%io%write_restart, "infiltration", n_horizons)
+      (interflow_case /= 0_i4) .or. self%output_config%out_soil_infil, "infiltration", n_horizons)
     call mhm_expect_handoff_2d(self, self%exchange%soil_moisture, &
       self%output_config%out_swc .or. self%output_config%out_sm .or. self%output_config%out_sm_all .or. &
-      (neutron_case /= 0_i4) .or. self%io%write_restart, "soil_moisture", n_horizons)
+      (neutron_case /= 0_i4), "soil_moisture", n_horizons)
     call mhm_expect_handoff_2d(self, self%exchange%aet_soil, &
-      self%output_config%out_aet_layer .or. self%io%write_restart, "aet_soil", n_horizons)
+      self%output_config%out_aet_layer, "aet_soil", n_horizons)
     call mhm_expect_handoff_dp(self, self%exchange%runoff_sealed, &
-      self%output_config%out_qd .or. self%io%write_restart, "runoff_sealed")
+      self%output_config%out_qd, "runoff_sealed")
     call mhm_expect_handoff_dp(self, self%exchange%unsat_storage, &
-      self%output_config%out_unsatstw .or. self%io%write_restart, "unsat_storage")
+      self%output_config%out_unsatstw, "unsat_storage")
     call mhm_expect_handoff_dp(self, self%exchange%sat_storage, &
-      self%output_config%out_satstw .or. self%io%write_restart, "sat_storage")
+      self%output_config%out_satstw, "sat_storage")
     call mhm_expect_handoff_dp(self, self%exchange%interflow_fast, &
-      self%output_config%out_qif .or. self%io%write_restart, "interflow_fast")
+      self%output_config%out_qif, "interflow_fast")
     call mhm_expect_handoff_dp(self, self%exchange%interflow_slow, &
-      self%output_config%out_qis .or. self%io%write_restart, "interflow_slow")
+      self%output_config%out_qis, "interflow_slow")
     call mhm_expect_handoff_dp(self, self%exchange%percolation, &
-      self%output_config%out_recharge .or. self%io%write_restart, "percolation")
+      self%output_config%out_recharge, "percolation")
     call mhm_expect_handoff_dp(self, self%exchange%baseflow, &
-      self%output_config%out_qb .or. self%io%write_restart, "baseflow")
+      self%output_config%out_qb, "baseflow")
     call mhm_expect_handoff_dp(self, self%exchange%runoff_total, &
-      (routing_case /= 0_i4) .or. self%output_config%out_q .or. self%io%write_restart, "runoff_total")
+      (routing_case /= 0_i4) .or. self%output_config%out_q, "runoff_total")
     call mhm_expect_handoff_dp(self, self%exchange%neutrons, &
       self%output_config%out_neutrons, "neutrons")
-    if (self%output_config%out_aet_all .and. &
-      .not.(self%exchange%aet_canopy%provided .or. self%exchange%aet_sealed%provided .or. self%exchange%aet_soil%provided)) then
-      log_fatal(*) "mHM: output aET requested, but no evapotranspiration component is provided."
-      error stop 1
-    end if
     call mhm_reset_state_fluxes(self)
   end subroutine mhm_connect
 
@@ -551,7 +546,7 @@ contains
     end if
 
     if (self%io%read_restart) then
-      call self%read_restart_data(self%config%read_restart_fluxes(id(1)))
+      call self%read_restart_data()
     else
       call mhm_reset_state_fluxes(self)
     end if
@@ -701,9 +696,11 @@ contains
 
     if (.not.self%io%output_active) return
 
-    needs_f_sealed = self%output_config%out_aet_all .or. self%output_config%out_qd .or. self%output_config%out_qif .or. &
-      self%output_config%out_qis .or. self%output_config%out_qb .or. self%output_config%out_recharge .or. &
-      self%output_config%out_soil_infil .or. self%output_config%out_aet_layer
+    needs_f_sealed = (self%output_config%out_aet_all .and. &
+      (self%exchange%aet_soil%provided .or. self%exchange%aet_sealed%provided)) .or. &
+      self%output_config%out_qd .or. self%output_config%out_qif .or. self%output_config%out_qis .or. &
+      self%output_config%out_qb .or. self%output_config%out_recharge .or. self%output_config%out_soil_infil .or. &
+      self%output_config%out_aet_layer
     if (needs_f_sealed) then
       allocate(f_not_sealed(size(self%exchange%f_sealed%data)))
       f_not_sealed = 1.0_dp - self%exchange%f_sealed%data
@@ -1061,6 +1058,13 @@ contains
     nc_var = nc%setVariable("mhm_meta", "i32", dims0(:0))
     call nc_var%setAttribute("time_stamp", self%exchange%time%str())
     call nc_var%setAttribute("domain", self%exchange%domain)
+    call nc_var%setAttribute("interception_case", self%exchange%parameters%process_matrix(1, 1))
+    call nc_var%setAttribute("snow_case", self%exchange%parameters%process_matrix(2, 1))
+    call nc_var%setAttribute("soil_moisture_case", self%exchange%parameters%process_matrix(3, 1))
+    call nc_var%setAttribute("direct_runoff_case", self%exchange%parameters%process_matrix(4, 1))
+    call nc_var%setAttribute("interflow_case", self%exchange%parameters%process_matrix(6, 1))
+    call nc_var%setAttribute("percolation_case", self%exchange%parameters%process_matrix(7, 1))
+    call nc_var%setAttribute("baseflow_case", self%exchange%parameters%process_matrix(9, 1))
     call nc%close()
   end subroutine mhm_create_restart
 
@@ -1071,6 +1075,12 @@ contains
     type(NcDimension) :: dims_xy(2)
     type(NcDimension) :: soil_dim
     real(dp), allocatable :: soil_bounds(:)
+    integer(i4) :: interception_case
+    integer(i4) :: snow_case
+    integer(i4) :: soil_case
+    integer(i4) :: direct_runoff_case
+    integer(i4) :: interflow_case
+    integer(i4) :: baseflow_case
 
     if (.not.associated(self%exchange%level1)) then
       log_fatal(*) "mHM: level1 grid not connected while writing restart."
@@ -1094,42 +1104,49 @@ contains
       bounds=soil_bounds, reference=2_i4)
     deallocate(soil_bounds)
 
-    call self%write_restart_field_2d(nc, dims_xy, "L1_Inter", "Interception storage at level 1", self%exchange%interception%data)
-    call self%write_restart_field_2d(nc, dims_xy, "L1_snowPack", "Snowpack at level 1", self%exchange%snowpack%data)
-    call self%write_restart_field_2d(nc, dims_xy, "L1_sealSTW", &
-      "Retention storage of impervious areas at level 1", self%exchange%sealed_storage%data)
-    call self%write_restart_field_3d(nc, dims_xy, soil_dim, "L1_soilMoist", "soil moisture at level 1", &
-      self%exchange%soil_moisture%data)
-    call self%write_restart_field_2d(nc, dims_xy, "L1_unsatSTW", "upper soil storage at level 1", self%exchange%unsat_storage%data)
-    call self%write_restart_field_2d(nc, dims_xy, "L1_satSTW", "groundwater storage at level 1", self%exchange%sat_storage%data)
+    interception_case = self%exchange%parameters%process_matrix(1, 1)
+    snow_case = self%exchange%parameters%process_matrix(2, 1)
+    soil_case = self%exchange%parameters%process_matrix(3, 1)
+    direct_runoff_case = self%exchange%parameters%process_matrix(4, 1)
+    interflow_case = self%exchange%parameters%process_matrix(6, 1)
+    baseflow_case = self%exchange%parameters%process_matrix(9, 1)
 
-    call self%write_restart_field_3d(nc, dims_xy, soil_dim, "L1_aETSoil", "soil actual ET at level 1", &
-      self%exchange%aet_soil%data)
-    call self%write_restart_field_2d(nc, dims_xy, "L1_aETCanopy", "canopy actual ET at level 1", self%exchange%aet_canopy%data)
-    call self%write_restart_field_2d(nc, dims_xy, "L1_aETSealed", "sealed actual ET at level 1", self%exchange%aet_sealed%data)
-    call self%write_restart_field_2d(nc, dims_xy, "L1_baseflow", "baseflow at level 1", self%exchange%baseflow%data)
-    call self%write_restart_field_3d(nc, dims_xy, soil_dim, "L1_infilSoil", "soil in-exfiltration at level 1", &
-      self%exchange%infiltration%data)
-    call self%write_restart_field_2d(nc, dims_xy, "L1_fastRunoff", "fast runoff", self%exchange%interflow_fast%data)
-    call self%write_restart_field_2d(nc, dims_xy, "L1_percol", "percolation at level 1", self%exchange%percolation%data)
-    call self%write_restart_field_2d(nc, dims_xy, "L1_melt", "snow melt at level 1", self%exchange%melt%data)
-    call self%write_restart_field_2d(nc, dims_xy, "L1_preEffect", &
-      "effective precip. depth (snow melt + rain) at level 1", self%exchange%pre_eff%data)
-    call self%write_restart_field_2d(nc, dims_xy, "L1_rain", "rain (liquid water) at level 1", self%exchange%rain%data)
-    call self%write_restart_field_2d(nc, dims_xy, "L1_runoffSeal", &
-      "runoff from impervious area at level 1", self%exchange%runoff_sealed%data)
-    call self%write_restart_field_2d(nc, dims_xy, "L1_slowRunoff", "slow runoff at level 1", self%exchange%interflow_slow%data)
-    call self%write_restart_field_2d(nc, dims_xy, "L1_snow", "snow (solid water) at level 1", self%exchange%snow%data)
-    call self%write_restart_field_2d(nc, dims_xy, "L1_Throughfall", "throughfall at level 1", self%exchange%throughfall%data)
-    call self%write_restart_field_2d(nc, dims_xy, "L1_total_runoff", "total runoff at level 1", self%exchange%runoff_total%data)
+    if (interception_case == 1_i4) then
+      call self%write_restart_field_2d(nc, dims_xy, "L1_Inter", "Interception storage at level 1", &
+        self%exchange%interception%data)
+    end if
+    if (snow_case == 1_i4) then
+      call self%write_restart_field_2d(nc, dims_xy, "L1_snowPack", "Snowpack at level 1", self%exchange%snowpack%data)
+    end if
+    if (direct_runoff_case == 1_i4) then
+      call self%write_restart_field_2d(nc, dims_xy, "L1_sealSTW", &
+        "Retention storage of impervious areas at level 1", self%exchange%sealed_storage%data)
+    end if
+    if (soil_case > 0_i4) then
+      call self%write_restart_field_3d(nc, dims_xy, soil_dim, "L1_soilMoist", "soil moisture at level 1", &
+        self%exchange%soil_moisture%data)
+    end if
+    if (interflow_case == 1_i4) then
+      call self%write_restart_field_2d(nc, dims_xy, "L1_unsatSTW", "upper soil storage at level 1", &
+        self%exchange%unsat_storage%data)
+    end if
+    if (interflow_case == 1_i4 .or. baseflow_case == 1_i4) then
+      call self%write_restart_field_2d(nc, dims_xy, "L1_satSTW", "groundwater storage at level 1", &
+        self%exchange%sat_storage%data)
+    end if
   end subroutine mhm_write_restart_data
 
-  !> \brief Restore mHM states and optionally fluxes from a restart file.
-  subroutine mhm_read_restart_data(self, read_fluxes)
+  !> \brief Restore mHM physical-process states from a restart file.
+  subroutine mhm_read_restart_data(self)
     class(mhm_t), intent(inout), target :: self
-    logical, intent(in) :: read_fluxes
     type(NcDataset) :: nc
     type(grid_t) :: restart_grid
+    integer(i4) :: interception_case
+    integer(i4) :: snow_case
+    integer(i4) :: soil_case
+    integer(i4) :: direct_runoff_case
+    integer(i4) :: interflow_case
+    integer(i4) :: baseflow_case
 
     if (.not.allocated(self%io%restart_input_path)) then
       log_fatal(*) "mHM: restart input path is not configured."
@@ -1145,33 +1162,25 @@ contains
     call restart_grid%from_restart(nc)
     call self%validate_restart_grid(restart_grid)
     call self%validate_restart_horizon_bounds(nc)
+    call self%validate_restart_process_cases(nc)
 
-    call self%read_restart_field_2d(nc, "L1_Inter", self%canopy%interception)
-    call self%read_restart_field_2d(nc, "L1_snowPack", self%snow%snowpack)
-    call self%read_restart_field_2d(nc, "L1_sealSTW", self%direct_runoff%storage)
-    call self%read_restart_field_3d(nc, "L1_soilMoist", self%soil%moisture)
-    call self%read_restart_field_2d(nc, "L1_unsatSTW", self%runoff%unsat_storage)
-    call self%read_restart_field_2d(nc, "L1_satSTW", self%runoff%sat_storage)
+    interception_case = self%exchange%parameters%process_matrix(1, 1)
+    snow_case = self%exchange%parameters%process_matrix(2, 1)
+    soil_case = self%exchange%parameters%process_matrix(3, 1)
+    direct_runoff_case = self%exchange%parameters%process_matrix(4, 1)
+    interflow_case = self%exchange%parameters%process_matrix(6, 1)
+    baseflow_case = self%exchange%parameters%process_matrix(9, 1)
 
-    if (read_fluxes) then
-      call self%read_restart_field_3d(nc, "L1_aETSoil", self%soil%aet)
-      call self%read_restart_field_2d(nc, "L1_aETCanopy", self%canopy%aet)
-      call self%read_restart_field_2d(nc, "L1_aETSealed", self%direct_runoff%aet)
-      call self%read_restart_field_2d(nc, "L1_baseflow", self%runoff%baseflow)
-      call self%read_restart_field_3d(nc, "L1_infilSoil", self%soil%infiltration)
-      call self%read_restart_field_2d(nc, "L1_fastRunoff", self%runoff%fast_interflow)
-      call self%read_restart_field_2d(nc, "L1_percol", self%runoff%percolation)
-      call self%read_restart_field_2d(nc, "L1_melt", self%snow%melt)
-      call self%read_restart_field_2d(nc, "L1_preEffect", self%snow%pre_effect)
-      call self%read_restart_field_2d(nc, "L1_rain", self%snow%rain)
-      call self%read_restart_field_2d(nc, "L1_runoffSeal", self%direct_runoff%runoff)
-      call self%read_restart_field_2d(nc, "L1_slowRunoff", self%runoff%slow_interflow)
-      call self%read_restart_field_2d(nc, "L1_snow", self%snow%snow)
-      call self%read_restart_field_2d(nc, "L1_Throughfall", self%canopy%throughfall)
-      call self%read_restart_field_2d(nc, "L1_total_runoff", self%runoff%total_runoff)
-    else
-      call mhm_reset_fluxes(self)
+    if (interception_case == 1_i4) call self%read_restart_field_2d(nc, "L1_Inter", self%canopy%interception)
+    if (snow_case == 1_i4) call self%read_restart_field_2d(nc, "L1_snowPack", self%snow%snowpack)
+    if (direct_runoff_case == 1_i4) call self%read_restart_field_2d(nc, "L1_sealSTW", self%direct_runoff%storage)
+    if (soil_case > 0_i4) call self%read_restart_field_3d(nc, "L1_soilMoist", self%soil%moisture)
+    if (interflow_case == 1_i4) call self%read_restart_field_2d(nc, "L1_unsatSTW", self%runoff%unsat_storage)
+    if (interflow_case == 1_i4 .or. baseflow_case == 1_i4) then
+      call self%read_restart_field_2d(nc, "L1_satSTW", self%runoff%sat_storage)
     end if
+
+    call mhm_reset_fluxes(self)
     self%neutrons%counts = P1_InitStateFluxes
     call nc%close()
   end subroutine mhm_read_restart_data
@@ -1290,6 +1299,50 @@ contains
       error stop 1
     end if
   end subroutine mhm_validate_restart_horizon_bounds
+
+  !> \brief Validate that restart process cases are compatible with the current mHM configuration.
+  subroutine mhm_validate_restart_process_cases(self, nc)
+    class(mhm_t), intent(inout), target :: self
+    type(NcDataset), intent(inout) :: nc
+    type(NcVariable) :: meta_var
+
+    if (.not.nc%hasVariable("mhm_meta")) then
+      log_fatal(*) "mHM restart: required metadata variable mhm_meta is missing. Regenerate the restart file."
+      error stop 1
+    end if
+
+    meta_var = nc%getVariable("mhm_meta")
+    call mhm_validate_restart_case(meta_var, "interception_case", "interception", &
+      self%exchange%parameters%process_matrix(1, 1))
+    call mhm_validate_restart_case(meta_var, "snow_case", "snow", self%exchange%parameters%process_matrix(2, 1))
+    call mhm_validate_restart_case(meta_var, "soil_moisture_case", "soil_moisture", &
+      self%exchange%parameters%process_matrix(3, 1))
+    call mhm_validate_restart_case(meta_var, "direct_runoff_case", "direct_runoff", &
+      self%exchange%parameters%process_matrix(4, 1))
+    call mhm_validate_restart_case(meta_var, "interflow_case", "interflow", self%exchange%parameters%process_matrix(6, 1))
+    call mhm_validate_restart_case(meta_var, "baseflow_case", "baseflow", self%exchange%parameters%process_matrix(9, 1))
+  end subroutine mhm_validate_restart_process_cases
+
+  !> \brief Validate one restart process-case metadata attribute.
+  subroutine mhm_validate_restart_case(meta_var, attr_name, process_name, current_case)
+    type(NcVariable), intent(in) :: meta_var
+    character(*), intent(in) :: attr_name
+    character(*), intent(in) :: process_name
+    integer(i4), intent(in) :: current_case
+    integer(i4) :: restart_case
+
+    if (.not.meta_var%hasAttribute(trim(attr_name))) then
+      log_fatal(*) "mHM restart: required metadata attribute ", trim(attr_name), " is missing. Regenerate the restart file."
+      error stop 1
+    end if
+
+    call meta_var%getAttribute(trim(attr_name), restart_case)
+    if ((restart_case > 0_i4 .or. current_case > 0_i4) .and. restart_case /= current_case) then
+      log_fatal(*) "mHM restart: process case mismatch for ", trim(process_name), &
+        ". Restart value: ", n2s(restart_case), ", current value: ", n2s(current_case), "."
+      error stop 1
+    end if
+  end subroutine mhm_validate_restart_case
 
   !> \brief Write a packed L1 scalar field as unpacked 2D restart data.
   subroutine mhm_write_restart_field_2d(self, nc, dims_xy, var_name, long_name, data_packed)
@@ -1480,6 +1533,89 @@ contains
       end if
     end select
   end function mhm_flux_units
+
+  !> \brief Check whether a scalar exchange field is or will be available after mHM publication.
+  logical function mhm_available_dp(var, owned)
+    type(var_dp), intent(in) :: var
+    logical, intent(in) :: owned
+
+    mhm_available_dp = owned .or. (var%provided .and. associated(var%data))
+  end function mhm_available_dp
+
+  !> \brief Check whether a layered exchange field is or will be available after mHM publication.
+  logical function mhm_available_2d(var, owned)
+    type(var2d_dp), intent(in) :: var
+    logical, intent(in) :: owned
+
+    mhm_available_2d = owned .or. (var%provided .and. associated(var%data))
+  end function mhm_available_2d
+
+  !> \brief Disable an unavailable output flag while keeping the run configuration valid.
+  subroutine mhm_disable_unavailable_output(flag, name, available)
+    logical, intent(inout) :: flag
+    character(*), intent(in) :: name
+    logical, intent(in) :: available
+
+    if (flag .and. .not.available) then
+      log_warn(*) "mHM output ", trim(name), " requested but the required exchange field is not provided; output disabled."
+      flag = .false.
+    end if
+  end subroutine mhm_disable_unavailable_output
+
+  !> \brief Drop optional output requests that are not backed by provided exchange fields.
+  subroutine mhm_filter_output(self)
+    class(mhm_t), intent(inout), target :: self
+    logical :: aet_available
+
+    if (.not.self%io%output_active) return
+
+    call mhm_disable_unavailable_output(self%output_config%out_interception, "interception", &
+      mhm_available_dp(self%exchange%interception, self%contract%own_interception))
+    call mhm_disable_unavailable_output(self%output_config%out_snowpack, "snowpack", &
+      mhm_available_dp(self%exchange%snowpack, self%contract%own_snowpack))
+    call mhm_disable_unavailable_output(self%output_config%out_swc, "SWC_L", &
+      mhm_available_2d(self%exchange%soil_moisture, self%contract%own_soil_moisture))
+    call mhm_disable_unavailable_output(self%output_config%out_sm, "SM_L", &
+      mhm_available_2d(self%exchange%soil_moisture, self%contract%own_soil_moisture))
+    call mhm_disable_unavailable_output(self%output_config%out_sm_all, "SM_Lall", &
+      mhm_available_2d(self%exchange%soil_moisture, self%contract%own_soil_moisture))
+    call mhm_disable_unavailable_output(self%output_config%out_sealedstw, "sealedSTW", &
+      mhm_available_dp(self%exchange%sealed_storage, self%contract%own_sealed_storage))
+    call mhm_disable_unavailable_output(self%output_config%out_unsatstw, "unsatSTW", &
+      mhm_available_dp(self%exchange%unsat_storage, self%contract%own_unsat_storage))
+    call mhm_disable_unavailable_output(self%output_config%out_satstw, "satSTW", &
+      mhm_available_dp(self%exchange%sat_storage, self%contract%own_sat_storage))
+    call mhm_disable_unavailable_output(self%output_config%out_neutrons, "neutrons", &
+      mhm_available_dp(self%exchange%neutrons, self%contract%own_neutrons))
+    call mhm_disable_unavailable_output(self%output_config%out_pet, "PET", &
+      mhm_available_dp(self%exchange%pet, .false.))
+
+    aet_available = mhm_available_dp(self%exchange%aet_canopy, self%contract%own_aet_canopy) .or. &
+      mhm_available_dp(self%exchange%aet_sealed, self%contract%own_aet_sealed) .or. &
+      mhm_available_2d(self%exchange%aet_soil, self%contract%own_aet_soil)
+    call mhm_disable_unavailable_output(self%output_config%out_aet_all, "aET", aet_available)
+
+    call mhm_disable_unavailable_output(self%output_config%out_q, "Q", &
+      mhm_available_dp(self%exchange%runoff_total, self%contract%own_total_runoff))
+    call mhm_disable_unavailable_output(self%output_config%out_qd, "QD", &
+      mhm_available_dp(self%exchange%runoff_sealed, self%contract%own_runoff_sealed))
+    call mhm_disable_unavailable_output(self%output_config%out_qif, "QIf", &
+      mhm_available_dp(self%exchange%interflow_fast, self%contract%own_interflow_fast))
+    call mhm_disable_unavailable_output(self%output_config%out_qis, "QIs", &
+      mhm_available_dp(self%exchange%interflow_slow, self%contract%own_interflow_slow))
+    call mhm_disable_unavailable_output(self%output_config%out_qb, "QB", &
+      mhm_available_dp(self%exchange%baseflow, self%contract%own_baseflow))
+    call mhm_disable_unavailable_output(self%output_config%out_recharge, "recharge", &
+      mhm_available_dp(self%exchange%percolation, self%contract%own_percolation))
+    call mhm_disable_unavailable_output(self%output_config%out_soil_infil, "soil_infil_L", &
+      mhm_available_2d(self%exchange%infiltration, self%contract%own_infiltration))
+    call mhm_disable_unavailable_output(self%output_config%out_aet_layer, "aET_L", &
+      mhm_available_2d(self%exchange%aet_soil, self%contract%own_aet_soil))
+    call mhm_disable_unavailable_output(self%output_config%out_preeffect, "preEffect", &
+      mhm_available_dp(self%exchange%pre_eff, self%contract%own_pre_effect))
+    call mhm_disable_unavailable_output(self%output_config%out_qsm, "Qsm", &
+      mhm_available_dp(self%exchange%melt, self%contract%own_melt))
+  end subroutine mhm_filter_output
 
   !> \brief Mark a 1D exchange field as required and validate it.
   subroutine mhm_mark_required_dp(self, var, required, name)
