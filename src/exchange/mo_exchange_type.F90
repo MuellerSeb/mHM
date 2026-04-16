@@ -1109,11 +1109,9 @@ contains
   function variable_name(self) result(name)
     class(variable_abc), intent(in) :: self
     character(:), allocatable :: name
-
-    if (allocated(self%name) .and. len_trim(self%name) > 0) then
-      name = trim(self%name)
-    else
-      name = "<unnamed>"
+    name = "<unnamed>"
+    if (allocated(self%name)) then
+      if (len_trim(self%name) > 0) name = trim(self%name)
     end if
   end function variable_name
 
