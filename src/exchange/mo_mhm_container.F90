@@ -19,10 +19,10 @@ module mo_mhm_container
   use mo_runoff, only: L1_total_runoff, runoff_sat_zone, runoff_unsat_zone
   use mo_snow_accum_melt, only: snow_accum_melt
   use mo_soil_moisture, only: soil_moisture_direct_runoff, soil_moisture_pervious
-  use mo_kind, only: i4, dp
+  use mo_kind, only: i4, i8, dp
   use mo_constants, only: YearMonths
   use mo_common_constants, only: P1_InitStateFluxes, soilHorizonsVarName
-  use mo_exchange_type, only: exchange_t, var_dp, var2d_dp
+  use mo_exchange_type, only: exchange_t
   use mo_datetime, only: one_hour
   use mo_grid, only: grid_t, cartesian
   use mo_mhm_constants, only: P2_InitStateFluxes, P3_InitStateFluxes, P4_InitStateFluxes, C1_InitStateSM
@@ -288,6 +288,8 @@ contains
     integer(i4) :: id(1)
     integer(i4) :: n_cells
     integer(i4) :: n_horizons
+    integer(i8) :: expected_shape_1d(1)
+    integer(i8) :: expected_shape_2d(2)
     integer(i4) :: interception_case
     integer(i4) :: snow_case
     integer(i4) :: soil_case
@@ -335,6 +337,8 @@ contains
     call mhm_copy_horizon_bounds(self, self%exchange%soil_horizon_bounds)
     n_cells = int(self%exchange%level1%ncells, i4)
     n_horizons = size(self%soil%horizon_bounds) - 1_i4
+    expected_shape_1d = [self%exchange%level1%ncells]
+    expected_shape_2d = [self%exchange%level1%ncells, int(n_horizons, i8)]
     if (n_horizons < 1_i4) then
       log_fatal(*) "mHM: soil_horizon_bounds must contain at least two entries."
       error stop 1
@@ -382,49 +386,48 @@ contains
 
     call mhm_filter_output(self)
     aet_all_needs_f_sealed = self%output_config%out_aet_all .and. &
-      (mhm_available_2d(self%exchange%aet_soil, self%contract%own_aet_soil) .or. &
-      mhm_available_dp(self%exchange%aet_sealed, self%contract%own_aet_sealed))
+      (self%exchange%aet_soil%available(owned=self%contract%own_aet_soil) .or. &
+      self%exchange%aet_sealed%available(owned=self%contract%own_aet_sealed))
 
-    call mhm_mark_required_dp(self, self%exchange%pre, &
-      (interception_case /= 0_i4) .or. (snow_case == 1_i4), &
-      "pre")
-    call mhm_mark_required_dp(self, self%exchange%temp, snow_case == 1_i4, "temp")
-    call mhm_mark_required_dp(self, self%exchange%pet, &
-      (interception_case == 1_i4) .or. (soil_case /= 0_i4) .or. (direct_runoff_case /= 0_i4) .or. self%output_config%out_pet, "pet")
+    call self%exchange%pre%require("mHM", (interception_case /= 0_i4) .or. (snow_case == 1_i4), expected_shape_1d)
+    call self%exchange%temp%require("mHM", snow_case == 1_i4, expected_shape_1d)
+    call self%exchange%pet%require("mHM", &
+      (interception_case == 1_i4) .or. (soil_case /= 0_i4) .or. (direct_runoff_case /= 0_i4) .or. &
+      self%output_config%out_pet, expected_shape_1d)
 
-    call mhm_mark_required_dp(self, self%exchange%max_interception, interception_case == 1_i4, "max_interception")
-    call mhm_mark_required_dp(self, self%exchange%thresh_temp, snow_case == 1_i4, "thresh_temp")
-    call mhm_mark_required_dp(self, self%exchange%degday_dry, snow_case == 1_i4, "degday_dry")
-    call mhm_mark_required_dp(self, self%exchange%degday_inc, snow_case == 1_i4, "degday_inc")
-    call mhm_mark_required_dp(self, self%exchange%degday_max, snow_case == 1_i4, "degday_max")
+    call self%exchange%max_interception%require("mHM", interception_case == 1_i4, expected_shape_1d)
+    call self%exchange%thresh_temp%require("mHM", snow_case == 1_i4, expected_shape_1d)
+    call self%exchange%degday_dry%require("mHM", snow_case == 1_i4, expected_shape_1d)
+    call self%exchange%degday_inc%require("mHM", snow_case == 1_i4, expected_shape_1d)
+    call self%exchange%degday_max%require("mHM", snow_case == 1_i4, expected_shape_1d)
 
-    call mhm_mark_required_dp(self, self%exchange%f_sealed, &
+    call self%exchange%f_sealed%require("mHM", &
       (soil_case /= 0_i4) .or. (direct_runoff_case /= 0_i4) .or. (interflow_case /= 0_i4) .or. (baseflow_case /= 0_i4) .or. &
       aet_all_needs_f_sealed .or. self%output_config%out_qd .or. self%output_config%out_qif .or. &
       self%output_config%out_qis .or. self%output_config%out_qb .or. self%output_config%out_recharge .or. &
       self%output_config%out_soil_infil .or. self%output_config%out_aet_layer, &
-      "f_sealed")
-    call mhm_mark_required_2d(self, self%exchange%f_roots, soil_case /= 0_i4, "f_roots", n_horizons)
-    call mhm_mark_required_2d(self, self%exchange%sm_saturation, &
-      (soil_case /= 0_i4) .or. self%output_config%out_sm .or. self%output_config%out_sm_all, "sm_saturation", n_horizons)
-    call mhm_mark_required_2d(self, self%exchange%sm_exponent, soil_case /= 0_i4, "sm_exponent", n_horizons)
-    call mhm_mark_required_2d(self, self%exchange%sm_field_capacity, soil_case /= 0_i4, "sm_field_capacity", n_horizons)
-    call mhm_mark_required_2d(self, self%exchange%wilting_point, soil_case /= 0_i4, "wilting_point", n_horizons)
-    call mhm_mark_required_dp(self, self%exchange%thresh_jarvis, (soil_case == 2_i4) .or. (soil_case == 3_i4), "thresh_jarvis")
-    call mhm_mark_required_dp(self, self%exchange%thresh_sealed, direct_runoff_case /= 0_i4, "thresh_sealed")
+      expected_shape_1d)
+    call self%exchange%f_roots%require("mHM", soil_case /= 0_i4, expected_shape_2d)
+    call self%exchange%sm_saturation%require("mHM", &
+      (soil_case /= 0_i4) .or. self%output_config%out_sm .or. self%output_config%out_sm_all, expected_shape_2d)
+    call self%exchange%sm_exponent%require("mHM", soil_case /= 0_i4, expected_shape_2d)
+    call self%exchange%sm_field_capacity%require("mHM", soil_case /= 0_i4, expected_shape_2d)
+    call self%exchange%wilting_point%require("mHM", soil_case /= 0_i4, expected_shape_2d)
+    call self%exchange%thresh_jarvis%require("mHM", (soil_case == 2_i4) .or. (soil_case == 3_i4), expected_shape_1d)
+    call self%exchange%thresh_sealed%require("mHM", direct_runoff_case /= 0_i4, expected_shape_1d)
 
-    call mhm_mark_required_dp(self, self%exchange%alpha, interflow_case /= 0_i4, "alpha")
-    call mhm_mark_required_dp(self, self%exchange%k_fastflow, interflow_case /= 0_i4, "k_fastflow")
-    call mhm_mark_required_dp(self, self%exchange%k_slowflow, interflow_case /= 0_i4, "k_slowflow")
-    call mhm_mark_required_dp(self, self%exchange%k_percolation, percolation_case /= 0_i4, "k_percolation")
-    call mhm_mark_required_dp(self, self%exchange%f_karst_loss, percolation_case /= 0_i4, "f_karst_loss")
-    call mhm_mark_required_dp(self, self%exchange%thresh_unsat, interflow_case /= 0_i4, "thresh_unsat")
-    call mhm_mark_required_dp(self, self%exchange%k_baseflow, baseflow_case /= 0_i4, "k_baseflow")
+    call self%exchange%alpha%require("mHM", interflow_case /= 0_i4, expected_shape_1d)
+    call self%exchange%k_fastflow%require("mHM", interflow_case /= 0_i4, expected_shape_1d)
+    call self%exchange%k_slowflow%require("mHM", interflow_case /= 0_i4, expected_shape_1d)
+    call self%exchange%k_percolation%require("mHM", percolation_case /= 0_i4, expected_shape_1d)
+    call self%exchange%f_karst_loss%require("mHM", percolation_case /= 0_i4, expected_shape_1d)
+    call self%exchange%thresh_unsat%require("mHM", interflow_case /= 0_i4, expected_shape_1d)
+    call self%exchange%k_baseflow%require("mHM", baseflow_case /= 0_i4, expected_shape_1d)
 
-    call mhm_mark_required_dp(self, self%exchange%desilets_n0, neutron_case /= 0_i4, "desilets_n0")
-    call mhm_mark_required_2d(self, self%exchange%bulk_density, neutron_case /= 0_i4, "bulk_density", n_horizons)
-    call mhm_mark_required_2d(self, self%exchange%lattice_water, neutron_case /= 0_i4, "lattice_water", n_horizons)
-    call mhm_mark_required_2d(self, self%exchange%cosmic_l3, neutron_case == 2_i4, "cosmic_l3", n_horizons)
+    call self%exchange%desilets_n0%require("mHM", neutron_case /= 0_i4, expected_shape_1d)
+    call self%exchange%bulk_density%require("mHM", neutron_case /= 0_i4, expected_shape_2d)
+    call self%exchange%lattice_water%require("mHM", neutron_case /= 0_i4, expected_shape_2d)
+    call self%exchange%cosmic_l3%require("mHM", neutron_case == 2_i4, expected_shape_2d)
 
     call mhm_allocate_1d(self%canopy%interception, n_cells)
     call mhm_allocate_1d(self%canopy%throughfall, n_cells)
@@ -456,46 +459,32 @@ contains
     call mhm_allocate_1d(self%neutrons%counts, n_cells)
 
     call mhm_publish_exchange(self)
-    call mhm_expect_handoff_dp(self, self%exchange%interception, &
-      self%output_config%out_interception .or. (neutron_case /= 0_i4), "interception")
-    call mhm_expect_handoff_dp(self, self%exchange%throughfall, &
-      snow_case /= 0_i4, "throughfall")
-    call mhm_expect_handoff_dp(self, self%exchange%aet_canopy, &
-      (direct_runoff_case /= 0_i4) .or. (soil_case /= 0_i4), "aet_canopy")
-    call mhm_expect_handoff_dp(self, self%exchange%snowpack, &
-      self%output_config%out_snowpack .or. (neutron_case /= 0_i4), "snowpack")
-    call mhm_expect_handoff_dp(self, self%exchange%melt, &
-      self%output_config%out_qsm, "melt")
-    call mhm_expect_handoff_dp(self, self%exchange%pre_eff, &
-      (direct_runoff_case /= 0_i4) .or. (soil_case /= 0_i4) .or. self%output_config%out_preeffect, &
-      "pre_eff")
-    call mhm_expect_handoff_dp(self, self%exchange%sealed_storage, &
-      self%output_config%out_sealedstw, "sealed_storage")
-    call mhm_expect_handoff_2d(self, self%exchange%infiltration, &
-      (interflow_case /= 0_i4) .or. self%output_config%out_soil_infil, "infiltration", n_horizons)
-    call mhm_expect_handoff_2d(self, self%exchange%soil_moisture, &
+    call self%exchange%interception%expect_handoff("mHM", &
+      self%output_config%out_interception .or. (neutron_case /= 0_i4), expected_shape_1d)
+    call self%exchange%throughfall%expect_handoff("mHM", snow_case /= 0_i4, expected_shape_1d)
+    call self%exchange%aet_canopy%expect_handoff("mHM", &
+      (direct_runoff_case /= 0_i4) .or. (soil_case /= 0_i4), expected_shape_1d)
+    call self%exchange%snowpack%expect_handoff("mHM", &
+      self%output_config%out_snowpack .or. (neutron_case /= 0_i4), expected_shape_1d)
+    call self%exchange%melt%expect_handoff("mHM", self%output_config%out_qsm, expected_shape_1d)
+    call self%exchange%pre_eff%expect_handoff("mHM", &
+      (direct_runoff_case /= 0_i4) .or. (soil_case /= 0_i4) .or. self%output_config%out_preeffect, expected_shape_1d)
+    call self%exchange%sealed_storage%expect_handoff("mHM", self%output_config%out_sealedstw, expected_shape_1d)
+    call self%exchange%infiltration%expect_handoff("mHM", &
+      (interflow_case /= 0_i4) .or. self%output_config%out_soil_infil, expected_shape_2d)
+    call self%exchange%soil_moisture%expect_handoff("mHM", &
       self%output_config%out_swc .or. self%output_config%out_sm .or. self%output_config%out_sm_all .or. &
-      (neutron_case /= 0_i4), "soil_moisture", n_horizons)
-    call mhm_expect_handoff_2d(self, self%exchange%aet_soil, &
-      self%output_config%out_aet_layer, "aet_soil", n_horizons)
-    call mhm_expect_handoff_dp(self, self%exchange%runoff_sealed, &
-      self%output_config%out_qd, "runoff_sealed")
-    call mhm_expect_handoff_dp(self, self%exchange%unsat_storage, &
-      self%output_config%out_unsatstw, "unsat_storage")
-    call mhm_expect_handoff_dp(self, self%exchange%sat_storage, &
-      self%output_config%out_satstw, "sat_storage")
-    call mhm_expect_handoff_dp(self, self%exchange%interflow_fast, &
-      self%output_config%out_qif, "interflow_fast")
-    call mhm_expect_handoff_dp(self, self%exchange%interflow_slow, &
-      self%output_config%out_qis, "interflow_slow")
-    call mhm_expect_handoff_dp(self, self%exchange%percolation, &
-      self%output_config%out_recharge, "percolation")
-    call mhm_expect_handoff_dp(self, self%exchange%baseflow, &
-      self%output_config%out_qb, "baseflow")
-    call mhm_expect_handoff_dp(self, self%exchange%runoff_total, &
-      (routing_case /= 0_i4) .or. self%output_config%out_q, "runoff_total")
-    call mhm_expect_handoff_dp(self, self%exchange%neutrons, &
-      self%output_config%out_neutrons, "neutrons")
+      (neutron_case /= 0_i4), expected_shape_2d)
+    call self%exchange%aet_soil%expect_handoff("mHM", self%output_config%out_aet_layer, expected_shape_2d)
+    call self%exchange%runoff_sealed%expect_handoff("mHM", self%output_config%out_qd, expected_shape_1d)
+    call self%exchange%unsat_storage%expect_handoff("mHM", self%output_config%out_unsatstw, expected_shape_1d)
+    call self%exchange%sat_storage%expect_handoff("mHM", self%output_config%out_satstw, expected_shape_1d)
+    call self%exchange%interflow_fast%expect_handoff("mHM", self%output_config%out_qif, expected_shape_1d)
+    call self%exchange%interflow_slow%expect_handoff("mHM", self%output_config%out_qis, expected_shape_1d)
+    call self%exchange%percolation%expect_handoff("mHM", self%output_config%out_recharge, expected_shape_1d)
+    call self%exchange%baseflow%expect_handoff("mHM", self%output_config%out_qb, expected_shape_1d)
+    call self%exchange%runoff_total%expect_handoff("mHM", (routing_case /= 0_i4) .or. self%output_config%out_q, expected_shape_1d)
+    call self%exchange%neutrons%expect_handoff("mHM", self%output_config%out_neutrons, expected_shape_1d)
     call mhm_reset_state_fluxes(self)
   end subroutine mhm_connect
 
@@ -1534,22 +1523,6 @@ contains
     end select
   end function mhm_flux_units
 
-  !> \brief Check whether a scalar exchange field is or will be available after mHM publication.
-  logical function mhm_available_dp(var, owned)
-    type(var_dp), intent(in) :: var
-    logical, intent(in) :: owned
-
-    mhm_available_dp = owned .or. (var%provided .and. associated(var%data))
-  end function mhm_available_dp
-
-  !> \brief Check whether a layered exchange field is or will be available after mHM publication.
-  logical function mhm_available_2d(var, owned)
-    type(var2d_dp), intent(in) :: var
-    logical, intent(in) :: owned
-
-    mhm_available_2d = owned .or. (var%provided .and. associated(var%data))
-  end function mhm_available_2d
-
   !> \brief Disable an unavailable output flag while keeping the run configuration valid.
   subroutine mhm_disable_unavailable_output(flag, name, available)
     logical, intent(inout) :: flag
@@ -1570,206 +1543,52 @@ contains
     if (.not.self%io%output_active) return
 
     call mhm_disable_unavailable_output(self%output_config%out_interception, "interception", &
-      mhm_available_dp(self%exchange%interception, self%contract%own_interception))
+      self%exchange%interception%available(owned=self%contract%own_interception))
     call mhm_disable_unavailable_output(self%output_config%out_snowpack, "snowpack", &
-      mhm_available_dp(self%exchange%snowpack, self%contract%own_snowpack))
+      self%exchange%snowpack%available(owned=self%contract%own_snowpack))
     call mhm_disable_unavailable_output(self%output_config%out_swc, "SWC_L", &
-      mhm_available_2d(self%exchange%soil_moisture, self%contract%own_soil_moisture))
+      self%exchange%soil_moisture%available(owned=self%contract%own_soil_moisture))
     call mhm_disable_unavailable_output(self%output_config%out_sm, "SM_L", &
-      mhm_available_2d(self%exchange%soil_moisture, self%contract%own_soil_moisture))
+      self%exchange%soil_moisture%available(owned=self%contract%own_soil_moisture))
     call mhm_disable_unavailable_output(self%output_config%out_sm_all, "SM_Lall", &
-      mhm_available_2d(self%exchange%soil_moisture, self%contract%own_soil_moisture))
+      self%exchange%soil_moisture%available(owned=self%contract%own_soil_moisture))
     call mhm_disable_unavailable_output(self%output_config%out_sealedstw, "sealedSTW", &
-      mhm_available_dp(self%exchange%sealed_storage, self%contract%own_sealed_storage))
+      self%exchange%sealed_storage%available(owned=self%contract%own_sealed_storage))
     call mhm_disable_unavailable_output(self%output_config%out_unsatstw, "unsatSTW", &
-      mhm_available_dp(self%exchange%unsat_storage, self%contract%own_unsat_storage))
+      self%exchange%unsat_storage%available(owned=self%contract%own_unsat_storage))
     call mhm_disable_unavailable_output(self%output_config%out_satstw, "satSTW", &
-      mhm_available_dp(self%exchange%sat_storage, self%contract%own_sat_storage))
+      self%exchange%sat_storage%available(owned=self%contract%own_sat_storage))
     call mhm_disable_unavailable_output(self%output_config%out_neutrons, "neutrons", &
-      mhm_available_dp(self%exchange%neutrons, self%contract%own_neutrons))
+      self%exchange%neutrons%available(owned=self%contract%own_neutrons))
     call mhm_disable_unavailable_output(self%output_config%out_pet, "PET", &
-      mhm_available_dp(self%exchange%pet, .false.))
+      self%exchange%pet%available())
 
-    aet_available = mhm_available_dp(self%exchange%aet_canopy, self%contract%own_aet_canopy) .or. &
-      mhm_available_dp(self%exchange%aet_sealed, self%contract%own_aet_sealed) .or. &
-      mhm_available_2d(self%exchange%aet_soil, self%contract%own_aet_soil)
+    aet_available = self%exchange%aet_canopy%available(owned=self%contract%own_aet_canopy) .or. &
+      self%exchange%aet_sealed%available(owned=self%contract%own_aet_sealed) .or. &
+      self%exchange%aet_soil%available(owned=self%contract%own_aet_soil)
     call mhm_disable_unavailable_output(self%output_config%out_aet_all, "aET", aet_available)
 
     call mhm_disable_unavailable_output(self%output_config%out_q, "Q", &
-      mhm_available_dp(self%exchange%runoff_total, self%contract%own_total_runoff))
+      self%exchange%runoff_total%available(owned=self%contract%own_total_runoff))
     call mhm_disable_unavailable_output(self%output_config%out_qd, "QD", &
-      mhm_available_dp(self%exchange%runoff_sealed, self%contract%own_runoff_sealed))
+      self%exchange%runoff_sealed%available(owned=self%contract%own_runoff_sealed))
     call mhm_disable_unavailable_output(self%output_config%out_qif, "QIf", &
-      mhm_available_dp(self%exchange%interflow_fast, self%contract%own_interflow_fast))
+      self%exchange%interflow_fast%available(owned=self%contract%own_interflow_fast))
     call mhm_disable_unavailable_output(self%output_config%out_qis, "QIs", &
-      mhm_available_dp(self%exchange%interflow_slow, self%contract%own_interflow_slow))
+      self%exchange%interflow_slow%available(owned=self%contract%own_interflow_slow))
     call mhm_disable_unavailable_output(self%output_config%out_qb, "QB", &
-      mhm_available_dp(self%exchange%baseflow, self%contract%own_baseflow))
+      self%exchange%baseflow%available(owned=self%contract%own_baseflow))
     call mhm_disable_unavailable_output(self%output_config%out_recharge, "recharge", &
-      mhm_available_dp(self%exchange%percolation, self%contract%own_percolation))
+      self%exchange%percolation%available(owned=self%contract%own_percolation))
     call mhm_disable_unavailable_output(self%output_config%out_soil_infil, "soil_infil_L", &
-      mhm_available_2d(self%exchange%infiltration, self%contract%own_infiltration))
+      self%exchange%infiltration%available(owned=self%contract%own_infiltration))
     call mhm_disable_unavailable_output(self%output_config%out_aet_layer, "aET_L", &
-      mhm_available_2d(self%exchange%aet_soil, self%contract%own_aet_soil))
+      self%exchange%aet_soil%available(owned=self%contract%own_aet_soil))
     call mhm_disable_unavailable_output(self%output_config%out_preeffect, "preEffect", &
-      mhm_available_dp(self%exchange%pre_eff, self%contract%own_pre_effect))
+      self%exchange%pre_eff%available(owned=self%contract%own_pre_effect))
     call mhm_disable_unavailable_output(self%output_config%out_qsm, "Qsm", &
-      mhm_available_dp(self%exchange%melt, self%contract%own_melt))
+      self%exchange%melt%available(owned=self%contract%own_melt))
   end subroutine mhm_filter_output
-
-  !> \brief Mark a 1D exchange field as required and validate it.
-  subroutine mhm_mark_required_dp(self, var, required, name)
-    class(mhm_t), intent(in) :: self
-    type(var_dp), intent(inout) :: var
-    logical, intent(in) :: required
-    character(*), intent(in) :: name
-
-    var%required = var%required .or. required
-    if (.not.required) return
-    if (.not.var%provided) then
-      log_fatal(*) "mHM: ", trim(name), " not provided."
-      error stop 1
-    end if
-    if (.not.associated(var%data)) then
-      log_fatal(*) "mHM: ", trim(name), " data not connected."
-      error stop 1
-    end if
-    if (size(var%data, 1) /= self%exchange%level1%ncells) then
-      log_fatal(*) "mHM: ", trim(name), " has unexpected level1 size."
-      error stop 1
-    end if
-  end subroutine mhm_mark_required_dp
-
-  !> \brief Mark a 2D exchange field as required and validate its soil-horizon shape.
-  subroutine mhm_mark_required_2d(self, var, required, name, n_horizons)
-    class(mhm_t), intent(in) :: self
-    type(var2d_dp), intent(inout) :: var
-    logical, intent(in) :: required
-    character(*), intent(in) :: name
-    integer(i4), intent(in) :: n_horizons
-
-    var%required = var%required .or. required
-    if (.not.required) return
-    if (.not.var%provided) then
-      log_fatal(*) "mHM: ", trim(name), " not provided."
-      error stop 1
-    end if
-    if (.not.associated(var%data)) then
-      log_fatal(*) "mHM: ", trim(name), " data not connected."
-      error stop 1
-    end if
-    if (size(var%data, 1) /= self%exchange%level1%ncells .or. size(var%data, 2) /= n_horizons) then
-      log_fatal(*) "mHM: ", trim(name), " has unexpected soil-horizon shape."
-      error stop 1
-    end if
-  end subroutine mhm_mark_required_2d
-
-  !> \brief Mark and validate a required 1D internal handoff field on the exchange.
-  subroutine mhm_expect_handoff_dp(self, var, required, name)
-    class(mhm_t), intent(inout), target :: self
-    type(var_dp), intent(inout) :: var
-    logical, intent(in) :: required
-    character(*), intent(in) :: name
-
-    var%required = var%required .or. required
-    if (.not.required) return
-    if (.not.var%provided .or. .not.associated(var%data)) then
-      log_fatal(*) "mHM: required handoff not provided: ", trim(name), "."
-      error stop 1
-    end if
-    if (size(var%data) /= self%exchange%level1%ncells) then
-      log_fatal(*) "mHM: handoff ", trim(name), " has unexpected level1 size."
-      error stop 1
-    end if
-  end subroutine mhm_expect_handoff_dp
-
-  !> \brief Mark and validate a required 2D internal handoff field on the exchange.
-  subroutine mhm_expect_handoff_2d(self, var, required, name, n_horizons)
-    class(mhm_t), intent(inout), target :: self
-    type(var2d_dp), intent(inout) :: var
-    logical, intent(in) :: required
-    character(*), intent(in) :: name
-    integer(i4), intent(in) :: n_horizons
-
-    var%required = var%required .or. required
-    if (.not.required) return
-    if (.not.var%provided .or. .not.associated(var%data)) then
-      log_fatal(*) "mHM: required handoff not provided: ", trim(name), "."
-      error stop 1
-    end if
-    if (size(var%data, 1) /= self%exchange%level1%ncells .or. size(var%data, 2) /= n_horizons) then
-      log_fatal(*) "mHM: handoff ", trim(name), " has unexpected soil-horizon shape."
-      error stop 1
-    end if
-  end subroutine mhm_expect_handoff_2d
-
-  !> \brief Publish an mHM-owned 1D field through the exchange contract.
-  subroutine mhm_publish_local_dp(var, local, name)
-    type(var_dp), intent(inout) :: var
-    real(dp), intent(inout), target :: local(:)
-    character(*), intent(in) :: name
-
-    if (var%provided .or. associated(var%data)) then
-      log_fatal(*) "mHM: exchange field already provided before mHM publication: ", trim(name), "."
-      error stop 1
-    end if
-    var%data => local
-    var%provided = .true.
-  end subroutine mhm_publish_local_dp
-
-  !> \brief Publish an mHM-owned 2D field through the exchange contract.
-  subroutine mhm_publish_local_2d(var, local, name)
-    type(var2d_dp), intent(inout) :: var
-    real(dp), intent(inout), target :: local(:, :)
-    character(*), intent(in) :: name
-
-    if (var%provided .or. associated(var%data)) then
-      log_fatal(*) "mHM: exchange field already provided before mHM publication: ", trim(name), "."
-      error stop 1
-    end if
-    var%data => local
-    var%provided = .true.
-  end subroutine mhm_publish_local_2d
-
-  !> \brief Publish an exchange alias when a pass-through subprocess owns the handoff.
-  subroutine mhm_publish_alias_dp(var, source, name)
-    type(var_dp), intent(inout) :: var
-    type(var_dp), intent(in) :: source
-    character(*), intent(in) :: name
-
-    if (.not.source%provided .or. .not.associated(source%data)) then
-      log_fatal(*) "mHM: pass-through source not provided for ", trim(name), "."
-      error stop 1
-    end if
-    if (var%provided .or. associated(var%data)) then
-      log_fatal(*) "mHM: exchange field already provided before mHM publication: ", trim(name), "."
-      error stop 1
-    end if
-    var%data => source%data
-    var%provided = .true.
-  end subroutine mhm_publish_alias_dp
-
-  !> \brief Clear a 1D exchange publication only when it is owned by mHM.
-  subroutine mhm_clear_output_dp(var, own)
-    type(var_dp), intent(inout) :: var
-    logical, intent(in) :: own
-
-    if (own) then
-      nullify(var%data)
-      var%provided = .false.
-    end if
-  end subroutine mhm_clear_output_dp
-
-  !> \brief Clear a 2D exchange publication only when it is owned by mHM.
-  subroutine mhm_clear_output_2d(var, own)
-    type(var2d_dp), intent(inout) :: var
-    logical, intent(in) :: own
-
-    if (own) then
-      nullify(var%data)
-      var%provided = .false.
-    end if
-  end subroutine mhm_clear_output_2d
 
   !> \brief Allocate or resize a 1D state array.
   subroutine mhm_allocate_1d(data, n_cells)
@@ -1829,59 +1648,51 @@ contains
 
     select case (interception_case)
     case (1_i4)
-      call mhm_publish_local_dp(self%exchange%interception, self%canopy%interception, "interception")
-      call mhm_publish_local_dp(self%exchange%throughfall, self%canopy%throughfall, "throughfall")
-      call mhm_publish_local_dp(self%exchange%aet_canopy, self%canopy%aet, "aet_canopy")
+      call self%exchange%interception%publish_local("mHM", self%canopy%interception)
+      call self%exchange%throughfall%publish_local("mHM", self%canopy%throughfall)
+      call self%exchange%aet_canopy%publish_local("mHM", self%canopy%aet)
     case (-1_i4)
-      call mhm_publish_local_dp(self%exchange%interception, self%canopy%interception, "interception")
-      call mhm_publish_alias_dp(self%exchange%throughfall, self%exchange%pre, "throughfall")
-      call mhm_publish_local_dp(self%exchange%aet_canopy, self%canopy%aet, "aet_canopy")
+      call self%exchange%interception%publish_local("mHM", self%canopy%interception)
+      call self%exchange%throughfall%publish_alias("mHM", self%exchange%pre)
+      call self%exchange%aet_canopy%publish_local("mHM", self%canopy%aet)
     case (0_i4)
     end select
 
     select case (snow_case)
     case (1_i4)
-      call mhm_publish_local_dp(self%exchange%snowpack, self%snow%snowpack, "snowpack")
-      call mhm_publish_local_dp(self%exchange%melt, self%snow%melt, "melt")
-      call mhm_publish_local_dp(self%exchange%pre_eff, self%snow%pre_effect, "pre_eff")
-      call mhm_publish_local_dp(self%exchange%rain, self%snow%rain, "rain")
-      call mhm_publish_local_dp(self%exchange%snow, self%snow%snow, "snow")
-      call mhm_publish_local_dp(self%exchange%degday, self%snow%degday, "degday")
+      call self%exchange%snowpack%publish_local("mHM", self%snow%snowpack)
+      call self%exchange%melt%publish_local("mHM", self%snow%melt)
+      call self%exchange%pre_eff%publish_local("mHM", self%snow%pre_effect)
+      call self%exchange%rain%publish_local("mHM", self%snow%rain)
+      call self%exchange%snow%publish_local("mHM", self%snow%snow)
+      call self%exchange%degday%publish_local("mHM", self%snow%degday)
     case (-1_i4)
-      call mhm_publish_local_dp(self%exchange%snowpack, self%snow%snowpack, "snowpack")
-      call mhm_publish_local_dp(self%exchange%melt, self%snow%melt, "melt")
-      call mhm_publish_alias_dp(self%exchange%pre_eff, self%exchange%throughfall, "pre_eff")
-      call mhm_publish_alias_dp(self%exchange%rain, self%exchange%throughfall, "rain")
-      call mhm_publish_local_dp(self%exchange%snow, self%snow%snow, "snow")
-      call mhm_publish_local_dp(self%exchange%degday, self%snow%degday, "degday")
+      call self%exchange%snowpack%publish_local("mHM", self%snow%snowpack)
+      call self%exchange%melt%publish_local("mHM", self%snow%melt)
+      call self%exchange%pre_eff%publish_alias("mHM", self%exchange%throughfall)
+      call self%exchange%rain%publish_alias("mHM", self%exchange%throughfall)
+      call self%exchange%snow%publish_local("mHM", self%snow%snow)
+      call self%exchange%degday%publish_local("mHM", self%snow%degday)
     case (0_i4)
     end select
 
-    if (self%contract%own_sealed_storage) call mhm_publish_local_dp(self%exchange%sealed_storage, self%direct_runoff%storage, &
-      "sealed_storage")
-    if (self%contract%own_aet_sealed) call mhm_publish_local_dp(self%exchange%aet_sealed, self%direct_runoff%aet, "aet_sealed")
-    if (self%contract%own_runoff_sealed) call mhm_publish_local_dp(self%exchange%runoff_sealed, self%direct_runoff%runoff, &
-      "runoff_sealed")
+    if (self%contract%own_sealed_storage) call self%exchange%sealed_storage%publish_local("mHM", self%direct_runoff%storage)
+    if (self%contract%own_aet_sealed) call self%exchange%aet_sealed%publish_local("mHM", self%direct_runoff%aet)
+    if (self%contract%own_runoff_sealed) call self%exchange%runoff_sealed%publish_local("mHM", self%direct_runoff%runoff)
 
-    if (self%contract%own_soil_moisture) call mhm_publish_local_2d(self%exchange%soil_moisture, self%soil%moisture, &
-      "soil_moisture")
-    if (self%contract%own_infiltration) call mhm_publish_local_2d(self%exchange%infiltration, self%soil%infiltration, &
-      "infiltration")
-    if (self%contract%own_aet_soil) call mhm_publish_local_2d(self%exchange%aet_soil, self%soil%aet, "aet_soil")
+    if (self%contract%own_soil_moisture) call self%exchange%soil_moisture%publish_local("mHM", self%soil%moisture)
+    if (self%contract%own_infiltration) call self%exchange%infiltration%publish_local("mHM", self%soil%infiltration)
+    if (self%contract%own_aet_soil) call self%exchange%aet_soil%publish_local("mHM", self%soil%aet)
 
-    if (self%contract%own_unsat_storage) call mhm_publish_local_dp(self%exchange%unsat_storage, self%runoff%unsat_storage, &
-      "unsat_storage")
-    if (self%contract%own_sat_storage) call mhm_publish_local_dp(self%exchange%sat_storage, self%runoff%sat_storage, "sat_storage")
-    if (self%contract%own_percolation) call mhm_publish_local_dp(self%exchange%percolation, self%runoff%percolation, "percolation")
-    if (self%contract%own_interflow_fast) call mhm_publish_local_dp(self%exchange%interflow_fast, self%runoff%fast_interflow, &
-      "interflow_fast")
-    if (self%contract%own_interflow_slow) call mhm_publish_local_dp(self%exchange%interflow_slow, self%runoff%slow_interflow, &
-      "interflow_slow")
-    if (self%contract%own_baseflow) call mhm_publish_local_dp(self%exchange%baseflow, self%runoff%baseflow, "baseflow")
-    if (self%contract%own_total_runoff) call mhm_publish_local_dp(self%exchange%runoff_total, self%runoff%total_runoff, &
-      "runoff_total")
+    if (self%contract%own_unsat_storage) call self%exchange%unsat_storage%publish_local("mHM", self%runoff%unsat_storage)
+    if (self%contract%own_sat_storage) call self%exchange%sat_storage%publish_local("mHM", self%runoff%sat_storage)
+    if (self%contract%own_percolation) call self%exchange%percolation%publish_local("mHM", self%runoff%percolation)
+    if (self%contract%own_interflow_fast) call self%exchange%interflow_fast%publish_local("mHM", self%runoff%fast_interflow)
+    if (self%contract%own_interflow_slow) call self%exchange%interflow_slow%publish_local("mHM", self%runoff%slow_interflow)
+    if (self%contract%own_baseflow) call self%exchange%baseflow%publish_local("mHM", self%runoff%baseflow)
+    if (self%contract%own_total_runoff) call self%exchange%runoff_total%publish_local("mHM", self%runoff%total_runoff)
 
-    if (self%contract%own_neutrons) call mhm_publish_local_dp(self%exchange%neutrons, self%neutrons%counts, "neutrons")
+    if (self%contract%own_neutrons) call self%exchange%neutrons%publish_local("mHM", self%neutrons%counts)
   end subroutine mhm_publish_exchange
 
   !> \brief Reset all mHM state and flux arrays to legacy default values.
@@ -1947,29 +1758,29 @@ contains
   subroutine mhm_clear_exchange(self)
     class(mhm_t), intent(inout), target :: self
 
-    call mhm_clear_output_dp(self%exchange%interception, self%contract%own_interception)
-    call mhm_clear_output_dp(self%exchange%throughfall, self%contract%own_throughfall)
-    call mhm_clear_output_dp(self%exchange%aet_canopy, self%contract%own_aet_canopy)
-    call mhm_clear_output_dp(self%exchange%snowpack, self%contract%own_snowpack)
-    call mhm_clear_output_dp(self%exchange%melt, self%contract%own_melt)
-    call mhm_clear_output_dp(self%exchange%pre_eff, self%contract%own_pre_effect)
-    call mhm_clear_output_dp(self%exchange%rain, self%contract%own_rain)
-    call mhm_clear_output_dp(self%exchange%snow, self%contract%own_snow)
-    call mhm_clear_output_dp(self%exchange%degday, self%contract%own_degday)
-    call mhm_clear_output_dp(self%exchange%sealed_storage, self%contract%own_sealed_storage)
-    call mhm_clear_output_dp(self%exchange%aet_sealed, self%contract%own_aet_sealed)
-    call mhm_clear_output_dp(self%exchange%runoff_sealed, self%contract%own_runoff_sealed)
-    call mhm_clear_output_2d(self%exchange%soil_moisture, self%contract%own_soil_moisture)
-    call mhm_clear_output_2d(self%exchange%infiltration, self%contract%own_infiltration)
-    call mhm_clear_output_2d(self%exchange%aet_soil, self%contract%own_aet_soil)
-    call mhm_clear_output_dp(self%exchange%unsat_storage, self%contract%own_unsat_storage)
-    call mhm_clear_output_dp(self%exchange%sat_storage, self%contract%own_sat_storage)
-    call mhm_clear_output_dp(self%exchange%percolation, self%contract%own_percolation)
-    call mhm_clear_output_dp(self%exchange%interflow_fast, self%contract%own_interflow_fast)
-    call mhm_clear_output_dp(self%exchange%interflow_slow, self%contract%own_interflow_slow)
-    call mhm_clear_output_dp(self%exchange%baseflow, self%contract%own_baseflow)
-    call mhm_clear_output_dp(self%exchange%runoff_total, self%contract%own_total_runoff)
-    call mhm_clear_output_dp(self%exchange%neutrons, self%contract%own_neutrons)
+    call self%exchange%interception%clear(self%contract%own_interception)
+    call self%exchange%throughfall%clear(self%contract%own_throughfall)
+    call self%exchange%aet_canopy%clear(self%contract%own_aet_canopy)
+    call self%exchange%snowpack%clear(self%contract%own_snowpack)
+    call self%exchange%melt%clear(self%contract%own_melt)
+    call self%exchange%pre_eff%clear(self%contract%own_pre_effect)
+    call self%exchange%rain%clear(self%contract%own_rain)
+    call self%exchange%snow%clear(self%contract%own_snow)
+    call self%exchange%degday%clear(self%contract%own_degday)
+    call self%exchange%sealed_storage%clear(self%contract%own_sealed_storage)
+    call self%exchange%aet_sealed%clear(self%contract%own_aet_sealed)
+    call self%exchange%runoff_sealed%clear(self%contract%own_runoff_sealed)
+    call self%exchange%soil_moisture%clear(self%contract%own_soil_moisture)
+    call self%exchange%infiltration%clear(self%contract%own_infiltration)
+    call self%exchange%aet_soil%clear(self%contract%own_aet_soil)
+    call self%exchange%unsat_storage%clear(self%contract%own_unsat_storage)
+    call self%exchange%sat_storage%clear(self%contract%own_sat_storage)
+    call self%exchange%percolation%clear(self%contract%own_percolation)
+    call self%exchange%interflow_fast%clear(self%contract%own_interflow_fast)
+    call self%exchange%interflow_slow%clear(self%contract%own_interflow_slow)
+    call self%exchange%baseflow%clear(self%contract%own_baseflow)
+    call self%exchange%runoff_total%clear(self%contract%own_total_runoff)
+    call self%exchange%neutrons%clear(self%contract%own_neutrons)
   end subroutine mhm_clear_exchange
 
 end module mo_mhm_container

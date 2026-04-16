@@ -21,7 +21,7 @@ module mo_exchange_type
   use mo_grid, only: grid_t
   use mo_geology_classdefinition, only: geology_classdefinition_t
   use mo_datetime, only: datetime, timedelta
-  use mo_kind, only: dp, i4
+  use mo_kind, only: dp, i4, i8
   use mo_string_utils, only: n2s=>num2str
   use mo_main_config, only: parameters_t
   use mo_utils, only: optval
@@ -54,43 +54,108 @@ module mo_exchange_type
     logical :: static = .false.                !< flag to indicated static data (.false. by default)
     logical :: provided = .false.              !< flag to indicate that data is provided by a component (.false. by default)
     logical :: required = .false.              !< flag to indicate that data is required by a component (.false. by default)
+  contains
+    procedure(variable_has_data_i), public, deferred :: has_data
+    procedure(variable_data_shape_i), public, deferred :: data_shape
+    procedure(variable_clear_data_i), public, deferred :: clear_data
+    procedure, public :: available => variable_available
+    procedure, public :: require => variable_require
+    procedure, public :: expect_handoff => variable_expect_handoff
+    procedure, public :: clear => variable_clear
   end type variable_abc
 
   !> \class   var_dp
   !> \brief   Class for a double precision variable in the exchange type.
   type, public, extends(variable_abc) :: var_dp
     real(dp), dimension(:), pointer :: data => null() !< 1D real pointer (n-cells)
+  contains
+    procedure, public :: has_data => var_dp_has_data
+    procedure, public :: data_shape => var_dp_data_shape
+    procedure, public :: clear_data => var_dp_clear_data
+    procedure, public :: publish_local => var_dp_publish_local
+    procedure, public :: publish_alias => var_dp_publish_alias
   end type var_dp
 
   !> \class   var_i4
   !> \brief   Class for a 32bit integer variable in the exchange type.
   type, public, extends(variable_abc) :: var_i4
     integer(i4), dimension(:), pointer :: data => null() !< 1D integer pointer (n-cells)
+  contains
+    procedure, public :: has_data => var_i4_has_data
+    procedure, public :: data_shape => var_i4_data_shape
+    procedure, public :: clear_data => var_i4_clear_data
+    procedure, public :: publish_local => var_i4_publish_local
+    procedure, public :: publish_alias => var_i4_publish_alias
   end type var_i4
 
   !> \class   var_lg
   !> \brief   Class for a logical variable in the exchange type.
   type, public, extends(variable_abc) :: var_lg
     logical, dimension(:), pointer :: data => null() !< 1D logical pointer (n-cells)
+  contains
+    procedure, public :: has_data => var_lg_has_data
+    procedure, public :: data_shape => var_lg_data_shape
+    procedure, public :: clear_data => var_lg_clear_data
+    procedure, public :: publish_local => var_lg_publish_local
+    procedure, public :: publish_alias => var_lg_publish_alias
   end type var_lg
 
   !> \class   var2d_dp
   !> \brief   Class for a double precision variable for each horizon in the exchange type.
   type, public, extends(variable_abc) :: var2d_dp
     real(dp), dimension(:,:), pointer :: data => null() !< 2D real pointer (n-cells, horizons)
+  contains
+    procedure, public :: has_data => var2d_dp_has_data
+    procedure, public :: data_shape => var2d_dp_data_shape
+    procedure, public :: clear_data => var2d_dp_clear_data
+    procedure, public :: publish_local => var2d_dp_publish_local
+    procedure, public :: publish_alias => var2d_dp_publish_alias
   end type var2d_dp
 
   !> \class   var2d_i4
   !> \brief   Class for a 32bit integer variable for each horizon in the exchange type.
   type, public, extends(variable_abc) :: var2d_i4
     integer(i4), dimension(:,:), pointer :: data => null() !< 2D integer pointer (n-cells, horizons)
+  contains
+    procedure, public :: has_data => var2d_i4_has_data
+    procedure, public :: data_shape => var2d_i4_data_shape
+    procedure, public :: clear_data => var2d_i4_clear_data
+    procedure, public :: publish_local => var2d_i4_publish_local
+    procedure, public :: publish_alias => var2d_i4_publish_alias
   end type var2d_i4
 
   !> \class   var2d_lg
   !> \brief   Class for a logical variable for each horizon in the exchange type.
   type, public, extends(variable_abc) :: var2d_lg
     logical, dimension(:,:), pointer :: data => null() !< 2D logical pointer (n-cells, horizons)
+  contains
+    procedure, public :: has_data => var2d_lg_has_data
+    procedure, public :: data_shape => var2d_lg_data_shape
+    procedure, public :: clear_data => var2d_lg_clear_data
+    procedure, public :: publish_local => var2d_lg_publish_local
+    procedure, public :: publish_alias => var2d_lg_publish_alias
   end type var2d_lg
+
+  abstract interface
+    !> \brief Return whether an exchange variable currently has an associated data pointer.
+    logical function variable_has_data_i(self)
+      import :: variable_abc
+      class(variable_abc), intent(in) :: self
+    end function variable_has_data_i
+
+    !> \brief Return the shape of an associated data pointer, or a zero-length shape if unassociated.
+    function variable_data_shape_i(self) result(shape)
+      import :: variable_abc, i8
+      class(variable_abc), intent(in) :: self
+      integer(i8), allocatable :: shape(:)
+    end function variable_data_shape_i
+
+    !> \brief Clear the data pointer of an exchange variable.
+    subroutine variable_clear_data_i(self)
+      import :: variable_abc
+      class(variable_abc), intent(inout) :: self
+    end subroutine variable_clear_data_i
+  end interface
 
   !> \class   exchange_t
   !> \brief   Class for dynamically exchanging variables in mHM.
@@ -927,5 +992,437 @@ contains
     character(:), allocatable :: norm_path !< formatted path
     norm_path = path_normpath(path_join(self%cwd, path, file))
   end function exchange_get_path
+
+  !> \brief Return whether an exchange variable is already available or will be owned by the caller.
+  logical function variable_available(self, owned)
+    class(variable_abc), intent(in) :: self
+    logical, intent(in), optional :: owned !< caller owns the field and may bypass provided/data availability checks
+
+    variable_available = optval(owned, .false.) .or. (self%provided .and. self%has_data())
+  end function variable_available
+
+  !> \brief Mark an exchange variable as required and validate source/data availability when needed.
+  subroutine variable_require(self, component, required, expected_shape, check_data)
+    class(variable_abc), intent(inout) :: self
+    character(*), intent(in) :: component           !< calling component name for diagnostics
+    logical, intent(in) :: required                 !< whether this variable is required by the caller
+    integer(i8), intent(in), optional :: expected_shape(:) !< expected data shape for contract validation
+    logical, intent(in), optional :: check_data     !< enforce data-pointer association check when .true.
+
+    self%required = self%required .or. required
+    if (.not.required) return
+    call variable_validate(self, component, .false., expected_shape, optval(check_data, .true.))
+  end subroutine variable_require
+
+  !> \brief Mark an exchange variable as a required handoff and validate data availability when needed.
+  subroutine variable_expect_handoff(self, component, required, expected_shape)
+    class(variable_abc), intent(inout) :: self
+    character(*), intent(in) :: component           !< calling component name for diagnostics
+    logical, intent(in) :: required                 !< whether a handoff is required by the caller
+    integer(i8), intent(in), optional :: expected_shape(:) !< expected data shape for handoff validation
+
+    self%required = self%required .or. required
+    if (.not.required) return
+    call variable_validate(self, component, .true., expected_shape, .true.)
+  end subroutine variable_expect_handoff
+
+  !> \brief Clear a variable publication when the caller owns the exchange field.
+  subroutine variable_clear(self, owned)
+    class(variable_abc), intent(inout) :: self
+    logical, intent(in), optional :: owned !< caller ownership flag; only owned publications are cleared
+
+    if (.not.optval(owned, .false.)) return
+    call self%clear_data()
+    self%provided = .false.
+  end subroutine variable_clear
+
+  !> \brief Validate the provided/data/shape contract of an exchange variable.
+  subroutine variable_validate(self, component, handoff, expected_shape, check_data)
+    class(variable_abc), intent(in) :: self
+    character(*), intent(in) :: component
+    logical, intent(in) :: handoff
+    integer(i8), intent(in), optional :: expected_shape(:)
+    logical, intent(in) :: check_data
+    integer(i8), allocatable :: actual_shape(:)
+    character(:), allocatable :: var_name
+    logical :: shape_ok
+
+    var_name = variable_name(self)
+    if (.not.self%provided) then
+      if (handoff) then
+        log_fatal(*) trim(component), ": required handoff not provided: ", var_name, "."
+      else
+        log_fatal(*) trim(component), ": ", var_name, " not provided."
+      end if
+      error stop 1
+    end if
+    if (.not.check_data) return
+    if (.not.self%has_data()) then
+      if (handoff) then
+        log_fatal(*) trim(component), ": required handoff data not connected: ", var_name, "."
+      else
+        log_fatal(*) trim(component), ": ", var_name, " data not connected."
+      end if
+      error stop 1
+    end if
+    if (present(expected_shape)) then
+      actual_shape = self%data_shape()
+      shape_ok = size(actual_shape) == size(expected_shape)
+      if (shape_ok) shape_ok = all(actual_shape == expected_shape)
+      if (.not.shape_ok) then
+        if (handoff) then
+          log_fatal(*) trim(component), ": handoff ", var_name, " has unexpected shape. Expected ", &
+            variable_shape_string(expected_shape), ", got ", variable_shape_string(actual_shape), "."
+        else
+          log_fatal(*) trim(component), ": ", var_name, " has unexpected shape. Expected ", &
+            variable_shape_string(expected_shape), ", got ", variable_shape_string(actual_shape), "."
+        end if
+        error stop 1
+      end if
+    end if
+  end subroutine variable_validate
+
+  !> \brief Validate that a publication target is not already occupied.
+  subroutine variable_validate_publish_target(self, component)
+    class(variable_abc), intent(in) :: self
+    character(*), intent(in) :: component
+
+    if (self%provided .or. self%has_data()) then
+      log_fatal(*) trim(component), ": exchange field already provided before publication: ", variable_name(self), "."
+      error stop 1
+    end if
+  end subroutine variable_validate_publish_target
+
+  !> \brief Validate that an alias source is already connected.
+  subroutine variable_validate_alias_source(source, component, target)
+    class(variable_abc), intent(in) :: source
+    character(*), intent(in) :: component
+    class(variable_abc), intent(in) :: target
+
+    if (.not.source%provided .or. .not.source%has_data()) then
+      log_fatal(*) trim(component), ": pass-through source not provided for ", variable_name(target), "."
+      error stop 1
+    end if
+  end subroutine variable_validate_alias_source
+
+  !> \brief Return the configured variable name or a fallback for diagnostics.
+  function variable_name(self) result(name)
+    class(variable_abc), intent(in) :: self
+    character(:), allocatable :: name
+
+    if (allocated(self%name) .and. len_trim(self%name) > 0) then
+      name = trim(self%name)
+    else
+      name = "<unnamed>"
+    end if
+  end function variable_name
+
+  !> \brief Format a shape vector for diagnostics.
+  function variable_shape_string(shape) result(text)
+    integer(i8), intent(in) :: shape(:)
+    character(:), allocatable :: text
+    integer :: i
+
+    text = "["
+    do i = 1, size(shape)
+      if (i > 1) text = text // ", "
+      text = text // trim(n2s(shape(i)))
+    end do
+    text = text // "]"
+  end function variable_shape_string
+
+  !> \brief Return whether a 1D real exchange variable has data connected.
+  logical function var_dp_has_data(self)
+    class(var_dp), intent(in) :: self
+
+    var_dp_has_data = associated(self%data)
+  end function var_dp_has_data
+
+  !> \brief Return the data shape of a 1D real exchange variable.
+  function var_dp_data_shape(self) result(shape)
+    class(var_dp), intent(in) :: self
+    integer(i8), allocatable :: shape(:)
+
+    if (associated(self%data)) then
+      shape = [size(self%data, 1, kind=i8)]
+    else
+      allocate(shape(0))
+    end if
+  end function var_dp_data_shape
+
+  !> \brief Clear the data pointer of a 1D real exchange variable.
+  subroutine var_dp_clear_data(self)
+    class(var_dp), intent(inout) :: self
+
+    nullify(self%data)
+  end subroutine var_dp_clear_data
+
+  !> \brief Publish a local 1D real field through the exchange variable.
+  subroutine var_dp_publish_local(self, component, local)
+    class(var_dp), intent(inout) :: self
+    character(*), intent(in) :: component    !< publishing component name for diagnostics
+    real(dp), intent(inout), target :: local(:) !< local 1D real field to publish
+
+    call variable_validate_publish_target(self, component)
+    self%data => local
+    self%provided = .true.
+  end subroutine var_dp_publish_local
+
+  !> \brief Publish a 1D real alias through the exchange variable.
+  subroutine var_dp_publish_alias(self, component, source)
+    class(var_dp), intent(inout) :: self
+    character(*), intent(in) :: component !< publishing component name for diagnostics
+    type(var_dp), intent(in) :: source    !< already-published source variable to alias
+
+    call variable_validate_alias_source(source, component, self)
+    call variable_validate_publish_target(self, component)
+    self%data => source%data
+    self%provided = .true.
+  end subroutine var_dp_publish_alias
+
+  !> \brief Return whether a 1D integer exchange variable has data connected.
+  logical function var_i4_has_data(self)
+    class(var_i4), intent(in) :: self
+
+    var_i4_has_data = associated(self%data)
+  end function var_i4_has_data
+
+  !> \brief Return the data shape of a 1D integer exchange variable.
+  function var_i4_data_shape(self) result(shape)
+    class(var_i4), intent(in) :: self
+    integer(i8), allocatable :: shape(:)
+
+    if (associated(self%data)) then
+      shape = [size(self%data, 1, kind=i8)]
+    else
+      allocate(shape(0))
+    end if
+  end function var_i4_data_shape
+
+  !> \brief Clear the data pointer of a 1D integer exchange variable.
+  subroutine var_i4_clear_data(self)
+    class(var_i4), intent(inout) :: self
+
+    nullify(self%data)
+  end subroutine var_i4_clear_data
+
+  !> \brief Publish a local 1D integer field through the exchange variable.
+  subroutine var_i4_publish_local(self, component, local)
+    class(var_i4), intent(inout) :: self
+    character(*), intent(in) :: component       !< publishing component name for diagnostics
+    integer(i4), intent(inout), target :: local(:) !< local 1D integer field to publish
+
+    call variable_validate_publish_target(self, component)
+    self%data => local
+    self%provided = .true.
+  end subroutine var_i4_publish_local
+
+  !> \brief Publish a 1D integer alias through the exchange variable.
+  subroutine var_i4_publish_alias(self, component, source)
+    class(var_i4), intent(inout) :: self
+    character(*), intent(in) :: component !< publishing component name for diagnostics
+    type(var_i4), intent(in) :: source    !< already-published source variable to alias
+
+    call variable_validate_alias_source(source, component, self)
+    call variable_validate_publish_target(self, component)
+    self%data => source%data
+    self%provided = .true.
+  end subroutine var_i4_publish_alias
+
+  !> \brief Return whether a 1D logical exchange variable has data connected.
+  logical function var_lg_has_data(self)
+    class(var_lg), intent(in) :: self
+
+    var_lg_has_data = associated(self%data)
+  end function var_lg_has_data
+
+  !> \brief Return the data shape of a 1D logical exchange variable.
+  function var_lg_data_shape(self) result(shape)
+    class(var_lg), intent(in) :: self
+    integer(i8), allocatable :: shape(:)
+
+    if (associated(self%data)) then
+      shape = [size(self%data, 1, kind=i8)]
+    else
+      allocate(shape(0))
+    end if
+  end function var_lg_data_shape
+
+  !> \brief Clear the data pointer of a 1D logical exchange variable.
+  subroutine var_lg_clear_data(self)
+    class(var_lg), intent(inout) :: self
+
+    nullify(self%data)
+  end subroutine var_lg_clear_data
+
+  !> \brief Publish a local 1D logical field through the exchange variable.
+  subroutine var_lg_publish_local(self, component, local)
+    class(var_lg), intent(inout) :: self
+    character(*), intent(in) :: component !< publishing component name for diagnostics
+    logical, intent(inout), target :: local(:) !< local 1D logical field to publish
+
+    call variable_validate_publish_target(self, component)
+    self%data => local
+    self%provided = .true.
+  end subroutine var_lg_publish_local
+
+  !> \brief Publish a 1D logical alias through the exchange variable.
+  subroutine var_lg_publish_alias(self, component, source)
+    class(var_lg), intent(inout) :: self
+    character(*), intent(in) :: component !< publishing component name for diagnostics
+    type(var_lg), intent(in) :: source    !< already-published source variable to alias
+
+    call variable_validate_alias_source(source, component, self)
+    call variable_validate_publish_target(self, component)
+    self%data => source%data
+    self%provided = .true.
+  end subroutine var_lg_publish_alias
+
+  !> \brief Return whether a 2D real exchange variable has data connected.
+  logical function var2d_dp_has_data(self)
+    class(var2d_dp), intent(in) :: self
+
+    var2d_dp_has_data = associated(self%data)
+  end function var2d_dp_has_data
+
+  !> \brief Return the data shape of a 2D real exchange variable.
+  function var2d_dp_data_shape(self) result(shape)
+    class(var2d_dp), intent(in) :: self
+    integer(i8), allocatable :: shape(:)
+
+    if (associated(self%data)) then
+      shape = [size(self%data, 1, kind=i8), size(self%data, 2, kind=i8)]
+    else
+      allocate(shape(0))
+    end if
+  end function var2d_dp_data_shape
+
+  !> \brief Clear the data pointer of a 2D real exchange variable.
+  subroutine var2d_dp_clear_data(self)
+    class(var2d_dp), intent(inout) :: self
+
+    nullify(self%data)
+  end subroutine var2d_dp_clear_data
+
+  !> \brief Publish a local 2D real field through the exchange variable.
+  subroutine var2d_dp_publish_local(self, component, local)
+    class(var2d_dp), intent(inout) :: self
+    character(*), intent(in) :: component   !< publishing component name for diagnostics
+    real(dp), intent(inout), target :: local(:, :) !< local 2D real field to publish
+
+    call variable_validate_publish_target(self, component)
+    self%data => local
+    self%provided = .true.
+  end subroutine var2d_dp_publish_local
+
+  !> \brief Publish a 2D real alias through the exchange variable.
+  subroutine var2d_dp_publish_alias(self, component, source)
+    class(var2d_dp), intent(inout) :: self
+    character(*), intent(in) :: component !< publishing component name for diagnostics
+    type(var2d_dp), intent(in) :: source  !< already-published source variable to alias
+
+    call variable_validate_alias_source(source, component, self)
+    call variable_validate_publish_target(self, component)
+    self%data => source%data
+    self%provided = .true.
+  end subroutine var2d_dp_publish_alias
+
+  !> \brief Return whether a 2D integer exchange variable has data connected.
+  logical function var2d_i4_has_data(self)
+    class(var2d_i4), intent(in) :: self
+
+    var2d_i4_has_data = associated(self%data)
+  end function var2d_i4_has_data
+
+  !> \brief Return the data shape of a 2D integer exchange variable.
+  function var2d_i4_data_shape(self) result(shape)
+    class(var2d_i4), intent(in) :: self
+    integer(i8), allocatable :: shape(:)
+
+    if (associated(self%data)) then
+      shape = [size(self%data, 1, kind=i8), size(self%data, 2, kind=i8)]
+    else
+      allocate(shape(0))
+    end if
+  end function var2d_i4_data_shape
+
+  !> \brief Clear the data pointer of a 2D integer exchange variable.
+  subroutine var2d_i4_clear_data(self)
+    class(var2d_i4), intent(inout) :: self
+
+    nullify(self%data)
+  end subroutine var2d_i4_clear_data
+
+  !> \brief Publish a local 2D integer field through the exchange variable.
+  subroutine var2d_i4_publish_local(self, component, local)
+    class(var2d_i4), intent(inout) :: self
+    character(*), intent(in) :: component      !< publishing component name for diagnostics
+    integer(i4), intent(inout), target :: local(:, :) !< local 2D integer field to publish
+
+    call variable_validate_publish_target(self, component)
+    self%data => local
+    self%provided = .true.
+  end subroutine var2d_i4_publish_local
+
+  !> \brief Publish a 2D integer alias through the exchange variable.
+  subroutine var2d_i4_publish_alias(self, component, source)
+    class(var2d_i4), intent(inout) :: self
+    character(*), intent(in) :: component !< publishing component name for diagnostics
+    type(var2d_i4), intent(in) :: source  !< already-published source variable to alias
+
+    call variable_validate_alias_source(source, component, self)
+    call variable_validate_publish_target(self, component)
+    self%data => source%data
+    self%provided = .true.
+  end subroutine var2d_i4_publish_alias
+
+  !> \brief Return whether a 2D logical exchange variable has data connected.
+  logical function var2d_lg_has_data(self)
+    class(var2d_lg), intent(in) :: self
+
+    var2d_lg_has_data = associated(self%data)
+  end function var2d_lg_has_data
+
+  !> \brief Return the data shape of a 2D logical exchange variable.
+  function var2d_lg_data_shape(self) result(shape)
+    class(var2d_lg), intent(in) :: self
+    integer(i8), allocatable :: shape(:)
+
+    if (associated(self%data)) then
+      shape = [size(self%data, 1, kind=i8), size(self%data, 2, kind=i8)]
+    else
+      allocate(shape(0))
+    end if
+  end function var2d_lg_data_shape
+
+  !> \brief Clear the data pointer of a 2D logical exchange variable.
+  subroutine var2d_lg_clear_data(self)
+    class(var2d_lg), intent(inout) :: self
+
+    nullify(self%data)
+  end subroutine var2d_lg_clear_data
+
+  !> \brief Publish a local 2D logical field through the exchange variable.
+  subroutine var2d_lg_publish_local(self, component, local)
+    class(var2d_lg), intent(inout) :: self
+    character(*), intent(in) :: component !< publishing component name for diagnostics
+    logical, intent(inout), target :: local(:, :) !< local 2D logical field to publish
+
+    call variable_validate_publish_target(self, component)
+    self%data => local
+    self%provided = .true.
+  end subroutine var2d_lg_publish_local
+
+  !> \brief Publish a 2D logical alias through the exchange variable.
+  subroutine var2d_lg_publish_alias(self, component, source)
+    class(var2d_lg), intent(inout) :: self
+    character(*), intent(in) :: component !< publishing component name for diagnostics
+    type(var2d_lg), intent(in) :: source  !< already-published source variable to alias
+
+    call variable_validate_alias_source(source, component, self)
+    call variable_validate_publish_target(self, component)
+    self%data => source%data
+    self%provided = .true.
+  end subroutine var2d_lg_publish_alias
 
 end module mo_exchange_type

@@ -94,8 +94,6 @@ module mo_meteo_container
     procedure, private :: ensure_size => meteo_ensure_size
     procedure, private :: remap_raw => meteo_remap_raw
     procedure, private :: load_weight_cache => meteo_load_weight_cache
-    procedure, private :: require_raw_var => meteo_require_raw_var
-    procedure, private :: require_exchange_field => meteo_require_exchange_field
     procedure, private :: validate_step => meteo_validate_step
     procedure, private :: require_fraction => meteo_require_fraction
     procedure, private :: load_level1_latitude => meteo_load_level1_latitude
@@ -147,6 +145,7 @@ contains
     integer(i4) :: riv_temp_process
     integer(i4) :: steps_day
     integer(i4) :: frac_domain_id
+    integer(i8) :: n_l1
     integer(i4) :: id(1)
     integer :: status
     character(1024) :: errmsg
@@ -162,6 +161,7 @@ contains
     end if
     call self%ensure_level1_grid()
     call self%regrid%init(self%exchange%level2, self%exchange%level1)
+    n_l1 = self%exchange%level1%ncells
 
     domain_id = self%exchange%domain
     id(1) = domain_id
@@ -174,48 +174,42 @@ contains
     need_pre = self%exchange%parameters%meteo_active()
     need_temp = (snow_process == 1_i4) .or. any(pet_process == [1_i4, 2_i4, 3_i4])
 
-    self%exchange%raw_pre%required = need_pre
-    self%exchange%raw_temp%required = need_temp
-    self%exchange%raw_pet%required = any(pet_process == [-2_i4, -1_i4])
-    self%exchange%raw_tann%required = riv_temp_process > 0_i4
-    self%exchange%raw_tmin%required = pet_process == 1_i4
-    self%exchange%raw_tmax%required = pet_process == 1_i4
-    self%exchange%raw_ssrd%required = riv_temp_process > 0_i4
-    self%exchange%raw_strd%required = riv_temp_process > 0_i4
-    self%exchange%raw_netrad%required = any(pet_process == [2_i4, 3_i4])
-    self%exchange%raw_eabs%required = pet_process == 3_i4
-    self%exchange%raw_wind%required = pet_process == 3_i4
+    call self%exchange%raw_pre%require("Meteo", need_pre, check_data=.false.)
+    call self%exchange%raw_temp%require("Meteo", need_temp, check_data=.false.)
+    call self%exchange%raw_pet%require("Meteo", any(pet_process == [-2_i4, -1_i4]), check_data=.false.)
+    call self%exchange%raw_tann%require("Meteo", riv_temp_process > 0_i4, check_data=.false.)
+    call self%exchange%raw_tmin%require("Meteo", pet_process == 1_i4, check_data=.false.)
+    call self%exchange%raw_tmax%require("Meteo", pet_process == 1_i4, check_data=.false.)
+    call self%exchange%raw_ssrd%require("Meteo", riv_temp_process > 0_i4, check_data=.false.)
+    call self%exchange%raw_strd%require("Meteo", riv_temp_process > 0_i4, check_data=.false.)
+    call self%exchange%raw_netrad%require("Meteo", any(pet_process == [2_i4, 3_i4]), check_data=.false.)
+    call self%exchange%raw_eabs%require("Meteo", pet_process == 3_i4, check_data=.false.)
+    call self%exchange%raw_wind%require("Meteo", pet_process == 3_i4, check_data=.false.)
 
     if (need_pre) then
-      call self%require_raw_var(self%exchange%raw_pre, "raw_pre")
       call self%validate_step("raw_pre", self%exchange%raw_pre%stepping, allow_daily=.true., allow_hourly=.true.)
       if (.not.self%weight_mode_active() .and. steps_day > 1_i4 .and. self%exchange%raw_pre%stepping == daily) then
         call self%require_fraction("frac_night_pre", frac_domain_id)
       end if
       call self%ensure_size(self%out%pre, self%exchange%level1%ncells)
-      self%exchange%pre%data => self%out%pre
-      self%exchange%pre%provided = .true.
+      call self%exchange%pre%publish_local("Meteo", self%out%pre)
     end if
 
     if (need_temp) then
-      call self%require_raw_var(self%exchange%raw_temp, "raw_temp")
       call self%validate_step("raw_temp", self%exchange%raw_temp%stepping, allow_daily=.true., allow_hourly=.true.)
       if (.not.self%weight_mode_active() .and. steps_day > 1_i4 .and. self%exchange%raw_temp%stepping == daily) then
         call self%require_fraction("frac_night_temp", frac_domain_id)
       end if
       call self%ensure_size(self%out%temp, self%exchange%level1%ncells)
-      self%exchange%temp%data => self%out%temp
-      self%exchange%temp%provided = .true.
+      call self%exchange%temp%publish_local("Meteo", self%out%temp)
     end if
 
     if (pet_process /= 0_i4) then
       call self%ensure_size(self%out%pet, self%exchange%level1%ncells)
-      self%exchange%pet%data => self%out%pet
-      self%exchange%pet%provided = .true.
+      call self%exchange%pet%publish_local("Meteo", self%out%pet)
     end if
 
     if (any(pet_process == [-2_i4, -1_i4])) then
-      call self%require_raw_var(self%exchange%raw_pet, "raw_pet")
       call self%validate_step("raw_pet", self%exchange%raw_pet%stepping, allow_daily=.true., allow_hourly=.true.)
       if (.not.self%weight_mode_active() .and. steps_day > 1_i4 .and. self%exchange%raw_pet%stepping == daily) then
         call self%require_fraction("frac_night_pet", frac_domain_id)
@@ -223,29 +217,23 @@ contains
     end if
 
     if (pet_process == 1_i4) then
-      call self%require_raw_var(self%exchange%raw_tmin, "raw_tmin")
-      call self%require_raw_var(self%exchange%raw_tmax, "raw_tmax")
       call self%validate_step("raw_temp", self%exchange%raw_temp%stepping, allow_daily=.true.)
       call self%validate_step("raw_tmin", self%exchange%raw_tmin%stepping, allow_daily=.true.)
       call self%validate_step("raw_tmax", self%exchange%raw_tmax%stepping, allow_daily=.true.)
       if (.not.self%weight_mode_active() .and. steps_day > 1_i4) then
         call self%require_fraction("frac_night_pet", frac_domain_id)
       end if
-      call self%require_exchange_field(self%exchange%pet_fac_aspect, "pet_fac_aspect")
-      call self%require_exchange_field(self%exchange%pet_coeff_hs, "pet_coeff_hs")
+      call self%exchange%pet_fac_aspect%require("Meteo", .true., [n_l1])
+      call self%exchange%pet_coeff_hs%require("Meteo", .true., [n_l1])
       call self%load_level1_latitude()
     else if (pet_process == 2_i4) then
-      call self%require_raw_var(self%exchange%raw_netrad, "raw_netrad")
       call self%validate_step("raw_temp", self%exchange%raw_temp%stepping, allow_daily=.true.)
       call self%validate_step("raw_netrad", self%exchange%raw_netrad%stepping, allow_daily=.true.)
       if (.not.self%weight_mode_active() .and. steps_day > 1_i4) then
         call self%require_fraction("frac_night_pet", frac_domain_id)
       end if
-      call self%require_exchange_field(self%exchange%pet_coeff_pt, "pet_coeff_pt")
+      call self%exchange%pet_coeff_pt%require("Meteo", .true., [n_l1])
     else if (pet_process == 3_i4) then
-      call self%require_raw_var(self%exchange%raw_netrad, "raw_netrad")
-      call self%require_raw_var(self%exchange%raw_eabs, "raw_eabs")
-      call self%require_raw_var(self%exchange%raw_wind, "raw_wind")
       call self%validate_step("raw_temp", self%exchange%raw_temp%stepping, allow_daily=.true.)
       call self%validate_step("raw_netrad", self%exchange%raw_netrad%stepping, allow_daily=.true.)
       call self%validate_step("raw_eabs", self%exchange%raw_eabs%stepping, allow_daily=.true.)
@@ -253,18 +241,15 @@ contains
       if (.not.self%weight_mode_active() .and. steps_day > 1_i4) then
         call self%require_fraction("frac_night_pet", frac_domain_id)
       end if
-      call self%require_exchange_field(self%exchange%resist_aero, "resist_aero")
-      call self%require_exchange_field(self%exchange%resist_surf, "resist_surf")
+      call self%exchange%resist_aero%require("Meteo", .true., [n_l1])
+      call self%exchange%resist_surf%require("Meteo", .true., [n_l1])
     else if (pet_process == -2_i4) then
-      call self%require_exchange_field(self%exchange%pet_fac_aspect, "pet_fac_aspect")
+      call self%exchange%pet_fac_aspect%require("Meteo", .true., [n_l1])
     else if (pet_process == -1_i4) then
-      call self%require_exchange_field(self%exchange%pet_fac_lai, "pet_fac_lai")
+      call self%exchange%pet_fac_lai%require("Meteo", .true., [n_l1])
     end if
 
     if (riv_temp_process > 0_i4) then
-      call self%require_raw_var(self%exchange%raw_ssrd, "raw_ssrd")
-      call self%require_raw_var(self%exchange%raw_strd, "raw_strd")
-      call self%require_raw_var(self%exchange%raw_tann, "raw_tann")
       call self%validate_step("raw_ssrd", self%exchange%raw_ssrd%stepping, allow_daily=.true., allow_hourly=.true.)
       call self%validate_step("raw_strd", self%exchange%raw_strd%stepping, allow_daily=.true., allow_hourly=.true.)
       call self%validate_step("raw_tann", self%exchange%raw_tann%stepping, allow_static=.true., allow_daily=.true., &
@@ -276,12 +261,9 @@ contains
       call self%ensure_size(self%out%ssrd, self%exchange%level1%ncells)
       call self%ensure_size(self%out%strd, self%exchange%level1%ncells)
       call self%ensure_size(self%out%tann, self%exchange%level1%ncells)
-      self%exchange%ssrd%data => self%out%ssrd
-      self%exchange%strd%data => self%out%strd
-      self%exchange%tann%data => self%out%tann
-      self%exchange%ssrd%provided = .true.
-      self%exchange%strd%provided = .true.
-      self%exchange%tann%provided = .true.
+      call self%exchange%ssrd%publish_local("Meteo", self%out%ssrd)
+      call self%exchange%strd%publish_local("Meteo", self%out%strd)
+      call self%exchange%tann%publish_local("Meteo", self%out%tann)
     end if
 
     if (self%weight_mode_active() .and. steps_day > 1_i4) then
@@ -530,35 +512,6 @@ contains
     deallocate(packed_l1)
     deallocate(l2_data)
   end subroutine meteo_load_weight_cache
-
-  !> \brief Check that a required raw exchange variable is provided.
-  subroutine meteo_require_raw_var(self, raw_var, name)
-    class(meteo_t), intent(inout), target :: self
-    type(var_dp), intent(in), target :: raw_var
-    character(*), intent(in) :: name
-
-    if (.not.raw_var%required) return
-    if (.not.raw_var%provided) then
-      log_fatal(*) "Meteo: required raw input not provided: ", trim(name)
-      error stop 1
-    end if
-  end subroutine meteo_require_raw_var
-
-  !> \brief Check that a required exchange field is already connected.
-  subroutine meteo_require_exchange_field(self, exchange_var, name)
-    class(meteo_t), intent(inout), target :: self
-    type(var_dp), intent(in), target :: exchange_var
-    character(*), intent(in) :: name
-
-    if (.not.exchange_var%provided) then
-      log_fatal(*) "Meteo: required exchange field not provided: ", trim(name)
-      error stop 1
-    end if
-    if (.not.associated(exchange_var%data)) then
-      log_fatal(*) "Meteo: required exchange field not connected: ", trim(name)
-      error stop 1
-    end if
-  end subroutine meteo_require_exchange_field
 
   !> \brief Require that monthly day/night fractions are explicitly configured for one domain.
   subroutine meteo_require_fraction(self, name, domain_id)
