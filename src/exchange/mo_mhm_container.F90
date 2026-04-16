@@ -110,17 +110,31 @@ module mo_mhm_container
   end type mhm_forcing_state_t
 
   !> \class   mhm_contract_state_t
-  !> \brief   Internal ownership flags for couplable mHM subprocess outputs.
+  !> \brief   Internal ownership flags for mHM subprocess exchange outputs.
   type :: mhm_contract_state_t
-    logical :: own_throughfall = .true. !< whether mHM publishes throughfall
-    logical :: own_pre_effect = .true. !< whether mHM publishes effective precipitation
-    logical :: own_infiltration = .true. !< whether mHM publishes soil infiltration
-    logical :: own_runoff_sealed = .true. !< whether mHM publishes direct runoff
-    logical :: own_interflow_fast = .true. !< whether mHM publishes fast interflow
-    logical :: own_interflow_slow = .true. !< whether mHM publishes slow interflow
-    logical :: own_percolation = .true. !< whether mHM publishes percolation
-    logical :: own_baseflow = .true. !< whether mHM publishes baseflow
-    logical :: own_total_runoff = .true. !< whether mHM publishes total runoff
+    logical :: own_interception = .false. !< whether mHM publishes canopy interception storage
+    logical :: own_throughfall = .false. !< whether mHM publishes throughfall
+    logical :: own_aet_canopy = .false. !< whether mHM publishes canopy actual evapotranspiration
+    logical :: own_snowpack = .false. !< whether mHM publishes snowpack storage
+    logical :: own_melt = .false. !< whether mHM publishes snow melt
+    logical :: own_pre_effect = .false. !< whether mHM publishes effective precipitation
+    logical :: own_rain = .false. !< whether mHM publishes liquid precipitation
+    logical :: own_snow = .false. !< whether mHM publishes solid precipitation
+    logical :: own_degday = .false. !< whether mHM publishes degree-day factor
+    logical :: own_sealed_storage = .false. !< whether mHM publishes sealed-area storage
+    logical :: own_aet_sealed = .false. !< whether mHM publishes sealed-area actual evapotranspiration
+    logical :: own_runoff_sealed = .false. !< whether mHM publishes direct runoff
+    logical :: own_soil_moisture = .false. !< whether mHM publishes soil moisture
+    logical :: own_infiltration = .false. !< whether mHM publishes soil infiltration
+    logical :: own_aet_soil = .false. !< whether mHM publishes soil actual evapotranspiration
+    logical :: own_unsat_storage = .false. !< whether mHM publishes unsaturated-zone storage
+    logical :: own_sat_storage = .false. !< whether mHM publishes saturated-zone storage
+    logical :: own_interflow_fast = .false. !< whether mHM publishes fast interflow
+    logical :: own_interflow_slow = .false. !< whether mHM publishes slow interflow
+    logical :: own_percolation = .false. !< whether mHM publishes percolation
+    logical :: own_baseflow = .false. !< whether mHM publishes baseflow
+    logical :: own_total_runoff = .false. !< whether mHM publishes total runoff
+    logical :: own_neutrons = .false. !< whether mHM publishes neutron counts
   end type mhm_contract_state_t
 
   !> \class   mhm_io_state_t
@@ -343,18 +357,32 @@ contains
       error stop 1
     end if
 
+    self%contract%own_interception = interception_case /= 0_i4
     self%contract%own_throughfall = interception_case /= 0_i4
+    self%contract%own_aet_canopy = interception_case /= 0_i4
+    self%contract%own_snowpack = snow_case /= 0_i4
+    self%contract%own_melt = snow_case /= 0_i4
     self%contract%own_pre_effect = snow_case /= 0_i4
-    self%contract%own_infiltration = soil_case /= 0_i4
+    self%contract%own_rain = snow_case /= 0_i4
+    self%contract%own_snow = snow_case /= 0_i4
+    self%contract%own_degday = snow_case /= 0_i4
+    self%contract%own_sealed_storage = direct_runoff_case /= 0_i4
+    self%contract%own_aet_sealed = direct_runoff_case /= 0_i4
     self%contract%own_runoff_sealed = direct_runoff_case /= 0_i4
+    self%contract%own_soil_moisture = soil_case /= 0_i4
+    self%contract%own_infiltration = soil_case /= 0_i4
+    self%contract%own_aet_soil = soil_case /= 0_i4
+    self%contract%own_unsat_storage = interflow_case /= 0_i4
+    self%contract%own_sat_storage = interflow_case /= 0_i4 .or. baseflow_case /= 0_i4
     self%contract%own_interflow_fast = interflow_case /= 0_i4
     self%contract%own_interflow_slow = interflow_case /= 0_i4
     self%contract%own_percolation = percolation_case /= 0_i4
     self%contract%own_baseflow = baseflow_case /= 0_i4
     self%contract%own_total_runoff = direct_runoff_case /= 0_i4 .or. interflow_case /= 0_i4 .or. baseflow_case /= 0_i4
+    self%contract%own_neutrons = neutron_case /= 0_i4
 
     call mhm_mark_required_dp(self, self%exchange%pre, &
-      interception_case /= 0_i4, &
+      (interception_case /= 0_i4) .or. (snow_case == 1_i4), &
       "pre")
     call mhm_mark_required_dp(self, self%exchange%temp, snow_case == 1_i4, "temp")
     call mhm_mark_required_dp(self, self%exchange%pet, &
@@ -424,25 +452,55 @@ contains
     call mhm_allocate_1d(self%neutrons%counts, n_cells)
 
     call mhm_publish_exchange(self)
+    call mhm_expect_handoff_dp(self, self%exchange%interception, &
+      self%output_config%out_interception .or. (neutron_case /= 0_i4) .or. self%io%write_restart, "interception")
     call mhm_expect_handoff_dp(self, self%exchange%throughfall, &
       (snow_case /= 0_i4) .or. self%io%write_restart, "throughfall")
+    call mhm_expect_handoff_dp(self, self%exchange%aet_canopy, &
+      (direct_runoff_case /= 0_i4) .or. (soil_case /= 0_i4) .or. self%io%write_restart, "aet_canopy")
+    call mhm_expect_handoff_dp(self, self%exchange%snowpack, &
+      self%output_config%out_snowpack .or. (neutron_case /= 0_i4) .or. self%io%write_restart, "snowpack")
+    call mhm_expect_handoff_dp(self, self%exchange%melt, &
+      self%output_config%out_qsm .or. self%io%write_restart, "melt")
     call mhm_expect_handoff_dp(self, self%exchange%pre_eff, &
       (direct_runoff_case /= 0_i4) .or. (soil_case /= 0_i4) .or. self%output_config%out_preeffect .or. self%io%write_restart, &
       "pre_eff")
+    call mhm_expect_handoff_dp(self, self%exchange%rain, self%io%write_restart, "rain")
+    call mhm_expect_handoff_dp(self, self%exchange%snow, self%io%write_restart, "snow")
+    call mhm_expect_handoff_dp(self, self%exchange%degday, self%io%write_restart, "degday")
+    call mhm_expect_handoff_dp(self, self%exchange%sealed_storage, &
+      self%output_config%out_sealedstw .or. self%io%write_restart, "sealed_storage")
+    call mhm_expect_handoff_dp(self, self%exchange%aet_sealed, self%io%write_restart, "aet_sealed")
     call mhm_expect_handoff_2d(self, self%exchange%infiltration, &
       (interflow_case /= 0_i4) .or. self%output_config%out_soil_infil .or. self%io%write_restart, "infiltration", n_horizons)
+    call mhm_expect_handoff_2d(self, self%exchange%soil_moisture, &
+      self%output_config%out_swc .or. self%output_config%out_sm .or. self%output_config%out_sm_all .or. &
+      (neutron_case /= 0_i4) .or. self%io%write_restart, "soil_moisture", n_horizons)
+    call mhm_expect_handoff_2d(self, self%exchange%aet_soil, &
+      self%output_config%out_aet_layer .or. self%io%write_restart, "aet_soil", n_horizons)
     call mhm_expect_handoff_dp(self, self%exchange%runoff_sealed, &
-      self%contract%own_total_runoff .or. self%output_config%out_qd .or. self%io%write_restart, "runoff_sealed")
+      self%output_config%out_qd .or. self%io%write_restart, "runoff_sealed")
+    call mhm_expect_handoff_dp(self, self%exchange%unsat_storage, &
+      self%output_config%out_unsatstw .or. self%io%write_restart, "unsat_storage")
+    call mhm_expect_handoff_dp(self, self%exchange%sat_storage, &
+      self%output_config%out_satstw .or. self%io%write_restart, "sat_storage")
     call mhm_expect_handoff_dp(self, self%exchange%interflow_fast, &
-      self%contract%own_total_runoff .or. self%output_config%out_qif .or. self%io%write_restart, "interflow_fast")
+      self%output_config%out_qif .or. self%io%write_restart, "interflow_fast")
     call mhm_expect_handoff_dp(self, self%exchange%interflow_slow, &
-      self%contract%own_total_runoff .or. self%output_config%out_qis .or. self%io%write_restart, "interflow_slow")
+      self%output_config%out_qis .or. self%io%write_restart, "interflow_slow")
     call mhm_expect_handoff_dp(self, self%exchange%percolation, &
       self%output_config%out_recharge .or. self%io%write_restart, "percolation")
     call mhm_expect_handoff_dp(self, self%exchange%baseflow, &
-      self%contract%own_total_runoff .or. self%output_config%out_qb .or. self%io%write_restart, "baseflow")
+      self%output_config%out_qb .or. self%io%write_restart, "baseflow")
     call mhm_expect_handoff_dp(self, self%exchange%runoff_total, &
       (routing_case /= 0_i4) .or. self%output_config%out_q .or. self%io%write_restart, "runoff_total")
+    call mhm_expect_handoff_dp(self, self%exchange%neutrons, &
+      self%output_config%out_neutrons, "neutrons")
+    if (self%output_config%out_aet_all .and. &
+      .not.(self%exchange%aet_canopy%provided .or. self%exchange%aet_sealed%provided .or. self%exchange%aet_soil%provided)) then
+      log_fatal(*) "mHM: output aET requested, but no evapotranspiration component is provided."
+      error stop 1
+    end if
     call mhm_reset_state_fluxes(self)
   end subroutine mhm_connect
 
@@ -453,6 +511,7 @@ contains
     integer(i4) :: coeff_domain
     integer(i4) :: direct_runoff_case
     integer(i4) :: neutron_case
+    integer(i4) :: soil_case
 
     log_info(*) "Initialize mhm"
 
@@ -495,6 +554,10 @@ contains
       call self%read_restart_data(self%config%read_restart_fluxes(id(1)))
     else
       call mhm_reset_state_fluxes(self)
+    end if
+    soil_case = self%exchange%parameters%process_matrix(3, 1)
+    if ((soil_case /= 0_i4) .and. (.not.self%io%read_restart)) then
+      self%soil%moisture = 0.5_dp * self%exchange%sm_field_capacity%data
     end if
 
     call self%create_output()
@@ -646,33 +709,36 @@ contains
       f_not_sealed = 1.0_dp - self%exchange%f_sealed%data
     end if
 
-    if (self%output_config%out_interception) call self%ds_out%update("interception", self%canopy%interception)
-    if (self%output_config%out_snowpack) call self%ds_out%update("snowpack", self%snow%snowpack)
+    if (self%output_config%out_interception) call self%ds_out%update("interception", self%exchange%interception%data)
+    if (self%output_config%out_snowpack) call self%ds_out%update("snowpack", self%exchange%snowpack%data)
     if (self%output_config%out_swc) then
-      do horizon = 1_i4, size(self%soil%moisture, 2)
-        call self%ds_out%update("SWC_L" // trim(n2s(horizon, '(i2.2)')), self%soil%moisture(:, horizon))
+      do horizon = 1_i4, size(self%exchange%soil_moisture%data, 2)
+        call self%ds_out%update("SWC_L" // trim(n2s(horizon, '(i2.2)')), self%exchange%soil_moisture%data(:, horizon))
       end do
     end if
     if (self%output_config%out_sm) then
-      do horizon = 1_i4, size(self%soil%moisture, 2)
+      do horizon = 1_i4, size(self%exchange%soil_moisture%data, 2)
         call self%ds_out%update("SM_L" // trim(n2s(horizon, '(i2.2)')), &
-          self%soil%moisture(:, horizon) / self%exchange%sm_saturation%data(:, horizon))
+          self%exchange%soil_moisture%data(:, horizon) / self%exchange%sm_saturation%data(:, horizon))
       end do
     end if
     if (self%output_config%out_sm_all) then
-      allocate(tmp(size(self%soil%moisture, 1)))
-      tmp = sum(self%soil%moisture, dim=2) / sum(self%exchange%sm_saturation%data, dim=2)
+      allocate(tmp(size(self%exchange%soil_moisture%data, 1)))
+      tmp = sum(self%exchange%soil_moisture%data, dim=2) / sum(self%exchange%sm_saturation%data, dim=2)
       call self%ds_out%update("SM_Lall", tmp)
       deallocate(tmp)
     end if
-    if (self%output_config%out_sealedstw) call self%ds_out%update("sealedSTW", self%direct_runoff%storage)
-    if (self%output_config%out_unsatstw) call self%ds_out%update("unsatSTW", self%runoff%unsat_storage)
-    if (self%output_config%out_satstw) call self%ds_out%update("satSTW", self%runoff%sat_storage)
-    if (self%output_config%out_neutrons) call self%ds_out%update("neutrons", self%neutrons%counts)
+    if (self%output_config%out_sealedstw) call self%ds_out%update("sealedSTW", self%exchange%sealed_storage%data)
+    if (self%output_config%out_unsatstw) call self%ds_out%update("unsatSTW", self%exchange%unsat_storage%data)
+    if (self%output_config%out_satstw) call self%ds_out%update("satSTW", self%exchange%sat_storage%data)
+    if (self%output_config%out_neutrons) call self%ds_out%update("neutrons", self%exchange%neutrons%data)
     if (self%output_config%out_pet) call self%ds_out%update("PET", self%exchange%pet%data)
     if (self%output_config%out_aet_all) then
-      allocate(tmp(size(self%soil%aet, 1)))
-      tmp = sum(self%soil%aet, dim=2) * f_not_sealed + self%canopy%aet + self%direct_runoff%aet * self%exchange%f_sealed%data
+      allocate(tmp(int(self%exchange%level1%ncells, i4)))
+      tmp = 0.0_dp
+      if (self%exchange%aet_soil%provided) tmp = tmp + sum(self%exchange%aet_soil%data, dim=2) * f_not_sealed
+      if (self%exchange%aet_canopy%provided) tmp = tmp + self%exchange%aet_canopy%data
+      if (self%exchange%aet_sealed%provided) tmp = tmp + self%exchange%aet_sealed%data * self%exchange%f_sealed%data
       call self%ds_out%update("aET", tmp)
       deallocate(tmp)
     end if
@@ -684,16 +750,17 @@ contains
     if (self%output_config%out_recharge) call self%ds_out%update("recharge", self%exchange%percolation%data * f_not_sealed)
     if (self%output_config%out_soil_infil) then
       do horizon = 1_i4, size(self%exchange%infiltration%data, 2)
-        call self%ds_out%update("soil_infil_L" // trim(n2s(horizon, '(i2.2)')), self%exchange%infiltration%data(:, horizon) * f_not_sealed)
+        call self%ds_out%update("soil_infil_L" // trim(n2s(horizon, '(i2.2)')), &
+          self%exchange%infiltration%data(:, horizon) * f_not_sealed)
       end do
     end if
     if (self%output_config%out_aet_layer) then
-      do horizon = 1_i4, size(self%soil%aet, 2)
-        call self%ds_out%update("aET_L" // trim(n2s(horizon, '(i2.2)')), self%soil%aet(:, horizon) * f_not_sealed)
+      do horizon = 1_i4, size(self%exchange%aet_soil%data, 2)
+        call self%ds_out%update("aET_L" // trim(n2s(horizon, '(i2.2)')), self%exchange%aet_soil%data(:, horizon) * f_not_sealed)
       end do
     end if
     if (self%output_config%out_preeffect) call self%ds_out%update("preEffect", self%exchange%pre_eff%data)
-    if (self%output_config%out_qsm) call self%ds_out%update("Qsm", self%snow%melt)
+    if (self%output_config%out_qsm) call self%ds_out%update("Qsm", self%exchange%melt%data)
 
     write_stamp = .false.
     select case (self%output_config%output_frequency)
@@ -723,21 +790,18 @@ contains
     select case (interception_case)
     case (-1_i4)
       !$omp do schedule(static)
-      do k = 1_i4, size(self%canopy%aet)
-        self%canopy%aet(k) = 0.0_dp
+      do k = 1_i4, size(self%exchange%aet_canopy%data)
+        self%exchange%interception%data(k) = 0.0_dp
+        self%exchange%aet_canopy%data(k) = 0.0_dp
       end do
       !$omp end do
     case (0_i4)
-      !$omp do schedule(static)
-      do k = 1_i4, size(self%canopy%aet)
-        self%canopy%aet(k) = 0.0_dp
-      end do
-      !$omp end do
+      continue
     case (1_i4)
       !$omp do schedule(static)
-      do k = 1_i4, size(self%canopy%interception)
+      do k = 1_i4, size(self%exchange%interception%data)
         call canopy_interc(self%exchange%pet%data(k), self%exchange%max_interception%data(k), self%exchange%pre%data(k), &
-          self%canopy%interception(k), self%canopy%throughfall(k), self%canopy%aet(k))
+          self%exchange%interception%data(k), self%exchange%throughfall%data(k), self%exchange%aet_canopy%data(k))
       end do
       !$omp end do
     case default
@@ -756,29 +820,23 @@ contains
     select case (snow_case)
     case (-1_i4)
       !$omp do schedule(static)
-      do k = 1_i4, size(self%snow%melt)
-        self%snow%melt(k) = 0.0_dp
-        self%snow%snow(k) = 0.0_dp
-        self%snow%degday(k) = 0.0_dp
-        self%snow%rain(k) = self%exchange%throughfall%data(k)
+      do k = 1_i4, size(self%exchange%melt%data)
+        self%exchange%snowpack%data(k) = 0.0_dp
+        self%exchange%melt%data(k) = 0.0_dp
+        self%exchange%snow%data(k) = 0.0_dp
+        self%exchange%degday%data(k) = 0.0_dp
       end do
       !$omp end do
     case (0_i4)
-      !$omp do schedule(static)
-      do k = 1_i4, size(self%snow%melt)
-        self%snow%melt(k) = 0.0_dp
-        self%snow%snow(k) = 0.0_dp
-        self%snow%degday(k) = 0.0_dp
-        self%snow%rain(k) = 0.0_dp
-      end do
-      !$omp end do
+      continue
     case (1_i4)
       !$omp do schedule(static)
-      do k = 1_i4, size(self%snow%snowpack)
+      do k = 1_i4, size(self%exchange%snowpack%data)
         call snow_accum_melt(self%exchange%degday_inc%data(k), self%exchange%degday_max%data(k) * self%runtime%c2TSTu, &
           self%exchange%degday_dry%data(k) * self%runtime%c2TSTu, self%exchange%pre%data(k), self%exchange%temp%data(k), &
-          self%exchange%thresh_temp%data(k), self%exchange%throughfall%data(k), self%snow%snowpack(k), self%snow%degday(k), &
-          self%snow%melt(k), self%snow%pre_effect(k), self%snow%rain(k), self%snow%snow(k))
+          self%exchange%thresh_temp%data(k), self%exchange%throughfall%data(k), self%exchange%snowpack%data(k), &
+          self%exchange%degday%data(k), self%exchange%melt%data(k), self%exchange%pre_eff%data(k), self%exchange%rain%data(k), &
+          self%exchange%snow%data(k))
       end do
       !$omp end do
     case default
@@ -797,11 +855,7 @@ contains
     direct_runoff_case = self%exchange%parameters%process_matrix(4, 1)
     select case (direct_runoff_case)
     case (0_i4)
-      !$omp do schedule(static)
-      do k = 1_i4, size(self%direct_runoff%aet)
-        self%direct_runoff%aet(k) = 0.0_dp
-      end do
-      !$omp end do
+      continue
     case (1_i4)
       month = self%exchange%time%month
       if (month < 1_i4 .or. month > int(YearMonths, i4)) then
@@ -809,10 +863,11 @@ contains
         error stop 1
       end if
       !$omp do schedule(static)
-      do k = 1_i4, size(self%direct_runoff%storage)
+      do k = 1_i4, size(self%exchange%sealed_storage%data)
         call soil_moisture_direct_runoff(self%exchange%f_sealed%data(k), self%exchange%thresh_sealed%data(k), &
-          self%exchange%pet%data(k), self%forcing%evap_coeff(month), self%canopy%aet(k), self%exchange%pre_eff%data(k), &
-          self%direct_runoff%runoff(k), self%direct_runoff%storage(k), self%direct_runoff%aet(k))
+          self%exchange%pet%data(k), self%forcing%evap_coeff(month), self%exchange%aet_canopy%data(k), &
+          self%exchange%pre_eff%data(k), &
+          self%exchange%runoff_sealed%data(k), self%exchange%sealed_storage%data(k), self%exchange%aet_sealed%data(k))
       end do
       !$omp end do
     case default
@@ -833,11 +888,6 @@ contains
 
     soil_case = self%exchange%parameters%process_matrix(3, 1)
     if (soil_case == 0_i4) then
-      !$omp do schedule(static)
-      do k = 1_i4, size(self%soil%aet, 1)
-        self%soil%aet(k, :) = 0.0_dp
-      end do
-      !$omp end do
       return
     end if
     if (soil_case < 0_i4 .or. soil_case > 4_i4) then
@@ -845,29 +895,21 @@ contains
       error stop 1
     end if
 
-    if (self%exchange%step_count == 1_i4 .and. .not.self%io%read_restart) then
-      !$omp do schedule(static)
-      do k = 1_i4, size(self%soil%moisture, 1)
-        self%soil%moisture(k, :) = 0.5_dp * self%exchange%sm_field_capacity%data(k, :)
-      end do
-      !$omp end do
-    end if
-
     !$omp do schedule(static)
-    do k = 1_i4, size(self%soil%moisture, 1)
+    do k = 1_i4, size(self%exchange%soil_moisture%data, 1)
       tmp_infiltration = self%exchange%infiltration%data(k, :)
-      tmp_soil_moisture = self%soil%moisture(k, :)
+      tmp_soil_moisture = self%exchange%soil_moisture%data(k, :)
       jarvis_thresh = 0.0_dp
       if (soil_case == 2_i4 .or. soil_case == 3_i4) jarvis_thresh = self%exchange%thresh_jarvis%data(k)
 
       call soil_moisture_pervious(soil_case, self%exchange%pet%data(k), self%exchange%sm_saturation%data(k, :), &
         self%exchange%f_roots%data(k, :), self%exchange%sm_field_capacity%data(k, :), self%exchange%wilting_point%data(k, :), &
-        self%exchange%sm_exponent%data(k, :), jarvis_thresh, self%canopy%aet(k), self%exchange%pre_eff%data(k), &
+        self%exchange%sm_exponent%data(k, :), jarvis_thresh, self%exchange%aet_canopy%data(k), self%exchange%pre_eff%data(k), &
         tmp_infiltration, tmp_soil_moisture, tmp_aet)
 
-      self%soil%infiltration(k, :) = tmp_infiltration
-      self%soil%moisture(k, :) = tmp_soil_moisture
-      self%soil%aet(k, :) = tmp_aet
+      self%exchange%infiltration%data(k, :) = tmp_infiltration
+      self%exchange%soil_moisture%data(k, :) = tmp_soil_moisture
+      self%exchange%aet_soil%data(k, :) = tmp_aet
     end do
     !$omp end do
   end subroutine mhm_update_soil_moisture
@@ -892,12 +934,12 @@ contains
 
     n_horizons = size(self%soil%infiltration, 2)
     !$omp do schedule(static)
-    do k = 1_i4, size(self%runoff%unsat_storage)
+    do k = 1_i4, size(self%exchange%unsat_storage%data)
       call runoff_unsat_zone(self%runtime%c2TSTu / self%exchange%k_slowflow%data(k), &
         self%runtime%c2TSTu / self%exchange%k_percolation%data(k), self%runtime%c2TSTu / self%exchange%k_fastflow%data(k), &
         self%exchange%alpha%data(k), self%exchange%f_karst_loss%data(k), self%exchange%infiltration%data(k, n_horizons), &
-        self%exchange%thresh_unsat%data(k), self%runoff%sat_storage(k), self%runoff%unsat_storage(k), &
-        self%runoff%slow_interflow(k), self%runoff%fast_interflow(k), self%runoff%percolation(k))
+        self%exchange%thresh_unsat%data(k), self%exchange%sat_storage%data(k), self%exchange%unsat_storage%data(k), &
+        self%exchange%interflow_slow%data(k), self%exchange%interflow_fast%data(k), self%exchange%percolation%data(k))
       end do
     !$omp end do
   end subroutine mhm_update_interflow
@@ -911,11 +953,12 @@ contains
     baseflow_case = self%exchange%parameters%process_matrix(9, 1)
     select case (baseflow_case)
     case (0_i4)
+      continue
     case (1_i4)
       !$omp do schedule(static)
-      do k = 1_i4, size(self%runoff%sat_storage)
-        call runoff_sat_zone(self%runtime%c2TSTu / self%exchange%k_baseflow%data(k), self%runoff%sat_storage(k), &
-          self%runoff%baseflow(k))
+      do k = 1_i4, size(self%exchange%sat_storage%data)
+        call runoff_sat_zone(self%runtime%c2TSTu / self%exchange%k_baseflow%data(k), self%exchange%sat_storage%data(k), &
+          self%exchange%baseflow%data(k))
       end do
       !$omp end do
     case default
@@ -928,13 +971,25 @@ contains
   recursive subroutine mhm_update_total_runoff(self)
     class(mhm_t), intent(inout), target :: self
     integer(i4) :: k
+    real(dp) :: baseflow
+    real(dp) :: direct_runoff
+    real(dp) :: fast_interflow
+    real(dp) :: slow_interflow
 
     if (.not.self%contract%own_total_runoff) return
 
-    !$omp do schedule(static)
-    do k = 1_i4, size(self%runoff%total_runoff)
-      call L1_total_runoff(self%exchange%f_sealed%data(k), self%exchange%interflow_fast%data(k), self%exchange%interflow_slow%data(k), &
-        self%exchange%baseflow%data(k), self%exchange%runoff_sealed%data(k), self%runoff%total_runoff(k))
+    !$omp do schedule(static) private(baseflow, direct_runoff, fast_interflow, slow_interflow)
+    do k = 1_i4, size(self%exchange%runoff_total%data)
+      direct_runoff = 0.0_dp
+      fast_interflow = 0.0_dp
+      slow_interflow = 0.0_dp
+      baseflow = 0.0_dp
+      if (self%exchange%runoff_sealed%provided) direct_runoff = self%exchange%runoff_sealed%data(k)
+      if (self%exchange%interflow_fast%provided) fast_interflow = self%exchange%interflow_fast%data(k)
+      if (self%exchange%interflow_slow%provided) slow_interflow = self%exchange%interflow_slow%data(k)
+      if (self%exchange%baseflow%provided) baseflow = self%exchange%baseflow%data(k)
+      call L1_total_runoff(self%exchange%f_sealed%data(k), fast_interflow, slow_interflow, baseflow, direct_runoff, &
+        self%exchange%runoff_total%data(k))
     end do
     !$omp end do
   end subroutine mhm_update_total_runoff
@@ -948,15 +1003,10 @@ contains
 
     neutron_case = self%exchange%parameters%process_matrix(10, 1)
     if (neutron_case == 0_i4) then
-      !$omp do schedule(static)
-      do k = 1_i4, size(self%neutrons%counts)
-        self%neutrons%counts(k) = 0.0_dp
-      end do
-      !$omp end do
       return
     end if
 
-    n_layers = size(self%soil%moisture, 2) - 1_i4
+    n_layers = size(self%exchange%soil_moisture%data, 2) - 1_i4
     if (n_layers < 1_i4) then
       log_fatal(*) "mHM: neutron calculations require at least two soil horizons."
       error stop 1
@@ -965,19 +1015,20 @@ contains
     select case (neutron_case)
     case (1_i4)
       !$omp do schedule(static)
-      do k = 1_i4, size(self%neutrons%counts)
-        call DesiletsN0(self%soil%moisture(k, 1:n_layers), self%soil%horizon_bounds(2:n_layers + 1_i4), &
+      do k = 1_i4, size(self%exchange%neutrons%data)
+        call DesiletsN0(self%exchange%soil_moisture%data(k, 1:n_layers), self%soil%horizon_bounds(2:n_layers + 1_i4), &
           self%exchange%bulk_density%data(k, 1:n_layers), self%exchange%lattice_water%data(k, 1:n_layers), &
-          self%exchange%desilets_n0%data(k), self%neutrons%counts(k))
+          self%exchange%desilets_n0%data(k), self%exchange%neutrons%data(k))
       end do
       !$omp end do
     case (2_i4)
       !$omp do schedule(static)
-      do k = 1_i4, size(self%neutrons%counts)
-        call COSMIC(self%soil%moisture(k, 1:n_layers), self%soil%horizon_bounds(2:n_layers + 1_i4), &
-          self%neutrons%integral_afast, self%canopy%interception(k), self%snow%snowpack(k), self%exchange%desilets_n0%data(k), &
+      do k = 1_i4, size(self%exchange%neutrons%data)
+        call COSMIC(self%exchange%soil_moisture%data(k, 1:n_layers), self%soil%horizon_bounds(2:n_layers + 1_i4), &
+          self%neutrons%integral_afast, self%exchange%interception%data(k), self%exchange%snowpack%data(k), &
+          self%exchange%desilets_n0%data(k), &
           self%exchange%bulk_density%data(k, 1:n_layers), self%exchange%lattice_water%data(k, 1:n_layers), &
-          self%exchange%cosmic_l3%data(k, 1:n_layers), self%neutrons%counts(k))
+          self%exchange%cosmic_l3%data(k, 1:n_layers), self%exchange%neutrons%data(k))
       end do
       !$omp end do
     case default
@@ -1043,30 +1094,32 @@ contains
       bounds=soil_bounds, reference=2_i4)
     deallocate(soil_bounds)
 
-    call self%write_restart_field_2d(nc, dims_xy, "L1_Inter", "Interception storage at level 1", self%canopy%interception)
-    call self%write_restart_field_2d(nc, dims_xy, "L1_snowPack", "Snowpack at level 1", self%snow%snowpack)
+    call self%write_restart_field_2d(nc, dims_xy, "L1_Inter", "Interception storage at level 1", self%exchange%interception%data)
+    call self%write_restart_field_2d(nc, dims_xy, "L1_snowPack", "Snowpack at level 1", self%exchange%snowpack%data)
     call self%write_restart_field_2d(nc, dims_xy, "L1_sealSTW", &
-      "Retention storage of impervious areas at level 1", self%direct_runoff%storage)
-    call self%write_restart_field_3d(nc, dims_xy, soil_dim, "L1_soilMoist", "soil moisture at level 1", self%soil%moisture)
-    call self%write_restart_field_2d(nc, dims_xy, "L1_unsatSTW", "upper soil storage at level 1", self%runoff%unsat_storage)
-    call self%write_restart_field_2d(nc, dims_xy, "L1_satSTW", "groundwater storage at level 1", self%runoff%sat_storage)
+      "Retention storage of impervious areas at level 1", self%exchange%sealed_storage%data)
+    call self%write_restart_field_3d(nc, dims_xy, soil_dim, "L1_soilMoist", "soil moisture at level 1", &
+      self%exchange%soil_moisture%data)
+    call self%write_restart_field_2d(nc, dims_xy, "L1_unsatSTW", "upper soil storage at level 1", self%exchange%unsat_storage%data)
+    call self%write_restart_field_2d(nc, dims_xy, "L1_satSTW", "groundwater storage at level 1", self%exchange%sat_storage%data)
 
-    call self%write_restart_field_3d(nc, dims_xy, soil_dim, "L1_aETSoil", "soil actual ET at level 1", self%soil%aet)
-    call self%write_restart_field_2d(nc, dims_xy, "L1_aETCanopy", "canopy actual ET at level 1", self%canopy%aet)
-    call self%write_restart_field_2d(nc, dims_xy, "L1_aETSealed", "sealed actual ET at level 1", self%direct_runoff%aet)
+    call self%write_restart_field_3d(nc, dims_xy, soil_dim, "L1_aETSoil", "soil actual ET at level 1", &
+      self%exchange%aet_soil%data)
+    call self%write_restart_field_2d(nc, dims_xy, "L1_aETCanopy", "canopy actual ET at level 1", self%exchange%aet_canopy%data)
+    call self%write_restart_field_2d(nc, dims_xy, "L1_aETSealed", "sealed actual ET at level 1", self%exchange%aet_sealed%data)
     call self%write_restart_field_2d(nc, dims_xy, "L1_baseflow", "baseflow at level 1", self%exchange%baseflow%data)
     call self%write_restart_field_3d(nc, dims_xy, soil_dim, "L1_infilSoil", "soil in-exfiltration at level 1", &
       self%exchange%infiltration%data)
     call self%write_restart_field_2d(nc, dims_xy, "L1_fastRunoff", "fast runoff", self%exchange%interflow_fast%data)
     call self%write_restart_field_2d(nc, dims_xy, "L1_percol", "percolation at level 1", self%exchange%percolation%data)
-    call self%write_restart_field_2d(nc, dims_xy, "L1_melt", "snow melt at level 1", self%snow%melt)
+    call self%write_restart_field_2d(nc, dims_xy, "L1_melt", "snow melt at level 1", self%exchange%melt%data)
     call self%write_restart_field_2d(nc, dims_xy, "L1_preEffect", &
       "effective precip. depth (snow melt + rain) at level 1", self%exchange%pre_eff%data)
-    call self%write_restart_field_2d(nc, dims_xy, "L1_rain", "rain (liquid water) at level 1", self%snow%rain)
+    call self%write_restart_field_2d(nc, dims_xy, "L1_rain", "rain (liquid water) at level 1", self%exchange%rain%data)
     call self%write_restart_field_2d(nc, dims_xy, "L1_runoffSeal", &
       "runoff from impervious area at level 1", self%exchange%runoff_sealed%data)
     call self%write_restart_field_2d(nc, dims_xy, "L1_slowRunoff", "slow runoff at level 1", self%exchange%interflow_slow%data)
-    call self%write_restart_field_2d(nc, dims_xy, "L1_snow", "snow (solid water) at level 1", self%snow%snow)
+    call self%write_restart_field_2d(nc, dims_xy, "L1_snow", "snow (solid water) at level 1", self%exchange%snow%data)
     call self%write_restart_field_2d(nc, dims_xy, "L1_Throughfall", "throughfall at level 1", self%exchange%throughfall%data)
     call self%write_restart_field_2d(nc, dims_xy, "L1_total_runoff", "total runoff at level 1", self%exchange%runoff_total%data)
   end subroutine mhm_write_restart_data
@@ -1435,7 +1488,7 @@ contains
     logical, intent(in) :: required
     character(*), intent(in) :: name
 
-    var%required = required
+    var%required = var%required .or. required
     if (.not.required) return
     if (.not.var%provided) then
       log_fatal(*) "mHM: ", trim(name), " not provided."
@@ -1459,7 +1512,7 @@ contains
     character(*), intent(in) :: name
     integer(i4), intent(in) :: n_horizons
 
-    var%required = required
+    var%required = var%required .or. required
     if (.not.required) return
     if (.not.var%provided) then
       log_fatal(*) "mHM: ", trim(name), " not provided."
@@ -1482,7 +1535,7 @@ contains
     logical, intent(in) :: required
     character(*), intent(in) :: name
 
-    var%required = required
+    var%required = var%required .or. required
     if (.not.required) return
     if (.not.var%provided .or. .not.associated(var%data)) then
       log_fatal(*) "mHM: required handoff not provided: ", trim(name), "."
@@ -1502,7 +1555,7 @@ contains
     character(*), intent(in) :: name
     integer(i4), intent(in) :: n_horizons
 
-    var%required = required
+    var%required = var%required .or. required
     if (.not.required) return
     if (.not.var%provided .or. .not.associated(var%data)) then
       log_fatal(*) "mHM: required handoff not provided: ", trim(name), "."
@@ -1515,19 +1568,29 @@ contains
   end subroutine mhm_expect_handoff_2d
 
   !> \brief Publish an mHM-owned 1D field through the exchange contract.
-  subroutine mhm_publish_local_dp(var, local)
+  subroutine mhm_publish_local_dp(var, local, name)
     type(var_dp), intent(inout) :: var
     real(dp), intent(inout), target :: local(:)
+    character(*), intent(in) :: name
 
+    if (var%provided .or. associated(var%data)) then
+      log_fatal(*) "mHM: exchange field already provided before mHM publication: ", trim(name), "."
+      error stop 1
+    end if
     var%data => local
     var%provided = .true.
   end subroutine mhm_publish_local_dp
 
   !> \brief Publish an mHM-owned 2D field through the exchange contract.
-  subroutine mhm_publish_local_2d(var, local)
+  subroutine mhm_publish_local_2d(var, local, name)
     type(var2d_dp), intent(inout) :: var
     real(dp), intent(inout), target :: local(:, :)
+    character(*), intent(in) :: name
 
+    if (var%provided .or. associated(var%data)) then
+      log_fatal(*) "mHM: exchange field already provided before mHM publication: ", trim(name), "."
+      error stop 1
+    end if
     var%data => local
     var%provided = .true.
   end subroutine mhm_publish_local_2d
@@ -1540,6 +1603,10 @@ contains
 
     if (.not.source%provided .or. .not.associated(source%data)) then
       log_fatal(*) "mHM: pass-through source not provided for ", trim(name), "."
+      error stop 1
+    end if
+    if (var%provided .or. associated(var%data)) then
+      log_fatal(*) "mHM: exchange field already provided before mHM publication: ", trim(name), "."
       error stop 1
     end if
     var%data => source%data
@@ -1624,62 +1691,61 @@ contains
     interception_case = self%exchange%parameters%process_matrix(1, 1)
     snow_case = self%exchange%parameters%process_matrix(2, 1)
 
-    self%exchange%interception%data => self%canopy%interception
-    self%exchange%interception%provided = .true.
-    if (self%contract%own_throughfall) then
-      select case (interception_case)
-      case (1_i4)
-        call mhm_publish_local_dp(self%exchange%throughfall, self%canopy%throughfall)
-      case (-1_i4)
-        call mhm_publish_alias_dp(self%exchange%throughfall, self%exchange%pre, "throughfall")
-      end select
-    end if
-    self%exchange%aet_canopy%data => self%canopy%aet
-    self%exchange%aet_canopy%provided = .true.
+    select case (interception_case)
+    case (1_i4)
+      call mhm_publish_local_dp(self%exchange%interception, self%canopy%interception, "interception")
+      call mhm_publish_local_dp(self%exchange%throughfall, self%canopy%throughfall, "throughfall")
+      call mhm_publish_local_dp(self%exchange%aet_canopy, self%canopy%aet, "aet_canopy")
+    case (-1_i4)
+      call mhm_publish_local_dp(self%exchange%interception, self%canopy%interception, "interception")
+      call mhm_publish_alias_dp(self%exchange%throughfall, self%exchange%pre, "throughfall")
+      call mhm_publish_local_dp(self%exchange%aet_canopy, self%canopy%aet, "aet_canopy")
+    case (0_i4)
+    end select
 
-    self%exchange%snowpack%data => self%snow%snowpack
-    self%exchange%snowpack%provided = .true.
-    self%exchange%melt%data => self%snow%melt
-    self%exchange%melt%provided = .true.
-    if (self%contract%own_pre_effect) then
-      select case (snow_case)
-      case (1_i4)
-        call mhm_publish_local_dp(self%exchange%pre_eff, self%snow%pre_effect)
-      case (-1_i4)
-        call mhm_publish_alias_dp(self%exchange%pre_eff, self%exchange%throughfall, "pre_eff")
-      end select
-    end if
-    self%exchange%rain%data => self%snow%rain
-    self%exchange%rain%provided = .true.
-    self%exchange%snow%data => self%snow%snow
-    self%exchange%snow%provided = .true.
-    self%exchange%degday%data => self%snow%degday
-    self%exchange%degday%provided = .true.
+    select case (snow_case)
+    case (1_i4)
+      call mhm_publish_local_dp(self%exchange%snowpack, self%snow%snowpack, "snowpack")
+      call mhm_publish_local_dp(self%exchange%melt, self%snow%melt, "melt")
+      call mhm_publish_local_dp(self%exchange%pre_eff, self%snow%pre_effect, "pre_eff")
+      call mhm_publish_local_dp(self%exchange%rain, self%snow%rain, "rain")
+      call mhm_publish_local_dp(self%exchange%snow, self%snow%snow, "snow")
+      call mhm_publish_local_dp(self%exchange%degday, self%snow%degday, "degday")
+    case (-1_i4)
+      call mhm_publish_local_dp(self%exchange%snowpack, self%snow%snowpack, "snowpack")
+      call mhm_publish_local_dp(self%exchange%melt, self%snow%melt, "melt")
+      call mhm_publish_alias_dp(self%exchange%pre_eff, self%exchange%throughfall, "pre_eff")
+      call mhm_publish_alias_dp(self%exchange%rain, self%exchange%throughfall, "rain")
+      call mhm_publish_local_dp(self%exchange%snow, self%snow%snow, "snow")
+      call mhm_publish_local_dp(self%exchange%degday, self%snow%degday, "degday")
+    case (0_i4)
+    end select
 
-    self%exchange%sealed_storage%data => self%direct_runoff%storage
-    self%exchange%sealed_storage%provided = .true.
-    self%exchange%aet_sealed%data => self%direct_runoff%aet
-    self%exchange%aet_sealed%provided = .true.
-    if (self%contract%own_runoff_sealed) call mhm_publish_local_dp(self%exchange%runoff_sealed, self%direct_runoff%runoff)
+    if (self%contract%own_sealed_storage) call mhm_publish_local_dp(self%exchange%sealed_storage, self%direct_runoff%storage, &
+      "sealed_storage")
+    if (self%contract%own_aet_sealed) call mhm_publish_local_dp(self%exchange%aet_sealed, self%direct_runoff%aet, "aet_sealed")
+    if (self%contract%own_runoff_sealed) call mhm_publish_local_dp(self%exchange%runoff_sealed, self%direct_runoff%runoff, &
+      "runoff_sealed")
 
-    self%exchange%soil_moisture%data => self%soil%moisture
-    self%exchange%soil_moisture%provided = .true.
-    if (self%contract%own_infiltration) call mhm_publish_local_2d(self%exchange%infiltration, self%soil%infiltration)
-    self%exchange%aet_soil%data => self%soil%aet
-    self%exchange%aet_soil%provided = .true.
+    if (self%contract%own_soil_moisture) call mhm_publish_local_2d(self%exchange%soil_moisture, self%soil%moisture, &
+      "soil_moisture")
+    if (self%contract%own_infiltration) call mhm_publish_local_2d(self%exchange%infiltration, self%soil%infiltration, &
+      "infiltration")
+    if (self%contract%own_aet_soil) call mhm_publish_local_2d(self%exchange%aet_soil, self%soil%aet, "aet_soil")
 
-    self%exchange%unsat_storage%data => self%runoff%unsat_storage
-    self%exchange%unsat_storage%provided = .true.
-    self%exchange%sat_storage%data => self%runoff%sat_storage
-    self%exchange%sat_storage%provided = .true.
-    if (self%contract%own_percolation) call mhm_publish_local_dp(self%exchange%percolation, self%runoff%percolation)
-    if (self%contract%own_interflow_fast) call mhm_publish_local_dp(self%exchange%interflow_fast, self%runoff%fast_interflow)
-    if (self%contract%own_interflow_slow) call mhm_publish_local_dp(self%exchange%interflow_slow, self%runoff%slow_interflow)
-    if (self%contract%own_baseflow) call mhm_publish_local_dp(self%exchange%baseflow, self%runoff%baseflow)
-    if (self%contract%own_total_runoff) call mhm_publish_local_dp(self%exchange%runoff_total, self%runoff%total_runoff)
+    if (self%contract%own_unsat_storage) call mhm_publish_local_dp(self%exchange%unsat_storage, self%runoff%unsat_storage, &
+      "unsat_storage")
+    if (self%contract%own_sat_storage) call mhm_publish_local_dp(self%exchange%sat_storage, self%runoff%sat_storage, "sat_storage")
+    if (self%contract%own_percolation) call mhm_publish_local_dp(self%exchange%percolation, self%runoff%percolation, "percolation")
+    if (self%contract%own_interflow_fast) call mhm_publish_local_dp(self%exchange%interflow_fast, self%runoff%fast_interflow, &
+      "interflow_fast")
+    if (self%contract%own_interflow_slow) call mhm_publish_local_dp(self%exchange%interflow_slow, self%runoff%slow_interflow, &
+      "interflow_slow")
+    if (self%contract%own_baseflow) call mhm_publish_local_dp(self%exchange%baseflow, self%runoff%baseflow, "baseflow")
+    if (self%contract%own_total_runoff) call mhm_publish_local_dp(self%exchange%runoff_total, self%runoff%total_runoff, &
+      "runoff_total")
 
-    self%exchange%neutrons%data => self%neutrons%counts
-    self%exchange%neutrons%provided = .true.
+    if (self%contract%own_neutrons) call mhm_publish_local_dp(self%exchange%neutrons, self%neutrons%counts, "neutrons")
   end subroutine mhm_publish_exchange
 
   !> \brief Reset all mHM state and flux arrays to legacy default values.
@@ -1745,43 +1811,29 @@ contains
   subroutine mhm_clear_exchange(self)
     class(mhm_t), intent(inout), target :: self
 
-    nullify(self%exchange%interception%data)
-    self%exchange%interception%provided = .false.
+    call mhm_clear_output_dp(self%exchange%interception, self%contract%own_interception)
     call mhm_clear_output_dp(self%exchange%throughfall, self%contract%own_throughfall)
-    nullify(self%exchange%aet_canopy%data)
-    self%exchange%aet_canopy%provided = .false.
-    nullify(self%exchange%snowpack%data)
-    self%exchange%snowpack%provided = .false.
-    nullify(self%exchange%melt%data)
-    self%exchange%melt%provided = .false.
+    call mhm_clear_output_dp(self%exchange%aet_canopy, self%contract%own_aet_canopy)
+    call mhm_clear_output_dp(self%exchange%snowpack, self%contract%own_snowpack)
+    call mhm_clear_output_dp(self%exchange%melt, self%contract%own_melt)
     call mhm_clear_output_dp(self%exchange%pre_eff, self%contract%own_pre_effect)
-    nullify(self%exchange%rain%data)
-    self%exchange%rain%provided = .false.
-    nullify(self%exchange%snow%data)
-    self%exchange%snow%provided = .false.
-    nullify(self%exchange%degday%data)
-    self%exchange%degday%provided = .false.
-    nullify(self%exchange%sealed_storage%data)
-    self%exchange%sealed_storage%provided = .false.
-    nullify(self%exchange%aet_sealed%data)
-    self%exchange%aet_sealed%provided = .false.
+    call mhm_clear_output_dp(self%exchange%rain, self%contract%own_rain)
+    call mhm_clear_output_dp(self%exchange%snow, self%contract%own_snow)
+    call mhm_clear_output_dp(self%exchange%degday, self%contract%own_degday)
+    call mhm_clear_output_dp(self%exchange%sealed_storage, self%contract%own_sealed_storage)
+    call mhm_clear_output_dp(self%exchange%aet_sealed, self%contract%own_aet_sealed)
     call mhm_clear_output_dp(self%exchange%runoff_sealed, self%contract%own_runoff_sealed)
-    nullify(self%exchange%soil_moisture%data)
-    self%exchange%soil_moisture%provided = .false.
+    call mhm_clear_output_2d(self%exchange%soil_moisture, self%contract%own_soil_moisture)
     call mhm_clear_output_2d(self%exchange%infiltration, self%contract%own_infiltration)
-    nullify(self%exchange%aet_soil%data)
-    self%exchange%aet_soil%provided = .false.
-    nullify(self%exchange%unsat_storage%data)
-    self%exchange%unsat_storage%provided = .false.
-    nullify(self%exchange%sat_storage%data)
-    self%exchange%sat_storage%provided = .false.
+    call mhm_clear_output_2d(self%exchange%aet_soil, self%contract%own_aet_soil)
+    call mhm_clear_output_dp(self%exchange%unsat_storage, self%contract%own_unsat_storage)
+    call mhm_clear_output_dp(self%exchange%sat_storage, self%contract%own_sat_storage)
     call mhm_clear_output_dp(self%exchange%percolation, self%contract%own_percolation)
     call mhm_clear_output_dp(self%exchange%interflow_fast, self%contract%own_interflow_fast)
     call mhm_clear_output_dp(self%exchange%interflow_slow, self%contract%own_interflow_slow)
     call mhm_clear_output_dp(self%exchange%baseflow, self%contract%own_baseflow)
     call mhm_clear_output_dp(self%exchange%runoff_total, self%contract%own_total_runoff)
-    nullify(self%exchange%neutrons%data)
-    self%exchange%neutrons%provided = .false.
+    call mhm_clear_output_dp(self%exchange%neutrons, self%contract%own_neutrons)
   end subroutine mhm_clear_exchange
 
 end module mo_mhm_container
