@@ -423,7 +423,8 @@ CONTAINS
      real(dp),dimension(:),    intent(in) :: Horizons
      real(dp),                 intent(in) :: interc
      real(dp),                 intent(in) :: snowpack
-     real(dp),dimension(:), intent(out)   :: zthick
+     ! The caller uses previously computed layer thicknesses in later iterations.
+     real(dp),dimension(:), intent(inout) :: zthick
 
      if (ll.eq.1) then
         zthick(ll)=(snowpack+interc)/10.0_dp
