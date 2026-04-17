@@ -35,7 +35,7 @@
   soil_db_mode(1)          = 0
   n_horizons(1)            = 2
   tillage_depth(1)         = 200
-  soil_depth(1, 1)         = 200
+  soil_depth(1,1)          = 200
   fracSealed_cityArea(1)   = 0.6
   land_cover_path(1)       = "src/tests/files/lc_static.nc"
   land_cover_var(1)        = "land_cover"
