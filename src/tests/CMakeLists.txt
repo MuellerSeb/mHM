@@ -1,7 +1,7 @@
 enable_testing()
 
 set(LIB_NAME mhm_lib)
-find_package(PFUNIT)
+find_package(PFUNIT QUIET)
 
 if(PFUNIT_FOUND)
   message(STATUS "mHM: add unit tests")

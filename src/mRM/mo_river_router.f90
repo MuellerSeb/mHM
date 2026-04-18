@@ -530,12 +530,15 @@ contains
     ! distribute runoff in case of SCC
     if (this%river%scc) then
       this%scaled_runoff = this%scale_runoff(this%acc_runoff)
-      !$omp parallel do simd default(none) schedule(static) shared(this) private(c)
+      ! Keep SIMD but avoid the combined OpenMP 4.x form that NAG rejects here.
+      !$omp parallel default(none) shared(this) private(c, n)
+      !$omp do simd schedule(static)
       do n = 1_i8, this%river%n_nodes
         c = this%river%node_cell(n)
         this%runoff(n) = this%scaled_runoff(c) * this%river%area_fraction(n)
       end do
-      !$omp end parallel do simd
+      !$omp end do simd
+      !$omp end parallel
     else
       this%runoff = this%scale_runoff(this%acc_runoff)
     end if

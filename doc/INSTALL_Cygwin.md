@@ -13,7 +13,7 @@ Install cygwin by executing the cygwin setup and choose the following dependenci
 
 - gcc-fortran (the fortran compiler)
 - make
-- cmake (version >= 3.12)
+- cmake (version >= 3.18)
 - libnetcdf-fortran-devel
 - libhdf5-devel
 - libgfortran
@@ -61,7 +61,7 @@ If you will run mHM in parallel using OpenMP then you will need Microsoft MPI in
 
 Then use cmake option below. Note that memory dump is a common issue for cygwin users when compiling with OpenMP. For memory allocation please also use this line below.
 
-    cmake -DCMAKE_Fortran_FLAGS="${CMAKE_Fortran_FLAGS} -Wl,--stack,12485760" -DCMAKE_WITH_OpenMP=ON -DCMAKE_BUILD_TYPE=Release ..
+    cmake -DCMAKE_Fortran_FLAGS="${CMAKE_Fortran_FLAGS} -Wl,--stack,12485760" -DMHM_WITH_OpenMP=ON -DCMAKE_BUILD_TYPE=Release ..
 
 4) Execute `make`
         make

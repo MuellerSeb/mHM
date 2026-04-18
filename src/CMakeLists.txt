@@ -9,15 +9,14 @@ file(GLOB sources_coupling coupling/*mo_*.*90)
 file(GLOB sources_exchange exchange/*mo_*.*90)
 file(GLOB sources_nml nml/*nml_*.*90)
 list(APPEND sources ${sources_mpr} ${sources_mhm} ${sources_mrm} ${sources_common} ${sources_meteo} ${sources_coupling} ${sources_exchange} ${sources_nml})
-option(BUILD_MHM_LIB_SHARED "Build mhm library as shared." OFF)
 
-if(BUILD_MHM_LIB_SHARED)
+if(MHM_BUILD_LIB_SHARED)
   add_library(${LIB_NAME} SHARED ${sources})
 else()
   add_library(${LIB_NAME} STATIC ${sources})
 endif()
 
-if(BUILD_MHM_LIB_PIC)
+if(MHM_BUILD_LIB_PIC)
   set_property(TARGET ${LIB_NAME} PROPERTY POSITION_INDEPENDENT_CODE ON)
 endif()
 
@@ -25,7 +24,7 @@ target_include_directories(${LIB_NAME} PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
 
 # add FORCES
 # when building sdist download forces to top folder with CPM by setting "source cache"
-if(${SKBUILD_STATE} MATCHES "sdist")
+if(DEFINED SKBUILD_STATE AND "${SKBUILD_STATE}" MATCHES "sdist")
   set(FORCES_WITH_NETCDF OFF)  # we don't need netcdf to create sdist
   message(STATUS "mHM: downloading forces for sdist")
   file(REMOVE_RECURSE "${CMAKE_CURRENT_SOURCE_DIR}/../forces")
@@ -42,81 +41,147 @@ endif()
 file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/../version_forces.txt" ver_forces LIMIT_COUNT 1)
 # cmake directive to specify forces version: CPM_forces_VERSION
 set(CPM_forces_VERSION "${ver_forces}" CACHE STRING "FORCES version to download with CPM.")
+if(NOT DEFINED FORCES_WITH_MPI)
+  set(FORCES_WITH_MPI ${MHM_WITH_MPI} CACHE BOOL
+    "Build FORCES with MPI support (defaults to MHM_WITH_MPI)."
+  )
+endif()
+if(NOT DEFINED FORCES_WITH_OpenMP)
+  set(FORCES_WITH_OpenMP ${MHM_WITH_OpenMP} CACHE BOOL
+    "Build FORCES with OpenMP support (defaults to MHM_WITH_OpenMP)."
+  )
+endif()
 CPMAddPackage("https://git.ufz.de/chs/forces.git#${CPM_forces_VERSION}")
-if(BUILD_MHM_LIB_SHARED OR BUILD_MHM_LIB_PIC)
+if(MHM_BUILD_LIB_SHARED OR MHM_BUILD_LIB_PIC)
   set_property(TARGET forces PROPERTY POSITION_INDEPENDENT_CODE ON)
 endif()
 target_link_libraries(${LIB_NAME} PUBLIC forces)
 
-if(${SKBUILD_STATE} MATCHES "sdist")
+if(DEFINED SKBUILD_STATE AND "${SKBUILD_STATE}" MATCHES "sdist")
     file(COPY "${FORCES_SOURCE_DIR}" DESTINATION "${CMAKE_CURRENT_SOURCE_DIR}/..")
     get_filename_component(_fpath "${FORCES_SOURCE_DIR}" NAME)
     file(RENAME "${CMAKE_CURRENT_SOURCE_DIR}/../${_fpath}" "${CMAKE_CURRENT_SOURCE_DIR}/../forces")
     message(STATUS "mHM: copied forces from '${FORCES_SOURCE_DIR}' to './forces'.")
 endif()
 
-# check mhm specific env-vars
-if(DEFINED ENV{MHM_BUILD_PARALLEL})
-  set(CMAKE_WITH_OpenMP $ENV{MHM_BUILD_PARALLEL})
-endif()
-# add all compile options (MPI, OpenMP, Lapack, Coverage)
-include(../cmake/compileoptions.cmake)
-if (CMAKE_WITH_MPI)
+# add all compile options (MPI, OpenMP, Coverage)
+if(MHM_WITH_MPI)
+  find_package(MPI REQUIRED COMPONENTS Fortran)
+  if(NOT MPI_Fortran_HAVE_F08_MODULE)
+    message(FATAL_ERROR "mHM: MPI found, but the 'mpi_f08' module is not available.")
+  endif()
   message(STATUS "mHM: use MPI")
   target_compile_definitions(${LIB_NAME} PRIVATE MPI)
   target_link_libraries(${LIB_NAME} PRIVATE MPI::MPI_Fortran)
 endif()
-if (CMAKE_WITH_OpenMP)
+
+if(MHM_WITH_OpenMP)
+  find_package(OpenMP REQUIRED COMPONENTS Fortran)
+  if(NOT OpenMP_Fortran_HAVE_OMPLIB_MODULE)
+    message(FATAL_ERROR "mHM: OpenMP found, but the 'omp_lib' module is not available.")
+  endif()
   message(STATUS "mHM: use OpenMP")
-  target_link_libraries(${LIB_NAME} PRIVATE OpenMP::OpenMP_Fortran)
+  if(NOT TARGET project_openmp)
+    add_library(project_openmp INTERFACE)
+    if(CMAKE_Fortran_COMPILER_ID STREQUAL "NAG")
+      target_compile_options(project_openmp INTERFACE "$<$<COMPILE_LANGUAGE:Fortran>:-openmp>")
+      target_link_options(project_openmp INTERFACE "$<$<LINK_LANGUAGE:Fortran>:-openmp>")
+    else()
+      target_link_libraries(project_openmp INTERFACE OpenMP::OpenMP_Fortran)
+    endif()
+  endif()
+  target_link_libraries(${LIB_NAME} PRIVATE project_openmp)
 endif()
 
-# by setting compile options and definitions PUBLIC, they are also used by
-# programms linking agains it (mhm exe in this case)
+if(MHM_ENABLE_NATIVE)
+  message(STATUS "mHM: enable host-native Release tuning (opt-in local/HPC mode)")
+else()
+  message(STATUS "mHM: use portable Release tuning")
+endif()
+
 if(CMAKE_Fortran_COMPILER_ID MATCHES "GNU")
-  target_compile_definitions(${LIB_NAME} PRIVATE GFORTRAN)
+  target_compile_definitions(${LIB_NAME} PRIVATE "GFORTRAN")
   target_compile_options(${LIB_NAME} PUBLIC
-    -ffree-line-length-none
-    $<$<CONFIG:DEBUG>:-Og -g -Wall -Wextra -Wimplicit-interface -Wsurprising
-      -fimplicit-none -fbacktrace -fcheck=all
-      -ffpe-trap=zero,overflow,underflow -finit-real=snan -pedantic-errors>
-    $<$<CONFIG:RELEASE>:-O3>
-    $<$<BOOL:${CMAKE_WITH_GPROF}>:-pg>
+    "$<$<COMPILE_LANGUAGE:Fortran>:-ffree-line-length-none>"
   )
+  target_compile_options(${LIB_NAME} PRIVATE
+    "$<$<AND:$<COMPILE_LANGUAGE:Fortran>,$<CONFIG:DEBUG>>:-Og;-g;-Wall;-Wextra;-Wimplicit-interface;-Wsurprising;-fimplicit-none;-fbacktrace;-fcheck=all,no-array-temps;-ffpe-trap=zero,overflow,underflow;-finit-real=snan;-pedantic-errors>"
+    "$<$<AND:$<COMPILE_LANGUAGE:Fortran>,$<CONFIG:RELEASE>>:-O3>"
+    "$<$<AND:$<COMPILE_LANGUAGE:Fortran>,$<CONFIG:RELWITHDEBINFO>>:-fbacktrace>"
+    "$<$<AND:$<COMPILE_LANGUAGE:Fortran>,$<BOOL:${MHM_WITH_GPROF}>>:-pg>"
+  )
+  target_link_options(${LIB_NAME} PUBLIC
+    "$<$<AND:$<LINK_LANGUAGE:Fortran>,$<BOOL:${MHM_WITH_GPROF}>>:-pg>"
+  )
+  if(MHM_ENABLE_NATIVE)
+    target_compile_options(${LIB_NAME} PRIVATE
+      "$<$<AND:$<COMPILE_LANGUAGE:Fortran>,$<CONFIG:RELEASE>>:-march=native>"
+      "$<$<AND:$<COMPILE_LANGUAGE:Fortran>,$<CONFIG:RELWITHDEBINFO>>:-march=native>"
+    )
+  endif()
   # https://www.scivision.dev/gfortran-15-external-argument-mismatch
   # AND: passed procedures with pointer attribute should be called with positional arguments
-  # see: mo_mrm_objective_function_runoff / mo_objective_function
-  if(CMAKE_Fortran_COMPILER_VERSION VERSION_GREATER_EQUAL "15.0")
-    target_compile_options(${LIB_NAME} PRIVATE $<$<CONFIG:DEBUG>:-Wno-external-argument-mismatch>)
+  if(CMAKE_Fortran_COMPILER_VERSION VERSION_GREATER_EQUAL "15.0" AND
+     CMAKE_Fortran_COMPILER_VERSION VERSION_LESS          "15.2")
+    target_compile_options(${LIB_NAME} PRIVATE
+      "$<$<AND:$<COMPILE_LANGUAGE:Fortran>,$<CONFIG:DEBUG>>:-Wno-external-argument-mismatch>"
+    )
   endif()
 endif()
-# ifort (Classic)
+
 if(CMAKE_Fortran_COMPILER_ID STREQUAL "Intel")
-  target_compile_definitions(${LIB_NAME} PRIVATE INTEL)
-  target_compile_options(${LIB_NAME} PUBLIC
-    -nofixed "SHELL:-assume byterecl" -standard-realloc-lhs
-    $<$<CONFIG:DEBUG>:-g -fp-model=source "SHELL:-warn all" "SHELL:-check all" "SHELL:-check noarg_temp_created" -debug -traceback -fp-stack-check -O0>
-    $<$<CONFIG:RELEASE>:-O3 -qoverride-limits -fp-model=precise -fprotect-parens>
+  target_compile_definitions(${LIB_NAME} PRIVATE "INTEL")
+  target_compile_options(${LIB_NAME} PRIVATE
+    "$<$<COMPILE_LANGUAGE:Fortran>:-nofixed;SHELL:-assume byterecl;-standard-realloc-lhs>"
+    "$<$<AND:$<COMPILE_LANGUAGE:Fortran>,$<CONFIG:DEBUG>>:-g;-fp-model=source;SHELL:-warn all;SHELL:-check all;SHELL:-check noarg_temp_created;-debug;-traceback;-fp-stack-check;-O0>"
+    "$<$<AND:$<COMPILE_LANGUAGE:Fortran>,$<CONFIG:RELEASE>>:-O3;-qoverride-limits>"
+    "$<$<AND:$<COMPILE_LANGUAGE:Fortran>,$<CONFIG:RELWITHDEBINFO>>:-traceback>"
   )
+  if(MHM_ENABLE_NATIVE)
+    target_compile_options(${LIB_NAME} PRIVATE
+      "$<$<AND:$<COMPILE_LANGUAGE:Fortran>,$<CONFIG:RELEASE>>:-xHost>"
+      "$<$<AND:$<COMPILE_LANGUAGE:Fortran>,$<CONFIG:RELWITHDEBINFO>>:-xHost>"
+    )
+  endif()
 endif()
-# ifx (IntelLLVM)
+
 if(CMAKE_Fortran_COMPILER_ID STREQUAL "IntelLLVM")
-  target_compile_definitions(${LIB_NAME} PRIVATE INTEL)
-  target_compile_options(${LIB_NAME} PUBLIC
-    -nofixed "SHELL:-assume byterecl" -standard-realloc-lhs
-    $<$<CONFIG:DEBUG>:-g -fp-model=source "SHELL:-warn all" "SHELL:-check all" "SHELL:-check noarg_temp_created" "SHELL:-check nouninit" -traceback -O0>
-    $<$<CONFIG:RELEASE>:-O3 -qoverride-limits -fp-model=precise -fprotect-parens>
+  target_compile_definitions(${LIB_NAME} PRIVATE "INTEL")
+  target_compile_options(${LIB_NAME} PRIVATE
+    "$<$<COMPILE_LANGUAGE:Fortran>:-nofixed;SHELL:-assume byterecl;-standard-realloc-lhs>"
+    "$<$<AND:$<COMPILE_LANGUAGE:Fortran>,$<CONFIG:DEBUG>>:-g;-fp-model=source;SHELL:-warn all;SHELL:-check all;SHELL:-check noarg_temp_created;SHELL:-check nouninit;-traceback;-O0>"
+    "$<$<AND:$<COMPILE_LANGUAGE:Fortran>,$<CONFIG:RELEASE>>:-O3;-qoverride-limits>"
+    "$<$<AND:$<COMPILE_LANGUAGE:Fortran>,$<CONFIG:RELWITHDEBINFO>>:-traceback>"
   )
+  if(MHM_ENABLE_NATIVE)
+    target_compile_options(${LIB_NAME} PRIVATE
+      "$<$<AND:$<COMPILE_LANGUAGE:Fortran>,$<CONFIG:RELEASE>>:-xHost>"
+      "$<$<AND:$<COMPILE_LANGUAGE:Fortran>,$<CONFIG:RELWITHDEBINFO>>:-xHost>"
+    )
+  endif()
 endif()
+
 if(CMAKE_Fortran_COMPILER_ID MATCHES "NAG")
-  target_compile_definitions(${LIB_NAME} PRIVATE NAG)
-  target_compile_options(${LIB_NAME} PUBLIC
-    -fpp -colour -unsharedf95 -ideclient
+  if(MHM_ENABLE_NATIVE)
+    message(STATUS "mHM: host-native Release tuning has no effect for NAG")
+  endif()
+  target_compile_definitions(${LIB_NAME} PRIVATE "NAG")
+  if(MHM_WITH_OpenMP)
+    # NAG's -gline traceback instrumentation destabilizes explicit OpenMP calls.
+    set(NAG_DEBUG_FLAGS "-g;-nan;-O0;-C;-C=alias;-C=dangling;-strict95;-ieee=full")
+    set(NAG_RELWITHDEBINFO_FLAGS "-ieee=full")
+  else()
+    set(NAG_DEBUG_FLAGS "-gline;-g;-nan;-O0;-C;-C=alias;-C=dangling;-strict95;-ieee=full")
+    set(NAG_RELWITHDEBINFO_FLAGS "-gline;-ieee=full")
+  endif()
+  target_compile_options(${LIB_NAME} PRIVATE
+    "$<$<COMPILE_LANGUAGE:Fortran>:-fpp;-colour;-unsharedf95;-ideclient>"
     # "-C=all" is not set, only "-C -C=alias -C=dangling" and "-ieee=full" instead of "-ieee=stop" because
     # this effectively omits the -C=intovf flag which checks for integer overflow
     # we need to exclude that as the random number generator relies on that technique
     # -ieee=full is needed for mo_utils (is_nan, is_finite etc. fails with -ieee=stop)
-    $<$<CONFIG:DEBUG>:-gline -g -nan -O0 -C -C=alias -C=dangling -strict95 -ieee=full>
-    $<$<CONFIG:RELEASE>:-O4 -ieee=full>
+    "$<$<AND:$<COMPILE_LANGUAGE:Fortran>,$<CONFIG:DEBUG>>:${NAG_DEBUG_FLAGS}>"
+    "$<$<AND:$<COMPILE_LANGUAGE:Fortran>,$<CONFIG:RELEASE>>:-O4;-ieee=full>"
+    "$<$<AND:$<COMPILE_LANGUAGE:Fortran>,$<CONFIG:RELWITHDEBINFO>>:${NAG_RELWITHDEBINFO_FLAGS}>"
   )
 endif()

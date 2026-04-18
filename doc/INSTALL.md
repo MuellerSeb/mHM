@@ -176,6 +176,17 @@ You can execute it with:
 ./mhm
 ```
 
+The project-specific CMake options are namespaced with `MHM_`. Common examples are:
+
+- `-DMHM_WITH_OpenMP=ON`
+- `-DMHM_WITH_MPI=ON`
+- `-DMHM_BUILD_TESTING=ON`
+- `-DMHM_ENABLE_NATIVE=ON`
+
+`MHM_WITH_OpenMP` and `MHM_WITH_MPI` are forwarded to the embedded FORCES build by default.
+If you need to disable the corresponding FORCES feature explicitly, override it with `-DFORCES_WITH_OpenMP=OFF`
+or `-DFORCES_WITH_MPI=OFF`.
+
 
 ## Installation
 
@@ -230,6 +241,19 @@ You can control all `cmake` options by passing them as directives staring with `
 For example for debug configuration, you can do the following:
 ```bash
 cmake -B build -DCMAKE_BUILD_TYPE=Debug
+```
+
+To enable OpenMP, MPI, or pfUnit testing explicitly, use:
+```bash
+cmake -B build -DCMAKE_BUILD_TYPE=Release -DMHM_WITH_OpenMP=ON
+cmake -B build -DCMAKE_BUILD_TYPE=Release -DMHM_WITH_MPI=ON
+cmake -B build -DCMAKE_BUILD_TYPE=Debug -DMHM_BUILD_TESTING=ON
+```
+
+To keep mHM parallel while forcing FORCES to stay serial, override the propagated FORCES options explicitly:
+```bash
+cmake -B build -DCMAKE_BUILD_TYPE=Release -DMHM_WITH_OpenMP=ON -DFORCES_WITH_OpenMP=OFF
+cmake -B build -DCMAKE_BUILD_TYPE=Release -DMHM_WITH_MPI=ON -DFORCES_WITH_MPI=OFF
 ```
 
 To configure the build interactively, you can also use [ccmake](https://cmake.org/cmake/help/latest/manual/ccmake.1.html) (command line tool) or the [CMake GUI](https://cmake.org/cmake/help/latest/manual/cmake-gui.1.html) (graphical user interface).
