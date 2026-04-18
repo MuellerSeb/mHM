@@ -9,7 +9,7 @@
 &config_time
   sim_start(1)   = "1990" ! "1990-01-01 00:00"
   eval_start(1)  = "1990" ! "1990-01-01 00:00"
-  sim_end(1)     = "1994" ! "1994-01-01 00:00"
+  sim_end(1)     = "1990-06" ! "1990-06-01 00:00"
 /
 
 &config_input
@@ -20,7 +20,7 @@
 /
 
 &config_mrm
-  resolution(1)  = 2000.0
+  resolution(1)  = 6000.0
   max_route_step(1) = 3600 ! [s] truncate routing steps to 1 hour
   output_path(1) = "mrm_output.nc"
   ! output_node_path(1) = "mrm_output_node.nc"

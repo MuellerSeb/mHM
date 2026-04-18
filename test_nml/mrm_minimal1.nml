@@ -9,7 +9,7 @@
 &config_time
   sim_start(1)   = "1990" ! "1990-01-01 00:00"
   eval_start(1)  = "1990" ! "1990-01-01 00:00"
-  sim_end(1)     = "1992" ! "1992-01-01 00:00"
+  sim_end(1)     = "1991" ! "1991-01-01 00:00"
 /
 
 &config_input
@@ -21,8 +21,8 @@
 &config_mrm
   resolution(1)  = 12000.0
   max_route_step(1) = 3600 ! [s] truncate routing steps to 1 hour
-  output_path(1) = "mrm_output_1990-1992.nc"
+  output_path(1) = "mrm_output_1990-1991.nc"
   write_restart(1) = .true.
-  restart_output_path(1) = "mrm_restart_1992.nc"
+  restart_output_path(1) = "mrm_restart_1991.nc"
   scc_gauges_path(1) = "src/tests/files/scc_gauges.nc"
 /

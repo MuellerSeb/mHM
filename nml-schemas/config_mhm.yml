@@ -30,13 +30,6 @@ properties:
       default: false
     x-fortran-shape: max_domains
     title: Read restart
-  read_restart_fluxes:
-    type: array
-    items:
-      type: boolean
-      default: true
-    x-fortran-shape: max_domains
-    title: Read restart fluxes
   restart_input_path:
     type: array
     items:

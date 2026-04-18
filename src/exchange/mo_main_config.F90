@@ -115,6 +115,7 @@ contains
       (self%process_matrix(1, 1) /= 0_i4) .or. &
       (self%process_matrix(2, 1) /= 0_i4) .or. &
       (self%process_matrix(3, 1) /= 0_i4) .or. &
+      (self%process_matrix(4, 1) /= 0_i4) .or. &
       (self%process_matrix(5, 1) /= 0_i4) .or. &
       (self%process_matrix(6, 1) /= 0_i4) .or. &
       (self%process_matrix(7, 1) /= 0_i4) .or. &
@@ -626,6 +627,10 @@ contains
 
     ! Process 1 - interception
     select case (self%process_matrix(1, 1))
+      case(-1)
+        ! -1 - pass through precipitation as throughfall
+        log_debug(*) "SELECTION: interception pass-through is activated!"
+        self%process_matrix(1, 3) = 0_i4
       case(0)
         ! 0 - no interception process selected
         log_debug(*) "SELECTION: interception process is deactivated!"
@@ -648,6 +653,10 @@ contains
 
     ! Process 2 - snow
     select case (self%process_matrix(2, 1))
+      case(-1)
+        ! -1 - pass through throughfall as effective precipitation
+        log_debug(*) "SELECTION: snow pass-through is activated!"
+        self%process_matrix(2, 3) = sum(self%process_matrix(1 : 2, 2))
       case(0)
         ! 0 - no snow process selected
         log_debug(*) "SELECTION: snow process is deactivated!"
@@ -1244,8 +1253,12 @@ contains
         end if
     end select
 
-    ! set default values
-    self%values = self%definition(:, 3)
+    ! set default values; pass-through-only configurations can legitimately have no parameters.
+    if (allocated(self%definition)) then
+      self%values = self%definition(:, 3)
+    else
+      allocate(self%values(0))
+    end if
 
   end subroutine parameters_initialize
 
@@ -1260,7 +1273,11 @@ contains
       end if
       self%values = parameters
     else
-      self%values = self%definition(:, 3) ! default parameters from configuration
+      if (allocated(self%definition)) then
+        self%values = self%definition(:, 3) ! default parameters from configuration
+      else
+        if (.not. allocated(self%values)) allocate(self%values(0))
+      end if
     end if
   end subroutine parameters_set
 

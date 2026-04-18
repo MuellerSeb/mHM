@@ -221,23 +221,10 @@ contains
       self%restart_output_path = self%exchange%get_path(self%config%restart_output_path(id(1)))
     end if
 
-    ! check required input and parameters, set provided flags
-    self%exchange%runoff_total%required = .true.
-    self%exchange%fdir%required = .not.self%read_restart
-    self%exchange%slope%required = .not.const_celerity .and. .not.self%read_restart
-
-    if (.not.self%exchange%runoff_total%provided) then
-      log_fatal(*) "mRM: runoff_total not provided (check input/mHM settings)."
-      error stop 1
-    end if
-    if (self%exchange%fdir%required .and. .not.self%exchange%fdir%provided) then ! req => prov not fulfilled
-      log_fatal(*) "mRM: fdir not provided (check input settings)."
-      error stop 1
-    end if
-    if (.not.const_celerity .and. (self%exchange%slope%required .and. .not.self%exchange%slope%provided)) then
-      log_fatal(*) "mRM: slope not provided, but required for variable celerity (routing case 3)."
-      error stop 1
-    end if
+    ! Runoff may be provided by dynamic input and connected during update.
+    call self%exchange%runoff_total%require("mRM", .true., check_data=.false.)
+    call self%exchange%fdir%require("mRM", .not.self%read_restart)
+    call self%exchange%slope%require("mRM", .not.const_celerity .and. .not.self%read_restart)
 
     ! derive level-3 grid
     if (self%read_restart) then

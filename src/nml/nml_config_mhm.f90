@@ -40,7 +40,6 @@ module nml_config_mhm
 
   ! default values
   logical, parameter, public :: read_restart_default = .false.
-  logical, parameter, public :: read_restart_fluxes_default = .true.
   logical, parameter, public :: write_restart_default = .false.
   logical, parameter, public :: share_evap_coeff_default = .true.
 
@@ -52,7 +51,6 @@ module nml_config_mhm
     real(dp), dimension(max_domains) :: resolution !< mHM model resolution (L1)
     character(len=buf), dimension(max_domains) :: output_path !< Output path
     logical, dimension(max_domains) :: read_restart !< Read restart
-    logical, dimension(max_domains) :: read_restart_fluxes !< Read restart fluxes
     character(len=buf), dimension(max_domains) :: restart_input_path !< Restart input path
     logical, dimension(max_domains) :: write_restart !< Write restart
     character(len=buf), dimension(max_domains) :: restart_output_path !< Restart output path
@@ -86,7 +84,6 @@ contains
     this%evap_coeff = ieee_value(this%evap_coeff, ieee_quiet_nan) ! sentinel for optional real array
     ! default values
     this%read_restart = read_restart_default
-    this%read_restart_fluxes = read_restart_fluxes_default
     this%write_restart = write_restart_default
     this%share_evap_coeff = share_evap_coeff_default ! bool values always need a default
   end function nml_config_mhm_init
@@ -100,7 +97,6 @@ contains
     real(dp), dimension(max_domains) :: resolution
     character(len=buf), dimension(max_domains) :: output_path
     logical, dimension(max_domains) :: read_restart
-    logical, dimension(max_domains) :: read_restart_fluxes
     character(len=buf), dimension(max_domains) :: restart_input_path
     logical, dimension(max_domains) :: write_restart
     character(len=buf), dimension(max_domains) :: restart_output_path
@@ -116,7 +112,6 @@ contains
       resolution, &
       output_path, &
       read_restart, &
-      read_restart_fluxes, &
       restart_input_path, &
       write_restart, &
       restart_output_path, &
@@ -128,7 +123,6 @@ contains
     resolution = this%resolution
     output_path = this%output_path
     read_restart = this%read_restart
-    read_restart_fluxes = this%read_restart_fluxes
     restart_input_path = this%restart_input_path
     write_restart = this%write_restart
     restart_output_path = this%restart_output_path
@@ -162,7 +156,6 @@ contains
     this%resolution = resolution
     this%output_path = output_path
     this%read_restart = read_restart
-    this%read_restart_fluxes = read_restart_fluxes
     this%restart_input_path = restart_input_path
     this%write_restart = write_restart
     this%restart_output_path = restart_output_path
@@ -179,7 +172,6 @@ contains
     resolution, &
     output_path, &
     read_restart, &
-    read_restart_fluxes, &
     restart_input_path, &
     write_restart, &
     restart_output_path, &
@@ -192,7 +184,6 @@ contains
     real(dp), dimension(:), intent(in), optional :: resolution
     character(len=*), dimension(:), intent(in), optional :: output_path
     logical, dimension(:), intent(in), optional :: read_restart
-    logical, dimension(:), intent(in), optional :: read_restart_fluxes
     character(len=*), dimension(:), intent(in), optional :: restart_input_path
     logical, dimension(:), intent(in), optional :: write_restart
     character(len=*), dimension(:), intent(in), optional :: restart_output_path
@@ -238,16 +229,6 @@ contains
       lb_1 = lbound(this%read_restart, 1)
       ub_1 = lb_1 + size(read_restart, 1) - 1
       this%read_restart(lb_1:ub_1) = read_restart
-    end if
-    if (present(read_restart_fluxes)) then
-      if (size(read_restart_fluxes, 1) > size(this%read_restart_fluxes, 1)) then
-        status = NML_ERR_INVALID_INDEX
-        if (present(errmsg)) errmsg = "dimension 1 exceeds bounds for 'read_restart_fluxes'"
-        return
-      end if
-      lb_1 = lbound(this%read_restart_fluxes, 1)
-      ub_1 = lb_1 + size(read_restart_fluxes, 1) - 1
-      this%read_restart_fluxes(lb_1:ub_1) = read_restart_fluxes
     end if
     if (present(restart_input_path)) then
       if (size(restart_input_path, 1) > size(this%restart_input_path, 1)) then
@@ -333,13 +314,6 @@ contains
       if (present(idx)) then
         status = idx_check(idx, lbound(this%read_restart), ubound(this%read_restart), &
           "read_restart", errmsg)
-        if (status /= NML_OK) return
-      else
-      end if
-    case ("read_restart_fluxes")
-      if (present(idx)) then
-        status = idx_check(idx, lbound(this%read_restart_fluxes), ubound(this%read_restart_fluxes), &
-          "read_restart_fluxes", errmsg)
         if (status /= NML_OK) return
       else
       end if
