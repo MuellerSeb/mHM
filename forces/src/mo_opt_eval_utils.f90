@@ -154,7 +154,8 @@ MODULE mo_opt_eval_utils
     integer(i4), dimension(:), optional, intent(in) :: data_shape  !< data shape
 
     type(sim_var_t) :: add_data
-    integer(i4) :: ndim_
+    type(sim_var_t), allocatable :: tmp(:)
+    integer(i4) :: ndim_, n
 
     if (this%has(name)) call error_message('sim_data_add: variable name "', trim(name), '" already present.')
     if (present(ndim) .eqv. present(data_shape)) then
@@ -173,7 +174,11 @@ MODULE mo_opt_eval_utils
     add_data%ndim = ndim_
 
     if (allocated(this%variables)) then
-      this%variables = [this%variables, add_data]
+      n = size(this%variables)
+      allocate(tmp(n + 1_i4))
+      tmp(1_i4:n) = this%variables
+      tmp(n + 1_i4) = add_data
+      call move_alloc(tmp, this%variables)
     else
       allocate(this%variables(1))
       this%variables(1)=add_data
