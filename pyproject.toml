@@ -155,7 +155,7 @@ before-all = "yum install -y gcc-gfortran"
 
 [tool.cibuildwheel.macos]
 # netcdf-c from conda-forge via micromamba (set up in CI workflow)
-environment = { FC="gfortran-14", F77="gfortran-14", CC="gcc-14", CXX="g++-14", CMAKE_PREFIX_PATH="/Users/runner/micromamba/envs/build" }
+environment = { FC="gfortran-14", F77="gfortran-14", CC="gcc-14", CXX="g++-14", CMAKE_PREFIX_PATH="/Users/runner/micromamba/envs/build", MACOSX_DEPLOYMENT_TARGET = "15.0" }
 repair-wheel-command = "DYLD_FALLBACK_LIBRARY_PATH=/Users/runner/micromamba/envs/build/lib delocate-wheel --require-archs {delocate_archs} -w {dest_dir} -v {wheel}"
 
 [tool.cibuildwheel.windows]
@@ -164,16 +164,6 @@ repair-wheel-command = [
   "delvewheel show {wheel}",
   "delvewheel repair -w {dest_dir} {wheel}",
 ]
-
-[[tool.cibuildwheel.overrides]]
-select = "*-macosx_x86_64"
-inherit.environment = "append"
-environment = { MACOSX_DEPLOYMENT_TARGET = "13.0" }
-
-[[tool.cibuildwheel.overrides]]
-select = "*-macosx_arm64"
-inherit.environment = "append"
-environment = { MACOSX_DEPLOYMENT_TARGET = "14.0" }
 
 [[tool.cibuildwheel.overrides]]
 select = "*-win_*"
