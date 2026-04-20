@@ -258,6 +258,7 @@ contains
     character(len=*), intent(in) :: raw
     character(:), allocatable :: norm
     type(scope_filter_entry) :: add_filter
+    type(scope_filter_entry), allocatable :: tmp(:)
     integer :: n
     norm = tolower(trim(raw))
     if (norm == "#") norm = ""
@@ -268,7 +269,11 @@ contains
         end if
       end do
       add_filter%name = norm
-      scope_filters = [scope_filters, add_filter]
+      n = size(scope_filters)
+      allocate(tmp(n + 1))
+      tmp(1:n) = scope_filters
+      tmp(n + 1) = add_filter
+      call move_alloc(tmp, scope_filters)
     else
       if (len(norm) == 0) return
       allocate(scope_filters(1))
