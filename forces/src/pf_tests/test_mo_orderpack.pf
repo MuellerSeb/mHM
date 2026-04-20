@@ -1,0 +1,91 @@
+module test_mo_orderpack
+  
+  use funit
+  use mo_kind,      only: i4, dp, sp
+  use mo_orderpack, only: refsor, mrgrnk, indmed, omedian, sort, sort_index
+  
+  implicit none
+
+  integer(i4), dimension(10) :: ii
+  
+contains
+  
+  ! Double precision
+  @test
+  subroutine test_orderpack_dp()
+
+    real(dp),    dimension(10) :: dat1, dat2
+    real(dp),    dimension(5) :: dat3
+    integer(i4) :: idx
+
+    ! sort
+    dat1 = (/ 1., 2., 3., 4., 5., 6., 7., 8., 9., 10. /)
+    dat2 = dat1(10:1:-1)
+    call refsor(dat2)
+    @assertEqual(dat1, dat2)
+    dat2 = dat1(10:1:-1)
+    call mrgrnk(dat2, ii)
+    @assertEqual(dat1, dat2(ii))
+    ! sort aliases
+    dat1 = (/ 1., 2., 3., 4., 5., 6., 7., 8., 9., 10. /)
+    dat2 = dat1(10:1:-1)
+    call sort(dat2)
+    @assertEqual(dat1, dat2)
+    dat2 = dat1(10:1:-1)
+    ii = sort_index(dat2)
+    @assertEqual(dat1, dat2(ii))
+ 
+    ! median
+    @assertEqual(omedian(dat1), 5.5_dp)
+    dat3 = [11.0_dp,  1.0_dp,  7.0_dp,  3.0_dp,  5.0_dp]
+    call indmed(dat3, idx)
+    @assertEqual(idx, 5_i4)
+
+  end subroutine test_orderpack_dp
+
+  ! Single precision
+  @test
+  subroutine test_orderpack_sp()
+
+    real(sp),    dimension(10) :: sat1, sat2
+    real(sp),    dimension(5) :: sat3
+    integer(i4) :: idx
+  
+    ! sort
+    sat1 = (/ 1., 2., 3., 4., 5., 6., 7., 8., 9., 10. /)
+    sat2 = sat1(10:1:-1)
+    call refsor(sat2)
+    @assertEqual(sat1, sat2)
+    sat2 = sat1(10:1:-1)
+    call mrgrnk(sat2, ii)
+    @assertEqual(sat1, sat2(ii))
+    ! sort aliases
+    sat1 = (/ 1., 2., 3., 4., 5., 6., 7., 8., 9., 10. /)
+    sat2 = sat1(10:1:-1)
+    call sort(sat2)
+    @assertEqual(sat1, sat2)
+    sat2 = sat1(10:1:-1)
+    ii = sort_index(sat2)
+    @assertEqual(sat1, sat2(ii))
+
+    ! median
+    @assertEqual(omedian(sat1), 5.5_sp)
+    sat3 = [11.0_sp,  1.0_sp,  7.0_sp,  3.0_sp,  5.0_sp]
+    call indmed(sat3, idx)
+    @assertEqual(idx, 5_i4)
+
+  end subroutine test_orderpack_sp
+
+  @test
+  subroutine test_orderpack_indmed_i4()
+
+    integer(i4), dimension(5) :: idat
+    integer(i4) :: idx
+
+    idat = [11_i4, 1_i4, 7_i4, 3_i4, 5_i4]
+    call indmed(idat, idx)
+    @assertEqual(idx, 5_i4)
+
+  end subroutine test_orderpack_indmed_i4
+
+end module test_mo_orderpack
