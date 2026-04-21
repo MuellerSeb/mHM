@@ -54,12 +54,26 @@ target_include_directories(${f2py_module_name} PUBLIC ${F2PY_INCLUDE_DIR} ${NUMP
 target_link_libraries(${f2py_module_name} PUBLIC mhm_lib)
 add_dependencies(${f2py_module_name} genpyf)
 
-if(WIN32 AND CMAKE_C_COMPILER_ID STREQUAL "IntelLLVM")
-  # NumPy 2 avoids MSVC's _Dcomplex path for Intel classic via this macro.
-  # IntelLLVM/icx supports C99 _Complex but does not define it on Windows.
-  target_compile_definitions(${f2py_module_name} PRIVATE
-    "$<$<COMPILE_LANGUAGE:C>:__INTEL_COMPILER=2021>"
-  )
+if(WIN32)
+  if(CMAKE_C_COMPILER_ID STREQUAL "IntelLLVM")
+    # NumPy 2 avoids MSVC's _Dcomplex path for Intel classic via this macro.
+    # IntelLLVM/icx supports C99 _Complex but does not define it on Windows.
+    target_compile_definitions(${f2py_module_name} PRIVATE
+      "$<$<COMPILE_LANGUAGE:C>:__INTEL_COMPILER=2021>"
+    )
+  endif()
+  if(CMAKE_Fortran_COMPILER_ID STREQUAL "IntelLLVM")
+    # f2py's generated C wrapper assumes lowercase external names and, unless
+    # told otherwise, appends a trailing underscore. Intel Fortran on Windows
+    # defaults to uppercase names with no trailing underscore, so align both
+    # sides for the generated f2py init entry points.
+    target_compile_definitions(${f2py_module_name} PRIVATE
+      "$<$<COMPILE_LANGUAGE:C>:NO_APPEND_FORTRAN>"
+    )
+    set_source_files_properties(${f2py_module_name_f} PROPERTIES
+      COMPILE_OPTIONS "/names:lowercase"
+    )
+  endif()
 endif()
 
 # install
