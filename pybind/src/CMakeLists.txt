@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.17.2...3.24)
+cmake_minimum_required(VERSION 3.22...3.24)
 find_package(Python REQUIRED COMPONENTS Interpreter Development.Module)
 
 if(${SKBUILD_STATE} MATCHES "editable")
@@ -74,6 +74,14 @@ if(WIN32)
       COMPILE_OPTIONS "/names:lowercase"
     )
   endif()
+endif()
+
+if(CMAKE_Fortran_COMPILER_ID STREQUAL "LLVMFlang")
+  # Keep the generated f2py init entry points on the usual lowercase+underscore
+  # ABI that the generated C wrapper expects.
+  set_source_files_properties(${f2py_module_name_f} PROPERTIES
+    COMPILE_OPTIONS "-funderscoring"
+  )
 endif()
 
 # install

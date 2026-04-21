@@ -12,7 +12,7 @@
 # -DCMAKE_WITH_GPROF=ON          - build with GNU gprof instrumentation
 # -DCMAKE_VERBOSE_MAKEFILE=OFF   - see all the commands
 # -DCMAKE_FIND_LIBRARY_CUSTOM_LIB_SUFFIX=64     - find extra library paths on some systems
-cmake_minimum_required(VERSION 3.18)
+cmake_minimum_required(VERSION 3.22)
 
 # get version and date from files (version.txt and version_date.txt)
 include(cmake/version.cmake)

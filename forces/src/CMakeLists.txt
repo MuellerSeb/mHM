@@ -213,6 +213,23 @@ if(CMAKE_Fortran_COMPILER_ID STREQUAL "IntelLLVM")
     endif()
   endif()
 endif()
+
+# flang (LLVMFlang)
+if(CMAKE_Fortran_COMPILER_ID STREQUAL "LLVMFlang")
+  target_compile_options(${LIB_NAME} PRIVATE
+    "$<$<COMPILE_LANGUAGE:Fortran>:-frealloc-lhs>"
+    "$<$<AND:$<COMPILE_LANGUAGE:Fortran>,$<CONFIG:DEBUG>>:-g;-O0;-fimplicit-none;-pedantic;-Wall;-Wextra>"
+    "$<$<AND:$<COMPILE_LANGUAGE:Fortran>,$<CONFIG:RELEASE>>:-O3>"
+    "$<$<AND:$<COMPILE_LANGUAGE:Fortran>,$<CONFIG:RELWITHDEBINFO>>:-g>"
+  )
+  if(FORCES_ENABLE_NATIVE)
+    target_compile_options(${LIB_NAME} PRIVATE
+      "$<$<AND:$<COMPILE_LANGUAGE:Fortran>,$<CONFIG:RELEASE>>:-march=native>"
+      "$<$<AND:$<COMPILE_LANGUAGE:Fortran>,$<CONFIG:RELWITHDEBINFO>>:-march=native>"
+    )
+  endif()
+endif()
+
 if(CMAKE_Fortran_COMPILER_ID MATCHES "NAG")
   if(FORCES_ENABLE_NATIVE)
     message(STATUS "FORCES: host-native Release tuning has no effect for NAG")

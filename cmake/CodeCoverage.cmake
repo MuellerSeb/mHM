@@ -234,7 +234,7 @@ if(CMAKE_C_COMPILER_ID MATCHES "(GNU|Clang)")
 endif()
 
 set(COVERAGE_Fortran_COMPILER_FLAGS ${COVERAGE_COMPILER_FLAGS})
-if(CMAKE_Fortran_COMPILER_ID MATCHES "(GNU|Clang)")
+if(CMAKE_Fortran_COMPILER_ID MATCHES "(GNU|Clang|(LLVM)?[Ff]lang)")
     include(CheckFortranCompilerFlag)
     check_fortran_compiler_flag(-fprofile-abs-path HAVE_fortran_fprofile_abs_path)
     if(HAVE_fortran_fprofile_abs_path)
