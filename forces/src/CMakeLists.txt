@@ -187,7 +187,7 @@ if(CMAKE_Fortran_COMPILER_ID STREQUAL "IntelLLVM")
   target_compile_definitions(${LIB_NAME} PRIVATE "INTEL")
   if(WIN32)
     target_compile_options(${LIB_NAME} PRIVATE
-      "$<$<COMPILE_LANGUAGE:Fortran>:/nofixed;/assume:byterecl;/assume:recursion;/standard-realloc-lhs>"
+      "$<$<COMPILE_LANGUAGE:Fortran>:/nofixed;/assume:byterecl;/assume:recursion;/standard-realloc-lhs;/heap-arrays>"
       "$<$<AND:$<COMPILE_LANGUAGE:Fortran>,$<CONFIG:DEBUG>>:/debug:full;/fp:source;/warn:all;/check:all;/check:noarg_temp_created;/traceback;/Od>"
       "$<$<AND:$<COMPILE_LANGUAGE:Fortran>,$<CONFIG:RELEASE>>:/O3;/Qoverride-limits>"
       "$<$<AND:$<COMPILE_LANGUAGE:Fortran>,$<CONFIG:RELWITHDEBINFO>>:/traceback>"
