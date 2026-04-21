@@ -63,16 +63,13 @@ if(WIN32)
     )
   endif()
   if(CMAKE_Fortran_COMPILER_ID STREQUAL "IntelLLVM")
-    # f2py's generated C wrapper assumes lowercase external names and, unless
-    # told otherwise, appends a trailing underscore. Intel Fortran on Windows
-    # defaults to uppercase names with no trailing underscore. Use lowercase
-    # consistently for both the generated f2py glue and wrapper.f90 so the
-    # init entry points and module procedure references match.
+    # Match f2py's C-side name mangling to Intel Fortran's native Windows ABI:
+    # uppercase external names with no trailing underscore. This keeps the
+    # generated f2py init entry points aligned without changing module naming
+    # for wrapper.f90 or the libraries it uses.
     target_compile_definitions(${f2py_module_name} PRIVATE
       "$<$<COMPILE_LANGUAGE:C>:NO_APPEND_FORTRAN>"
-    )
-    set_source_files_properties(${f2py_module_name_f} ${fortran_src_file} PROPERTIES
-      COMPILE_OPTIONS "/names:lowercase"
+      "$<$<COMPILE_LANGUAGE:C>:UPPERCASE_FORTRAN>"
     )
   endif()
 endif()
