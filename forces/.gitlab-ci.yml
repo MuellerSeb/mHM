@@ -1,0 +1,525 @@
+# to use the env-var "GIT_CLONE_PATH", set the following in
+# ./gitlab-runner/config.toml under [[runners]]:
+#   [runners.custom_build_dir]
+#     enabled = true
+# This will prevent git clone conflicts for jobs ran in parallel
+
+variables:
+  GIT_DEPTH: 10
+  GIT_CLONE_PATH: $CI_BUILDS_DIR/$CI_RUNNER_SHORT_TOKEN/$CI_PROJECT_PATH/$CI_COMMIT_REF_NAME/$CI_JOB_NAME/$CI_CONCURRENT_ID
+  MAKE_FLAGS: -j 4
+
+stages:
+  - info
+  - test
+  - openmp
+  - examples
+  - doc
+  - deploy
+
+workflow:
+  rules:
+    - if: $CI_COMMIT_REF_NAME =~ /-wip$/
+      when: never
+    - when: always
+
+#############
+### INFOS ###
+#############
+
+show-env-vars:
+  stage: info
+  variables:
+    SEP: "##################################################################"
+    S00: "commit date - "
+    S01: "project: ${CI_PROJECT_PATH}"
+    S02: "branch: ${CI_COMMIT_REF_NAME}"
+    S03: "commit: ${CI_COMMIT_SHA}"
+    S04: "commit msg: ${CI_COMMIT_MESSAGE}"
+    S05: "clone base path: "
+    S06: "runner token: ${CI_RUNNER_SHORT_TOKEN}"
+  script:
+    - echo -e "${SEP}\n${S00}$(date)\n${SEP}\n${S01}\n${S02}\n${S03}\n${S04}\n${SEP}\n${S05}${GIT_CLONE_PATH}\n${S06}\n${SEP}"
+
+###############
+### CONFIGS ###
+###############
+
+# doc stable variables
+.doc_stable_vars: &doc_stable_vars
+  GIT_DEPTH: 0
+  DOC_TYPE: stable
+
+# doc latest variables
+.doc_latest_vars: &doc_latest_vars
+  DOC_TYPE: latest
+
+# debug variables
+.debug_vars: &debug_vars
+  BUILD_DIR: build_debug
+  CMAKE_FLAGS: '-DFORCES_BUILD_TESTING=ON -DCMAKE_BUILD_TYPE=Debug'
+  BUILD_TARGET: test
+  ARTIFACT_PATH: Testing/Temporary
+
+# release variables
+.release_vars: &release_vars
+  BUILD_DIR: build_release
+  CMAKE_FLAGS: '-DFORCES_BUILD_TESTING=ON -DCMAKE_BUILD_TYPE=Release'
+  BUILD_TARGET: test
+  ARTIFACT_PATH: Testing/Temporary
+
+# debug OpenMP variables
+.omp_debug_vars: &omp_debug_vars
+  BUILD_DIR: build_omp_debug
+  CMAKE_FLAGS: '-DFORCES_BUILD_TESTING=ON -DCMAKE_BUILD_TYPE=Debug -DFORCES_WITH_OpenMP=ON'
+  BUILD_TARGET: test
+  ARTIFACT_PATH: Testing/Temporary
+  OMP_NUM_THREADS: 4
+
+# release OpenMP variables
+.omp_release_vars: &omp_release_vars
+  BUILD_DIR: build_omp_release
+  CMAKE_FLAGS: '-DFORCES_BUILD_TESTING=ON -DCMAKE_BUILD_TYPE=Release -DFORCES_WITH_OpenMP=ON'
+  BUILD_TARGET: test
+  ARTIFACT_PATH: Testing/Temporary
+  OMP_NUM_THREADS: 4
+
+# native release OpenMP variables (opt-in local/HPC tuning mode)
+.omp_release_native_vars: &omp_release_native_vars
+  BUILD_DIR: build_omp_release_native
+  CMAKE_FLAGS: '-DFORCES_BUILD_TESTING=ON -DCMAKE_BUILD_TYPE=Release -DFORCES_WITH_OpenMP=ON -DFORCES_ENABLE_NATIVE=ON'
+  BUILD_TARGET: test
+  ARTIFACT_PATH: Testing/Temporary
+  OMP_NUM_THREADS: 4
+
+# example variables
+.examples_vars: &examples_vars
+  BUILD_DIR: build_examples
+  CMAKE_FLAGS: '-DFORCES_BUILD_TESTING=OFF -DCMAKE_BUILD_TYPE=Debug'
+
+# coverage variables
+.coverage_vars: &coverage_vars
+  BUILD_DIR: build_debug
+  CMAKE_FLAGS: '-DFORCES_BUILD_TESTING=ON -DCMAKE_BUILD_TYPE=Debug -DFORCES_WITH_COVERAGE=ON'
+  BUILD_TARGET: coverage
+  ARTIFACT_PATH: coverage
+  POST_RUN_CMD: 'lcov_cobertura build_debug/coverage.info'
+
+# module loads for intel fortran compiler
+.intel_vars_2020b: &intel_vars_2020b
+  MODULE_LOAD_SCRIPT: hpc-module-loads/eve.intel2020b
+.intel_vars_2023b-classic: &intel_vars_2023b-classic
+  MODULE_LOAD_SCRIPT: hpc-module-loads/eve.intel2023b-classic
+.intel_vars_2023b-llvm: &intel_vars_2023b-llvm
+  MODULE_LOAD_SCRIPT: hpc-module-loads/eve.intel2023b-llvm
+
+# module loads for gfortran compiler
+.gnu_vars_102: &gfortran_vars_102
+  MODULE_LOAD_SCRIPT: hpc-module-loads/eve.gfortran102
+.gnu_vars_122: &gfortran_vars_122
+  MODULE_LOAD_SCRIPT: hpc-module-loads/eve.gfortran122
+.gnu_vars_133: &gfortran_vars_133
+  MODULE_LOAD_SCRIPT: hpc-module-loads/eve.gfortran133
+
+# module loads for conda+gfortran
+.conda_vars_01: &conda_vars_01
+  MODULE_LOAD_SCRIPT: hpc-module-loads/eve.chs-conda01
+.conda_vars_02: &conda_vars_02
+  MODULE_LOAD_SCRIPT: hpc-module-loads/eve.chs-conda02
+.conda_vars_03: &conda_vars_03
+  MODULE_LOAD_SCRIPT: hpc-module-loads/eve.chs-conda03
+.conda_vars_04: &conda_vars_04
+  MODULE_LOAD_SCRIPT: hpc-module-loads/eve.chs-conda04
+
+# module loads for NAG compiler
+.nag_vars_72: &nag_vars_72
+  MODULE_LOAD_SCRIPT: hpc-module-loads/eve.nagfor72
+
+#################
+### TEMPLATES ###
+#################
+
+# template for documentation
+.doc_template: &doc_template
+  when: always
+  stage: doc
+  needs: []
+  script:
+    - source hpc-module-loads/eve.chs-conda04
+    # checkout latest tag if there is at least one (and only for stable docs)
+    - if [ $(git rev-list --tags --max-count=1) ] && [ $DOC_TYPE == "stable" ]; then git checkout $(git describe --tags $(git rev-list --tags --max-count=1)); fi
+    - export PROJECT_NUMBER="$(cat version.txt)"
+    # create html documentation
+    - sed -i '/GENERATE_LATEX.*=/s/^.*$/GENERATE_LATEX = NO/'         doc/doxygen.config
+    - doxygen doc/doxygen.config > doxygen_log_${DOC_TYPE}_html.txt 2>&1
+    # create pdf documentation (no files and namespaces there)
+    - sed -i '/GENERATE_HTML.*=/s/^.*$/GENERATE_HTML = NO/'           doc/doxygen.config
+    - sed -i '/GENERATE_LATEX.*=/s/^.*$/GENERATE_LATEX = YES/'        doc/doxygen.config
+    - sed -i '/SHOW_FILES.*=/s/^.*$/SHOW_FILES = NO/'                 doc/doxygen.config
+    - sed -i '/SHOW_NAMESPACES.*=/s/^.*$/SHOW_NAMESPACES = NO/'       doc/doxygen.config
+    - sed -i '/ALPHABETICAL_INDEX.*=/s/^.*$/ALPHABETICAL_INDEX = NO/' doc/doxygen.config
+    - doxygen doc/doxygen.config > doxygen_log_${DOC_TYPE}_latex.txt 2>&1
+    # doxygen_latex_stable.txt
+    - cd latex/ && tectonic -r 10 -Z continue-on-errors refman.tex > ../doxygen_latex_${DOC_TYPE}.txt 2>&1
+    # copy files
+    - cp refman.pdf ../html/forces_doc.pdf                          # same name always
+    - cp refman.pdf ../forces_doc_${DOC_TYPE}.pdf                   # ../forces_doc_stable.pdf
+    - cd .. && mv html html_${DOC_TYPE}                             # html_stable
+    - mv doxygen_warn.txt doxygen_warn_${DOC_TYPE}.txt              # doxygen_warn_stable.txt
+  artifacts:
+    name: "$CI_COMMIT_REF_NAME"
+    paths:
+      - html_*
+      - forces_doc_*.pdf
+      - doxygen_*.txt
+
+# template for test jobs
+.job_template: &job_template
+  stage: test
+  script:
+    - source $MODULE_LOAD_SCRIPT
+    - cmake -B $BUILD_DIR $CMAKE_FLAGS
+    - cmake --build $BUILD_DIR --parallel 4
+    - cmake --build $BUILD_DIR --parallel 4 --target $BUILD_TARGET
+    - $POST_RUN_CMD
+  artifacts:
+    when: always
+    paths:
+    - $BUILD_DIR/$ARTIFACT_PATH
+
+# template for OpenMP test jobs
+.omp_job_template: &omp_job_template
+  <<: *job_template
+  stage: openmp
+
+# template for example jobs
+.examples_template: &examples_template
+  stage: examples
+  script:
+    - source $MODULE_LOAD_SCRIPT
+    - EXAMPLE_FILES="$(find examples -type f -name '*.f90' | sort)"
+    - |
+      if [ -z "$EXAMPLE_FILES" ]; then
+        echo "FORCES: no Fortran examples found under examples/"
+        exit 1
+      fi
+    - |
+      for example in $EXAMPLE_FILES; do
+        echo "FORCES: building and running example ${example}"
+        cmake -B "$BUILD_DIR" $CMAKE_FLAGS -DFORCES_EXE="$example"
+        cmake --build "$BUILD_DIR" --parallel 4
+        ./$BUILD_DIR/main
+      done
+
+#################
+### TEST JOBS ###
+#################
+
+test-conda01-release:
+  variables:
+    <<: [*release_vars, *conda_vars_01]
+  <<: *job_template
+
+test-conda02-release:
+  variables:
+    <<: [*release_vars, *conda_vars_02]
+  <<: *job_template
+
+test-conda03-release:
+  variables:
+    <<: [*release_vars, *conda_vars_03]
+  <<: *job_template
+
+test-conda04-release:
+  variables:
+    <<: [*release_vars, *conda_vars_04]
+  <<: *job_template
+
+test-gfortran102-release:
+  variables:
+    <<: [*release_vars, *gfortran_vars_102]
+  <<: *job_template
+
+test-gfortran102-debug:
+  variables:
+    <<: [*debug_vars, *gfortran_vars_102]
+  <<: *job_template
+
+test-gfortran122-release:
+  variables:
+    <<: [*release_vars, *gfortran_vars_122]
+  <<: *job_template
+
+test-gfortran122-debug:
+  variables:
+    <<: [*debug_vars, *gfortran_vars_122]
+  <<: *job_template
+
+test-gfortran133-release:
+  variables:
+    <<: [*release_vars, *gfortran_vars_133]
+  <<: *job_template
+
+test-gfortran133-debug:
+  variables:
+    <<: [*debug_vars, *gfortran_vars_133]
+  <<: *job_template
+
+test-intel2020b-release:
+  variables:
+    <<: [*release_vars, *intel_vars_2020b]
+  <<: *job_template
+
+test-intel2020b-debug:
+  variables:
+    <<: [*debug_vars, *intel_vars_2020b]
+  <<: *job_template
+
+test-intel2023b-classic-release:
+  variables:
+    <<: [*release_vars, *intel_vars_2023b-classic]
+  <<: *job_template
+
+test-intel2023b-classic-debug:
+  variables:
+    <<: [*debug_vars, *intel_vars_2023b-classic]
+  <<: *job_template
+
+test-intel2023b-llvm-release:
+  variables:
+    <<: [*release_vars, *intel_vars_2023b-llvm]
+  <<: *job_template
+
+test-intel2023b-llvm-debug:
+  variables:
+    <<: [*debug_vars, *intel_vars_2023b-llvm]
+  <<: *job_template
+
+test-nag72-release:
+  variables:
+    <<: [*release_vars, *nag_vars_72]
+  <<: *job_template
+
+test-nag72-debug:
+  variables:
+    <<: [*debug_vars, *nag_vars_72]
+  <<: *job_template
+
+coverage:
+  variables:
+    <<: [*coverage_vars, *conda_vars_04]
+  <<: *job_template
+  coverage: '/lines[\.]+\: (\d+\.\d+)\%/'
+  artifacts:
+    reports:
+      coverage_report:
+        coverage_format: cobertura
+        path: coverage.xml
+    paths:
+    - $BUILD_DIR/$ARTIFACT_PATH
+
+conditional_coverage:
+  variables:
+    <<: [*coverage_vars, *conda_vars_02]
+    CMAKE_FLAGS: '-DFORCES_BUILD_TESTING=ON -DCMAKE_BUILD_TYPE=Debug -DFORCES_WITH_COVERAGE=ON -DFORCES_WITH_OPTIMIZATION=OFF -DFORCES_WITH_NETCDF=OFF'
+  <<: *job_template
+
+##############
+### OPENMP ###
+##############
+
+test-gfortran102-release-omp:
+  variables:
+    <<: [*omp_release_vars, *gfortran_vars_102]
+  <<: *omp_job_template
+
+test-gfortran102-debug-omp:
+  variables:
+    <<: [*omp_debug_vars, *gfortran_vars_102]
+  <<: *omp_job_template
+
+test-gfortran122-release-omp:
+  variables:
+    <<: [*omp_release_vars, *gfortran_vars_122]
+  <<: *omp_job_template
+
+test-gfortran122-debug-omp:
+  variables:
+    <<: [*omp_debug_vars, *gfortran_vars_122]
+  <<: *omp_job_template
+
+test-gfortran133-release-omp:
+  variables:
+    <<: [*omp_release_vars, *gfortran_vars_133]
+  <<: *omp_job_template
+
+test-gfortran133-release-omp-native:
+  variables:
+    <<: [*omp_release_native_vars, *gfortran_vars_133]
+  <<: *omp_job_template
+
+test-gfortran133-debug-omp:
+  variables:
+    <<: [*omp_debug_vars, *gfortran_vars_133]
+  <<: *omp_job_template
+
+test-intel2020b-release-omp:
+  variables:
+    <<: [*omp_release_vars, *intel_vars_2020b]
+  <<: *omp_job_template
+
+test-intel2020b-debug-omp:
+  variables:
+    <<: [*omp_debug_vars, *intel_vars_2020b]
+  <<: *omp_job_template
+
+test-intel2023b-classic-release-omp:
+  variables:
+    <<: [*omp_release_vars, *intel_vars_2023b-classic]
+  <<: *omp_job_template
+
+test-intel2023b-classic-release-omp-native:
+  variables:
+    <<: [*omp_release_native_vars, *intel_vars_2023b-classic]
+  <<: *omp_job_template
+
+test-intel2023b-classic-debug-omp:
+  variables:
+    <<: [*omp_debug_vars, *intel_vars_2023b-classic]
+  <<: *omp_job_template
+
+test-intel2023b-llvm-release-omp:
+  variables:
+    <<: [*omp_release_vars, *intel_vars_2023b-llvm]
+  <<: *omp_job_template
+
+test-intel2023b-llvm-release-omp-native:
+  variables:
+    <<: [*omp_release_native_vars, *intel_vars_2023b-llvm]
+  <<: *omp_job_template
+
+test-intel2023b-llvm-debug-omp:
+  variables:
+    <<: [*omp_debug_vars, *intel_vars_2023b-llvm]
+  <<: *omp_job_template
+
+test-nag72-release-omp:
+  variables:
+    <<: [*omp_release_vars, *nag_vars_72]
+  <<: *omp_job_template
+
+test-nag72-debug-omp:
+  variables:
+    <<: [*omp_debug_vars, *nag_vars_72]
+  <<: *omp_job_template
+
+################
+### EXAMPLES ###
+################
+
+examples-conda01:
+  variables:
+    <<: [*examples_vars, *conda_vars_01]
+  <<: *examples_template
+
+examples-conda02:
+  variables:
+    <<: [*examples_vars, *conda_vars_02]
+  <<: *examples_template
+
+examples-conda03:
+  variables:
+    <<: [*examples_vars, *conda_vars_03]
+  <<: *examples_template
+
+examples-conda04:
+  variables:
+    <<: [*examples_vars, *conda_vars_04]
+  <<: *examples_template
+
+examples-gfortran102:
+  variables:
+    <<: [*examples_vars, *gfortran_vars_102]
+  <<: *examples_template
+
+examples-gfortran122:
+  variables:
+    <<: [*examples_vars, *gfortran_vars_122]
+  <<: *examples_template
+
+examples-gfortran133:
+  variables:
+    <<: [*examples_vars, *gfortran_vars_133]
+  <<: *examples_template
+
+examples-intel2020b:
+  variables:
+    <<: [*examples_vars, *intel_vars_2020b]
+  <<: *examples_template
+
+examples-intel2023b-classic:
+  variables:
+    <<: [*examples_vars, *intel_vars_2023b-classic]
+  <<: *examples_template
+
+examples-intel2023b-llvm:
+  variables:
+    <<: [*examples_vars, *intel_vars_2023b-llvm]
+  <<: *examples_template
+
+examples-nag72:
+  variables:
+    <<: [*examples_vars, *nag_vars_72]
+  <<: *examples_template
+
+################
+### DOC JOBS ###
+################
+
+documentation_stable:
+  only:
+    - main
+  variables:
+    <<: *doc_stable_vars
+  <<: *doc_template
+
+documentation:
+  variables:
+    <<: *doc_latest_vars
+  <<: *doc_template
+
+###################
+### DEPLOY JOBS ###
+###################
+
+pages:
+  when: always
+  only:
+    - main
+  stage: deploy
+  needs:
+    - job: documentation_stable
+      artifacts: true
+    - job: documentation
+      artifacts: true
+    - job: coverage
+      artifacts: true
+  script:
+    # create public dir (remove if already present)
+    - test -d public && rm -rf public
+    - mkdir -p public
+    # create the subdir
+    - mkdir public/stable/
+    - mkdir public/latest/
+    # copy the doxygen generated html page to the public site
+    - cp html_stable/* public/stable/ -R
+    - cp html_latest/* public/latest/ -R
+    # create an index.html that redirects to the stable documentation (in stable folder)
+    - cp doc/html_files/index.html public/
+    # create the coverage site
+    - mkdir -p public/coverage
+    - cp  build_debug/coverage/* public/coverage/ -R
+  artifacts:
+    name: "$CI_COMMIT_REF_NAME"
+    paths:
+      - public
