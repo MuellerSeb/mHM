@@ -141,17 +141,12 @@ skip = ["cp38*", "*-musllinux_*", "cp31?t-*"]
 test-extras = "test"
 test-command = "mhm -h && python -m pytest pybind/tests/"
 test-sources = ["pybind/tests/", "pyproject.toml"]
-test-skip = "cp314*"  # not all test dependencies have wheels for python 3.14 yet
-# force binary numpy dep
-environment.PIP_ONLY_BINARY = "numpy"
-environment.PIP_PREFER_BINARY = "1"
 
 [tool.cibuildwheel.linux]
 # use netcdf-c docker images (netcdf-c, hdf5, zlib pre-installed)
 manylinux-x86_64-image = "ghcr.io/ocefpaf/manylinux_2_28_x86_64-netcdf"
 manylinux-aarch64-image = "ghcr.io/ocefpaf/manylinux_2_28_aarch64-netcdf"
 environment = { FC="gfortran", F77="gfortran", CC="gcc", CXX="g++" }
-before-all = "yum install -y gcc-gfortran"
 
 [tool.cibuildwheel.macos]
 # netcdf-c from conda-forge via micromamba (set up in CI workflow)
@@ -160,12 +155,8 @@ repair-wheel-command = "DYLD_FALLBACK_LIBRARY_PATH=/Users/runner/micromamba/envs
 
 [tool.cibuildwheel.windows]
 before-build = "pip install delvewheel"
+environment = { FC = "ifx", CMAKE_PREFIX_PATH = 'C:\\Users\\runneradmin\\micromamba\\envs\\build\\Library', PATH = 'C:\\Users\\runneradmin\\micromamba\\envs\\build\\Library\\bin;${PATH}' }
 repair-wheel-command = [
   "delvewheel show {wheel}",
   "delvewheel repair -w {dest_dir} {wheel}",
 ]
-
-[[tool.cibuildwheel.overrides]]
-select = "*-win_*"
-inherit.environment = "append"
-environment = { FC = "ifx", CMAKE_PREFIX_PATH = 'C:\\Users\\runneradmin\\micromamba\\envs\\build\\Library', PATH = 'C:\\Users\\runneradmin\\micromamba\\envs\\build\\Library\\bin;${PATH}' }
