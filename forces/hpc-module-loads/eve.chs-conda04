@@ -1,3 +1,0 @@
-module purge
-module use /global/apps/modulefiles
-module load chs-fortran-conda/0.4.0
