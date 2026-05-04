@@ -134,6 +134,39 @@ jobs:
           name: dist-wheel-windows-latest-AMD64
           path: ./dist-wheel-windows-latest-AMD64/*.whl
 
+  build_test_windows_flang:
+    name: build and run Python mHM with flang on windows
+    runs-on: windows-latest
+
+    defaults:
+      run:
+        shell: bash -el {0}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: '0'
+
+      - name: Setup Micromamba
+        uses: mamba-org/setup-micromamba@v2
+        with:
+          environment-name: build
+          init-shell: bash
+          create-args: >-
+            compilers pip pkg-config libnetcdf --channel conda-forge
+
+      - name: Build Python mHM
+        env:
+          CMAKE_PREFIX_PATH: ${{ env.CONDA_PREFIX }}/Library
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -v .
+
+      - name: Run mHM test domain
+        run: |
+          mhm -h
+          mhm test_domain
+
   upload_to_pypi:
     needs: [build_wheels_linux, build_wheels_macos, build_wheels_windows, build_sdist]
     runs-on: ubuntu-24.04
