@@ -155,6 +155,7 @@ jobs:
       - name: Run mHM test domain
         run: |
           mhm test_domain
+          dir test_domain/output_b1
           mhm -V
           mhm --pyversion
           mhm -h
