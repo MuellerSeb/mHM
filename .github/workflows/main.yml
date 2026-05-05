@@ -147,17 +147,22 @@ jobs:
         with:
           fetch-depth: '0'
 
-      - name: Setup Fortran
-        uses: gha3mi/setup-fortran-conda@latest
+      - name: Setup Micromamba
+        uses: mamba-org/setup-micromamba@v2
         with:
-          compiler: flang
-          platform: windows-latest
-          extra-packages: pip
+          environment-name: build
+          init-shell: bash
+          create-args: >-
+            clang-tools flang flang-rt_win-64 lld llvm llvm-openmp pip pkg-config libnetcdf --channel conda-forge
 
       - name: Build Python mHM
-        # env:
-        #   CMAKE_PREFIX_PATH: ${{ env.CONDA_PREFIX }}/Library
+        env:
+          CMAKE_PREFIX_PATH: ${{ env.CONDA_PREFIX }}/Library
+          CC: clang-cl
+          CXX: clang-cl
+          FC: flang
         run: |
+          python -m pip install --upgrade pip
           python -m pip install -v .
 
       - name: Run mHM test domain
