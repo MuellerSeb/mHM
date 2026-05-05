@@ -161,8 +161,8 @@ jobs:
 
       - name: Run mHM test domain
         run: |
-          mhm -h
-          mhm test_domain
+          mhm.exe -h
+          mhm.exe test_domain
 
   upload_to_pypi:
     needs: [build_wheels_linux, build_wheels_macos, build_wheels_windows, build_sdist]
