@@ -41,7 +41,7 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Physics",
     "Topic :: Utilities",
 ]
-dependencies = ["numpy>=2.0"]
+dependencies = ["numpy>=1.21"]
 
 [project.urls]
 Changelog = "https://www.mhm-ufz.org"
