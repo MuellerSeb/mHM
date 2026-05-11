@@ -1,1 +1,1 @@
-add_ifx_msvc_support
+main
