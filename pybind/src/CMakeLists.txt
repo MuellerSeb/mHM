@@ -16,14 +16,6 @@ execute_process(
   OUTPUT_VARIABLE F2PY_INCLUDE_DIR
   OUTPUT_STRIP_TRAILING_WHITESPACE
 )
-# Compute NPY_TARGET_VERSION from the installed NumPy (major*10000 + minor*100 + patch),
-# so the build works with both NumPy 1.x and 2.x without hardcoding.
-execute_process(
-  COMMAND "${Python_EXECUTABLE}"
-  -c "import numpy; v=numpy.__version__.split('.')[:3]; patch=int(''.join(filter(str.isdigit,v[2]))) if len(v)>2 else 0; print(int(v[0])*10000+int(v[1])*100+patch)"
-  OUTPUT_VARIABLE NPY_TARGET_VERSION_VALUE
-  OUTPUT_STRIP_TRAILING_WHITESPACE
-)
 
 set(f2py_module_name "wrapper")
 set(f2py_module_name_c "${f2py_module_name}module.c")
@@ -62,9 +54,9 @@ target_include_directories(${f2py_module_name}
 )
 target_compile_definitions(${f2py_module_name} PRIVATE
   "$<$<COMPILE_LANGUAGE:C>:NPY_NO_DEPRECATED_API=NPY_1_7_API_VERSION>"
-  "$<$<COMPILE_LANGUAGE:C>:NPY_TARGET_VERSION=${NPY_TARGET_VERSION_VALUE}>"
+  "$<$<COMPILE_LANGUAGE:C>:NPY_TARGET_VERSION=20000>"
   "$<$<COMPILE_LANGUAGE:CXX>:NPY_NO_DEPRECATED_API=NPY_1_7_API_VERSION>"
-  "$<$<COMPILE_LANGUAGE:CXX>:NPY_TARGET_VERSION=${NPY_TARGET_VERSION_VALUE}>"
+  "$<$<COMPILE_LANGUAGE:CXX>:NPY_TARGET_VERSION=20000>"
 )
 target_link_libraries(${f2py_module_name} PUBLIC mhm_lib)
 add_dependencies(${f2py_module_name} genpyf)
