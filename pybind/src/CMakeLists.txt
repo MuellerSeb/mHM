@@ -7,18 +7,10 @@ else()
   set(mhm_install_dir "mhm")
 endif()
 
-# Grab include directories from the isolated build-env Python (set by scikit-build-core).
-# Using Python_EXECUTABLE ensures we pick up the numpy installed in the build env
-# (numpy>=2), not any system-wide numpy that CMake's FindPython might discover.
+# Grab link directories from a local Python installation: Numpy/F2PY headers
 execute_process(
   COMMAND "${Python_EXECUTABLE}"
-  -c "import numpy as np; print(np.__version__)"
-  OUTPUT_VARIABLE NUMPY_VERSION
-  OUTPUT_STRIP_TRAILING_WHITESPACE
-)
-execute_process(
-  COMMAND "${Python_EXECUTABLE}"
-  -c "import numpy as np, pathlib as p; print(p.Path(np.get_include()).as_posix())"
+  -c "import numpy, pathlib as p; print(p.Path(numpy.get_include()).as_posix())"
   OUTPUT_VARIABLE NUMPY_INCLUDE_DIR
   OUTPUT_STRIP_TRAILING_WHITESPACE
 )
@@ -28,9 +20,6 @@ execute_process(
   OUTPUT_VARIABLE F2PY_INCLUDE_DIR
   OUTPUT_STRIP_TRAILING_WHITESPACE
 )
-message(STATUS "NumPy version   : ${NUMPY_VERSION}")
-message(STATUS "NumPy includes  : ${NUMPY_INCLUDE_DIR}")
-message(STATUS "f2py  includes  : ${F2PY_INCLUDE_DIR}")
 
 set(f2py_module_name "wrapper")
 set(f2py_module_name_c "${f2py_module_name}module.c")
@@ -61,11 +50,7 @@ python_add_library(${f2py_module_name}
 )
 
 # link mhm to wrapper
-target_include_directories(${f2py_module_name}
-  PUBLIC
-    ${NUMPY_INCLUDE_DIR}
-    ${F2PY_INCLUDE_DIR}
-)
+target_include_directories(${f2py_module_name} PUBLIC ${F2PY_INCLUDE_DIR} ${NUMPY_INCLUDE_DIR})
 target_link_libraries(${f2py_module_name} PUBLIC mhm_lib)
 add_dependencies(${f2py_module_name} genpyf)
 
