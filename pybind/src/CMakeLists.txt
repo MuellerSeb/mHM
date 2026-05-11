@@ -12,6 +12,12 @@ endif()
 # (numpy>=2), not any system-wide numpy that CMake's FindPython might discover.
 execute_process(
   COMMAND "${Python_EXECUTABLE}"
+  -c "import numpy as np; print(np.__version__)"
+  OUTPUT_VARIABLE NUMPY_VERSION
+  OUTPUT_STRIP_TRAILING_WHITESPACE
+)
+execute_process(
+  COMMAND "${Python_EXECUTABLE}"
   -c "import numpy as np, pathlib as p; print(p.Path(np.get_include()).as_posix())"
   OUTPUT_VARIABLE NUMPY_INCLUDE_DIR
   OUTPUT_STRIP_TRAILING_WHITESPACE
@@ -22,6 +28,9 @@ execute_process(
   OUTPUT_VARIABLE F2PY_INCLUDE_DIR
   OUTPUT_STRIP_TRAILING_WHITESPACE
 )
+message(STATUS "NumPy version   : ${NUMPY_VERSION}")
+message(STATUS "NumPy includes  : ${NUMPY_INCLUDE_DIR}")
+message(STATUS "f2py  includes  : ${F2PY_INCLUDE_DIR}")
 
 set(f2py_module_name "wrapper")
 set(f2py_module_name_c "${f2py_module_name}module.c")
