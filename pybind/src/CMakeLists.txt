@@ -62,7 +62,6 @@ python_add_library(${f2py_module_name}
 
 # link mhm to wrapper
 target_include_directories(${f2py_module_name}
-  BEFORE
   PUBLIC
     ${NUMPY_INCLUDE_DIR}
     ${F2PY_INCLUDE_DIR}
