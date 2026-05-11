@@ -41,7 +41,7 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Physics",
     "Topic :: Utilities",
 ]
-dependencies = ["numpy>=2.0"]
+dependencies = ["numpy>=1.21"]
 
 [project.urls]
 Changelog = "https://www.mhm-ufz.org"
@@ -115,6 +115,14 @@ write_to_template = "__version__ = '{version}'"
 local_scheme = "no-local-version"
 fallback_version = "0.0.0.dev0"
 search_parent_directories = true
+
+[tool.pytest.ini_options]
+filterwarnings = [
+    # numpy 2 changed PyArrayObject to an opaque struct in C headers (sizeof=16),
+    # while tp_basicsize at runtime is still 96. This mismatch is an expected
+    # false-positive for extensions built with numpy 2 headers and is benign.
+    "ignore:numpy.ndarray size changed:RuntimeWarning",
+]
 
 [tool.black]
 exclude = "_version.py"
