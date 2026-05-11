@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22...3.24)
-find_package(Python REQUIRED COMPONENTS Interpreter Development.Module NumPy)
+find_package(Python REQUIRED COMPONENTS Interpreter Development.Module)
 
 if(${SKBUILD_STATE} MATCHES "editable")
   set(mhm_install_dir "${CMAKE_CURRENT_SOURCE_DIR}/mhm")
@@ -7,9 +7,15 @@ else()
   set(mhm_install_dir "mhm")
 endif()
 
-# Grab include directories from the current Python environment:
-# NumPy via find_package(Python COMPONENTS NumPy) and f2py via numpy.f2py.
-set(NUMPY_INCLUDE_DIR "${Python_NumPy_INCLUDE_DIRS}")
+# Grab include directories from the isolated build-env Python (set by scikit-build-core).
+# Using Python_EXECUTABLE ensures we pick up the numpy installed in the build env
+# (numpy>=2), not any system-wide numpy that CMake's FindPython might discover.
+execute_process(
+  COMMAND "${Python_EXECUTABLE}"
+  -c "import numpy as np, pathlib as p; print(p.Path(np.get_include()).as_posix())"
+  OUTPUT_VARIABLE NUMPY_INCLUDE_DIR
+  OUTPUT_STRIP_TRAILING_WHITESPACE
+)
 execute_process(
   COMMAND "${Python_EXECUTABLE}"
   -c "import numpy.f2py as f, pathlib as p; print(p.Path(f.get_include()).as_posix())"
