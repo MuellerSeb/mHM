@@ -55,6 +55,8 @@ target_include_directories(${f2py_module_name}
 target_compile_definitions(${f2py_module_name} PRIVATE
   "$<$<COMPILE_LANGUAGE:C>:NPY_NO_DEPRECATED_API=NPY_1_7_API_VERSION>"
   "$<$<COMPILE_LANGUAGE:C>:NPY_TARGET_VERSION=20000>"
+  "$<$<COMPILE_LANGUAGE:CXX>:NPY_NO_DEPRECATED_API=NPY_1_7_API_VERSION>"
+  "$<$<COMPILE_LANGUAGE:CXX>:NPY_TARGET_VERSION=20000>"
 )
 target_link_libraries(${f2py_module_name} PUBLIC mhm_lib)
 add_dependencies(${f2py_module_name} genpyf)
