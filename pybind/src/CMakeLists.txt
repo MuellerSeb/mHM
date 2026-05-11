@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22...3.24)
-find_package(Python REQUIRED COMPONENTS Interpreter Development.Module)
+find_package(Python REQUIRED COMPONENTS Interpreter Development.Module NumPy)
 
 if(${SKBUILD_STATE} MATCHES "editable")
   set(mhm_install_dir "${CMAKE_CURRENT_SOURCE_DIR}/mhm")
@@ -7,13 +7,9 @@ else()
   set(mhm_install_dir "mhm")
 endif()
 
-# Grab link directories from a local Python installation: Numpy/F2PY headers
-execute_process(
-  COMMAND "${Python_EXECUTABLE}"
-  -c "import numpy, pathlib as p; print(p.Path(numpy.get_include()).as_posix())"
-  OUTPUT_VARIABLE NUMPY_INCLUDE_DIR
-  OUTPUT_STRIP_TRAILING_WHITESPACE
-)
+# Grab include directories from the current Python environment:
+# NumPy via find_package(Python COMPONENTS NumPy) and f2py via numpy.f2py.
+set(NUMPY_INCLUDE_DIR "${Python_NumPy_INCLUDE_DIRS}")
 execute_process(
   COMMAND "${Python_EXECUTABLE}"
   -c "import numpy.f2py as f, pathlib as p; print(p.Path(f.get_include()).as_posix())"
@@ -50,7 +46,16 @@ python_add_library(${f2py_module_name}
 )
 
 # link mhm to wrapper
-target_include_directories(${f2py_module_name} PUBLIC ${F2PY_INCLUDE_DIR} ${NUMPY_INCLUDE_DIR})
+target_include_directories(${f2py_module_name}
+  BEFORE
+  PUBLIC
+    ${NUMPY_INCLUDE_DIR}
+    ${F2PY_INCLUDE_DIR}
+)
+target_compile_definitions(${f2py_module_name} PRIVATE
+  "$<$<COMPILE_LANGUAGE:C>:NPY_NO_DEPRECATED_API=NPY_1_7_API_VERSION>"
+  "$<$<COMPILE_LANGUAGE:C>:NPY_TARGET_VERSION=20000>"
+)
 target_link_libraries(${f2py_module_name} PUBLIC mhm_lib)
 add_dependencies(${f2py_module_name} genpyf)
 
