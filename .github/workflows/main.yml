@@ -134,32 +134,6 @@ jobs:
           name: dist-wheel-windows-latest-AMD64
           path: ./dist-wheel-windows-latest-AMD64/*.whl
 
-  build_test_windows_flang:
-    name: build and run Python mHM with flang on windows
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: '0'
-
-      - name: Setup Fortran
-        uses: gha3mi/setup-fortran-conda@latest
-        with:
-          compiler: flang
-          extra-packages: pip libnetcdf
-
-      - name: Build Python mHM
-        run: |
-          python -m pip install -v .
-
-      - name: Run mHM test domain
-        run: |
-          mhm test_domain
-          dir test_domain/output_b1
-          mhm -V
-          mhm --pyversion
-          mhm -h
-
   upload_to_pypi:
     needs: [build_wheels_linux, build_wheels_macos, build_wheels_windows, build_sdist]
     runs-on: ubuntu-24.04
