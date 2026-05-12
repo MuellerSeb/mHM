@@ -82,10 +82,12 @@ BUILD_MHM_PYBIND = "ON"
 [tool.scikit-build.sdist]
 include = [
     "pybind/src/mhm/_version.py",
+    "forces/CMakeLists.txt",
     "forces/cmake/*.cmake",
     "forces/include",
     "forces/src/*.fypp",
     "forces/src/*.*90",
+    "forces/src/*.c",
     "forces/src/CMakeLists.txt",
     "forces/*.txt",
     "forces/*.md",
