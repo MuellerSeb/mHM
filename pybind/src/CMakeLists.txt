@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.22...3.24)
+cmake_minimum_required(VERSION 3.17.2...3.24)
 find_package(Python REQUIRED COMPONENTS Interpreter Development.Module)
 
 if(${SKBUILD_STATE} MATCHES "editable")
