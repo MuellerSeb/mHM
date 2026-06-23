@@ -126,6 +126,10 @@ jobs:
         uses: pypa/cibuildwheel@v3.1.4
         env:
           CIBW_ARCHS: AMD64
+          # Pass the compiler paths and tools down to the isolated environment
+          CIBW_ENVIRONMENT_WINDOWS: "CMAKE_Fortran_COMPILER=ifx CMAKE_C_COMPILER=icx"
+          # Ensure cibuildwheel doesn't strip the Intel/Mamba paths
+          CIBW_ENVIRONMENT_PASS_WINDOWS: "PATH ONEAPI_ROOT"
         with:
           output-dir: dist-wheel-windows-latest-AMD64
 
