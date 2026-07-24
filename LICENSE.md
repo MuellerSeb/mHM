@@ -256,11 +256,48 @@ data for mHM and links to the licenses the data was provided under.
   - authors: CHS Developers
   - license: LGPLv3+
 
-## Notice about Python wheel distribution
+## Notices for Python binary wheels
 
-Python wheels for mHM may include the following libraries in binary form.
+Python wheels are built with zlib, HDF5, netCDF-C, and FORCES. Platform
+repair tools can also bundle the compiler runtime libraries required by the
+compiled extension. The applicable notices are reproduced below. The GNU
+GPL and LGPL texts referenced by the runtime notices are provided in
+`COPYING` and `COPYING.LESSER`.
 
-### HDF5 license notice
+FORCES retains the license statements supplied by its upstream source
+archive. Its version is selected by `version_forces.txt`; this notice does
+not reclassify FORCES or resolve any separate compatibility question.
+
+### zlib
+
+Source: https://zlib.net/
+
+```
+Copyright notice:
+
+ (C) 1995-2026 Jean-loup Gailly and Mark Adler
+
+  This software is provided 'as-is', without any express or implied
+  warranty.  In no event will the authors be held liable for any damages
+  arising from the use of this software.
+
+  Permission is granted to anyone to use this software for any purpose,
+  including commercial applications, and to alter it and redistribute it
+  freely, subject to the following restrictions:
+
+  1. The origin of this software must not be misrepresented; you must not
+     claim that you wrote the original software. If you use this software
+     in a product, an acknowledgment in the product documentation would be
+     appreciated but is not required.
+  2. Altered source versions must be plainly marked as such, and must not be
+     misrepresented as being the original software.
+  3. This notice may not be removed or altered from any source distribution.
+
+  Jean-loup Gailly        Mark Adler
+  jloup@gzip.org          madler@alumni.caltech.edu
+```
+
+### HDF5
 
 Source: https://github.com/HDFGroup/hdf5
 
@@ -276,6 +313,8 @@ NCSA HDF5 (Hierarchical Data Format 5) Software Library and Utilities
 Copyright 1998-2006 by The Board of Trustees of the University of Illinois.
 
 All rights reserved.
+
+This software library and utilities is covered by the 3-clause BSD License.
 
 Redistribution and use in source and binary forms, with or without
 modification, are permitted for any purpose (including commercial purposes)
@@ -294,11 +333,19 @@ provided that the following conditions are met:
    The HDF Group, the University, or the Contributor, respectively.
 
 DISCLAIMER:
-THIS SOFTWARE IS PROVIDED BY THE HDF GROUP AND THE CONTRIBUTORS
-"AS IS" WITH NO WARRANTY OF ANY KIND, EITHER EXPRESSED OR IMPLIED. IN NO
-EVENT SHALL THE HDF GROUP OR THE CONTRIBUTORS BE LIABLE FOR ANY DAMAGES
-SUFFERED BY THE USERS ARISING OUT OF THE USE OF THIS SOFTWARE, EVEN IF
-ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+“AS IS” AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
+THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR
+TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+For further details, please refer to the full license text available
+at https://opensource.org/licenses/bsd-3-clause
 
 You are under no obligation whatsoever to provide any bug fixes, patches, or
 upgrades to the features, functionality or performance of the source code
@@ -309,14 +356,6 @@ grant the following license: a non-exclusive, royalty-free perpetual license
 to install, use, modify, prepare derivative works, incorporate into other
 computer software, distribute, and sublicense such enhancements or derivative
 works thereof, in binary and source code form.
-
------------------------------------------------------------------------------
------------------------------------------------------------------------------
-
-Limited portions of HDF5 were developed by Lawrence Berkeley National
-Laboratory (LBNL). LBNL's Copyright Notice and Licensing Terms can be
-found here: COPYING_LBNL_HDF5 file in this directory or at
-http://support.hdfgroup.org/ftp/HDF5/releases/COPYING_LBNL_HDF5.
 
 -----------------------------------------------------------------------------
 -----------------------------------------------------------------------------
@@ -369,87 +408,55 @@ and/or accompanying materials:
    AND SHALL NOT BE USED FOR ADVERTISING OR PRODUCT ENDORSEMENT PURPOSES.
 
 -----------------------------------------------------------------------------
-```
 
-```
-Copyright Notice and License Terms for
-HDF5 (Hierarchical Data Format 5) Software Library and Utilities
+Portions of HDF5 were developed with support from the National Science
+Foundation under Federal Award No. 2534078.
+
 -----------------------------------------------------------------------------
+```
 
-HDF5 (Hierarchical Data Format 5)
-Copyright (c) 2016, The Regents of the University of California, through
-Lawrence Berkeley National Laboratory (subject to receipt of any required
-approvals from the U.S. Dept. of Energy).
+### netCDF-C
 
-All rights reserved.
+Source: https://github.com/Unidata/netcdf-c
+
+```
+Copyright 2025 Unidata
 
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions are met:
 
 1. Redistributions of source code must retain the above copyright notice,
-   this list of conditions, and the following disclaimer.
+   this list of conditions and the following disclaimer.
 
 2. Redistributions in binary form must reproduce the above copyright notice,
-   this list of conditions, and the following disclaimer in the documentation
-   and/or materials provided with the distribution.
+   this list of conditions and the following disclaimer in the documentation
+   and/or other materials provided with the distribution.
 
-3. Neither the name of the University of California, Lawrence Berkeley
-National Laboratory, U.S. Dept. of Energy nor the names of its contributors
-may be used to endorse or promote products derived from this software without
-specific prior written permission.
+3. Neither the name of the copyright holder nor the names of its contributors
+   may be used to endorse or promote products derived from this software
+   without specific prior written permission.
 
 THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
 AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
 IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
+ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
 LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
 CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
 SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
 INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
 CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
-ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
-THE POSSIBILITY OF SUCH DAMAGE.
-
-You are under no obligation whatsoever to provide any bug fixes, patches,
-or upgrades to the features, functionality or performance of the source
-code ("Enhancements") to anyone; however, if you choose to make your
-Enhancements available either publicly, or directly to Lawrence Berkeley
-National Laboratory, without imposing a separate written license agreement
-for such Enhancements, then you hereby grant the following license:
-a non-exclusive, royalty-free perpetual license to install, use, modify,
-prepare derivative works, incorporate into other computer software,
-distribute, and sublicense such enhancements or derivative works thereof,
-in binary and source code form.
+ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+POSSIBILITY OF SUCH DAMAGE.
 ```
 
-### NetCDF-C license notice
+### GCC runtime libraries
 
-Source: https://github.com/Unidata/netcdf-c
+Wheels built with GNU Fortran can contain `libgcc`, `libgfortran`, and
+`libquadmath`. The GNU license texts are provided in `COPYING` and
+`COPYING.LESSER`. `libgcc` and `libgfortran` are distributed with the
+following exception.
 
-```
-Copyright 2018 Unidata
-
-Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
-
-1. Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
-
-2. Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or other materials provided with the distribution.
-
-3. Neither the name of the copyright holder nor the names of its contributors may be used to endorse or promote products derived from this software without specific prior written permission.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-```
-
-### GCC license notice
-
-Wheels may include `libgcc`, `libgfortran` and/or `libquadmath` from the GNU Compiler Collection.
-
-Source: https://gcc.gnu.org/git/?p=gcc.git
-
-The mentioned libraries can be found in respective sub-folders under the given source link.
-
-`libquadmath` is released under the LGPL (see link above).
-`libgcc` and `libgfortran` are released under GPL (see link above) with the GCC RUNTIME LIBRARY EXCEPTION:
+Source: https://gcc.gnu.org/
 
 ```
 GCC RUNTIME LIBRARY EXCEPTION
@@ -491,10 +498,10 @@ the license of GCC.
 
 "Target Code" refers to output from any compiler for a real or virtual
 target processor architecture, in executable form or suitable for
-input to an assembler, loader, linker and/or execution
-phase. Notwithstanding that, Target Code does not include data in any
-format that is used as a compiler intermediate representation, or used
-for producing a compiler intermediate representation.
+input to an assembler, loader, linker and/or execution phase.
+Notwithstanding that, Target Code does not include data in any format
+that is used as a compiler intermediate representation, or used for
+producing a compiler intermediate representation.
 
 The "Compilation Process" transforms code entirely represented in
 non-intermediate languages designed for human-written code, and/or in
@@ -526,447 +533,116 @@ presumption that third-party software is unaffected by the copyleft
 requirements of the license of GCC.
 ```
 
-### glibc license notice
+### MinGW-w64 CRT
 
-Wheels may include `libmvec` or other parts from the GNU C Library which is released under the LGPL (see link).
+Windows wheels are built with the MinGW-w64 UCRT64 toolchain.
 
-Source: https://sourceware.org/git/?p=glibc.git
-
-Various files in the GNU C Library distribution have copyright owners other than the Free Software Foundation.
-See the following license.
+Source: https://www.mingw-w64.org/
 
 ```
-This file contains the copying permission notices for various files in the
-GNU C Library distribution that have copyright owners other than the Free
-Software Foundation.  These notices all require that a copy of the notice
-be included in the accompanying documentation and be distributed with
-binary distributions of the code, so be sure to include this file along
-with any binary distributions derived from the GNU C Library.
+Copyright (c) 2009, 2010 by the mingw-w64 project
 
-
-All code incorporated from 4.4 BSD is distributed under the following
-license:
-
-Copyright (C) 1991 Regents of the University of California.
-All rights reserved.
+This license has been certified as open source. It has also been designated
+as GPL compatible by the Free Software Foundation (FSF).
 
 Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions
-are met:
-
-1. Redistributions of source code must retain the above copyright
-   notice, this list of conditions and the following disclaimer.
-2. Redistributions in binary form must reproduce the above copyright
-   notice, this list of conditions and the following disclaimer in the
-   documentation and/or other materials provided with the distribution.
-3. [This condition was removed.]
-4. Neither the name of the University nor the names of its contributors
-   may be used to endorse or promote products derived from this software
-   without specific prior written permission.
-
-THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
-ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
-FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
-OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
-HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
-LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
-OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
-SUCH DAMAGE.
-
-The DNS resolver code, taken from BIND 4.9.5, is copyrighted by UC
-Berkeley, by Digital Equipment Corporation and by Internet Software
-Consortium.  The DEC portions are under the following license:
-
-Portions Copyright (C) 1993 by Digital Equipment Corporation.
-
-Permission to use, copy, modify, and distribute this software for any
-purpose with or without fee is hereby granted, provided that the above
-copyright notice and this permission notice appear in all copies, and
-that the name of Digital Equipment Corporation not be used in
-advertising or publicity pertaining to distribution of the document or
-software without specific, written prior permission.
-
-THE SOFTWARE IS PROVIDED ``AS IS'' AND DIGITAL EQUIPMENT CORP.
-DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE, INCLUDING ALL
-IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS.  IN NO EVENT SHALL
-DIGITAL EQUIPMENT CORPORATION BE LIABLE FOR ANY SPECIAL, DIRECT,
-INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING
-FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT,
-NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION
-WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
-
-The ISC portions are under the following license:
-
-Portions Copyright (c) 1996-1999 by Internet Software Consortium.
-
-Permission to use, copy, modify, and distribute this software for any
-purpose with or without fee is hereby granted, provided that the above
-copyright notice and this permission notice appear in all copies.
-
-THE SOFTWARE IS PROVIDED "AS IS" AND INTERNET SOFTWARE CONSORTIUM DISCLAIMS
-ALL WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES
-OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL INTERNET SOFTWARE
-CONSORTIUM BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL
-DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR
-PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS
-ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS
-SOFTWARE.
-
-The Sun RPC support (from rpcsrc-4.0) is covered by the following
-license:
-
-Copyright (c) 2010, Oracle America, Inc.
-
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are
-met:
-
-    * Redistributions of source code must retain the above copyright
-      notice, this list of conditions and the following disclaimer.
-    * Redistributions in binary form must reproduce the above
-      copyright notice, this list of conditions and the following
-      disclaimer in the documentation and/or other materials
-      provided with the distribution.
-    * Neither the name of the "Oracle America, Inc." nor the names of its
-      contributors may be used to endorse or promote products derived
-      from this software without specific prior written permission.
-
-  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-  FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-  COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
-  INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-  DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE
-  GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
-  INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
-  WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
-  NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
-
-The following CMU license covers some of the support code for Mach,
-derived from Mach 3.0:
-
-Mach Operating System
-Copyright (C) 1991,1990,1989 Carnegie Mellon University
-All Rights Reserved.
-
-Permission to use, copy, modify and distribute this software and its
-documentation is hereby granted, provided that both the copyright
-notice and this permission notice appear in all copies of the
-software, derivative works or modified versions, and any portions
-thereof, and that both notices appear in supporting documentation.
-
-CARNEGIE MELLON ALLOWS FREE USE OF THIS SOFTWARE IN ITS ``AS IS''
-CONDITION.  CARNEGIE MELLON DISCLAIMS ANY LIABILITY OF ANY KIND FOR
-ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
-
-Carnegie Mellon requests users of this software to return to
-
- Software Distribution Coordinator
- School of Computer Science
- Carnegie Mellon University
- Pittsburgh PA 15213-3890
-
-or Software.Distribution@CS.CMU.EDU any improvements or
-extensions that they make and grant Carnegie Mellon the rights to
-redistribute these changes.
-
-The file if_ppp.h is under the following CMU license:
-
- Redistribution and use in source and binary forms, with or without
- modification, are permitted provided that the following conditions
- are met:
- 1. Redistributions of source code must retain the above copyright
-    notice, this list of conditions and the following disclaimer.
- 2. Redistributions in binary form must reproduce the above copyright
-    notice, this list of conditions and the following disclaimer in the
-    documentation and/or other materials provided with the distribution.
- 3. Neither the name of the University nor the names of its contributors
-    may be used to endorse or promote products derived from this software
-    without specific prior written permission.
-
- THIS SOFTWARE IS PROVIDED BY CARNEGIE MELLON UNIVERSITY AND
- CONTRIBUTORS ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES,
- INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
- MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
- IN NO EVENT SHALL THE UNIVERSITY OR CONTRIBUTORS BE LIABLE FOR ANY
- DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE
- GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
- INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER
- IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
- OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
- IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
-The files nss/getnameinfo.c and nss/getaddrinfo.c are copyright (C) by
-Craig Metz and are distributed under the following license:
-
-/* The Inner Net License, Version 2.00
-
-  The author(s) grant permission for redistribution and use in source and
-binary forms, with or without modification, of the software and documentation
-provided that the following conditions are met:
-
-0. If you receive a version of the software that is specifically labelled
-   as not being for redistribution (check the version message and/or README),
-   you are not permitted to redistribute that version of the software in any
-   way or form.
-1. All terms of the all other applicable copyrights and licenses must be
-   followed.
-2. Redistributions of source code must retain the authors' copyright
-   notice(s), this list of conditions, and the following disclaimer.
-3. Redistributions in binary form must reproduce the authors' copyright
-   notice(s), this list of conditions, and the following disclaimer in the
-   documentation and/or other materials provided with the distribution.
-4. [The copyright holder has authorized the removal of this clause.]
-5. Neither the name(s) of the author(s) nor the names of its contributors
-   may be used to endorse or promote products derived from this software
-   without specific prior written permission.
-
-THIS SOFTWARE IS PROVIDED BY ITS AUTHORS AND CONTRIBUTORS ``AS IS'' AND ANY
-EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE AUTHORS OR CONTRIBUTORS BE LIABLE FOR ANY
-DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
-(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
-ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
-  If these license terms cause you a real problem, contact the author.  */
-
-The file sunrpc/des_impl.c is copyright Eric Young:
-
-Copyright (C) 1992 Eric Young
-Collected from libdes and modified for SECURE RPC by Martin Kuck 1994
-This file is distributed under the terms of the GNU Lesser General
-Public License, version 2.1 or later - see the file COPYING.LIB for details.
-If you did not receive a copy of the license with this program, please
-see <https://www.gnu.org/licenses/> to obtain a copy.
-
-The file inet/rcmd.c is under a UCB copyright and the following:
-
-Copyright (C) 1998 WIDE Project.
-All rights reserved.
-
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions
-are met:
-1. Redistributions of source code must retain the above copyright
-   notice, this list of conditions and the following disclaimer.
-2. Redistributions in binary form must reproduce the above copyright
-   notice, this list of conditions and the following disclaimer in the
-   documentation and/or other materials provided with the distribution.
-3. Neither the name of the project nor the names of its contributors
-   may be used to endorse or promote products derived from this software
-   without specific prior written permission.
-
-THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
-ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-ARE DISCLAIMED.  IN NO EVENT SHALL THE PROJECT OR CONTRIBUTORS BE LIABLE
-FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
-OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
-HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
-LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
-OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
-SUCH DAMAGE.
-
-The file posix/runtests.c is copyright Tom Lord:
-
-Copyright 1995 by Tom Lord
-
-                        All Rights Reserved
-
-Permission to use, copy, modify, and distribute this software and its
-documentation for any purpose and without fee is hereby granted,
-provided that the above copyright notice appear in all copies and that
-both that copyright notice and this permission notice appear in
-supporting documentation, and that the name of the copyright holder not be
-used in advertising or publicity pertaining to distribution of the
-software without specific, written prior permission.
-
-Tom Lord DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE,
-INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS, IN NO
-EVENT SHALL TOM LORD BE LIABLE FOR ANY SPECIAL, INDIRECT OR
-CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF
-USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR
-OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
-PERFORMANCE OF THIS SOFTWARE.
-
-The posix/rxspencer tests are copyright Henry Spencer:
-
-Copyright 1992, 1993, 1994, 1997 Henry Spencer.  All rights reserved.
-This software is not subject to any license of the American Telephone
-and Telegraph Company or of the Regents of the University of California.
-
-Permission is granted to anyone to use this software for any purpose on
-any computer system, and to alter it and redistribute it, subject
-to the following restrictions:
-
-1. The author is not responsible for the consequences of use of this
-   software, no matter how awful, even if they arise from flaws in it.
-
-2. The origin of this software must not be misrepresented, either by
-   explicit claim or by omission.  Since few users ever read sources,
-   credits must appear in the documentation.
-
-3. Altered versions must be plainly marked as such, and must not be
-   misrepresented as being the original software.  Since few users
-   ever read sources, credits must appear in the documentation.
-
-4. This notice may not be removed or altered.
-
-The file posix/PCRE.tests is copyright University of Cambridge:
-
-Copyright (c) 1997-2003 University of Cambridge
-
-Permission is granted to anyone to use this software for any purpose on any
-computer system, and to redistribute it freely, subject to the following
-restrictions:
-
-1. This software is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
-
-2. The origin of this software must not be misrepresented, either by
-   explicit claim or by omission. In practice, this means that if you use
-   PCRE in software that you distribute to others, commercially or
-   otherwise, you must put a sentence like this
-
-     Regular expression support is provided by the PCRE library package,
-     which is open source software, written by Philip Hazel, and copyright
-     by the University of Cambridge, England.
-
-   somewhere reasonably visible in your documentation and in any relevant
-   files or online help data or similar. A reference to the ftp site for
-   the source, that is, to
-
-     ftp://ftp.csx.cam.ac.uk/pub/software/programming/pcre/
-
-   should also be given in the documentation. However, this condition is not
-   intended to apply to whole chains of software. If package A includes PCRE,
-   it must acknowledge it, but if package B is software that includes package
-   A, the condition is not imposed on package B (unless it uses PCRE
-   independently).
-
-3. Altered versions must be plainly marked as such, and must not be
-   misrepresented as being the original software.
-
-4. If PCRE is embedded in any software that is released under the GNU
-  General Purpose Licence (GPL), or Lesser General Purpose Licence (LGPL),
-  then the terms of that licence shall supersede any condition above with
-  which it is incompatible.
-
-Files from Sun fdlibm are copyright Sun Microsystems, Inc.:
-
-Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.
-
-Developed at SunPro, a Sun Microsystems, Inc. business.
-Permission to use, copy, modify, and distribute this
-software is freely granted, provided that this notice
-is preserved.
-
-Various long double libm functions are copyright Stephen L. Moshier:
-
-Copyright 2001 by Stephen L. Moshier <moshier@na-net.ornl.gov>
-
- This library is free software; you can redistribute it and/or
- modify it under the terms of the GNU Lesser General Public
- License as published by the Free Software Foundation; either
- version 2.1 of the License, or (at your option) any later version.
-
- This library is distributed in the hope that it will be useful,
- but WITHOUT ANY WARRANTY; without even the implied warranty of
- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- Lesser General Public License for more details.
-
- You should have received a copy of the GNU Lesser General Public
- License along with this library; if not, see
- <https://www.gnu.org/licenses/>.  */
-
-Copyright (c) 1995 IBM Corporation
-
-Permission is hereby granted, free of charge, to any person obtaining
-a copy of this software and associated documentation files (the
-'Software'), to deal in the Software without restriction, including
-without limitation the rights to use, copy, modify, merge, publish,
-distribute, sublicense, and/or sell copies of the Software, and to
-permit persons to whom the Software is furnished to do so, subject to
-the following conditions:
-
-The above copyright notice and this permission notice shall be
-included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED 'AS IS', WITHOUT WARRANTY OF ANY KIND,
-EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
-CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
-SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-
-Various files in sysdeps/ieee754/flt-32, taken from the CORE-MATH project
-<https://core-math.gitlabpages.inria.fr/>, are distributed under the
-following license:
-
-Copyright (c) 2022-2024 Alexei Sibidanov. Paul Zimmermann.
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+modification, are permitted provided that the following conditions are met:
+
+   1. Redistributions in source code must retain the accompanying copyright
+      notice, this list of conditions, and the following disclaimer.
+   2. Redistributions in binary form must reproduce the accompanying
+      copyright notice, this list of conditions, and the following disclaimer
+      in the documentation and/or other materials provided with the
+      distribution.
+   3. Names of the copyright holders must not be used to endorse or promote
+      products derived from this software without prior written permission
+      from the copyright holders.
+   4. The right to distribute this software or to use it for any purpose does
+      not give you the right to use Servicemarks (sm) or Trademarks (tm) of
+      the copyright holders. Use of them is covered by separate agreement
+      with the copyright holders.
+   5. If any files are modified, you must cause the modified files to carry
+      prominent notices stating that you changed the files and the date of
+      any change.
+
+Disclaimer
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS "AS IS" AND ANY EXPRESSED
+OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN
+NO EVENT SHALL THE COPYRIGHT HOLDERS BE LIABLE FOR ANY DIRECT, INDIRECT,
+INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA,
+OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
+EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+Some runtime files carry the following public-domain disclaimer:
+
+This file has no copyright assigned and is placed in the Public Domain.
+This file is a part of the w64 mingw-runtime package.
+
+The w64 mingw-runtime package and its code is distributed in the hope that
+it will be useful but WITHOUT ANY WARRANTY. ALL WARRANTIES, EXPRESSED OR
+IMPLIED ARE HEREBY DISCLAIMED. This includes but is not limited to
+warranties of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+```
+
+### winpthreads
+
+Windows wheels can contain `libwinpthread`, supplied by MinGW-w64.
+
+Source: https://www.mingw-w64.org/
+
+```
+Copyright (c) 2011 mingw-w64 project
+
+Permission is hereby granted, free of charge, to any person obtaining a
+copy of this software and associated documentation files (the "Software"),
+to deal in the Software without restriction, including without limitation
+the rights to use, copy, modify, merge, publish, distribute, sublicense,
+and/or sell copies of the Software, and to permit persons to whom the
+Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
 AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-```
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+DEALINGS IN THE SOFTWARE.
 
-### libaec license notice
+Parts of this library are derived from the Posix Threads library for
+Microsoft Windows:
 
-Wheels may include `libaec`.
-
-Source: https://gitlab.dkrz.de/k202009/libaec
-
-```
-Copyright 2024 Mathis Rosenhauer, Moritz Hanke, Joerg Behrens, Luis Kornblueh
+Copyright (C) 2010 Lockless Inc.
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions
-are met:
+modification, are permitted provided that the following conditions are met:
 
-1. Redistributions of source code must retain the above copyright
-   notice, this list of conditions and the following disclaimer.
+1. Redistributions of source code must retain the above copyright notice,
+   this list of conditions and the following disclaimer.
 2. Redistributions in binary form must reproduce the above copyright
    notice, this list of conditions and the following disclaimer in the
    documentation and/or other materials provided with the distribution.
+3. Neither the name of Lockless Inc. nor the names of its contributors may
+   be used to endorse or promote products derived from this software without
+   specific prior written permission.
 
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+POSSIBILITY OF SUCH DAMAGE.
 ```
