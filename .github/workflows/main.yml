@@ -88,22 +88,15 @@ jobs:
           name: dist-sdist
           path: dist-sdist
 
-      - name: Install pinned R-macOS GNU Fortran 14.2
+      - name: Install R-macOS GNU Fortran 14.2
         if: runner.os == 'macOS'
         shell: bash
-        env:
-          GFORTRAN_ARCHIVE_URL: >-
-            https://github.com/R-macos/gcc-14-branch/releases/download/gcc-14.2-darwin-r2.1/gfortran-14.2-darwin20-r2-universal.tar.xz
-          GFORTRAN_ARCHIVE_SHA256: >-
-            adf14be50fa59e8cdd3d67ee727556e6b7559949101065d8218628c46e896903
         run: |
           set -euo pipefail
-          archive="${RUNNER_TEMP}/gfortran-14.2-darwin20-r2-universal.tar.xz"
-          curl --fail --location --retry 3 \
-            --output "${archive}" "${GFORTRAN_ARCHIVE_URL}"
-          printf '%s  %s\n' "${GFORTRAN_ARCHIVE_SHA256}" "${archive}" \
-            | shasum -a 256 --check
-          sudo tar -xJf "${archive}" -C /
+          archive="$RUNNER_TEMP/gfortran.tar.xz"
+          curl -fsSL --retry 3 -o "$archive" https://github.com/R-macos/gcc-14-branch/releases/download/gcc-14.2-darwin-r2.1/gfortran-14.2-darwin20-r2-universal.tar.xz
+          echo "adf14be50fa59e8cdd3d67ee727556e6b7559949101065d8218628c46e896903  $archive" | shasum -a 256 -c -
+          sudo tar -xJf "$archive" -C /
           sudo ln -sfn "$(xcrun --sdk macosx --show-sdk-path)" /opt/gfortran/SDK
           /opt/gfortran/bin/gfortran --version
 
