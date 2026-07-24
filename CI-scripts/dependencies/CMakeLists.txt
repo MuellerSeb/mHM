@@ -33,6 +33,11 @@ set(_external_project_args
   TEST_COMMAND ""
 )
 
+if(MINGW)
+  # Work around https://github.com/HDFGroup/hdf5/issues/5885.
+  set(_hdf5_c_flags "-DCMAKE_C_FLAGS:STRING=-D_GNU_SOURCE")
+endif()
+
 ExternalProject_Add(zlib
   URL
     "https://zlib.net/fossils/zlib-1.3.2.tar.gz"
@@ -77,6 +82,7 @@ ExternalProject_Add(hdf5
     "-DHDF5_ENABLE_HDFS:BOOL=OFF"
     "-DHDF5_ENABLE_ROS3_VFD:BOOL=OFF"
     "-DHDF5_USE_ZLIB_STATIC:BOOL=OFF"
+    ${_hdf5_c_flags}
 )
 
 ExternalProject_Add(netcdf

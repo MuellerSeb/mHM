@@ -160,7 +160,7 @@ test-sources = ["pybind/tests/", "test_domain/"]
 manylinux-x86_64-image = "manylinux_2_28"
 manylinux-aarch64-image = "manylinux_2_28"
 before-all = [
-    "cmake -S \"{package}/CI-scripts/dependencies\" -B /tmp/mhm-dependencies-build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/opt/mhm-dependencies",
+    "cmake -S \"{package}/CI-scripts/dependencies\" -B /tmp/mhm-dependencies-build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/opt/mhm-dependencies",
     "cmake --build /tmp/mhm-dependencies-build --parallel",
 ]
 environment = { CC="gcc", CXX="g++", FC="gfortran", F77="gfortran", CMAKE_PREFIX_PATH="/opt/mhm-dependencies", CMAKE_ARGS="-DCMAKE_PREFIX_PATH=/opt/mhm-dependencies", HDF5_ROOT="/opt/mhm-dependencies", NetCDF_ROOT="/opt/mhm-dependencies", ZLIB_ROOT="/opt/mhm-dependencies", PKG_CONFIG_PATH="/opt/mhm-dependencies/lib/pkgconfig", LD_LIBRARY_PATH="/opt/mhm-dependencies/lib", PATH="/opt/mhm-dependencies/bin:${PATH}" }
