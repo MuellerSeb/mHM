@@ -90,6 +90,12 @@ jobs:
           name: dist-sdist
           path: dist-sdist
 
+      - name: Extract sdist for wheel build
+        shell: bash
+        run: |
+          mkdir sdist-package
+          tar -xzf "dist-sdist/${{ needs.build_sdist.outputs.sdist_filename }}" --strip-components=1 -C sdist-package
+
       - name: Install R-macOS GNU Fortran 14.2
         if: runner.os == 'macOS'
         shell: bash
@@ -130,7 +136,7 @@ jobs:
           CIBW_ARCHS: ${{ matrix.cfg.arch }}
           MHM_MSYS2_ROOT: ${{ steps.msys2.outputs.msys2-location }}
         with:
-          package-dir: dist-sdist/${{ needs.build_sdist.outputs.sdist_filename }}
+          package-dir: sdist-package
           config-file: "{package}/pyproject.toml"
           output-dir: dist-wheel-${{ matrix.cfg.id }}
 
