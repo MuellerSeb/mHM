@@ -83,7 +83,6 @@ BUILD_MHM_PYBIND = "ON"
 include = [
     "pybind/src/mhm/_version.py",
     "CI-scripts/dependencies/CMakeLists.txt",
-    "test_domain/**",
     "forces/cmake/*.cmake",
     "forces/include",
     "forces/src/*.fypp",
