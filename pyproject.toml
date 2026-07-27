@@ -144,9 +144,10 @@ show_missing = true
 [tool.cibuildwheel]
 # verbose output for debugging purpose
 build-verbosity = 1
-# Six CPython versions across the five CI platform/architecture jobs.
+# Six CPython versions across the established platform/architecture jobs.
+# Windows ARM64 starts at CPython 3.11, where NumPy ARM64 wheels are available.
 build = ["cp39-*", "cp310-*", "cp311-*", "cp312-*", "cp313-*", "cp314-*"]
-skip = ["*-musllinux_*"]
+skip = ["*-musllinux_*", "cp39-win_arm64", "cp310-win_arm64"]
 test-extras = "test"
 test-command = "mhm -h && mhm-download -h && mhm test_domain && python -m pytest pybind/tests/"
 test-sources = ["pybind/tests/", "test_domain/"]
@@ -202,4 +203,17 @@ environment.HDF5_ROOT = "$MHM_DEPS_PREFIX"
 environment.NetCDF_ROOT = "$MHM_DEPS_PREFIX"
 environment.ZLIB_ROOT = "$MHM_DEPS_PREFIX"
 environment.PKG_CONFIG_PATH = "$MHM_DEPS_PREFIX/lib/pkgconfig"
+
+[[tool.cibuildwheel.overrides]]
+select = "*-win_amd64"
+inherit.environment = "append"
+environment.MSYSTEM = "UCRT64"
 environment.PATH = "$MHM_DEPS_PREFIX/bin;$MHM_MSYS2_ROOT/ucrt64/bin;$MHM_BASE_PATH"
+
+[[tool.cibuildwheel.overrides]]
+select = "*-win_arm64"
+inherit.environment = "append"
+environment.CC = "cl"
+environment.FC = "flang-new"
+environment.FFLAGS = "-mmlir -fdynamic-heap-array -mmlir -fstack-array-size=0"
+environment.PATH = "$MHM_DEPS_PREFIX/bin;$MHM_BASE_PATH"
