@@ -82,7 +82,6 @@ BUILD_MHM_PYBIND = "ON"
 [tool.scikit-build.sdist]
 include = [
     "pybind/src/mhm/_version.py",
-    "CI-scripts/dependencies/CMakeLists.txt",
     "forces/cmake/*.cmake",
     "forces/include",
     "forces/src/*.fypp",
@@ -103,9 +102,6 @@ exclude = [
     "test_domain**",
     ".git*",
     ".zenodo.json",
-    "**/__pycache__/**",
-    "**/*.pyc",
-    "**/*.pyo",
     "*.nml",
     "src/tests",
     "cmake/.gitrepo",
@@ -162,14 +158,14 @@ before-all = [
     "cmake -S \"{package}/CI-scripts/dependencies\" -B /tmp/mhm-dependencies-build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/opt/mhm-dependencies",
     "cmake --build /tmp/mhm-dependencies-build --parallel",
 ]
-environment = { CC="gcc", CXX="g++", FC="gfortran", F77="gfortran", CMAKE_PREFIX_PATH="/opt/mhm-dependencies", CMAKE_ARGS="-DCMAKE_PREFIX_PATH=/opt/mhm-dependencies", HDF5_ROOT="/opt/mhm-dependencies", NetCDF_ROOT="/opt/mhm-dependencies", ZLIB_ROOT="/opt/mhm-dependencies", PKG_CONFIG_PATH="/opt/mhm-dependencies/lib/pkgconfig", LD_LIBRARY_PATH="/opt/mhm-dependencies/lib", PATH="/opt/mhm-dependencies/bin:${PATH}" }
+environment = { CC="gcc", CXX="g++", FC="gfortran", F77="gfortran", CPM_SOURCE_CACHE="/tmp/mhm-cpm-cache", CMAKE_PREFIX_PATH="/opt/mhm-dependencies", CMAKE_ARGS="-DCMAKE_PREFIX_PATH=/opt/mhm-dependencies", HDF5_ROOT="/opt/mhm-dependencies", NetCDF_ROOT="/opt/mhm-dependencies", ZLIB_ROOT="/opt/mhm-dependencies", PKG_CONFIG_PATH="/opt/mhm-dependencies/lib/pkgconfig", LD_LIBRARY_PATH="/opt/mhm-dependencies/lib", PATH="/opt/mhm-dependencies/bin:${PATH}" }
 
 [tool.cibuildwheel.macos]
 before-all = [
     "cmake -S \"{package}/CI-scripts/dependencies\" -B /tmp/mhm-dependencies-build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/tmp/mhm-dependencies -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0",
     "cmake --build /tmp/mhm-dependencies-build --parallel",
 ]
-environment = { CC="clang", CXX="clang++", FC="/opt/gfortran/bin/gfortran", F77="/opt/gfortran/bin/gfortran", MACOSX_DEPLOYMENT_TARGET="11.0", CMAKE_OSX_DEPLOYMENT_TARGET="11.0", CMAKE_PREFIX_PATH="/tmp/mhm-dependencies", CMAKE_ARGS="-DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 -DCMAKE_PREFIX_PATH=/tmp/mhm-dependencies", HDF5_ROOT="/tmp/mhm-dependencies", NetCDF_ROOT="/tmp/mhm-dependencies", ZLIB_ROOT="/tmp/mhm-dependencies", PKG_CONFIG_PATH="/tmp/mhm-dependencies/lib/pkgconfig", DYLD_FALLBACK_LIBRARY_PATH="/tmp/mhm-dependencies/lib:/opt/gfortran/lib:/opt/gfortran/lib/gcc/current", PATH="/tmp/mhm-dependencies/bin:${PATH}" }
+environment = { CC="clang", CXX="clang++", FC="/opt/gfortran/bin/gfortran", F77="/opt/gfortran/bin/gfortran", CPM_SOURCE_CACHE="/tmp/mhm-cpm-cache", MACOSX_DEPLOYMENT_TARGET="11.0", CMAKE_OSX_DEPLOYMENT_TARGET="11.0", CMAKE_PREFIX_PATH="/tmp/mhm-dependencies", CMAKE_ARGS="-DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 -DCMAKE_PREFIX_PATH=/tmp/mhm-dependencies", HDF5_ROOT="/tmp/mhm-dependencies", NetCDF_ROOT="/tmp/mhm-dependencies", ZLIB_ROOT="/tmp/mhm-dependencies", PKG_CONFIG_PATH="/tmp/mhm-dependencies/lib/pkgconfig", DYLD_FALLBACK_LIBRARY_PATH="/tmp/mhm-dependencies/lib:/opt/gfortran/lib:/opt/gfortran/lib/gcc/current", PATH="/tmp/mhm-dependencies/bin:${PATH}" }
 
 [tool.cibuildwheel.windows]
 environment-pass = ["MHM_MSYS2_ROOT"]
@@ -177,4 +173,4 @@ before-all = [
     "cmake -S \"{package}/CI-scripts/dependencies\" -B C:/mhm-dependencies-build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=C:/mhm-dependencies",
     "cmake --build C:/mhm-dependencies-build --parallel",
 ]
-environment = { MSYSTEM="UCRT64", CC="gcc", CXX="g++", FC="gfortran", F77="gfortran", CMAKE_PREFIX_PATH="C:/mhm-dependencies", CMAKE_ARGS="-DCMAKE_PREFIX_PATH=C:/mhm-dependencies", HDF5_ROOT="C:/mhm-dependencies", NetCDF_ROOT="C:/mhm-dependencies", ZLIB_ROOT="C:/mhm-dependencies", PKG_CONFIG_PATH="C:/mhm-dependencies/lib/pkgconfig", PATH="C:/mhm-dependencies/bin;${MHM_MSYS2_ROOT}/ucrt64/bin;${PATH}" }
+environment = { MSYSTEM="UCRT64", CC="gcc", CXX="g++", FC="gfortran", F77="gfortran", CPM_SOURCE_CACHE="C:/mhm-cpm-cache", CMAKE_PREFIX_PATH="C:/mhm-dependencies", CMAKE_ARGS="-DCMAKE_PREFIX_PATH=C:/mhm-dependencies", HDF5_ROOT="C:/mhm-dependencies", NetCDF_ROOT="C:/mhm-dependencies", ZLIB_ROOT="C:/mhm-dependencies", PKG_CONFIG_PATH="C:/mhm-dependencies/lib/pkgconfig", PATH="C:/mhm-dependencies/bin;${MHM_MSYS2_ROOT}/ucrt64/bin;${PATH}" }

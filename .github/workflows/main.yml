@@ -38,7 +38,6 @@ jobs:
 
   build_wheels:
     name: wheels / ${{ matrix.cfg.id }}
-    needs: build_sdist
     runs-on: ${{ matrix.cfg.os }}
     strategy:
       fail-fast: false
@@ -52,21 +51,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-
-      - uses: actions/download-artifact@v4
         with:
-          name: dist-sdist
-          path: dist-sdist
-
-      - name: Extract sdist for wheel build
-        id: extract_sdist
-        shell: bash
-        run: |
-          sdists=(dist-sdist/*.tar.gz)
-          filename="${sdists[0]##*/}"
-          mkdir sdist-package
-          tar -xzf "${sdists[0]}" -C sdist-package
-          echo "package_dir=sdist-package/${filename%.tar.gz}" >> "$GITHUB_OUTPUT"
+          fetch-depth: "0"
 
       - name: Install R-macOS GNU Fortran 14.2
         if: runner.os == 'macOS'
@@ -108,8 +94,6 @@ jobs:
           CIBW_ARCHS: ${{ matrix.cfg.arch }}
           MHM_MSYS2_ROOT: ${{ steps.msys2.outputs.msys2-location }}
         with:
-          package-dir: ${{ steps.extract_sdist.outputs.package_dir }}
-          config-file: "{package}/pyproject.toml"
           output-dir: dist-wheel-${{ matrix.cfg.id }}
 
       - uses: actions/upload-artifact@v4
