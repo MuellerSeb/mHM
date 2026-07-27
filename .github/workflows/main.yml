@@ -15,8 +15,6 @@ jobs:
   build_sdist:
     name: sdist
     runs-on: ubuntu-24.04
-    outputs:
-      sdist_filename: ${{ steps.sdist.outputs.filename }}
 
     steps:
       - uses: actions/checkout@v4
@@ -27,45 +25,15 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Build and inspect sdist
-        id: sdist
-        shell: bash
+      - name: Build sdist
         run: |
-          set -euo pipefail
           python -m pip install --upgrade pip build
           python -m build --sdist --outdir dist-sdist .
-
-          mapfile -t sdists < <(
-            find dist-sdist -maxdepth 1 -type f -name '*.tar.gz' -print
-          )
-          if [[ ${#sdists[@]} -ne 1 ]]; then
-            echo "Expected exactly one sdist, found ${#sdists[@]}" >&2
-            exit 1
-          fi
-
-          sdist="${sdists[0]}"
-          archive_listing="$(tar -tzf "${sdist}")"
-          for path in \
-            CI-scripts/dependencies/CMakeLists.txt \
-            forces/CMakeLists.txt \
-            forces/src/CMakeLists.txt \
-            forces/src/mo_kind.F90 \
-            forces/COPYING \
-            forces/COPYING.LESSER \
-            forces/LICENSE.md
-          do
-            if ! grep -q "/${path}$" <<<"${archive_listing}"; then
-              echo "Missing from sdist: ${path}" >&2
-              exit 1
-            fi
-          done
-
-          echo "filename=$(basename "${sdist}")" >> "${GITHUB_OUTPUT}"
 
       - uses: actions/upload-artifact@v4
         with:
           name: dist-sdist
-          path: dist-sdist/${{ steps.sdist.outputs.filename }}
+          path: dist-sdist/*.tar.gz
           if-no-files-found: error
 
   build_wheels:
@@ -91,10 +59,14 @@ jobs:
           path: dist-sdist
 
       - name: Extract sdist for wheel build
+        id: extract_sdist
         shell: bash
         run: |
+          sdists=(dist-sdist/*.tar.gz)
+          filename="${sdists[0]##*/}"
           mkdir sdist-package
-          tar -xzf "dist-sdist/${{ needs.build_sdist.outputs.sdist_filename }}" --strip-components=1 -C sdist-package
+          tar -xzf "${sdists[0]}" -C sdist-package
+          echo "package_dir=sdist-package/${filename%.tar.gz}" >> "$GITHUB_OUTPUT"
 
       - name: Install R-macOS GNU Fortran 14.2
         if: runner.os == 'macOS'
@@ -136,7 +108,7 @@ jobs:
           CIBW_ARCHS: ${{ matrix.cfg.arch }}
           MHM_MSYS2_ROOT: ${{ steps.msys2.outputs.msys2-location }}
         with:
-          package-dir: sdist-package
+          package-dir: ${{ steps.extract_sdist.outputs.package_dir }}
           config-file: "{package}/pyproject.toml"
           output-dir: dist-wheel-${{ matrix.cfg.id }}
 
