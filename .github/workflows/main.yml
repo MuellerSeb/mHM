@@ -47,8 +47,24 @@ jobs:
           - { id: linux-aarch64, os: ubuntu-24.04-arm, arch: aarch64 }
           - { id: macos-arm64, os: macos-15, arch: arm64 }
           - { id: macos-x86_64, os: macos-15-intel, arch: x86_64 }
-          - { id: windows-AMD64, os: windows-2025, arch: AMD64, toolchain: ucrt64 }
-          - { id: windows-ARM64-flang, os: windows-11-arm, arch: ARM64, toolchain: flang }
+          - id: windows-AMD64
+            os: windows-2025
+            arch: AMD64
+            msystem: UCRT64
+            msys_prefix: mingw-w64-ucrt-x86_64
+            cc: gcc
+            fc: gfortran
+            c_package: gcc
+            fc_package: gcc-fortran
+          - id: windows-ARM64-flang
+            os: windows-11-arm
+            arch: ARM64
+            msystem: CLANGARM64
+            msys_prefix: mingw-w64-clang-aarch64
+            cc: clang
+            fc: flang-new
+            c_package: clang
+            fc_package: flang
 
     steps:
       - uses: actions/checkout@v4
@@ -67,41 +83,26 @@ jobs:
           sudo ln -sfn "$(xcrun --sdk macosx --show-sdk-path)" /opt/gfortran/SDK
           /opt/gfortran/bin/gfortran --version
 
-      - name: Set up MSYS2 UCRT64
-        if: matrix.cfg.toolchain == 'ucrt64'
+      - name: Set up MSYS2 ${{ matrix.cfg.msystem }}
+        if: runner.os == 'Windows'
         id: msys2
         uses: msys2/setup-msys2@v2
         with:
-          msystem: UCRT64
+          msystem: ${{ matrix.cfg.msystem }}
           update: true
           install: >-
-            mingw-w64-ucrt-x86_64-gcc
-            mingw-w64-ucrt-x86_64-gcc-fortran
-            mingw-w64-ucrt-x86_64-cmake
-            mingw-w64-ucrt-x86_64-ninja
-            mingw-w64-ucrt-x86_64-pkgconf
+            ${{ matrix.cfg.msys_prefix }}-${{ matrix.cfg.c_package }}
+            ${{ matrix.cfg.msys_prefix }}-${{ matrix.cfg.fc_package }}
+            ${{ matrix.cfg.msys_prefix }}-cmake
+            ${{ matrix.cfg.msys_prefix }}-ninja
+            ${{ matrix.cfg.msys_prefix }}-pkgconf
 
-      - name: Log UCRT64 toolchain
-        if: matrix.cfg.toolchain == 'ucrt64'
+      - name: Log MSYS2 toolchain
+        if: runner.os == 'Windows'
         shell: msys2 {0}
         run: |
-          gcc --version
-          gfortran --version
-          cmake --version
-          ninja --version
-
-      - name: Set up ARM64 MSVC environment
-        if: matrix.cfg.toolchain == 'flang'
-        uses: ilammy/msvc-dev-cmd@v1
-        with:
-          arch: amd64_arm64
-
-      - name: Log native ARM64 Flang toolchain
-        if: matrix.cfg.toolchain == 'flang'
-        shell: pwsh
-        run: |
-          cl
-          flang-new --version
+          ${{ matrix.cfg.cc }} --version
+          ${{ matrix.cfg.fc }} --version
           cmake --version
           ninja --version
 
