@@ -37,34 +37,18 @@ jobs:
           if-no-files-found: error
 
   build_wheels:
-    name: wheels / ${{ matrix.cfg.id }}
-    runs-on: ${{ matrix.cfg.os }}
+    name: wheels / ${{ matrix.id }}
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        cfg:
+        include:
           - { id: linux-x86_64, os: ubuntu-24.04, arch: x86_64 }
           - { id: linux-aarch64, os: ubuntu-24.04-arm, arch: aarch64 }
           - { id: macos-arm64, os: macos-15, arch: arm64 }
           - { id: macos-x86_64, os: macos-15-intel, arch: x86_64 }
-          - id: windows-AMD64
-            os: windows-2025
-            arch: AMD64
-            msystem: UCRT64
-            msys_prefix: mingw-w64-ucrt-x86_64
-            cc: gcc
-            fc: gfortran
-            c_package: gcc
-            fc_package: gcc-fortran
-          - id: windows-ARM64-flang
-            os: windows-11-arm
-            arch: ARM64
-            msystem: CLANGARM64
-            msys_prefix: mingw-w64-clang-aarch64
-            cc: clang
-            fc: flang-new
-            c_package: clang
-            fc_package: flang
+          - { id: windows-AMD64, os: windows-2025, arch: AMD64, msystem: UCRT64, compilers: "gcc:p gcc-fortran:p" }
+          - { id: windows-ARM64-flang, os: windows-11-arm, arch: ARM64, msystem: CLANGARM64, compilers: "clang:p flang:p" }
 
     steps:
       - uses: actions/checkout@v4
@@ -83,40 +67,30 @@ jobs:
           sudo ln -sfn "$(xcrun --sdk macosx --show-sdk-path)" /opt/gfortran/SDK
           /opt/gfortran/bin/gfortran --version
 
-      - name: Set up MSYS2 ${{ matrix.cfg.msystem }}
+      - name: Set up MSYS2 ${{ matrix.msystem }}
         if: runner.os == 'Windows'
         id: msys2
         uses: msys2/setup-msys2@v2
         with:
-          msystem: ${{ matrix.cfg.msystem }}
+          msystem: ${{ matrix.msystem }}
           update: true
-          install: >-
-            ${{ matrix.cfg.msys_prefix }}-${{ matrix.cfg.c_package }}
-            ${{ matrix.cfg.msys_prefix }}-${{ matrix.cfg.fc_package }}
-            ${{ matrix.cfg.msys_prefix }}-cmake
-            ${{ matrix.cfg.msys_prefix }}-ninja
-            ${{ matrix.cfg.msys_prefix }}-pkgconf
-
-      - name: Log MSYS2 toolchain
-        if: runner.os == 'Windows'
-        shell: msys2 {0}
-        run: |
-          ${{ matrix.cfg.cc }} --version
-          ${{ matrix.cfg.fc }} --version
-          cmake --version
-          ninja --version
+          pacboy: >-
+            ${{ matrix.compilers }}
+            cmake:p
+            ninja:p
+            pkgconf:p
 
       - uses: pypa/cibuildwheel@v4.1.0
         env:
-          CIBW_ARCHS: ${{ matrix.cfg.arch }}
+          CIBW_ARCHS: ${{ matrix.arch }}
           MHM_MSYS2_ROOT: ${{ steps.msys2.outputs.msys2-location }}
         with:
-          output-dir: dist-wheel-${{ matrix.cfg.id }}
+          output-dir: dist-wheel-${{ matrix.id }}
 
       - uses: actions/upload-artifact@v4
         with:
-          name: dist-wheel-${{ matrix.cfg.id }}
-          path: dist-wheel-${{ matrix.cfg.id }}/*.whl
+          name: dist-wheel-${{ matrix.id }}
+          path: dist-wheel-${{ matrix.id }}/*.whl
           if-no-files-found: error
 
   upload_to_pypi:

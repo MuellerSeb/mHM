@@ -213,7 +213,7 @@ environment.PATH = "$MHM_DEPS_PREFIX/bin;$MHM_MSYS2_ROOT/ucrt64/bin;$MHM_BASE_PA
 select = "*-win_arm64"
 inherit.environment = "append"
 environment.CC = "clang"
-environment.FC = "flang-new"
+environment.FC = "flang"
 environment.FFLAGS = "-mmlir -fdynamic-heap-array -mmlir -fstack-array-size=0"
 environment.MSYSTEM = "CLANGARM64"
 environment.PATH = "$MHM_DEPS_PREFIX/bin;$MHM_MSYS2_ROOT/clangarm64/bin;$MHM_BASE_PATH"
