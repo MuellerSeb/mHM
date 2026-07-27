@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.26)
 
-project(mhm_wheel_dependencies LANGUAGES C CXX)
+project(mhm_wheel_dependencies LANGUAGES C)
 
 include(ExternalProject)
 
@@ -13,7 +13,6 @@ set(_common_args
   "-DCMAKE_INSTALL_PREFIX:PATH=${CMAKE_INSTALL_PREFIX}"
   "-DCMAKE_POSITION_INDEPENDENT_CODE:BOOL=ON"
   "-DCMAKE_C_COMPILER:FILEPATH=${CMAKE_C_COMPILER}"
-  "-DCMAKE_CXX_COMPILER:FILEPATH=${CMAKE_CXX_COMPILER}"
   "-DCMAKE_INSTALL_LIBDIR:STRING=lib"
 )
 
